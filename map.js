@@ -27,14 +27,19 @@ window.MapModule = (function () {
   let markersLayer = null;
   let mapLinksLayer = null;
   const mapMarkers = new Map(); // id -> marker
-  // Leaflet renders EPSG:3857. The regional Indo-Pacific JPG is visually useful, but
-  // using it directly as a lat/lon rectangle makes the coastlines drift by latitude.
-  // This generated asset is warped from the bundled equirectangular Blue Marble image
-  // into a true full-world Web Mercator square, so markers and coastlines share one CRS.
+  // Leaflet renders EPSG:3857. Keep a generated full-world Web Mercator Blue Marble
+  // underneath the operational theater so panning never falls back to a dead grid, then
+  // drape the PO-provided Indo-Pacific satellite image over a tight regional envelope.
   const WEB_MERCATOR_MAX_LAT = 85.05112878;
-  const SATELLITE_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, -180], [WEB_MERCATOR_MAX_LAT, 180]];
-  const SATELLITE_BASEMAP = 'assets/earth-blue-marble-webmercator-2048.jpg';
-  let satelliteBasemapLoaded = false;
+  const GLOBAL_SATELLITE_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, -180], [WEB_MERCATOR_MAX_LAT, 180]];
+  const GLOBAL_SATELLITE_BASEMAP = 'assets/earth-blue-marble-webmercator-2048.jpg';
+  // The square source image covers mainland China through Japan, the Philippines,
+  // Indonesia, and Papua New Guinea. These bounds intentionally hug visible coastlines
+  // so force-network nodes sit on recognizable terrain instead of an abstract grid.
+  const THEATER_SATELLITE_BOUNDS = [[-13.5, 57.5], [62.5, 173.5]];
+  const THEATER_SATELLITE_BASEMAP = 'assets/earth-blue-marble-indopac-3072.jpg';
+  let globalSatelliteLoaded = false;
+  let theaterSatelliteLoaded = false;
 
   // --- Injected context (overridden by init); safe defaults so nothing throws ---
   let ctx = {
@@ -42,6 +47,7 @@ window.MapModule = (function () {
     getHighlightMode: () => null,
     getHighlightSet: () => new Set(),
     isMapMode: () => false,
+    enableLocalTiles: false,
     tileBasePath: './tiles',
     blankTileDataUrl: ''
   };
@@ -101,9 +107,11 @@ window.MapModule = (function () {
     };
     const refreshBasemapStatus = () => {
       if (realTilesLoaded) {
-        setBasemapStatus(satelliteBasemapLoaded ? 'Basemap: local tiles + satellite' : 'Basemap: local tiles', 'ok');
-      } else if (satelliteBasemapLoaded) {
-        setBasemapStatus(coastlinesLoaded ? 'Basemap: satellite + coastlines' : 'Basemap: satellite', 'ok');
+        setBasemapStatus(theaterSatelliteLoaded ? 'Basemap: local tiles + theater satellite' : 'Basemap: local tiles', 'ok');
+      } else if (theaterSatelliteLoaded) {
+        setBasemapStatus(coastlinesLoaded ? 'Basemap: theater satellite + coastlines' : 'Basemap: theater satellite', 'ok');
+      } else if (globalSatelliteLoaded) {
+        setBasemapStatus(coastlinesLoaded ? 'Basemap: global satellite + coastlines' : 'Basemap: global satellite', 'ok');
       } else if (coastlinesLoaded) {
         setBasemapStatus('Basemap: coastlines (offline)', 'ok');
       } else {
@@ -111,18 +119,20 @@ window.MapModule = (function () {
       }
     };
 
-    // Offline satellite basemap behind coastlines so markers and links remain visible.
-    const addSatelliteBasemap = () => {
+    // Offline satellite basemaps behind coastlines so markers and links remain visible.
+    const addImageBasemap = (url, bounds, opts = {}) => {
       try {
-        fetch(SATELLITE_BASEMAP, { method: 'HEAD', cache: 'force-cache' })
+        fetch(url, { method: 'HEAD', cache: 'force-cache' })
           .then(r => {
             if (!(r && r.ok) || !leafletMap) return;
-            satelliteBasemapLoaded = true;
-            L.imageOverlay(SATELLITE_BASEMAP, SATELLITE_BOUNDS, {
+            L.imageOverlay(url, bounds, {
               pane: 'basemapPane',
               interactive: false,
-              opacity: 1
+              opacity: opts.opacity ?? 1,
+              className: opts.className || ''
             }).addTo(leafletMap);
+            if (opts.kind === 'theater') theaterSatelliteLoaded = true;
+            if (opts.kind === 'global') globalSatelliteLoaded = true;
             refreshBasemapStatus();
           })
           .catch(() => {});
@@ -130,7 +140,16 @@ window.MapModule = (function () {
         // No-op: offline fallback stack remains in place.
       }
     };
-    addSatelliteBasemap();
+    addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, {
+      kind: 'global',
+      opacity: 0.62,
+      className: 'global-satellite-overlay'
+    });
+    addImageBasemap(THEATER_SATELLITE_BASEMAP, THEATER_SATELLITE_BOUNDS, {
+      kind: 'theater',
+      opacity: 0.98,
+      className: 'theater-satellite-overlay'
+    });
 
     // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
     // top of the blank grid so the operator sees actual geography (China coast, Japan,
@@ -191,11 +210,15 @@ window.MapModule = (function () {
     // If no raster tiles, the offline coastline basemap is still shown, so only fall back
     // to the bare-grid message when even that hasn't loaded.
     const noTiles = () => { refreshBasemapStatus(); };
-    try {
-      fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
-        .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
-        .catch(noTiles);
-    } catch (err) {
+    if (ctx.enableLocalTiles && ctx.tileBasePath) {
+      try {
+        fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
+          .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
+          .catch(noTiles);
+      } catch (err) {
+        noTiles();
+      }
+    } else {
       noTiles();
     }
 

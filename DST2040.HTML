@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MDSC 3D Network Visualizer 3.0 - Enhanced</title>
+  <link rel="icon" href="data:,">
 
   <!-- Leaflet (Map) -->
   <link
@@ -280,6 +281,13 @@
     display: none;
     z-index: 1;
     background: #020814;
+    }
+    #map .global-satellite-overlay {
+      filter: saturate(1.12) contrast(1.08) brightness(0.72);
+    }
+    #map .theater-satellite-overlay {
+      filter: saturate(1.18) contrast(1.14) brightness(0.86);
+      mix-blend-mode: screen;
     }
 
     /* Org Chart Surface (hidden by default) */
@@ -1471,6 +1479,19 @@
   </div>
 
   <!-- Scripts -->
+  <script>
+    // The bundled 3d-force-graph build ships its own Three.js internals and emits this
+    // exact warning even when the app intentionally provides window.THREE for engine.js.
+    // Keep the operator console clean without muting real application warnings.
+    (() => {
+      const warn = console.warn.bind(console);
+      console.warn = (...args) => {
+        if (args[0] === 'WARNING: Multiple instances of Three.js being imported.') return;
+        warn(...args);
+      };
+    })();
+  </script>
+
   <!-- three.js must load first so window.THREE exists for OrbitControls (which attaches
        THREE.OrbitControls) and for the standalone WebGLRenderer / minimap that the app
        builds directly against the global THREE. -->
@@ -1485,7 +1506,10 @@
 
     // Offline / IL5-IL6 hardening: block remote fetches and use local assets only.
     const OFFLINE_MODE = true;
-    const TILE_BASE_PATH = './tiles'; // place {z}/{x}/{y}.png tiles here for the Leaflet map
+    const ENABLE_LOCAL_TILES = new URLSearchParams(window.location.search).get('tiles') === '1';
+    // Optional local tile pyramid. Disabled unless launched with ?tiles=1 so a fresh
+    // checkout does not probe missing files and dirty the operator console.
+    const TILE_BASE_PATH = './tiles'; // place {z}/{x}/{y}.png tiles here when enabled
     const BLANK_TILE_DATAURL = (() => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 256;
@@ -3170,6 +3194,7 @@
         getHighlightMode: () => highlightMode,
         getHighlightSet: () => highlightSet,
         isMapMode: () => mapModeEnabled,
+        enableLocalTiles: ENABLE_LOCAL_TILES,
         tileBasePath: TILE_BASE_PATH,
         blankTileDataUrl: BLANK_TILE_DATAURL
       });
@@ -3236,6 +3261,9 @@
     let mcLastResults = null;
     let mcRunInProgress = false;
     let mcCancelRequested = false;
+    let mcWorker = null;
+    let mcWorkerRunId = 0;
+    let mcWorkerActiveRunId = null;
     let goalPlanCache = null;
     let goalPlanStats = null;
 
@@ -3338,6 +3366,8 @@
       let stepsToGoal = null;
       let blueBudget = blueBudgetBase;
       let redBudget = redBudgetBase;
+      let blueSpent = 0;
+      let redSpent = 0;
       let blueTypeBudget = JSON.parse(JSON.stringify(blueTypeBase));
       let redTypeBudget  = JSON.parse(JSON.stringify(redTypeBase));
       const redNeutralized = new Set();
@@ -3455,10 +3485,12 @@
         }
         if (blueTypeBudget[blueCat] !== undefined) blueTypeBudget[blueCat] -= blueCost;
         else blueBudget -= blueCost;
+        blueSpent += blueCost;
 
         if (redActive) {
           if (redTypeBudget?.[redChoice.cat] !== undefined) redTypeBudget[redChoice.cat] -= redChoice.cost;
           else redBudget -= redChoice.cost;
+          redSpent += redChoice.cost;
         }
 
         const success = rng.next() < p;
@@ -3518,8 +3550,8 @@
         impact,
         redNeutralized,
         blueNeutralized,
-        blueSpend: blueBudgetBase - blueBudget,
-        redSpend: redBudgetBase - redBudget,
+        blueSpend: blueSpent,
+        redSpend: redSpent,
         damageThisRun,
         log
       };
@@ -4099,9 +4131,76 @@
       btn.classList.remove('warn');
     }
 
+    function clonePlain(obj) {
+      return JSON.parse(JSON.stringify(obj || {}));
+    }
+
+    function serializeSimContextForWorker(context) {
+      return {
+        nodes: Array.from(context.nodeInfo.values()),
+        adjacency: Array.from(context.adj.entries()).map(([id, set]) => [id, Array.from(set)])
+      };
+    }
+
+    function canUseMonteCarloWorker() {
+      return typeof Worker === 'function' && window.location.protocol !== 'file:';
+    }
+
+    function clearMonteCarloWorker() {
+      if (mcWorker) {
+        try { mcWorker.terminate(); } catch (e) {}
+      }
+      mcWorker = null;
+      mcWorkerActiveRunId = null;
+    }
+
+    function runMonteCarloInWorker(payload, onProgress) {
+      if (!canUseMonteCarloWorker()) return Promise.resolve(null);
+      clearMonteCarloWorker();
+      const runId = ++mcWorkerRunId;
+      mcWorkerActiveRunId = runId;
+      try {
+        mcWorker = new Worker('sim-worker.js');
+      } catch (err) {
+        clearMonteCarloWorker();
+        return Promise.resolve(null);
+      }
+
+      return new Promise((resolve, reject) => {
+        mcWorker.onmessage = (event) => {
+          const msg = event.data || {};
+          if (msg.runId !== runId) return;
+          if (msg.type === 'progress') {
+            if (typeof onProgress === 'function') onProgress(msg);
+            return;
+          }
+          if (msg.type === 'done') {
+            const result = msg.result;
+            clearMonteCarloWorker();
+            resolve(result);
+            return;
+          }
+          if (msg.type === 'error') {
+            const err = new Error(msg.message || 'Monte Carlo worker failed');
+            clearMonteCarloWorker();
+            reject(err);
+          }
+        };
+        mcWorker.onerror = (event) => {
+          const err = new Error(event?.message || 'Monte Carlo worker failed');
+          clearMonteCarloWorker();
+          reject(err);
+        };
+        mcWorker.postMessage({ type: 'run', runId, payload });
+      });
+    }
+
     function requestCancelMonteCarlo() {
       if (!mcRunInProgress) return;
       mcCancelRequested = true;
+      if (mcWorker && mcWorkerActiveRunId != null) {
+        try { mcWorker.postMessage({ type: 'cancel', runId: mcWorkerActiveRunId }); } catch (e) {}
+      }
       const btn = document.getElementById('run-mc-btn');
       if (btn) btn.textContent = 'Canceling...';
       const note = document.getElementById('mc-note');
@@ -4266,62 +4365,115 @@
         let totalStepsToSuccess = 0;
         let completedTrials = 0;
         let cancelled = false;
-        const successImpacts = [];
-        const stepsToSuccessArr = [];
-        const redNeutralizedArr = [];
-        const blueNeutralizedArr = [];
-        const blueSpendArr = [];
-        const redSpendArr = [];
-        const neutralizedCounts = new Map();
-        const damageTotals = new Map();
-        const damageHitCounts = new Map();
+        let successImpacts = [];
+        let stepsToSuccessArr = [];
+        let redNeutralizedArr = [];
+        let blueNeutralizedArr = [];
+        let blueSpendArr = [];
+        let redSpendArr = [];
+        let neutralizedCounts = new Map();
+        let damageTotals = new Map();
+        let damageHitCounts = new Map();
 
         const chunk = Math.max(100, Math.floor(trials / 100));
 
-        for (let t = 1; t <= trials; t++) {
-          if (mcCancelRequested) {
-            cancelled = true;
-            break;
+        const note = document.getElementById('mc-note');
+        let workerResult = null;
+        if (canUseMonteCarloWorker()) {
+          if (note) note.textContent = `Worker thread running ${trials.toLocaleString()} trials...`;
+          try {
+            workerResult = await runMonteCarloInWorker({
+              actionPlan,
+              context: serializeSimContextForWorker(context),
+              trials,
+              chunk,
+              baseSeed,
+              successMode,
+              successN,
+              victoryThreshold,
+              prioritySet: prioritySet ? Array.from(prioritySet) : [],
+              maxBlueLoss: Infinity,
+              regenFrac,
+              teamResources: clonePlain(teamResources),
+              settings: clonePlain(settings),
+              strikeMethods: clonePlain(strikeMethods),
+              redProfiles: clonePlain(redProfiles)
+            }, (progress) => {
+              if (!bar) return;
+              const pct = Math.round((progress.completed / Math.max(1, progress.requestedTrials)) * 100);
+              bar.style.width = `${pct}%`;
+              bar.textContent = `${pct}%`;
+              if (note) note.textContent = `Worker thread running: ${progress.completed.toLocaleString()} / ${progress.requestedTrials.toLocaleString()} trials.`;
+            });
+          } catch (err) {
+            workerResult = null;
+            addEvent({ type: 'MC', text: 'Worker unavailable during run; falling back to main-thread chunks.' });
           }
-          const rng = createRng(baseSeed + t);
-          const result = simulateTrial(actionPlan, {
-            context,
-            rng,
-            successMode,
-            successN,
-            victoryThreshold,
-            prioritySet,
-            regenFrac,
-            logSteps: false
-          });
-          completedTrials = t;
+        }
 
-          if (result.success) {
-            trialsSuccess++;
-            totalImpactOnSuccess += result.impact;
-            totalStepsToSuccess += result.stepsToGoal;
-            successImpacts.push(result.impact);
-            stepsToSuccessArr.push(result.stepsToGoal);
-          }
+        if (workerResult) {
+          trialsSuccess = workerResult.trialsSuccess || 0;
+          totalImpactOnSuccess = workerResult.totalImpactOnSuccess || 0;
+          totalStepsToSuccess = workerResult.totalStepsToSuccess || 0;
+          completedTrials = workerResult.completedTrials || 0;
+          cancelled = !!workerResult.cancelled;
+          successImpacts = workerResult.successImpacts || [];
+          stepsToSuccessArr = workerResult.stepsToSuccessArr || [];
+          redNeutralizedArr = workerResult.redNeutralizedArr || [];
+          blueNeutralizedArr = workerResult.blueNeutralizedArr || [];
+          blueSpendArr = workerResult.blueSpendArr || [];
+          redSpendArr = workerResult.redSpendArr || [];
+          neutralizedCounts = new Map(workerResult.neutralizedCounts || []);
+          damageTotals = new Map(workerResult.damageTotals || []);
+          damageHitCounts = new Map(workerResult.damageHitCounts || []);
+          if (note) note.textContent = cancelled ? 'Worker run canceled; partial results shown.' : 'Worker run complete. UI stayed responsive during computation.';
+        } else {
+          if (note) note.textContent = `Worker unavailable; running ${trials.toLocaleString()} trials in animation-frame chunks.`;
+          for (let t = 1; t <= trials; t++) {
+            if (mcCancelRequested) {
+              cancelled = true;
+              break;
+            }
+            const rng = createRng(baseSeed + t);
+            const result = simulateTrial(actionPlan, {
+              context,
+              rng,
+              successMode,
+              successN,
+              victoryThreshold,
+              prioritySet,
+              regenFrac,
+              logSteps: false
+            });
+            completedTrials = t;
 
-          redNeutralizedArr.push(result.redNeutralized.size);
-          blueNeutralizedArr.push(result.blueNeutralized.size);
-          blueSpendArr.push(result.blueSpend);
-          redSpendArr.push(result.redSpend);
+            if (result.success) {
+              trialsSuccess++;
+              totalImpactOnSuccess += result.impact;
+              totalStepsToSuccess += result.stepsToGoal;
+              successImpacts.push(result.impact);
+              stepsToSuccessArr.push(result.stepsToGoal);
+            }
 
-          result.redNeutralized.forEach(id => {
-            neutralizedCounts.set(id, (neutralizedCounts.get(id) || 0) + 1);
-          });
-          result.damageThisRun.forEach((val, id) => {
-            damageTotals.set(id, (damageTotals.get(id) || 0) + val);
-            damageHitCounts.set(id, (damageHitCounts.get(id) || 0) + 1);
-          });
+            redNeutralizedArr.push(result.redNeutralized.size);
+            blueNeutralizedArr.push(result.blueNeutralized.size);
+            blueSpendArr.push(result.blueSpend);
+            redSpendArr.push(result.redSpend);
 
-          if (bar && (t % chunk === 0 || t === trials)) {
-            const pct = Math.round((t / trials) * 100);
-            bar.style.width = `${pct}%`;
-            bar.textContent = `${pct}%`;
-            await yieldToFrame();
+            result.redNeutralized.forEach(id => {
+              neutralizedCounts.set(id, (neutralizedCounts.get(id) || 0) + 1);
+            });
+            result.damageThisRun.forEach((val, id) => {
+              damageTotals.set(id, (damageTotals.get(id) || 0) + val);
+              damageHitCounts.set(id, (damageHitCounts.get(id) || 0) + 1);
+            });
+
+            if (bar && (t % chunk === 0 || t === trials)) {
+              const pct = Math.round((t / trials) * 100);
+              bar.style.width = `${pct}%`;
+              bar.textContent = `${pct}%`;
+              await yieldToFrame();
+            }
           }
         }
 
