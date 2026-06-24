@@ -20,6 +20,15 @@
   var lastSelId = null;         // selection-poll cache
   var pollTimer = null;
   var hud, launchBtn;
+  // Fog-of-war / blind-handoff state (only used when fog is on and both sides are human).
+  var curtain = false;          // device-handoff curtain is up (hide everything)
+  var pendingSide = null;       // side that plans next, after the curtain
+  var planTurnInit = -1;        // turn whose plan phase we've already initialised
+
+  function humanSides(cfg) { return ['blue', 'red'].filter(function (s) { return cfg.control[s] === 'human'; }); }
+  function otherSide(s) { return s === 'blue' ? 'red' : 'blue'; }
+  function hpBand(h, max) { var f = max ? h / max : 0; return f > 0.66 ? 'Intact' : (f > 0.33 ? 'Damaged' : 'Critical'); }
+  function fogActive(cfg) { return !!(cfg && cfg.fog); }
 
   // ---- styles --------------------------------------------------------------------
   var CSS = [
@@ -93,7 +102,16 @@
     '.wg-banner.red{background:linear-gradient(180deg,#6e2424,#3f1414);color:#ffd0d0;border:1px solid #a04848;}',
     '.wg-sel-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}',
     '.wg-chip{font-size:11px;padding:4px 7px;border:1px solid #234a68;border-radius:6px;background:rgba(20,40,60,.4);color:#bcd6ec;cursor:pointer;}',
-    '.wg-chip:hover{border-color:#4bb8ff;color:#fff;}'
+    '.wg-chip:hover{border-color:#4bb8ff;color:#fff;}',
+    '.wg-card.fog .wg-pts{color:#5e7790;}',
+    '.wg-card.fog{opacity:.85;}',
+    '.wg-fogtag{display:inline-block;font-size:10px;color:#ffcf6b;border:1px solid #6b5a2a;background:rgba(80,64,24,.3);border-radius:10px;padding:1px 7px;margin-left:6px;vertical-align:middle;}',
+    '.wg-curtain{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:60vh;gap:10px;}',
+    '.wg-curtain .lock{font-size:46px;}',
+    '.wg-curtain .ttl{font-weight:800;letter-spacing:.12em;color:#eaf4ff;font-size:15px;}',
+    '.wg-curtain p{color:#9fbdd6;font-size:13px;margin:2px 0 8px;}',
+    '.wg-curtain b.blue{color:#6cc0ff;}.wg-curtain b.red{color:#ff8585;}',
+    '.wg-curtain .wg-btn{min-width:220px;}'
   ].join('');
 
   function injectCss() {
@@ -162,11 +180,15 @@
         turnsBtn(6) + turnsBtn(10) + turnsBtn(16) + '</div></div>' +
       '<div class="wg-sec"><h4>AI difficulty</h4><div class="wg-toggle" id="wg-diff">' +
         '<button data-diff="easy">Easy</button><button data-diff="hard" class="on">Hard</button></div></div>' +
+      '<div class="wg-sec"><h4>Fog of war</h4><div class="wg-toggle" id="wg-fog">' +
+        '<button data-fog="on">On</button><button data-fog="off">Off</button></div>' +
+        '<p class="wg-hint" style="margin-top:6px;">On: enemy strength is masked while you plan, and a two-human match hands off blind so neither side sees the other\'s orders.</p></div>' +
       '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. A side is defeated if its surviving force value falls below 35% of its start, otherwise the higher score at the final turn wins.</p>';
     document.getElementById('wg-foot').innerHTML = '<button class="wg-btn primary" data-act="start">Start Match</button>';
     // defaults
     setToggle('wg-ctl-blue', 'human'); setToggle('wg-ctl-red', 'ai');
     setToggle('wg-turns', '10');
+    setToggle('wg-fog', 'on');
   }
   function sideSetup(side, label) {
     return '<div class="wg-sec"><h4>' + esc(label) + '</h4><div class="wg-toggle ' + side + '" id="wg-ctl-' + side + '">' +
@@ -177,7 +199,7 @@
   function setToggle(groupId, value) {
     var g = document.getElementById(groupId); if (!g) return;
     [].forEach.call(g.querySelectorAll('button'), function (b) {
-      var v = b.getAttribute('data-ctl') || b.getAttribute('data-turns') || b.getAttribute('data-diff');
+      var v = b.getAttribute('data-ctl') || b.getAttribute('data-turns') || b.getAttribute('data-diff') || b.getAttribute('data-fog');
       b.classList.toggle('on', v === value);
     });
   }
@@ -186,10 +208,12 @@
     var ctl = function (side) { var on = document.querySelector('#wg-ctl-' + side + ' button.on'); return on ? on.getAttribute('data-ctl') : (side === 'red' ? 'ai' : 'human'); };
     var turnsOn = document.querySelector('#wg-turns button.on');
     var diffOn = document.querySelector('#wg-diff button.on');
+    var fogOn = document.querySelector('#wg-fog button.on');
     return {
       control: { blue: ctl('blue'), red: ctl('red') },
       turnLimit: turnsOn ? Number(turnsOn.getAttribute('data-turns')) : 10,
-      difficulty: { blue: diffOn ? diffOn.getAttribute('data-diff') : 'hard', red: diffOn ? diffOn.getAttribute('data-diff') : 'hard' }
+      difficulty: { blue: diffOn ? diffOn.getAttribute('data-diff') : 'hard', red: diffOn ? diffOn.getAttribute('data-diff') : 'hard' },
+      fog: fogOn ? fogOn.getAttribute('data-fog') === 'on' : true
     };
   }
 
@@ -204,24 +228,50 @@
     if (!state) { renderSetup(); return; }
     if (state.control && !state.cfg) state.cfg = { control: state.control };
     var cfg = state.cfg;
-    // keep activeSide valid for whoever is human
-    if (cfg.control[activeSide] !== 'human') activeSide = firstHuman(cfg);
+    var humans = humanSides(cfg);
+    var fog = fogActive(cfg);
+    var fogHandoff = fog && humans.length > 1;   // sequential blind planning between two humans
 
-    document.getElementById('wg-sub').textContent =
-      state.phase === 'over' ? 'Match complete' : ('Turn ' + state.turn + ' of ' + cfg.turnLimit + ' · ' + (state.phase === 'plan' ? 'planning' : 'resolved'));
+    // Initialise each plan phase once: pick who plans first and drop any stale curtain.
+    if (state.phase === 'plan' && planTurnInit !== state.turn) {
+      planTurnInit = state.turn;
+      curtain = false; pendingSide = null;
+      if (fogHandoff) activeSide = humans[0];
+      else if (cfg.control[activeSide] !== 'human') activeSide = firstHuman(cfg);
+    }
+    if (cfg.control[activeSide] !== 'human' && humans.length) activeSide = firstHuman(cfg);
 
     var body = document.getElementById('wg-body');
-    var humans = ['blue', 'red'].filter(function (s) { return cfg.control[s] === 'human'; });
+    var foot = document.getElementById('wg-foot');
 
-    var html = scoreboard(state);
+    // Blind-handoff curtain takes over the whole panel between two human turns.
+    if (curtain && pendingSide) {
+      document.getElementById('wg-sub').textContent = 'Turn ' + state.turn + ' · handoff';
+      body.innerHTML = '<div class="wg-curtain"><div class="lock">🔒</div><div class="ttl">ORDERS LOCKED</div>' +
+        '<p>Pass the device to <b class="' + pendingSide + '">' + pendingSide.toUpperCase() + '</b>.<br>The previous orders are hidden — no peeking.</p>' +
+        '<button class="wg-btn primary" data-act="ready">' + pendingSide.toUpperCase() + ' is ready →</button></div>';
+      foot.innerHTML = '';
+      return;
+    }
+
+    document.getElementById('wg-sub').textContent =
+      state.phase === 'over' ? 'Match complete'
+        : ('Turn ' + state.turn + ' of ' + cfg.turnLimit + ' · ' + (state.phase === 'plan' ? (fogHandoff ? activeSide.toUpperCase() + ' planning' : 'planning') : 'resolved'));
+
+    // During planning under fog, mask the side that is NOT currently planning.
+    var maskEnemy = (fog && state.phase === 'plan' && cfg.control[activeSide] === 'human') ? otherSide(activeSide) : null;
+    var html = scoreboard(state, maskEnemy);
 
     if (state.phase === 'over') {
       // banner only; orders hidden
     } else {
-      if (humans.length > 1) {
+      if (humans.length > 1 && !fog) {
         html += '<div class="wg-sec"><h4>Issuing orders as</h4><div class="wg-toggle ' + activeSide + '" id="wg-active">' +
           '<button data-active="blue" class="' + (activeSide === 'blue' ? 'on' : '') + '">Blue</button>' +
           '<button data-active="red" class="' + (activeSide === 'red' ? 'on' : '') + '">Red</button></div></div>';
+      } else if (fogHandoff) {
+        html += '<div class="wg-sec"><h4>Issuing orders as <span class="wg-fogtag">fog of war</span></h4>' +
+          '<div class="wg-toggle ' + activeSide + '"><button class="on">' + activeSide.toUpperCase() + '</button></div></div>';
       }
       if (cfg.control[activeSide] === 'human' && state.phase === 'plan') {
         html += '<div class="wg-sec" id="wg-target"></div>';
@@ -238,10 +288,15 @@
     if (state.phase === 'plan' && cfg.control[activeSide] === 'human') renderTargetSection(state);
 
     // footer
-    var foot = document.getElementById('wg-foot');
     if (state.phase === 'plan') {
-      var label = anyHuman(cfg) ? 'Commit Turn → Resolve' : 'Resolve Turn';
-      foot.innerHTML = '<button class="wg-btn primary" data-act="commit">' + label + '</button>';
+      if (fogHandoff) {
+        var idx = humans.indexOf(activeSide);
+        if (idx === humans.length - 1) foot.innerHTML = '<button class="wg-btn primary" data-act="commit">Commit Turn → Resolve</button>';
+        else foot.innerHTML = '<button class="wg-btn primary" data-act="pass">Lock orders → Pass to ' + humans[idx + 1].toUpperCase() + '</button>';
+      } else {
+        var label = anyHuman(cfg) ? 'Commit Turn → Resolve' : 'Resolve Turn';
+        foot.innerHTML = '<button class="wg-btn primary" data-act="commit">' + label + '</button>';
+      }
     } else if (state.phase === 'resolved') {
       foot.innerHTML = '<button class="wg-btn primary" data-act="next">Next Turn →</button>';
     } else { // over
@@ -250,17 +305,25 @@
   }
   function anyHuman(cfg) { return cfg.control.blue === 'human' || cfg.control.red === 'human'; }
 
-  function scoreboard(state) {
+  function scoreboard(state, maskEnemy) {
     var fracB = state.startObj.blue ? Math.max(0, state.objNow.blue / state.startObj.blue) : 0;
     var fracR = state.startObj.red ? Math.max(0, state.objNow.red / state.startObj.red) : 0;
     var banner = '';
     if (state.phase === 'over' && state.winner) {
       banner = '<div class="wg-banner ' + state.winner + '">' + (state.winner === 'blue' ? 'BLUE' : 'RED') + ' WINS</div>';
     }
-    return banner + '<div class="wg-sec"><div class="wg-score">' +
-      card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB) +
-      card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR) +
-      '</div></div>';
+    var blueCard = maskEnemy === 'blue'
+      ? maskedCard('blue', 'BLUE', state.alive.blue, state.rosters.blue)
+      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB);
+    var redCard = maskEnemy === 'red'
+      ? maskedCard('red', 'RED', state.alive.red, state.rosters.red)
+      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR);
+    return banner + '<div class="wg-sec"><div class="wg-score">' + blueCard + redCard + '</div></div>';
+  }
+  function maskedCard(side, label, alive, total) {
+    return '<div class="wg-card fog ' + side + '"><div class="wg-team">' + label + ' <span class="wg-fogtag">fog</span></div>' +
+      '<div class="wg-pts">— · —</div><div class="wg-meta">' + alive + '/' + total + ' active · strength unknown</div>' +
+      '<div class="wg-bar"></div></div>';
   }
   function card(side, label, score, alive, total, frac) {
     return '<div class="wg-card ' + side + '"><div class="wg-team">' + label + '</div>' +
@@ -295,9 +358,14 @@
     var bn = W.boardNode(sel.id);
     if (!bn) { holder.innerHTML = '<h4>Selected target</h4><p class="wg-hint">That node is not a combatant in this match.</p>'; return; }
     var isMine = bn.team === activeSide;
+    // Under fog, you don't get perfect battle-damage assessment on the enemy: show a
+    // coarse health band instead of exact HP (vulnerabilities stay known intel so
+    // targeting is still a real decision).
+    var fogEnemy = fogActive(state.cfg) && !isMine;
+    var hpText = fogEnemy ? (hpBand(bn.health, bn.healthMax) + ' <span class="wg-fogtag">est.</span>') : (Math.round(bn.health) + '/' + bn.healthMax + ' hp');
     var head = '<h4>Selected target</h4><div class="wg-sel"><div class="nm">' + esc(bn.name) + '</div>' +
       '<div class="meta"><span class="tag ' + bn.team + '">' + bn.team.toUpperCase() + '</span>' +
-      esc(bn.difficulty) + ' · ' + Math.round(bn.health) + '/' + bn.healthMax + ' hp' +
+      esc(bn.difficulty) + ' · ' + hpText +
       (bn.vulns && bn.vulns.length ? ' · vuln: ' + esc(bn.vulns.join(', ')) : '') + '</div></div>';
     var actions;
     if (apLeft <= 0) {
@@ -347,13 +415,14 @@
 
   // ---- actions -------------------------------------------------------------------
   function onHudClick(ev) {
-    var t = ev.target.closest('[data-act],[data-order],[data-rm],[data-active],[data-side],[data-turns],[data-diff],[data-pick]');
+    var t = ev.target.closest('[data-act],[data-order],[data-rm],[data-active],[data-side],[data-turns],[data-diff],[data-fog],[data-pick]');
     if (!t) return;
 
     // setup toggles
     if (t.hasAttribute('data-side')) { setGroupOn(t); return; }
     if (t.hasAttribute('data-turns')) { setGroupOn(t); return; }
     if (t.hasAttribute('data-diff')) { setGroupOn(t); return; }
+    if (t.hasAttribute('data-fog')) { setGroupOn(t); return; }
 
     if (t.hasAttribute('data-active')) { activeSide = t.getAttribute('data-active'); render(W.getState()); return; }
     if (t.hasAttribute('data-pick')) { if (typeof selectNodeById === 'function') selectNodeById(t.getAttribute('data-pick')); else if (typeof selectNode === 'function') { var n = findNode(t.getAttribute('data-pick')); if (n) selectNode(n); } lastSelId = null; pollSelection(); return; }
@@ -373,6 +442,29 @@
     else if (act === 'next') { W.nextTurn(); }
     else if (act === 'clear') W.clearOrders(activeSide);
     else if (act === 'newmatch') { W.endMatch(); refreshVisuals(); renderSetup(); }
+    else if (act === 'pass') doPass();
+    else if (act === 'ready') doReady();
+  }
+
+  // Lock the current side's orders and raise the handoff curtain for the next human side.
+  function doPass() {
+    var cfg = W.getState().cfg;
+    var humans = humanSides(cfg);
+    var next = humans[humans.indexOf(activeSide) + 1];
+    if (!next) { doCommit(); return; }
+    pendingSide = next;
+    curtain = true;
+    if (typeof selectNode === 'function') selectNode(null);   // clear selection so the next player starts clean
+    lastSelId = null;
+    render(W.getState());
+  }
+  function doReady() {
+    if (!pendingSide) return;
+    activeSide = pendingSide;
+    pendingSide = null;
+    curtain = false;
+    lastSelId = null;
+    render(W.getState());
   }
 
   function setGroupOn(btn) {
@@ -385,6 +477,7 @@
   function doStart() {
     var cfg = readSetup();
     activeSide = firstHuman(cfg);
+    planTurnInit = -1; curtain = false; pendingSide = null;   // re-arm plan-phase init for the new match
     W.newMatch(cfg);
     refreshVisuals();
     if (typeof addEvent === 'function') addEvent({ type: 'War', text: 'War Game started — ' + cfg.control.blue + ' Blue vs ' + cfg.control.red + ' Red, ' + cfg.turnLimit + ' turns.' });

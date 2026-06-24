@@ -242,6 +242,22 @@
   - Balance still favors the side with more action points under AI play; unchanged from the engine note. Now that it is playable, this is the first thing to tune with real games.
   - Phase 3 (serverless-WebRTC networked play) rides on `GameModule.serialize()/deserialize()`, which already round-trip the full match.
 
+### Change 13 — Fog of war for the War Game (hotseat secrecy + intel masking)
+- **What changed (all in `wargame.js`; the engine is untouched)**
+  - Added a **Fog of war On/Off** toggle to match setup (default On). Fog is a presentation/flow concern — the engine still resolves with full information — so it lives entirely in the UI layer.
+  - **Blind handoff for two humans**: when fog is on and both sides are human, planning is sequential instead of a free side-toggle. Blue plans, "Lock orders → Pass to RED" raises a full-panel **ORDERS LOCKED** curtain ("pass the device… no peeking"), the next player presses "RED is ready →", then Red plans and commits. Neither side ever sees the other's queued orders; both resolve simultaneously and the result log is shown to both. The handoff re-arms every turn.
+  - **Intel masking**: while a human is planning under fog, the enemy scoreboard card hides score and force% (shows only the observable active-node count + "strength unknown"), and a selected enemy node shows a coarse health band — **Intact / Damaged / Critical "est."** — instead of exact HP. Vulnerabilities stay visible so targeting is still a real decision. After resolution the scoreboard un-masks (results are public).
+  - Selecting/clearing is reset across a handoff so a player doesn't inherit the previous player's selection.
+
+- **How verified (in-browser)**
+  - **Human-vs-AI + fog**: Red scoreboard card masked ("strength unknown"); own Blue card full; a selected Red node showed "Buried · Intact est. · vuln: Cyber, SOF" (band, not exact HP).
+  - **Human-vs-Human + fog**: "BLUE planning" → queued a Blue order → "Lock orders → Pass to RED" raised the curtain with Blue's orders hidden → "RED is ready" → "RED planning" with Blue now masked and Blue's order still queued underneath → committed and confirmed **both** sides' orders appeared in the resolution, scoreboard un-masked afterward, and Next Turn re-armed the handoff (turn 2, BLUE planning, orders cleared).
+  - **Regression — fog OFF, two humans**: the open side-toggle is preserved, nothing is masked, single commit (no handoff). Console clean.
+
+- **Uncertainties / follow-up**
+  - The board itself (3D/Map) still shows all nodes and prior battle damage to whoever is at the screen — that damage is public knowledge (past resolutions are announced), so this is intentional; true sensor-range visibility (hiding undetected enemy nodes entirely) would need a recon model and is a larger future option.
+  - Vulnerabilities are treated as known out-of-band intel; if a stricter fog is wanted, those could also be masked until first contact.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.
