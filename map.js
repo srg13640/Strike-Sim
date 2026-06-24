@@ -26,6 +26,7 @@ window.MapModule = (function () {
   let leafletMap = null;
   let markersLayer = null;
   let mapLinksLayer = null;
+  let coastlineLayer = null;
   const mapMarkers = new Map(); // id -> marker
   // Leaflet renders EPSG:3857. Keep a generated full-world Web Mercator Blue Marble
   // underneath the operational theater so panning never falls back to a dead grid, then
@@ -63,7 +64,7 @@ window.MapModule = (function () {
 
   function ensureMap() {
     if (leafletMap) return;
-    let coastlinesLoaded = false;   // offline vector basemap (assets/land.geojson)
+    let coastlinesLoaded = false;   // offline vector fallback (assets/land.geojson)
     let realTilesLoaded = false;    // raster tiles found under ./tiles/
     leafletMap = L.map('map', {
       zoomControl: true,
@@ -109,14 +110,22 @@ window.MapModule = (function () {
       if (realTilesLoaded) {
         setBasemapStatus(theaterSatelliteLoaded ? 'Basemap: local tiles + theater satellite' : 'Basemap: local tiles', 'ok');
       } else if (theaterSatelliteLoaded) {
-        setBasemapStatus(coastlinesLoaded ? 'Basemap: theater satellite + coastlines' : 'Basemap: theater satellite', 'ok');
+        setBasemapStatus('Basemap: theater satellite', 'ok');
       } else if (globalSatelliteLoaded) {
-        setBasemapStatus(coastlinesLoaded ? 'Basemap: global satellite + coastlines' : 'Basemap: global satellite', 'ok');
+        setBasemapStatus('Basemap: global satellite', 'ok');
       } else if (coastlinesLoaded) {
         setBasemapStatus('Basemap: coastlines (offline)', 'ok');
       } else {
         setBasemapStatus('Basemap: offline grid', 'offline');
       }
+    };
+    const shouldShowCoastlineFallback = () => coastlinesLoaded && !realTilesLoaded && !globalSatelliteLoaded && !theaterSatelliteLoaded;
+    const refreshCoastlineFallback = () => {
+      if (!coastlineLayer || !leafletMap) return;
+      const visible = shouldShowCoastlineFallback();
+      const hasLayer = leafletMap.hasLayer(coastlineLayer);
+      if (visible && !hasLayer) coastlineLayer.addTo(leafletMap);
+      if (!visible && hasLayer) leafletMap.removeLayer(coastlineLayer);
     };
 
     // Offline satellite basemaps behind coastlines so markers and links remain visible.
@@ -133,6 +142,7 @@ window.MapModule = (function () {
             }).addTo(leafletMap);
             if (opts.kind === 'theater') theaterSatelliteLoaded = true;
             if (opts.kind === 'global') globalSatelliteLoaded = true;
+            refreshCoastlineFallback();
             refreshBasemapStatus();
           })
           .catch(() => {});
@@ -151,20 +161,21 @@ window.MapModule = (function () {
       className: 'theater-satellite-overlay'
     });
 
-    // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
-    // top of the blank grid so the operator sees actual geography (China coast, Japan,
-    // Taiwan, Philippines, …) with NO map tiles. Relative path -> within OFFLINE_MODE.
+    // Offline vector fallback: land/coastlines from bundled GeoJSON. It is intentionally
+    // hidden when any raster basemap loads, because drawing this vector outline over the
+    // regional satellite crop creates a visible projection mismatch.
     try {
       fetch('assets/land.geojson', { cache: 'force-cache' })
         .then(r => (r && r.ok) ? r.json() : null)
         .then(geo => {
           if (!geo || !leafletMap) return;
-          L.geoJSON(geo, {
+          coastlineLayer = L.geoJSON(geo, {
             pane: 'basemapPane',
             interactive: false,
-            style: { color: '#78c9ff', weight: 0.7, opacity: 0.58, fillColor: '#15293a', fillOpacity: 0.045 }
-          }).addTo(leafletMap);
+            style: { color: '#5fbde8', weight: 0.55, opacity: 0.48, fillColor: '#15293a', fillOpacity: 0.035 }
+          });
           coastlinesLoaded = true;
+          refreshCoastlineFallback();
           refreshBasemapStatus();
         })
         .catch(() => {});
@@ -202,6 +213,7 @@ window.MapModule = (function () {
     // so it stays within OFFLINE_MODE; any failure (e.g. file://) degrades to offline.
     const enableRealTiles = () => {
       realTilesLoaded = true;
+      refreshCoastlineFallback();
       L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
         minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
       }).addTo(leafletMap);
