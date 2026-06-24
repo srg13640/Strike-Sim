@@ -82,14 +82,31 @@ window.EngineModule = (function () {
     }
   }
 
-  // Pull the camera back to frame the whole globe (geo mode entry). Without this the
-  // camera stays zoomed on the previous force-cluster and geo mode "looks like nothing".
+  // Frame the camera for geo mode. Aims at the centroid of the placed nodes — i.e. the
+  // active theater — and sits out above it, so the operator sees the populated region up
+  // close (like looking down at Earth from orbit) instead of a tiny patch on a big empty
+  // globe. Falls back to framing the whole globe if no nodes are pinned yet. Without this
+  // the camera stays zoomed on the previous force-cluster and geo "looks like nothing".
   function frameGeo(ms) {
     if (ms === undefined) ms = 800;
     if (!graphInstance) return;
+    const gd = graphInstance.graphData();
+    const nodes = (gd && gd.nodes) || [];
+    let cx = 0, cy = 0, cz = 0, k = 0;
+    nodes.forEach(n => {
+      // only nodes pinned on/near the globe surface (skip the y=-500 no-coord pool)
+      if (n.fx != null && n.fy != null && n.fz != null && n.fy > -400) { cx += n.fx; cy += n.fy; cz += n.fz; k++; }
+    });
+    if (k === 0) {
+      graphInstance.cameraPosition({ x: 0, y: EARTH_RADIUS * 0.55, z: EARTH_RADIUS * 3.1 }, { x: 0, y: 0, z: 0 }, ms);
+      return;
+    }
+    cx /= k; cy /= k; cz /= k;
+    const len = Math.hypot(cx, cy, cz) || 1;
+    const dist = EARTH_RADIUS * 1.9;   // out along the theater direction, with context
     graphInstance.cameraPosition(
-      { x: 0, y: EARTH_RADIUS * 0.55, z: EARTH_RADIUS * 3.1 },
-      { x: 0, y: 0, z: 0 },
+      { x: (cx / len) * dist, y: (cy / len) * dist, z: (cz / len) * dist },
+      { x: cx, y: cy, z: cz },
       ms
     );
   }

@@ -5,16 +5,27 @@
       "name": "I Corps (Pacific Shield) Main CP – Kadena AB, Okinawa",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber","EW","Kinetic"],
+      "vulnerabilities": [
+        "Cyber",
+        "EW",
+        "Kinetic"
+      ],
       "importance": 10,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 0,
       "y": 0,
       "z": 0,
@@ -26,16 +37,26 @@
       "name": "Long Range Sense and Strike Division TOC – Camp Hansen, Okinawa",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber","Kinetic"],
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic"
+      ],
       "importance": 10,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 20,
       "y": 80,
       "z": 0,
@@ -47,16 +68,26 @@
       "name": "Medium Range Sense and Strike Division TOC – Camp Zama, Japan",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber","Kinetic"],
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic"
+      ],
       "importance": 10,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 100,
       "y": 200,
       "z": 0,
@@ -68,16 +99,27 @@
       "name": "Contested Sustainment Division HQ – White Beach, Okinawa",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land","Sea"],
+      "domain": [
+        "Land",
+        "Sea"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic","Cyber"],
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber"
+      ],
       "importance": 9,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -40,
       "y": -60,
       "z": 0,
@@ -89,79 +131,120 @@
       "name": "Counter C2 Brigade HQ – Torii Station, Okinawa",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Land","Cyber","EW"],
+      "domain": [
+        "Land",
+        "Cyber",
+        "EW"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber","EW"],
+      "vulnerabilities": [
+        "Cyber",
+        "EW"
+      ],
       "importance": 9,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 4, "jam": 4, "sof": 3 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 4,
+        "jam": 4,
+        "sof": 3
+      },
       "x": 10,
       "y": 20,
       "z": 0,
-      "lat": 26.5000,
-      "lon": 127.9000
+      "lat": 26.5,
+      "lon": 127.9
     },
     {
       "id": "USA-CMD-006",
       "name": "1st Stryker BCT (LRSSD)",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic","EW"],
+      "vulnerabilities": [
+        "Kinetic",
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 40,
       "y": 100,
       "z": 0,
-      "lat": 26.3000,
-      "lon": 127.8000
+      "lat": 26.3,
+      "lon": 127.8
     },
     {
       "id": "USA-CMD-007",
       "name": "2nd Multi-Domain Task Force BCT (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic","Cyber"],
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 120,
       "y": 220,
       "z": 0,
-      "lat": 35.5000,
-      "lon": 139.4000
+      "lat": 35.5,
+      "lon": 139.4
     },
     {
       "id": "USA-CMD-008",
       "name": "88th Army Watercraft Group HQ – Naha Port",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -30,
       "y": -80,
       "z": 0,
@@ -173,35 +256,57 @@
       "name": "TITAN Fusion Cell (LRSSD)",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber","EW"],
+      "vulnerabilities": [
+        "Cyber",
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 30,
       "y": 90,
-      "z": 0
+      "z": 0,
+      "lat": 26.5322,
+      "lon": 127.706
     },
     {
       "id": "USA-CMD-010",
       "name": "ABMS Joint Fires Cell – Yokota AB Japan",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber","Kinetic"],
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic"
+      ],
       "importance": 9,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 110,
       "y": 210,
       "z": 0,
@@ -213,16 +318,26 @@
       "name": "Corps Alternate CP – Andersen AFB Guam",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Kinetic","Cyber"],
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber"
+      ],
       "importance": 9,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -200,
       "y": -200,
       "z": 0,
@@ -234,16 +349,26 @@
       "name": "Philippines CEBSA Liaison Cell – Camp Aguinaldo",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["SOF","Cyber"],
+      "vulnerabilities": [
+        "SOF",
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -100,
       "y": -150,
       "z": 0,
@@ -255,16 +380,25 @@
       "name": "Australia Darwin Coordination Cell – RAAF Tindal",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Command",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -150,
       "y": -300,
       "z": 0,
@@ -276,73 +410,118 @@
       "name": "1st Battalion, 3rd Hypersonic Strike Regiment (Dark Eagle) – Okinawa",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic","SOF"],
+      "vulnerabilities": [
+        "Kinetic",
+        "SOF"
+      ],
       "importance": 9,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 5, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 5,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 50,
       "y": 110,
-      "z": 0
+      "z": 0,
+      "lat": 26.4457,
+      "lon": 127.723
     },
     {
       "id": "USA-FIR-002",
       "name": "2nd Battalion, 3rd Hypersonic Strike Regiment – Guam",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 9,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 5, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 5,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -180,
       "y": -180,
-      "z": 0
+      "z": 0,
+      "lat": 13.5448,
+      "lon": 144.7074
     },
     {
       "id": "USA-FIR-003",
       "name": "Battery A, 1st ALBM Regiment (Air-Launched Hypersonic) – Kadena",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Air","SAM"],
+      "vulnerabilities": [
+        "Air",
+        "SAM"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 5, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 5,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 10,
       "y": 10,
-      "z": 0
+      "z": 0,
+      "lat": 26.4638,
+      "lon": 127.6818
     },
     {
       "id": "USA-FIR-004",
       "name": "Typhon Battery A (PrSM-ER + SM-6) – Northern Luzon",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic","EW"],
+      "vulnerabilities": [
+        "Kinetic",
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -80,
       "y": 100,
       "z": 0,
@@ -354,16 +533,25 @@
       "name": "Typhon Battery B – Palawan",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -120,
       "y": -120,
       "z": 0,
@@ -375,434 +563,685 @@
       "name": "1st MRC Battalion (MRC Typhon) – Camp Fuji Japan",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 130,
       "y": 230,
-      "z": 0
+      "z": 0,
+      "lat": 35.4685,
+      "lon": 138.6549
     },
     {
       "id": "USA-FIR-007",
       "name": "2nd MRC Battalion – Okinawa",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 30,
       "y": 70,
-      "z": 0
+      "z": 0,
+      "lat": 26.4476,
+      "lon": 127.7193
     },
     {
       "id": "USA-FIR-008",
       "name": "3rd MRC Battalion – Tindal Australia",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -140,
       "y": -280,
-      "z": 0
+      "z": 0,
+      "lat": -14.4009,
+      "lon": 132.2936
     },
     {
       "id": "USA-FIR-009",
       "name": "PrSM-ER Battery A (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 110,
       "y": 190,
-      "z": 0
+      "z": 0,
+      "lat": 35.7547,
+      "lon": 139.2018
     },
     {
       "id": "USA-FIR-010",
       "name": "PrSM-ER Battery B (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 140,
       "y": 210,
-      "z": 0
+      "z": 0,
+      "lat": 35.4617,
+      "lon": 139.5165
     },
     {
       "id": "USA-FIR-011",
       "name": "Battery C, 5th Naval Strike Missile Bn (LRSSD)",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 60,
       "y": 120,
-      "z": 0
+      "z": 0,
+      "lat": 26.4215,
+      "lon": 128.0529
     },
     {
       "id": "USA-FIR-012",
       "name": "Tomahawk Block Va Battery (LRSSD)",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -160,
       "y": -160,
-      "z": 0
+      "z": 0,
+      "lat": 26.4239,
+      "lon": 128.0669
     },
     {
       "id": "USA-FIR-013",
       "name": "HIMARS Battalion A (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 90,
       "y": 180,
-      "z": 0
+      "z": 0,
+      "lat": 35.4687,
+      "lon": 139.5212
     },
     {
       "id": "USA-FIR-014",
       "name": "HIMARS Battalion B (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 150,
       "y": 240,
-      "z": 0
+      "z": 0,
+      "lat": 35.471,
+      "lon": 139.5353
     },
     {
       "id": "USA-FIR-015",
       "name": "Battery A, 1st Directed Energy Fires Bn (50kW) – Okinawa",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 4, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 4,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -20,
       "y": -40,
-      "z": 0
+      "z": 0,
+      "lat": 26.3257,
+      "lon": 127.862
     },
     {
       "id": "USA-FIR-016",
       "name": "Battery B, 1st DE Fires Bn – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 4, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 4,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -190,
       "y": -190,
-      "z": 0
+      "z": 0,
+      "lat": 13.4266,
+      "lon": 144.8426
     },
     {
       "id": "USA-FIR-017",
       "name": "PrSM-ER Battery C (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 100,
       "y": 200,
-      "z": 0
+      "z": 0,
+      "lat": 35.4781,
+      "lon": 139.5401
     },
     {
       "id": "USA-FIR-018",
       "name": "Typhon Battery C – Okinawa",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 40,
       "y": 60,
-      "z": 0
+      "z": 0,
+      "lat": 26.3135,
+      "lon": 127.8488
     },
     {
       "id": "USA-FIR-019",
       "name": "Naval Strike Missile Battery D – Philippines",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -90,
       "y": -130,
-      "z": 0
+      "z": 0,
+      "lat": 14.5744,
+      "lon": 121.0544
     },
     {
       "id": "USA-FIR-020",
       "name": "MRC Battery E – Japan Mainland",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 140,
       "y": 250,
-      "z": 0
+      "z": 0,
+      "lat": 35.0879,
+      "lon": 137.8807
     },
     {
       "id": "USA-FIR-021",
       "name": "HIMARS Battalion C (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 130,
       "y": 200,
-      "z": 0
+      "z": 0,
+      "lat": 35.7266,
+      "lon": 139.6822
     },
     {
       "id": "USA-FIR-022",
       "name": "Battery D, 1st Hypersonic Regiment (LRSSD)",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 9,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 5, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 5,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 60,
       "y": 130,
-      "z": 0
+      "z": 0,
+      "lat": 26.6911,
+      "lon": 128.2092
     },
     {
       "id": "USA-FIR-023",
       "name": "MRC Battery F – Guam",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 4, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 4,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -170,
       "y": -170,
-      "z": 0
+      "z": 0,
+      "lat": 13.5288,
+      "lon": 144.6764
     },
     {
       "id": "USA-FIR-024",
       "name": "PrSM-ER Battery D (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 110,
       "y": 210,
-      "z": 0
+      "z": 0,
+      "lat": 35.7383,
+      "lon": 139.1151
     },
     {
       "id": "USA-FIR-025",
       "name": "DE Platoon 3 – Philippines",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 2, "ew": 4, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 2,
+        "ew": 4,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -110,
       "y": -140,
-      "z": 0
+      "z": 0,
+      "lat": 14.6907,
+      "lon": 120.8826
     },
     {
       "id": "USA-FIR-026",
       "name": "Naval Strike Missile Battery E – Japan",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 150,
       "y": 260,
-      "z": 0
+      "z": 0,
+      "lat": 35.0935,
+      "lon": 137.8845
     },
     {
       "id": "USA-FIR-027",
       "name": "HIMARS Battalion D – Australia",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Fires",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Counter-battery"],
+      "vulnerabilities": [
+        "Counter-battery"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 3, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 3,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -130,
       "y": -290,
-      "z": 0
+      "z": 0,
+      "lat": -14.4074,
+      "lon": 132.4989
     },
     {
       "id": "USA-SEN-001",
       "name": "HADES Flight A – Misawa Japan",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 200,
       "y": 300,
       "z": 10,
@@ -814,1342 +1253,2466 @@
       "name": "HADES Flight B – Kadena Okinawa",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 10,
       "y": 20,
-      "z": 10
+      "z": 10,
+      "lat": 26.3376,
+      "lon": 127.7968
     },
     {
       "id": "USA-SEN-003",
       "name": "TITAN Ground Station A – Camp Hansen",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber","EW"],
+      "vulnerabilities": [
+        "Cyber",
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 25,
       "y": 85,
-      "z": 0
+      "z": 0,
+      "lat": 26.4685,
+      "lon": 127.9224
     },
     {
       "id": "USA-SEN-004",
       "name": "TITAN Ground Station B – Camp Zama",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 105,
       "y": 205,
-      "z": 0
+      "z": 0,
+      "lat": 35.5057,
+      "lon": 139.3905
     },
     {
       "id": "USA-SEN-005",
       "name": "MQ-1C Gray Eagle Company (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 95,
       "y": 195,
-      "z": 8
+      "z": 8,
+      "lat": 35.5008,
+      "lon": 139.3723
     },
     {
       "id": "USA-SEN-006",
       "name": "Space-Based Infrared Node (USSF Liaison) – Guam",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["ASAT"],
+      "vulnerabilities": [
+        "ASAT"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -190,
       "y": -190,
-      "z": 0
+      "z": 0,
+      "lat": 13.4338,
+      "lon": 144.7793
     },
     {
       "id": "USA-SEN-007",
       "name": "JSTARS Replacement Flight – Kadena",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 5,
       "y": 5,
-      "z": 10
+      "z": 10,
+      "lat": 26.3548,
+      "lon": 127.7649
     },
     {
       "id": "USA-SEN-008",
       "name": "Moving Target Artillery Sensor Platoon (MRSSD)",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 115,
       "y": 215,
-      "z": 0
+      "z": 0,
+      "lat": 35.4891,
+      "lon": 139.3769
     },
     {
       "id": "USA-SEN-009",
       "name": "HADES Flight C – Philippines",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -100,
       "y": -140,
-      "z": 10
+      "z": 10,
+      "lat": 14.5929,
+      "lon": 120.9986
     },
     {
       "id": "USA-SEN-010",
       "name": "TITAN Ground Station C – Darwin",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -145,
       "y": -285,
-      "z": 0
+      "z": 0,
+      "lat": -12.4849,
+      "lon": 130.9365
     },
     {
       "id": "USA-SEN-011",
       "name": "AN/TPY-2 Radar (THAAD) – Shariki Japan",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 180,
       "y": 320,
-      "z": 0
+      "z": 0,
+      "lat": 34.9742,
+      "lon": 138.0908
     },
     {
       "id": "USA-SEN-012",
       "name": "AN/TPY-2 Radar – Kyogamisaki Japan",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 90,
       "y": 180,
-      "z": 0
+      "z": 0,
+      "lat": 34.977,
+      "lon": 138.0927
     },
     {
       "id": "USA-SEN-013",
       "name": "TITAN Ground Station D – Guam",
       "team": "blue",
       "subsystem": "Long Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -185,
       "y": -185,
-      "z": 0
+      "z": 0,
+      "lat": 13.416,
+      "lon": 144.8921
     },
     {
       "id": "USA-SEN-014",
       "name": "MQ-9B SeaGuardian Flight – Philippines",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -110,
       "y": -130,
-      "z": 8
+      "z": 8,
+      "lat": 14.5788,
+      "lon": 121.104
     },
     {
       "id": "USA-SEN-015",
       "name": "HADES Flight D – Tindal Australia",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -135,
       "y": -275,
-      "z": 10
+      "z": 10,
+      "lat": -14.5221,
+      "lon": 132.4784
     },
     {
       "id": "USA-SEN-016",
       "name": "JSTAR Replacement Flight B – Guam",
       "team": "blue",
       "subsystem": "Joint & Coalition Enablers",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -195,
       "y": -195,
-      "z": 10
+      "z": 10,
+      "lat": 13.4207,
+      "lon": 144.8903
     },
     {
       "id": "USA-SEN-017",
       "name": "TITAN Ground Station E – Philippines",
       "team": "blue",
       "subsystem": "Medium Range Sense and Strike",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Sensor",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -95,
       "y": -135,
-      "z": 0
+      "z": 0,
+      "lat": 14.5798,
+      "lon": 121.0946
     },
     {
       "id": "USA-REL-001",
       "name": "Starlink Terminal Cluster A – Kadena",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["EW","Kinetic"],
+      "vulnerabilities": [
+        "EW",
+        "Kinetic"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 5,
       "y": 5,
-      "z": 0
+      "z": 0,
+      "lat": 26.4458,
+      "lon": 127.6908
     },
     {
       "id": "USA-REL-002",
       "name": "ABMS Airborne Relay Node B-52 – Andersen",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -210,
       "y": -210,
-      "z": 12
+      "z": 12,
+      "lat": 13.6686,
+      "lon": 144.8527
     },
     {
       "id": "USA-REL-003",
       "name": "TROPO Site A – Okinawa",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 15,
       "y": 15,
-      "z": 0
+      "z": 0,
+      "lat": 26.4276,
+      "lon": 127.732
     },
     {
       "id": "USA-REL-004",
       "name": "Starlink Cluster B – Camp Zama",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 115,
       "y": 215,
-      "z": 0
+      "z": 0,
+      "lat": 35.6005,
+      "lon": 139.3239
     },
     {
       "id": "USA-REL-005",
       "name": "TROPO Site B – Guam",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -180,
       "y": -180,
-      "z": 0
+      "z": 0,
+      "lat": 13.5295,
+      "lon": 144.7183
     },
     {
       "id": "USA-REL-006",
       "name": "ABMS Relay Node C – Philippines",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -105,
       "y": -145,
-      "z": 12
+      "z": 12,
+      "lat": 14.6923,
+      "lon": 120.9302
     },
     {
       "id": "USA-REL-007",
       "name": "Starlink Cluster C – Tindal",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -155,
       "y": -295,
-      "z": 0
+      "z": 0,
+      "lat": -14.4286,
+      "lon": 132.3046
     },
     {
       "id": "USA-REL-008",
       "name": "TROPO Site C – Philippines",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -90,
       "y": -130,
-      "z": 0
+      "z": 0,
+      "lat": 14.6942,
+      "lon": 120.9265
     },
     {
       "id": "USA-REL-009",
       "name": "ABMS Airborne Relay D – Darwin",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -140,
       "y": -280,
-      "z": 12
+      "z": 12,
+      "lat": -12.3667,
+      "lon": 130.7608
     },
     {
       "id": "USA-REL-010",
       "name": "Starlink Terminal D – White Beach",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -35,
       "y": -55,
-      "z": 0
+      "z": 0,
+      "lat": 26.3111,
+      "lon": 127.9818
     },
     {
       "id": "USA-REL-011",
       "name": "TROPO Site D – Japan Mainland",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 130,
       "y": 230,
-      "z": 0
+      "z": 0,
+      "lat": 34.992,
+      "lon": 138.0675
     },
     {
       "id": "USA-REL-012",
       "name": "ABMS Relay Node E – Okinawa",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 20,
       "y": 30,
-      "z": 12
+      "z": 12,
+      "lat": 26.3292,
+      "lon": 127.8656
     },
     {
       "id": "USA-REL-013",
       "name": "Starlink Cluster E – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -175,
       "y": -175,
-      "z": 0
+      "z": 0,
+      "lat": 13.4301,
+      "lon": 144.8612
     },
     {
       "id": "USA-REL-014",
       "name": "TROPO Site E – Australia",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -160,
       "y": -300,
-      "z": 0
+      "z": 0,
+      "lat": -14.5127,
+      "lon": 132.4493
     },
     {
       "id": "USA-REL-015",
       "name": "ABMS Relay Node F – Philippines",
       "team": "blue",
       "subsystem": "Corps Command & Control",
-      "domain": ["Air"],
+      "domain": [
+        "Air"
+      ],
       "type": "Relay",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["SAM"],
+      "vulnerabilities": [
+        "SAM"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -95,
       "y": -145,
-      "z": 12
+      "z": 12,
+      "lat": 14.5883,
+      "lon": 121.0599
     },
     {
       "id": "USA-LOG-001",
       "name": "MSV(L)-801 Spearhead – Naha",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASCM"],
+      "vulnerabilities": [
+        "ASCM"
+      ],
       "importance": 8,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -50,
       "y": -70,
-      "z": 0
+      "z": 0,
+      "lat": 26.3156,
+      "lon": 127.7213
     },
     {
       "id": "USA-LOG-002",
       "name": "MSV(L)-802 – White Beach",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASCM"],
+      "vulnerabilities": [
+        "ASCM"
+      ],
       "importance": 8,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -45,
       "y": -65,
-      "z": 0
+      "z": 0,
+      "lat": 26.4128,
+      "lon": 127.9594
     },
     {
       "id": "USA-LOG-003",
       "name": "MSV(L)-803 – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASCM"],
+      "vulnerabilities": [
+        "ASCM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -210,
       "y": -210,
-      "z": 0
+      "z": 0,
+      "lat": 13.5337,
+      "lon": 144.835
     },
     {
       "id": "USA-LOG-004",
       "name": "LCU-2000 Flotilla – Philippines",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASCM"],
+      "vulnerabilities": [
+        "ASCM"
+      ],
       "importance": 6,
       "cascScore": 2,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -110,
       "y": -150,
-      "z": 0
+      "z": 0,
+      "lat": 14.6909,
+      "lon": 121.0431
     },
     {
       "id": "USA-LOG-005",
       "name": "Forward Ammunition Supply Point – Tinian",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -220,
       "y": -200,
-      "z": 0
+      "z": 0,
+      "lat": 15.0919,
+      "lon": 145.6637
     },
     {
       "id": "USA-LOG-006",
       "name": "Fuel Distribution Node – Darwin",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -150,
       "y": -310,
-      "z": 0
+      "z": 0,
+      "lat": -12.3709,
+      "lon": 130.8718
     },
     {
       "id": "USA-LOG-007",
       "name": "MSV(L)-804 – Philippines",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASCM"],
+      "vulnerabilities": [
+        "ASCM"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -100,
       "y": -140,
-      "z": 0
+      "z": 0,
+      "lat": 14.69,
+      "lon": 121.0375
     },
     {
       "id": "USA-LOG-008",
       "name": "Ammunition Supply Point – Okinawa",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -20,
       "y": -50,
-      "z": 0
+      "z": 0,
+      "lat": 26.4422,
+      "lon": 127.8357
     },
     {
       "id": "USA-LOG-009",
       "name": "Forward Logistics Element – Palau",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Dispersed",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 2,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -150,
       "y": -100,
-      "z": 0
+      "z": 0,
+      "lat": 28.7339,
+      "lon": 133.101
     },
     {
       "id": "USA-LOG-010",
       "name": "Watercraft Support Base – Yokosuka",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 140,
       "y": 240,
-      "z": 0
+      "z": 0,
+      "lat": 35.3903,
+      "lon": 139.5693
     },
     {
       "id": "USA-LOG-011",
       "name": "POL Distribution Node – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -190,
       "y": -190,
-      "z": 0
+      "z": 0,
+      "lat": 13.5394,
+      "lon": 144.6837
     },
     {
       "id": "USA-LOG-012",
       "name": "Watercraft Support Base – Darwin",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Sea"],
+      "domain": [
+        "Sea"
+      ],
       "type": "Logistics",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Fortified",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 2,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -160,
       "y": -310,
-      "z": 0
+      "z": 0,
+      "lat": -12.3578,
+      "lon": 130.7356
     },
     {
       "id": "USA-SUP-001",
       "name": "THAAD Battery A – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 9,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -200,
       "y": -200,
-      "z": 0
+      "z": 0,
+      "lat": 13.4234,
+      "lon": 144.6923
     },
     {
       "id": "USA-SUP-002",
       "name": "Patriot Battery A – Kadena",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 10,
       "y": 10,
-      "z": 0
+      "z": 0,
+      "lat": 26.3443,
+      "lon": 127.663
     },
     {
       "id": "USA-SUP-003",
       "name": "Patriot Battery B – Camp Zama",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 120,
       "y": 220,
-      "z": 0
+      "z": 0,
+      "lat": 35.4953,
+      "lon": 139.2886
     },
     {
       "id": "USA-SUP-004",
       "name": "IFPC Battery A – Okinawa",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 30,
       "y": 60,
-      "z": 0
+      "z": 0,
+      "lat": 26.3187,
+      "lon": 127.6892
     },
     {
       "id": "USA-SUP-005",
       "name": "M-SHORAD Battalion – Philippines",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -90,
       "y": -140,
-      "z": 0
+      "z": 0,
+      "lat": 14.5796,
+      "lon": 120.8948
     },
     {
       "id": "USA-SUP-006",
       "name": "THAAD Battery B – Japan",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 8,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 140,
       "y": 250,
-      "z": 0
+      "z": 0,
+      "lat": 34.9806,
+      "lon": 137.9004
     },
     {
       "id": "USA-SUP-007",
       "name": "IFPC Battery B – Guam",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -180,
       "y": -180,
-      "z": 0
+      "z": 0,
+      "lat": 13.4215,
+      "lon": 144.6811
     },
     {
       "id": "USA-SUP-008",
       "name": "M-SHORAD Company C – Okinawa",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": 40,
       "y": 70,
-      "z": 0
+      "z": 0,
+      "lat": 26.3149,
+      "lon": 127.6966
     },
     {
       "id": "USA-SUP-009",
       "name": "Patriot Battery C – Philippines",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ARMs"],
+      "vulnerabilities": [
+        "ARMs"
+      ],
       "importance": 7,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -100,
       "y": -150,
-      "z": 0
+      "z": 0,
+      "lat": 14.5759,
+      "lon": 120.9023
     },
     {
       "id": "USA-SUP-010",
       "name": "IFPC Battery C – Tindal",
       "team": "blue",
       "subsystem": "Contested Sustainment",
-      "domain": ["Land"],
+      "domain": [
+        "Land"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["Kinetic"],
+      "vulnerabilities": [
+        "Kinetic"
+      ],
       "importance": 6,
       "cascScore": 3,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 0, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 0,
+        "sof": 0
+      },
       "x": -140,
       "y": -290,
-      "z": 0
+      "z": 0,
+      "lat": -14.5319,
+      "lon": 132.3804
     },
     {
       "id": "USA-IAK-001",
       "name": "Offensive Cyber Company A – Torii Station",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Cyber"],
+      "domain": [
+        "Cyber"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 8,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 5, "sof": 4 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 5,
+        "sof": 4
+      },
       "x": 15,
       "y": 25,
-      "z": 0
+      "z": 0,
+      "lat": 26.4021,
+      "lon": 127.9106
     },
     {
       "id": "USA-IAK-002",
       "name": "Space Control Company A – Okinawa",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASAT"],
+      "vulnerabilities": [
+        "ASAT"
+      ],
       "importance": 8,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 5, "jam": 0, "sof": 3 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 5,
+        "jam": 0,
+        "sof": 3
+      },
       "x": 25,
       "y": 35,
-      "z": 0
+      "z": 0,
+      "lat": 26.2449,
+      "lon": 127.8125
     },
     {
       "id": "USA-IAK-003",
       "name": "EW Battalion HQ – Camp Zama",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["EW"],
+      "domain": [
+        "EW"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 8,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 5, "jam": 5, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 5,
+        "jam": 5,
+        "sof": 0
+      },
       "x": 130,
       "y": 230,
-      "z": 0
+      "z": 0,
+      "lat": 35.414,
+      "lon": 139.4119
     },
     {
       "id": "USA-IAK-004",
       "name": "Terrestrial Layer EW Company B – Guam",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["EW"],
+      "domain": [
+        "EW"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 4, "jam": 4, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 4,
+        "jam": 4,
+        "sof": 0
+      },
       "x": -170,
       "y": -170,
-      "z": 0
+      "z": 0,
+      "lat": 13.3468,
+      "lon": 144.8138
     },
     {
       "id": "USA-IAK-005",
       "name": "Offensive Cyber Company B – Philippines",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Cyber"],
+      "domain": [
+        "Cyber"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 4, "sof": 4 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 4,
+        "sof": 4
+      },
       "x": -90,
       "y": -130,
-      "z": 0
+      "z": 0,
+      "lat": 14.5058,
+      "lon": 121.0181
     },
     {
       "id": "USA-IAK-006",
       "name": "Space Control Company B – Australia",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASAT"],
+      "vulnerabilities": [
+        "ASAT"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 4, "jam": 0, "sof": 3 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 4,
+        "jam": 0,
+        "sof": 3
+      },
       "x": -150,
       "y": -300,
-      "z": 0
+      "z": 0,
+      "lat": -14.5913,
+      "lon": 132.4001
     },
     {
       "id": "USA-IAK-007",
       "name": "EW Company C – Okinawa",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["EW"],
+      "domain": [
+        "EW"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["EW"],
+      "vulnerabilities": [
+        "EW"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 4, "jam": 4, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 4,
+        "jam": 4,
+        "sof": 0
+      },
       "x": 35,
       "y": 65,
-      "z": 0
+      "z": 0,
+      "lat": 26.2477,
+      "lon": 127.8144
     },
     {
       "id": "USA-IAK-008",
       "name": "Electromagnetic Battle Management Cell – Kadena",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["EW"],
+      "domain": [
+        "EW"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 8,
       "cascScore": 5,
-      "resourceGenByType": { "kinetic": 0, "ew": 3, "jam": 5, "sof": 0 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 3,
+        "jam": 5,
+        "sof": 0
+      },
       "x": 5,
       "y": 15,
-      "z": 0
+      "z": 0,
+      "lat": 26.2555,
+      "lon": 127.7862
     },
     {
       "id": "USA-IAK-009",
       "name": "Offensive Cyber Task Force – Guam",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Cyber"],
+      "domain": [
+        "Cyber"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Hardened",
-      "vulnerabilities": ["Cyber"],
+      "vulnerabilities": [
+        "Cyber"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 0, "jam": 4, "sof": 4 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 0,
+        "jam": 4,
+        "sof": 4
+      },
       "x": -180,
       "y": -180,
-      "z": 0
+      "z": 0,
+      "lat": 13.3346,
+      "lon": 144.8005
     },
     {
       "id": "USA-IAK-010",
       "name": "Space Control Company C – Japan",
       "team": "blue",
       "subsystem": "Counter C2",
-      "domain": ["Space"],
+      "domain": [
+        "Space"
+      ],
       "type": "Support",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
       "difficulty": "Mobile",
-      "vulnerabilities": ["ASAT"],
+      "vulnerabilities": [
+        "ASAT"
+      ],
       "importance": 7,
       "cascScore": 4,
-      "resourceGenByType": { "kinetic": 0, "ew": 4, "jam": 0, "sof": 3 },
+      "resourceGenByType": {
+        "kinetic": 0,
+        "ew": 4,
+        "jam": 0,
+        "sof": 3
+      },
       "x": 140,
       "y": 260,
-      "z": 0
+      "z": 0,
+      "lat": 34.8974,
+      "lon": 137.9126
     }
   ],
   "links": [
-    {"source": "USA-CMD-001", "target": "USA-CMD-002"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-003"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-004"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-005"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-010"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-011"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-012"},
-    {"source": "USA-CMD-001", "target": "USA-CMD-013"},
-    {"source": "USA-CMD-002", "target": "USA-CMD-006"},
-    {"source": "USA-CMD-002", "target": "USA-CMD-009"},
-    {"source": "USA-CMD-003", "target": "USA-CMD-007"},
-    {"source": "USA-CMD-004", "target": "USA-CMD-008"},
-    {"source": "USA-CMD-005", "target": "USA-CMD-001"},
-    {"source": "USA-CMD-010", "target": "USA-CMD-001"},
-    {"source": "USA-CMD-010", "target": "USA-CMD-002"},
-    {"source": "USA-CMD-010", "target": "USA-CMD-003"},
-    {"source": "USA-CMD-010", "target": "USA-CMD-004"},
-    {"source": "USA-CMD-010", "target": "USA-CMD-005"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-001"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-002"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-003"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-011"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-012"},
-    {"source": "USA-CMD-002", "target": "USA-FIR-022"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-004"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-005"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-006"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-007"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-009"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-010"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-013"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-014"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-017"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-018"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-019"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-020"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-021"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-023"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-024"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-026"},
-    {"source": "USA-CMD-003", "target": "USA-FIR-027"},
-    {"source": "USA-CMD-004", "target": "USA-FIR-015"},
-    {"source": "USA-CMD-004", "target": "USA-FIR-016"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-001"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-002"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-003"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-004"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-005"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-007"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-008"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-009"},
-    {"source": "USA-CMD-004", "target": "USA-SUP-010"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-001"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-002"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-003"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-004"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-005"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-006"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-007"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-008"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-009"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-010"},
-    {"source": "USA-CMD-002", "target": "USA-SEN-001"},
-    {"source": "USA-CMD-002", "target": "USA-SEN-002"},
-    {"source": "USA-CMD-002", "target": "USA-SEN-003"},
-    {"source": "USA-CMD-002", "target": "USA-SEN-013"},
-    {"source": "USA-CMD-003", "target": "USA-SEN-004"},
-    {"source": "USA-CMD-003", "target": "USA-SEN-005"},
-    {"source": "USA-CMD-003", "target": "USA-SEN-008"},
-    {"source": "USA-CMD-003", "target": "USA-SEN-017"},
-    {"source": "USA-CMD-004", "target": "USA-SEN-006"},
-    {"source": "USA-CMD-004", "target": "USA-SEN-011"},
-    {"source": "USA-CMD-004", "target": "USA-SEN-012"},
-    {"source": "USA-CMD-010", "target": "USA-SEN-007"},
-    {"source": "USA-CMD-010", "target": "USA-SEN-014"},
-    {"source": "USA-CMD-010", "target": "USA-SEN-016"},
-    {"source": "USA-CMD-012", "target": "USA-SEN-009"},
-    {"source": "USA-CMD-013", "target": "USA-SEN-010"},
-    {"source": "USA-CMD-013", "target": "USA-SEN-015"},
-    {"source": "USA-CMD-001", "target": "USA-REL-001"},
-    {"source": "USA-CMD-001", "target": "USA-REL-002"},
-    {"source": "USA-CMD-001", "target": "USA-REL-003"},
-    {"source": "USA-CMD-001", "target": "USA-REL-012"},
-    {"source": "USA-CMD-002", "target": "USA-REL-004"},
-    {"source": "USA-CMD-003", "target": "USA-REL-011"},
-    {"source": "USA-CMD-004", "target": "USA-REL-005"},
-    {"source": "USA-CMD-004", "target": "USA-REL-010"},
-    {"source": "USA-CMD-010", "target": "USA-REL-006"},
-    {"source": "USA-CMD-010", "target": "USA-REL-009"},
-    {"source": "USA-CMD-012", "target": "USA-REL-008"},
-    {"source": "USA-CMD-013", "target": "USA-REL-007"},
-    {"source": "USA-CMD-013", "target": "USA-REL-014"},
-    {"source": "USA-REL-001", "target": "USA-REL-002"},
-    {"source": "USA-REL-002", "target": "USA-REL-003"},
-    {"source": "USA-REL-004", "target": "USA-REL-005"},
-    {"source": "USA-REL-006", "target": "USA-REL-007"},
-    {"source": "USA-REL-010", "target": "USA-REL-011"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-001"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-002"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-003"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-007"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-008"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-011"},
-    {"source": "USA-CMD-012", "target": "USA-LOG-004"},
-    {"source": "USA-CMD-012", "target": "USA-LOG-007"},
-    {"source": "USA-CMD-013", "target": "USA-LOG-006"},
-    {"source": "USA-CMD-013", "target": "USA-LOG-012"},
-    {"source": "USA-CMD-010", "target": "USA-LOG-003"},
-    {"source": "USA-CMD-010", "target": "USA-LOG-010"},
-    {"source": "USA-CMD-005", "target": "USA-FIR-001"},
-    {"source": "USA-CMD-005", "target": "USA-FIR-004"},
-    {"source": "USA-CMD-005", "target": "USA-FIR-015"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-001"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-003"},
-    {"source": "USA-CMD-005", "target": "USA-IAK-008"},
-    {"source": "USA-SEN-003", "target": "USA-CMD-009"},
-    {"source": "USA-SEN-004", "target": "USA-CMD-007"},
-    {"source": "USA-SEN-013", "target": "USA-CMD-009"},
-    {"source": "USA-FIR-001", "target": "USA-CMD-009"},
-    {"source": "USA-FIR-002", "target": "USA-CMD-009"},
-    {"source": "USA-FIR-003", "target": "USA-CMD-009"},
-    {"source": "USA-FIR-012", "target": "USA-CMD-009"},
-    {"source": "USA-FIR-022", "target": "USA-CMD-009"},
-    {"source": "USA-SEN-001", "target": "USA-CMD-002"},
-    {"source": "USA-SEN-002", "target": "USA-CMD-002"},
-    {"source": "USA-SEN-006", "target": "USA-CMD-002"},
-    {"source": "USA-CMD-001", "target": "USA-IAK-008"},
-    {"source": "USA-CMD-001", "target": "USA-REL-001"},
-    {"source": "USA-CMD-001", "target": "USA-REL-002"},
-    {"source": "USA-CMD-001", "target": "USA-REL-012"},
-    {"source": "USA-CMD-011", "target": "USA-REL-002"},
-    {"source": "USA-CMD-011", "target": "USA-REL-005"},
-    {"source": "USA-CMD-012", "target": "USA-REL-006"},
-    {"source": "USA-CMD-013", "target": "USA-REL-009"},
-    {"source": "USA-CMD-002", "target": "USA-LOG-008"},
-    {"source": "USA-CMD-003", "target": "USA-LOG-010"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-001"},
-    {"source": "USA-CMD-004", "target": "USA-LOG-002"},
-    {"source": "USA-CMD-010", "target": "USA-LOG-003"},
-    {"source": "USA-CMD-010", "target": "USA-LOG-010"},
-    {"source": "USA-CMD-012", "target": "USA-LOG-004"},
-    {"source": "USA-CMD-013", "target": "USA-LOG-006"},
-    {"source": "USA-CMD-013", "target": "USA-LOG-012"}
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-002"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-003"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-004"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-005"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-010"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-011"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-012"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-CMD-013"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-CMD-006"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-CMD-007"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-CMD-008"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-CMD-001"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-CMD-001"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-CMD-002"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-CMD-003"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-CMD-004"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-CMD-005"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-001"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-002"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-003"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-011"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-012"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-FIR-022"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-004"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-005"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-006"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-007"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-009"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-010"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-013"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-014"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-017"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-018"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-019"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-020"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-021"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-023"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-024"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-026"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-FIR-027"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-FIR-015"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-FIR-016"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-001"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-002"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-003"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-004"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-005"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-007"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-008"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-009"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SUP-010"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-001"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-002"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-003"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-004"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-005"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-006"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-007"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-008"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-009"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-010"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-SEN-001"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-SEN-002"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-SEN-003"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-SEN-013"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-SEN-004"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-SEN-005"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-SEN-008"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-SEN-017"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SEN-006"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SEN-011"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-SEN-012"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-SEN-007"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-SEN-014"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-SEN-016"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-SEN-009"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-SEN-010"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-SEN-015"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-001"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-002"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-003"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-012"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-REL-004"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-REL-011"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-REL-005"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-REL-010"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-REL-006"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-REL-009"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-REL-008"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-REL-007"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-REL-014"
+    },
+    {
+      "source": "USA-REL-001",
+      "target": "USA-REL-002"
+    },
+    {
+      "source": "USA-REL-002",
+      "target": "USA-REL-003"
+    },
+    {
+      "source": "USA-REL-004",
+      "target": "USA-REL-005"
+    },
+    {
+      "source": "USA-REL-006",
+      "target": "USA-REL-007"
+    },
+    {
+      "source": "USA-REL-010",
+      "target": "USA-REL-011"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-001"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-002"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-003"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-007"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-008"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-011"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-LOG-004"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-LOG-007"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-LOG-006"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-LOG-012"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-LOG-003"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-LOG-010"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-FIR-001"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-FIR-004"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-FIR-015"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-001"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-003"
+    },
+    {
+      "source": "USA-CMD-005",
+      "target": "USA-IAK-008"
+    },
+    {
+      "source": "USA-SEN-003",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-SEN-004",
+      "target": "USA-CMD-007"
+    },
+    {
+      "source": "USA-SEN-013",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-FIR-001",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-FIR-002",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-FIR-003",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-FIR-012",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-FIR-022",
+      "target": "USA-CMD-009"
+    },
+    {
+      "source": "USA-SEN-001",
+      "target": "USA-CMD-002"
+    },
+    {
+      "source": "USA-SEN-002",
+      "target": "USA-CMD-002"
+    },
+    {
+      "source": "USA-SEN-006",
+      "target": "USA-CMD-002"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-IAK-008"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-001"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-002"
+    },
+    {
+      "source": "USA-CMD-001",
+      "target": "USA-REL-012"
+    },
+    {
+      "source": "USA-CMD-011",
+      "target": "USA-REL-002"
+    },
+    {
+      "source": "USA-CMD-011",
+      "target": "USA-REL-005"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-REL-006"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-REL-009"
+    },
+    {
+      "source": "USA-CMD-002",
+      "target": "USA-LOG-008"
+    },
+    {
+      "source": "USA-CMD-003",
+      "target": "USA-LOG-010"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-001"
+    },
+    {
+      "source": "USA-CMD-004",
+      "target": "USA-LOG-002"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-LOG-003"
+    },
+    {
+      "source": "USA-CMD-010",
+      "target": "USA-LOG-010"
+    },
+    {
+      "source": "USA-CMD-012",
+      "target": "USA-LOG-004"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-LOG-006"
+    },
+    {
+      "source": "USA-CMD-013",
+      "target": "USA-LOG-012"
+    }
   ]
 }
