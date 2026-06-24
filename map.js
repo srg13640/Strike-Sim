@@ -98,7 +98,7 @@ window.MapModule = (function () {
       if (realTilesLoaded) {
         setBasemapStatus(indopacSatelliteLoaded ? 'Basemap: local tiles + Indo-Pacific satellite' : 'Basemap: local tiles', 'ok');
       } else if (indopacSatelliteLoaded) {
-        setBasemapStatus('Basemap: Indo-Pacific satellite', 'ok');
+        setBasemapStatus(coastlinesLoaded ? 'Basemap: Indo-Pacific satellite + coastlines' : 'Basemap: Indo-Pacific satellite', 'ok');
       } else if (coastlinesLoaded) {
         setBasemapStatus('Basemap: coastlines (offline)', 'ok');
       } else {
@@ -138,7 +138,7 @@ window.MapModule = (function () {
           L.geoJSON(geo, {
             pane: 'basemapPane',
             interactive: false,
-            style: { color: '#33617f', weight: 0.7, opacity: 0.85, fillColor: '#15293a', fillOpacity: 1 }
+            style: { color: '#78c9ff', weight: 0.75, opacity: 0.72, fillColor: '#15293a', fillOpacity: 0.12 }
           }).addTo(leafletMap);
           coastlinesLoaded = true;
           refreshBasemapStatus();

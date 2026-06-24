@@ -79,7 +79,10 @@ window.EngineModule = (function () {
       );
       group.add(grid);
 
-      if (!earthLightingDone && scene) {
+      const scene = graphInstance.scene && graphInstance.scene();
+      if (!scene) return;
+
+      if (!earthLightingDone) {
         const ambient = new THREE.AmbientLight(0x36597d, 0.55);
         const key = new THREE.DirectionalLight(0xe8f5ff, 0.8);
         const fill = new THREE.DirectionalLight(0x1e4d73, 0.45);
@@ -91,12 +94,24 @@ window.EngineModule = (function () {
         earthLightingDone = true;
       }
 
+      const atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_RADIUS + 6, 48, 48),
+        new THREE.MeshBasicMaterial({
+          color: 0x4bb8ff,
+          transparent: true,
+          opacity: 0.11,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      group.add(atmosphere);
+
       earthMesh = group;
       earthMesh.visible = false;
-      const scene = graphInstance.scene && graphInstance.scene();
-      if (scene) scene.add(earthMesh);
+      scene.add(earthMesh);
 
-      // Upgrade to a real-Earth photo globe if assets/earth.jpg is bundled. Probe with a
+      // Upgrade to a real-Earth photo globe if the bundled Blue Marble texture is present. Probe with a
       // fetch HEAD first so a missing file makes no request (no 404). When textured, the
       // globe becomes opaque (far-side nodes are correctly occluded by the planet) and the
       // graticule is hidden since the photo already shows coastlines.

@@ -62,3 +62,25 @@
 - **Uncertainties / follow-up**
   - `runMonteCarlo(10000)` now always fires on `M`; if reviewers want mode-gated behavior, we can restrict behind active COA flow context.
   - Header hint line may need wrapping strategy for very narrow viewports if the operator pane is very narrow.
+
+### Change 4 — Repair first-run controls and harden Globe/Map presentation
+- **What changed**
+  - Fixed `engine.js` Geo globe creation by reading the Three.js scene before using it. The prior code referenced `scene` while it was still in the temporal dead zone, which could silently drop into the broad globe fallback catch.
+  - Added a subtle atmospheric shell around the textured Earth so Geo Mode has better depth against the dark force network.
+  - Changed the left quick-controls rail from hover-only hidden by default to open by default, with a real collapsed/open toggle, arrow direction, and `aria-expanded` state.
+  - Added a plain-language mission brief in the right header and let shortcut help wrap instead of truncating.
+  - Reduced the offline coastline vector fill opacity in Map Mode so the Indo-Pacific satellite image remains the visual basemap while coastlines stay useful for registration.
+
+- **Why**
+  - The first 60 seconds matter: operators should see controls immediately, understand the workflow, and trust that Geo/Map are real views rather than failed toggles.
+  - The map should look like a satellite ops picture, not a dark vector mask laid over a photo.
+
+- **How verified**
+  - Ran `python3 -m http.server 8000` and loaded `http://localhost:8000/DST2040.HTML`.
+  - Confirmed clean load except the known benign `Multiple instances of Three.js` warning.
+  - Confirmed the left control rail is visible on first load and can collapse/expand.
+  - Confirmed Geo Mode switches to `Exit Geo`, updates the header to `Geo ON (224 nodes pinned by lat/lon)`, and renders the Blue Marble globe with pinned nodes.
+  - Confirmed Map Mode renders 224 markers over the Indo-Pacific satellite with the basemap status badge.
+
+- **Uncertainties / follow-up**
+  - Left rail open by default intentionally trades graph width for discoverability. If the reviewer wants a denser default, keep the fixed toggle behavior and start collapsed only after adding an obvious primary workflow strip elsewhere.

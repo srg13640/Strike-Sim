@@ -328,6 +328,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
     flex: 0 0 auto;
     background: rgba(10,15,20,0.98);
     position: sticky;
@@ -350,6 +351,13 @@
     #side header .sub {
     color: var(--muted);
     font-size: 11px;
+    }
+    #mission-brief {
+      flex: 1 0 100%;
+      color: #cfe7ff;
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 2px;
     }
 
     /* Single scroll container for the column */
@@ -519,10 +527,9 @@
     flex-direction: column;
     overflow: hidden;
     z-index: 4;
-    transform: translateX(calc(-100% + var(--handle-width)));
+    transform: translateX(0);
     transition: transform 0.2s ease;
     }
-    #left-panel:hover { transform: translateX(0); }
     #left-panel.locked-collapsed { transform: translateX(calc(-100% + var(--handle-width))); }
     #left-panel.locked-collapsed:hover { transform: translateX(calc(-100% + var(--handle-width))); }
     #left-panel header {
@@ -574,6 +581,7 @@
     .panel-handle .arrow { font-size: 14px; color: var(--muted); }
     #left-panel .panel-handle { right: 0; border-left: 1px solid var(--border); }
     #left-panel .panel-handle .arrow { transform: translateX(1px); }
+    #left-panel:not(.locked-collapsed) .panel-handle .arrow { transform: translateX(-1px); }
 
     .left-actions {
     display: grid;
@@ -651,9 +659,8 @@
       line-height: 1.2;
       color: var(--muted);
       opacity: 0.95;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      flex: 1 0 100%;
+      white-space: normal;
       max-width: 100%;
     }
     .leaflet-control-scale {
@@ -1141,6 +1148,7 @@
       <span class="sub" id="counts">0 nodes · 0 links</span>
     </div>
       <div id="view-status" role="status" aria-live="polite">View: 3D Network</div>
+      <div id="mission-brief">Explore the force network, build an attack plan, then run Monte Carlo risk checks before committing.</div>
       <div id="control-hints" class="muted">Shortcuts: M=Run MC · Shift/Alt+M=Map · R=Reset · [ ]=Target · Space=Pause</div>
       </header>
 
@@ -2836,12 +2844,22 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); }
     };
     if (leftPanel && leftCollapseBtn) {
-      leftCollapseBtn.addEventListener('click', () => leftPanel.classList.add('locked-collapsed'));
-    }
-    if (leftPanel && leftHandle) {
-      const toggleLeft = () => leftPanel.classList.toggle('locked-collapsed');
-      leftHandle.addEventListener('click', toggleLeft);
-      leftHandle.addEventListener('keydown', (e) => handleKey(e, toggleLeft));
+      const setLeftCollapsed = (collapsed) => {
+        leftPanel.classList.toggle('locked-collapsed', collapsed);
+        if (leftHandle) {
+          leftHandle.setAttribute('aria-expanded', String(!collapsed));
+          const arrow = leftHandle.querySelector('.arrow');
+          if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
+        }
+        leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      };
+      setLeftCollapsed(false);
+      leftCollapseBtn.addEventListener('click', () => setLeftCollapsed(true));
+      if (leftHandle) {
+        const toggleLeft = () => setLeftCollapsed(!leftPanel.classList.contains('locked-collapsed'));
+        leftHandle.addEventListener('click', toggleLeft);
+        leftHandle.addEventListener('keydown', (e) => handleKey(e, toggleLeft));
+      }
     }
     if (rightPanel && rightCollapseBtn) {
       rightCollapseBtn.addEventListener('click', () => {
