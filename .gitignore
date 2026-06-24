@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Editor / OS noise
+*.swp
+*~
+Thumbs.db
+
+# Claude Code local (machine-specific permissions/cache); keep shared config only
+.claude/settings.local.json
+
+# Local preview server state (keep launch.json — it's shared config)
+# (nothing to ignore here yet)
+
+# Local map tiles are environment-specific; bundle deliberately, not by accident.
+# Uncomment if tiles should stay out of version control:
+# /tiles/
