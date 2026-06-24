@@ -8,19 +8,37 @@
 # Move into the folder this file lives in (works on any machine).
 cd "$(dirname "$0")" || exit 1
 
-# Start the local server only if it isn't already running on port 8000.
-if ! lsof -ti tcp:8000 >/dev/null 2>&1; then
-  nohup python3 -m http.server 8000 >/tmp/strikesim_server.log 2>&1 &
-  sleep 1
+# Reuse a real Strike Sim server on 8000 if it is already up. If some other
+# process owns 8000, pick the next free port instead of opening the wrong app.
+PORT=""
+if command -v curl >/dev/null 2>&1 && curl -fsI "http://localhost:8000/DST2040.HTML" >/dev/null 2>&1; then
+  PORT=8000
+else
+  for candidate in $(seq 8000 8020); do
+    if ! lsof -ti tcp:"$candidate" >/dev/null 2>&1; then
+      PORT="$candidate"
+      nohup python3 -m http.server "$PORT" >"/tmp/strikesim_server_${PORT}.log" 2>&1 &
+      sleep 1
+      break
+    fi
+  done
+fi
+
+if [ -z "$PORT" ]; then
+  echo ""
+  echo "   No free local port found between 8000 and 8020."
+  echo "   Close another local server and try again."
+  echo ""
+  exit 1
 fi
 
 # Open the app in the default web browser.
-open "http://localhost:8000/DST2040.HTML"
+open "http://localhost:${PORT}/DST2040.HTML"
 
 echo ""
 echo "   ✅  Strike Sim is opening in your browser..."
 echo ""
 echo "   You can close this window now."
 echo "   (Leave it running and the app stays available at"
-echo "    http://localhost:8000/DST2040.HTML )"
+echo "    http://localhost:${PORT}/DST2040.HTML )"
 echo ""

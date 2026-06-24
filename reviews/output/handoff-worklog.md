@@ -105,3 +105,19 @@
 
 - **Uncertainties / follow-up**
   - This keeps MC on the main thread with frame-yield chunking rather than moving it to a Worker. It is materially more controllable now, but a true Worker remains the right architecture if reviewers want large runs while dragging the 3D scene continuously.
+
+### Change 6 — Make the double-click launcher avoid wrong-port launches
+- **What changed**
+  - Updated `Open Strike Sim.command` to reuse port `8000` only when it is already serving `DST2040.HTML`.
+  - If port `8000` is occupied by something else, the launcher now searches `8000-8020`, starts `python3 -m http.server` on the first free port, and opens that exact URL.
+  - Added a clear failure message when no local port in that range is available.
+
+- **Why**
+  - The prior launcher checked whether anything owned port `8000`, not whether Strike Sim owned it. That can silently open the wrong local app, which is exactly the sort of avoidable launch friction that makes a prototype feel brittle.
+
+- **How verified**
+  - Ran `bash -n "Open Strike Sim.command"` to verify shell syntax.
+  - Existing local server on `8000` continued serving the app during browser verification.
+
+- **Uncertainties / follow-up**
+  - The script still assumes `python3` is installed. README already lists Python 3 as a prerequisite; a future packaged launcher could detect Python and fall back to another local static server.
