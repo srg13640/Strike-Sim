@@ -35,7 +35,9 @@ window.EngineModule = (function () {
   // Optional real-Earth texture (equirectangular). If this file is bundled it upgrades
   // the procedural globe to a photo globe; if absent, the procedural globe is used and
   // NO request is made (a fetch-HEAD probe guards the load), so there's no 404.
-  const EARTH_TEX_URL = 'assets/earth.jpg';
+  const EARTH_TEX_URL = 'assets/earth-blue-marble-2048.png';
+  const EARTH_AUTO_ROTATE = 0.15;
+  let earthLightingDone = false;
 
   function latLonToXYZ(lat, lon, radius) {
     if (radius === undefined) radius = 400;
@@ -62,8 +64,8 @@ window.EngineModule = (function () {
       const body = new THREE.Mesh(
         new THREE.SphereGeometry(EARTH_RADIUS, 48, 48),
         new THREE.MeshPhongMaterial({
-          color: 0x0c2336, emissive: 0x040d16, shininess: 4,
-          transparent: true, opacity: 0.5, depthWrite: false
+          color: 0x09253b, emissive: 0x050f1a, shininess: 6,
+          transparent: true, opacity: 0.62, depthWrite: true
         })
       );
       group.add(body);
@@ -76,6 +78,18 @@ window.EngineModule = (function () {
         })
       );
       group.add(grid);
+
+      if (!earthLightingDone && scene) {
+        const ambient = new THREE.AmbientLight(0x36597d, 0.55);
+        const key = new THREE.DirectionalLight(0xe8f5ff, 0.8);
+        const fill = new THREE.DirectionalLight(0x1e4d73, 0.45);
+        key.position.set(1.35, 0.75, 1.15);
+        fill.position.set(-1, -0.55, -1.05);
+        scene.add(ambient);
+        scene.add(key);
+        scene.add(fill);
+        earthLightingDone = true;
+      }
 
       earthMesh = group;
       earthMesh.visible = false;
@@ -99,6 +113,17 @@ window.EngineModule = (function () {
       } catch (e) { /* keep procedural globe */ }
     } catch (e) {
       addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
+    }
+  }
+
+  function setGeoAutoRotate(enabled) {
+    if (!graphInstance || !graphInstance.controls) return;
+    const controls = graphInstance.controls();
+    if (!controls || typeof controls.autoRotate === 'undefined') return;
+    controls.autoRotate = !!enabled;
+    if (enabled) {
+      controls.autoRotateSpeed = EARTH_AUTO_ROTATE;
+      if (typeof controls.update === 'function') controls.update();
     }
   }
 
@@ -142,7 +167,7 @@ window.EngineModule = (function () {
         const pos = latLonToXYZ(node.lat, node.lon, 400 + (node.alt || 0));
         node.fx = pos.x; node.fy = pos.y; node.fz = pos.z;
         node.x  = pos.x; node.y  = pos.y; node.z  = pos.z;
-      } else {
+      } else if (node.fx == null || node.fy == null || node.fz == null) {
         const angle = Math.random() * 2 * Math.PI;
         const r = 50 + Math.random() * 20;
         const px = r * Math.cos(angle);
@@ -156,6 +181,7 @@ window.EngineModule = (function () {
       .d3Force('charge', null)
       .d3Force('center', null)
       .d3ReheatSimulation();
+    setGeoAutoRotate(true);
     frameGeo();   // pull back so the globe + pinned nodes are actually visible
   }
 
@@ -168,6 +194,7 @@ window.EngineModule = (function () {
       .d3Force('link', d3.forceLink().distance(60))
       .d3Force('charge', d3.forceManyBody().strength(-150))
       .d3Force('center', d3.forceCenter());
+    setGeoAutoRotate(false);
     graphInstance.d3ReheatSimulation();
   }
 
