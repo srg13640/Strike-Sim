@@ -32,6 +32,10 @@ window.EngineModule = (function () {
   // --- Geo mode (globe backdrop + lat/lon layout) ---
   let earthMesh = null;                          // globe backdrop, lazily created
   const EARTH_RADIUS = 398;                      // slightly less than node radius for depth sorting
+  // Optional real-Earth texture (equirectangular). If this file is bundled it upgrades
+  // the procedural globe to a photo globe; if absent, the procedural globe is used and
+  // NO request is made (a fetch-HEAD probe guards the load), so there's no 404.
+  const EARTH_TEX_URL = 'assets/earth.jpg';
 
   function latLonToXYZ(lat, lon, radius) {
     if (radius === undefined) radius = 400;
@@ -77,6 +81,22 @@ window.EngineModule = (function () {
       earthMesh.visible = false;
       const scene = graphInstance.scene && graphInstance.scene();
       if (scene) scene.add(earthMesh);
+
+      // Upgrade to a real-Earth photo globe if assets/earth.jpg is bundled. Probe with a
+      // fetch HEAD first so a missing file makes no request (no 404). When textured, the
+      // globe becomes opaque (far-side nodes are correctly occluded by the planet) and the
+      // graticule is hidden since the photo already shows coastlines.
+      try {
+        fetch(EARTH_TEX_URL, { method: 'HEAD', cache: 'force-cache' })
+          .then(r => {
+            if (!(r && r.ok) || !window.THREE) return;
+            const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
+            body.material = new THREE.MeshPhongMaterial({ map: tex, color: 0xffffff, emissive: 0x0a1622, shininess: 6 });
+            body.material.needsUpdate = true;
+            grid.visible = false;
+          })
+          .catch(() => {});
+      } catch (e) { /* keep procedural globe */ }
     } catch (e) {
       addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
     }
