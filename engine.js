@@ -38,6 +38,100 @@ window.EngineModule = (function () {
   const EARTH_TEX_URL = 'assets/earth-blue-marble-2048.png';
   const EARTH_AUTO_ROTATE = 0.15;
   let earthLightingDone = false;
+  let starField = null;   // procedural deep-space backdrop, lives inside the EarthSphere group
+
+  // Fresnel rim-glow shader for the atmosphere shell. Rendered on the BACK faces of a
+  // slightly larger sphere with additive blending, so the limb of the planet picks up a
+  // soft blue halo that fades toward the center — the look real orbital imagery has, and
+  // far more convincing than a flat translucent shell. Falls back to a plain additive
+  // material if ShaderMaterial fails (e.g. cross-instance THREE edge cases).
+  function makeAtmosphereMaterial() {
+    try {
+      return new THREE.ShaderMaterial({
+        uniforms: {
+          glowColor: { value: new THREE.Color(0x5cc8ff) },
+          coefficient: { value: 0.62 },
+          power: { value: 3.4 }
+        },
+        vertexShader: [
+          'varying vec3 vNormal;',
+          'varying vec3 vView;',
+          'void main() {',
+          '  vNormal = normalize(normalMatrix * normal);',
+          '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+          '  vView = normalize(-mv.xyz);',
+          '  gl_Position = projectionMatrix * mv;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform vec3 glowColor;',
+          'uniform float coefficient;',
+          'uniform float power;',
+          'varying vec3 vNormal;',
+          'varying vec3 vView;',
+          'void main() {',
+          '  float rim = pow(clamp(coefficient - dot(vNormal, vView), 0.0, 1.0), power);',
+          '  gl_FragColor = vec4(glowColor, rim);',
+          '}'
+        ].join('\n'),
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false
+      });
+    } catch (e) {
+      return new THREE.MeshBasicMaterial({
+        color: 0x4bb8ff, transparent: true, opacity: 0.11,
+        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false
+      });
+    }
+  }
+
+  // A static starfield far outside the globe so Geo mode reads as a view from orbit
+  // rather than a sphere floating in a black box. Points are scattered on a large shell;
+  // a handful are brightened to suggest nearer stars. Pure procedural — no asset, no
+  // network. Returns a THREE.Points or null on failure.
+  function makeStarField() {
+    try {
+      const COUNT = 1400;
+      const R = EARTH_RADIUS * 9;
+      const positions = new Float32Array(COUNT * 3);
+      const colors = new Float32Array(COUNT * 3);
+      let seed = 0x9e3779b9;
+      const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      for (let i = 0; i < COUNT; i++) {
+        // even-ish distribution on a sphere
+        const u = rnd() * 2 - 1;
+        const t = rnd() * Math.PI * 2;
+        const s = Math.sqrt(1 - u * u);
+        const r = R * (0.85 + rnd() * 0.3);
+        positions[i * 3]     = r * s * Math.cos(t);
+        positions[i * 3 + 1] = r * u;
+        positions[i * 3 + 2] = r * s * Math.sin(t);
+        // mostly cool white, a few warm/bright
+        const b = 0.55 + rnd() * 0.45;
+        const warm = rnd() > 0.92;
+        colors[i * 3]     = warm ? b : b * 0.82;
+        colors[i * 3 + 1] = b * 0.9;
+        colors[i * 3 + 2] = warm ? b * 0.8 : b;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      // Constant screen-space size (no attenuation): the star shell is thousands of units
+      // out, so attenuated points collapse to sub-pixel and vanish. Fixed pixel size keeps
+      // them as crisp specks regardless of zoom.
+      const mat = new THREE.PointsMaterial({
+        size: 1.7, sizeAttenuation: false, vertexColors: true,
+        transparent: true, opacity: 0.95, depthWrite: false
+      });
+      const pts = new THREE.Points(geo, mat);
+      pts.name = 'StarField';
+      return pts;
+    } catch (e) {
+      return null;
+    }
+  }
 
   function latLonToXYZ(lat, lon, radius) {
     if (radius === undefined) radius = 400;
@@ -83,29 +177,34 @@ window.EngineModule = (function () {
       if (!scene) return;
 
       if (!earthLightingDone) {
-        const ambient = new THREE.AmbientLight(0x36597d, 0.55);
-        const key = new THREE.DirectionalLight(0xe8f5ff, 0.8);
-        const fill = new THREE.DirectionalLight(0x1e4d73, 0.45);
+        // Lower ambient + a brighter near-white key gives the planet a real terminator
+        // and self-shadowed limb (depth), while the warm-cool fill keeps the night side
+        // readable enough that pinned nodes there are never lost in pure black.
+        const ambient = new THREE.AmbientLight(0x2a4866, 0.42);
+        const key = new THREE.DirectionalLight(0xfff4e6, 1.05);
+        const fill = new THREE.DirectionalLight(0x24557d, 0.5);
+        const rim = new THREE.DirectionalLight(0x4bb8ff, 0.35);
         key.position.set(1.35, 0.75, 1.15);
         fill.position.set(-1, -0.55, -1.05);
+        rim.position.set(-0.6, 0.2, -1.4);
         scene.add(ambient);
         scene.add(key);
         scene.add(fill);
+        scene.add(rim);
         earthLightingDone = true;
       }
 
+      // Fresnel rim-glow atmosphere on the planet limb.
       const atmosphere = new THREE.Mesh(
-        new THREE.SphereGeometry(EARTH_RADIUS + 6, 48, 48),
-        new THREE.MeshBasicMaterial({
-          color: 0x4bb8ff,
-          transparent: true,
-          opacity: 0.11,
-          side: THREE.BackSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        })
+        new THREE.SphereGeometry(EARTH_RADIUS + 9, 64, 64),
+        makeAtmosphereMaterial()
       );
+      atmosphere.name = 'Atmosphere';
       group.add(atmosphere);
+
+      // Deep-space starfield so the globe sits in orbit, not a void.
+      starField = makeStarField();
+      if (starField) group.add(starField);
 
       earthMesh = group;
       earthMesh.visible = false;
@@ -120,7 +219,23 @@ window.EngineModule = (function () {
           .then(r => {
             if (!(r && r.ok) || !window.THREE) return;
             const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
-            body.material = new THREE.MeshPhongMaterial({ map: tex, color: 0xffffff, emissive: 0x0a1622, shininess: 6 });
+            // Sharpen the texture at grazing angles (anisotropy) so coastlines stay crisp
+            // when the camera sits low over a theater.
+            try {
+              const renderer = graphInstance.renderer && graphInstance.renderer();
+              if (renderer && renderer.capabilities) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            } catch (e) { /* anisotropy is a nicety, not required */ }
+            // Specular oceans: a tight, dim highlight gives the seas a wet sheen under the
+            // key light without washing out the land. Low emissive keeps the night side
+            // from going fully black so pinned nodes there remain legible.
+            body.material = new THREE.MeshPhongMaterial({
+              map: tex,
+              color: 0xffffff,
+              emissive: 0x0b1a2b,
+              emissiveIntensity: 0.6,
+              specular: 0x2b4a63,
+              shininess: 22
+            });
             body.material.needsUpdate = true;
             grid.visible = false;
           })
@@ -163,7 +278,9 @@ window.EngineModule = (function () {
     }
     cx /= k; cy /= k; cz /= k;
     const len = Math.hypot(cx, cy, cz) || 1;
-    const dist = EARTH_RADIUS * 1.9;   // out along the theater direction, with context
+    // Far enough back that the planet's curvature and the glowing atmospheric limb are in
+    // frame (the "from orbit" command-center read), while the theater still fills the view.
+    const dist = EARTH_RADIUS * 2.5;
     graphInstance.cameraPosition(
       { x: (cx / len) * dist, y: (cy / len) * dist, z: (cz / len) * dist },
       { x: cx, y: cy, z: cz },

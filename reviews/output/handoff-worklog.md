@@ -159,3 +159,25 @@
 
 - **Uncertainties / follow-up**
   - The retired Indo-Pacific JPG may still be recoverable if its source projection and exact bounds are found. Without that metadata, direct `L.imageOverlay` use is a trap: it can be tuned for one theater slice while visibly breaking another.
+
+### Change 9 — Promote the Geo globe from "lit sphere" to a command-center orbital view
+- **What changed (all in `engine.js`, Geo mode only — 3D network and Map untouched)**
+  - Added a procedural **starfield**: ~1400 deterministically-seeded `THREE.Points` on a far shell inside the `EarthSphere` group, so it shows only in Geo mode and never hits the network. Stars use `sizeAttenuation:false` (fixed screen-space size) — attenuated points at that radius collapse to sub-pixel and disappear.
+  - Replaced the flat translucent atmosphere shell with a real **Fresnel rim-glow `ShaderMaterial`** on the back faces of a slightly larger sphere (additive, depth-write off). The limb now picks up the soft blue halo that real orbital imagery has. Falls back to the old additive `MeshBasicMaterial` if shader compilation ever fails (guarded for cross-instance THREE edge cases).
+  - Upgraded the **lighting stack**: lower ambient + brighter near-white key gives the planet a genuine terminator and self-shadowed limb (depth); a cool fill + faint blue rim keep the night side legible so pinned nodes there are never lost in black.
+  - Upgraded the **textured Earth material**: max **anisotropy** (crisp coastlines at grazing angles), a tight dim **specular** highlight so oceans read as wet under the key light, and balanced emissive so land/sea stay rich without washing out.
+  - Pulled the default Geo framing back from `EARTH_RADIUS * 1.9` to `* 2.5` so the curvature and the glowing atmosphere are actually in frame on entry, while the West Pacific theater still fills the view. (Previously the camera sat so close the limb/atmosphere were always off-screen.)
+
+- **Why**
+  - This was the brief's #1 immediate target: make the globe "feel like a high-end command center." The texture was already wired, but the presentation was a lit ball in a black box. Atmosphere + stars + orbital framing + specular oceans are what sell "view from orbit."
+
+- **How verified**
+  - Ran the local static server, entered Geo mode, and confirmed via scene traversal that `StarField` and a `ShaderMaterial` `Atmosphere` are present and the globe is visible.
+  - Screenshotted the default Geo entry: full Earth curvature, blue atmospheric limb, theater filling the frame, nodes pinned with link lines, faint stars around the limb.
+  - Console clean except the pre-existing benign "Multiple instances of Three.js" warning — no shader-compile errors.
+  - Regression check: exited Geo (globe hidden), entered Map (224 markers + 2048px satellite render), returned to 3D (224 nodes). No cross-view breakage.
+
+- **Uncertainties / follow-up**
+  - All new globe objects are created with `window.THREE` (three.min.js r128) and added to 3d-force-graph's bundled-THREE scene. This cross-instance pattern already worked for the existing globe; the Fresnel `ShaderMaterial` and `Points` extend it and rendered correctly, but it remains the one place to look first if a future THREE bump changes behavior.
+  - Stars are intentionally subtle (ops tool, not a planetarium). If a reviewer wants them more prominent, raise `PointsMaterial.size` or the bright-star ratio in `makeStarField()`.
+  - Note on testing this locally: `python3 -m http.server` sends no `Cache-Control`, so browsers heuristically cache `engine.js` after an edit. A plain reload can run stale JS — hard-reload or append a `?cb=` query to force fresh module fetch when verifying.
