@@ -32,7 +32,6 @@ window.EngineModule = (function () {
   // --- Geo mode (globe backdrop + lat/lon layout) ---
   let earthMesh = null;                          // globe backdrop, lazily created
   const EARTH_RADIUS = 398;                      // slightly less than node radius for depth sorting
-  const EARTH_TEX_URL = 'assets/earth-dark.jpg';
 
   function latLonToXYZ(lat, lon, radius) {
     if (radius === undefined) radius = 400;
@@ -44,21 +43,55 @@ window.EngineModule = (function () {
     return { x, y, z };
   }
 
+  // Build a self-contained, clearly-visible globe — no external texture, so there is no
+  // network request (and no 404), and it reads as a globe against the dark background:
+  // a deep-blue lit sphere plus a cyan lat/lon graticule overlay.
   function ensureEarthSphere() {
     try {
       if (!graphInstance || !window.THREE) return;
       if (earthMesh) return;
-      const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
-      const geom = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
-      const mat = new THREE.MeshPhongMaterial({ map: tex });
-      earthMesh = new THREE.Mesh(geom, mat);
-      earthMesh.name = 'EarthSphere';
+      const group = new THREE.Group();
+      group.name = 'EarthSphere';
+
+      // Dark, semi-transparent body so the lat/lon-pinned nodes on its surface (and dimly
+      // through it on the far side) stand out, while it still clearly reads as a globe.
+      const body = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_RADIUS, 48, 48),
+        new THREE.MeshPhongMaterial({
+          color: 0x0c2336, emissive: 0x040d16, shininess: 4,
+          transparent: true, opacity: 0.5, depthWrite: false
+        })
+      );
+      group.add(body);
+
+      // Graticule: a slightly larger low-detail wireframe sphere reads as the lat/lon grid.
+      const grid = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_RADIUS + 1.5, 24, 16),
+        new THREE.MeshBasicMaterial({
+          color: 0x3aa0d6, wireframe: true, transparent: true, opacity: 0.32
+        })
+      );
+      group.add(grid);
+
+      earthMesh = group;
       earthMesh.visible = false;
       const scene = graphInstance.scene && graphInstance.scene();
       if (scene) scene.add(earthMesh);
     } catch (e) {
       addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
     }
+  }
+
+  // Pull the camera back to frame the whole globe (geo mode entry). Without this the
+  // camera stays zoomed on the previous force-cluster and geo mode "looks like nothing".
+  function frameGeo(ms) {
+    if (ms === undefined) ms = 800;
+    if (!graphInstance) return;
+    graphInstance.cameraPosition(
+      { x: 0, y: EARTH_RADIUS * 0.55, z: EARTH_RADIUS * 3.1 },
+      { x: 0, y: 0, z: 0 },
+      ms
+    );
   }
 
   // Pin nodes onto the globe by lat/lon and switch off the force layout. Nodes with no
@@ -86,6 +119,7 @@ window.EngineModule = (function () {
       .d3Force('charge', null)
       .d3Force('center', null)
       .d3ReheatSimulation();
+    frameGeo();   // pull back so the globe + pinned nodes are actually visible
   }
 
   // Release the pinned positions, restore the default forces, and hide the globe.
@@ -192,5 +226,5 @@ window.EngineModule = (function () {
   function getGraph() { return graphInstance; }
   function isInitialViewDone() { return initialViewDone; }
 
-  return { create, frameBlueToRed, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
+  return { create, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
 })();

@@ -56,24 +56,24 @@ window.MapModule = (function () {
     });
     leafletMap.on('click', () => selectNode(null));
 
-    // Minimal no-labels tiles
-    let tileErrorNotified = false;
-    const localTiles = L.tileLayer(
-      `${ctx.tileBasePath}/{z}/{x}/{y}.png`,
-      {
-        minZoom: 0,
-        maxZoom: 5,
-        tileSize: 256,
-        errorTileUrl: ctx.blankTileDataUrl,
-        attribution: 'Local tiles'
-      }
-    ).addTo(leafletMap);
-    localTiles.on('tileerror', () => {
-      if (!tileErrorNotified) {
-        addEvent({ type: 'View', text: 'Offline tiles missing for some areas; showing blank tiles.' });
-        tileErrorNotified = true;
+    // Base layer: a blank grid drawn locally on a canvas — makes ZERO network requests,
+    // so missing tiles can never flood the console with 404s. Real tiles, if present,
+    // are overlaid on top after a quiet existence check (see the probe below).
+    const BlankGrid = L.GridLayer.extend({
+      createTile(coords) {
+        const tile = document.createElement('canvas');
+        const size = this.getTileSize();
+        tile.width = size.x; tile.height = size.y;
+        const c = tile.getContext('2d');
+        c.fillStyle = '#0b131b';
+        c.fillRect(0, 0, size.x, size.y);
+        c.strokeStyle = '#1e2a38';
+        c.lineWidth = 1;
+        c.strokeRect(0.5, 0.5, size.x - 1, size.y - 1);
+        return tile;
       }
     });
+    new BlankGrid({ minZoom: 0, maxZoom: 8, tileSize: 256 }).addTo(leafletMap);
 
     // Map overlays: scale + compass
     L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
@@ -106,18 +106,21 @@ window.MapModule = (function () {
       if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
     };
 
-    // Probe for a real local tile (root z/x/y). Relative path, so it stays within
-    // OFFLINE_MODE. If found, the local tiles are used silently; if absent, keep the
-    // blank offline grid and say so plainly rather than failing quietly. Any error in
-    // probing degrades to the offline state without throwing.
+    // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
+    // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
+    // probe), so a tile-less checkout stays console-clean. If tiles are present, overlay
+    // them on the blank grid; otherwise keep the grid and say so plainly. Relative path,
+    // so it stays within OFFLINE_MODE; any failure (e.g. file://) degrades to offline.
+    const enableRealTiles = () => {
+      L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
+        minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
+      }).addTo(leafletMap);
+      setBasemapStatus('Basemap: local tiles', 'ok');
+    };
     try {
-      const probe = new Image();
-      probe.onload = () => setBasemapStatus('Basemap: local tiles', 'ok');
-      probe.onerror = () => {
-        setBasemapStatus('Basemap: offline — no tiles', 'offline');
-        addEvent({ type: 'View', text: 'No local basemap tiles found; showing offline grid.' });
-      };
-      probe.src = `${ctx.tileBasePath}/0/0/0.png`;
+      fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
+        .then(r => { if (r && r.ok) enableRealTiles(); else setBasemapStatus('Basemap: offline — no tiles', 'offline'); })
+        .catch(() => setBasemapStatus('Basemap: offline — no tiles', 'offline'));
     } catch (err) {
       setBasemapStatus('Basemap: offline — no tiles', 'offline');
     }
