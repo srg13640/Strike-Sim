@@ -33,6 +33,40 @@ and conventions, then inspect the code.
 `views.js`, `inline-datasets.js`. The git history (`git log`) shows each extraction as a
 separate, verified commit.
 
+## Reported issues to investigate FIRST (from the product owner)
+
+These were observed in a real Chrome session and take priority. Reproduce each, find the
+root cause (cite file + line), and give a concrete fix. Distinguish genuine app bugs from
+expected-offline noise and from third-party/browser-extension noise.
+
+1. **~237 console errors on load/use.** The DevTools console shows a red "237" error
+   count (plus one warning). Enumerate what they actually are and categorize them.
+   Strong suspects to confirm or rule out: (a) HTTP 404 floods from missing local map
+   tiles — the Leaflet layer requests `./tiles/{z}/{x}/{y}.png` and there is no `tiles/`
+   directory, so every tile 404s (see `map.js` `ensureMap`); (b) a 404 for the missing
+   earth texture `assets/earth-dark.jpg` used by geo mode (see `engine.js`
+   `ensureEarthSphere` / `EARTH_TEX_URL`); (c) noise from a browser extension (the one
+   visible warning points at `hook.js:1`, which is React DevTools, not app code). For a
+   defense-contractor handoff the runtime console should be clean — recommend how to
+   eliminate or gracefully suppress the real ones (e.g. detect missing tiles once and
+   stop requesting, ship a tiny placeholder/encoded earth texture or skip the textured
+   globe when absent) without breaking offline behavior.
+
+2. **Geo Mode appears to do nothing.** Clicking **Geo Mode** produces no visible change —
+   the user still sees the flat view, no globe. Investigate the full path: `engine.js`
+   `applyGeoLayout` (pins nodes to lat/lon, sets `d3Force(...) = null`, reheats) and
+   `ensureEarthSphere` (builds the sphere with the possibly-404'ing texture and adds it
+   to `graphInstance.scene()`), plus the main shell's `enableGeoMode` wrapper. Specifically
+   determine: (a) does the earth sphere actually render if its texture 404s (does the
+   `MeshPhongMaterial` show as invisible/black, making the globe seem absent)? (b) do the
+   nodes actually reposition? (c) **does the camera ever move to frame the globe** — i.e.
+   after `enableGeoMode`, is there a camera reframe, or does the camera stay zoomed on the
+   old layout so the repositioned nodes/globe end up off-screen, making it look like
+   "nothing happened"? Propose the fix (likely: render an untextured-but-visible globe
+   when the image is missing, AND reframe the camera on geo-mode entry).
+
+When done with these, continue with the general review below.
+
 ## What to review
 
 Work through these and report findings for each:
