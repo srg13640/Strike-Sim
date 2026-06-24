@@ -14,6 +14,8 @@
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
   <script src="state.js"></script>
+  <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
+  <script src="map.js"></script>
   <script src="inline-datasets.js"></script>
   <style>
     :root {
@@ -1614,12 +1616,9 @@
     let importCounter = 0;
     let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, ew:0, jam:0, sof:0 }, redTypes: { ke:0, ew:0, jam:0, sof:0 } };
 
-    // Map state
+    // Map state. The map *mode* flag stays here (app-level orchestration); the Leaflet
+    // instance, layers, and marker index now live in MapModule (see map.js).
     let mapModeEnabled = false;
-    let leafletMap = null;
-    let markersLayer = null;
-    let mapLinksLayer = null;
-    const mapMarkers = new Map(); // id -> marker
     // Org chart state
     let orgModeEnabled = false;
     let orgZoomBehavior = null;
@@ -1813,19 +1812,8 @@
       if (closeBtn) closeBtn.onclick = () => selectNode(null);
     }
 
-    function closeMapPopup() {
-      if (!mapMarkers) return;
-      mapMarkers.forEach(m => { try { m.closePopup(); } catch {} });
-    }
-
-    function openMapPopup(node) {
-      if (!node || !mapMarkers) return;
-      const m = mapMarkers.get(node.id);
-      if (m) {
-        m.openPopup();
-        if (leafletMap && node.lat != null && node.lon != null) leafletMap.setView([node.lat, node.lon], Math.max(leafletMap.getZoom(), 3), { animate: true });
-      }
-    }
+    // closeMapPopup / openMapPopup now live in MapModule (map.js); aliased to globals
+    // in wireMapModule() so existing call sites keep working.
 
     function initCollapsibles() {
       const ids = ['filters-domain-title', 'filters-team-title', 'coa-generator-title', 'sim-controls-title', 'data-io-title'];
@@ -2860,85 +2848,8 @@
     }
 
     // --- MAP HELPERS ---
-    function ensureMap() {
-    if (leafletMap) return;
-    leafletMap = L.map('map', {
-    zoomControl: true,
-    worldCopyJump: true,
-    attributionControl: true
-    });
-    leafletMap.on('click', () => selectNode(null));
-
-    // Minimal no-labels tiles
-    let tileErrorNotified = false;
-    const localTiles = L.tileLayer(
-      `${TILE_BASE_PATH}/{z}/{x}/{y}.png`,
-      {
-        minZoom: 0,
-        maxZoom: 5,
-        tileSize: 256,
-        errorTileUrl: BLANK_TILE_DATAURL,
-        attribution: 'Local tiles'
-      }
-    ).addTo(leafletMap);
-    localTiles.on('tileerror', () => {
-      if (!tileErrorNotified) {
-        addEvent({ type: 'View', text: 'Offline tiles missing for some areas; showing blank tiles.' });
-        tileErrorNotified = true;
-      }
-    });
-
-    // Map overlays: scale + compass
-    L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
-    const CompassControl = L.Control.extend({
-      onAdd() {
-        const div = L.DomUtil.create('div', 'leaflet-control compass-control');
-        div.innerHTML = `<div class="compass-arrow">↑</div><div class="compass-label">N</div>`;
-        L.DomEvent.disableClickPropagation(div);
-        return div;
-      }
-    });
-    new CompassControl({ position: 'topright' }).addTo(leafletMap);
-
-    // Persistent basemap status badge + offline-aware tile auto-detection.
-    const BasemapStatusControl = L.Control.extend({
-      onAdd() {
-        const div = L.DomUtil.create('div', 'leaflet-control basemap-status');
-        div.setAttribute('role', 'status');
-        div.setAttribute('aria-live', 'polite');
-        div.textContent = 'Basemap: checking…';
-        L.DomEvent.disableClickPropagation(div);
-        return div;
-      }
-    });
-    new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
-    const setBasemapStatus = (text, state) => {
-      const el = document.querySelector('.basemap-status');
-      if (!el) return;
-      el.textContent = text;
-      if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
-    };
-
-    // Probe for a real local tile (root z/x/y). Relative path, so it stays within
-    // OFFLINE_MODE. If found, the local tiles are used silently; if absent, keep the
-    // blank offline grid and say so plainly rather than failing quietly. Any error in
-    // probing degrades to the offline state without throwing.
-    try {
-      const probe = new Image();
-      probe.onload = () => setBasemapStatus('Basemap: local tiles', 'ok');
-      probe.onerror = () => {
-        setBasemapStatus('Basemap: offline — no tiles', 'offline');
-        addEvent({ type: 'View', text: 'No local basemap tiles found; showing offline grid.' });
-      };
-      probe.src = `${TILE_BASE_PATH}/0/0/0.png`;
-    } catch (err) {
-      setBasemapStatus('Basemap: offline — no tiles', 'offline');
-    }
-
-    markersLayer = L.layerGroup().addTo(leafletMap);
-    mapLinksLayer = L.layerGroup().addTo(leafletMap);
-    setTimeout(() => { leafletMap.invalidateSize(); fitMapToMarkers(); }, 50);
-    }
+    // ensureMap() now lives in MapModule (map.js); aliased to a global in
+    // wireMapModule() so existing call sites keep working.
 
     function toggleMapMode() {
     mapModeEnabled = !mapModeEnabled;
@@ -2968,7 +2879,7 @@
     ensureMap();
     refreshMapMarkers();
     hideNodePopup();
-    setTimeout(() => { leafletMap.invalidateSize(); fitMapToMarkers(); }, 60);
+    setTimeout(() => { MapModule.invalidateSize(); fitMapToMarkers(); }, 60);
     } else {
     resetView();
     }
@@ -3056,109 +2967,9 @@
 
     function toggleLegend() { setLegendVisible(!legendVisible); }
 
-    function refreshMapMarkers() {
-    if (!leafletMap || !markersLayer) return;
-    markersLayer.clearLayers();
-    mapMarkers.clear();
-
-    const { visibleNodes } = currentVisible();
-    const hc = document.body.classList.contains('high-contrast');
-
-    visibleNodes.forEach(n => {
-    if (n.lat == null || n.lon == null) return;
-
-    // Determine marker colors under highlight modes
-    let col = mapColorFromTeam(n);
-    if (highlightMode && highlightSet.size > 0) {
-    if (!highlightSet.has(n.id)) {
-    col = hc ? '#3a4a5a' : '#2b3642';
-    } else {
-    col = highlightMode === 'payoff' ? resolveCssVar(hc ? 'var(--accent)' : '#00e5ff')
-    : resolveCssVar(hc ? 'var(--danger)' : '#ff8a65');
-    }
-    }
-
-    const marker = L.circleMarker([n.lat, n.lon], {
-    radius: 6,
-    color: col,
-    fillColor: col,
-    fillOpacity: 0.9,
-    weight: 1.5
-    })
-    .addTo(markersLayer)
-    .on('click', () => selectNodeById(n.id));
-
-    marker.bindPopup(`<strong>${n.name}</strong><br>${n.id}`);
-    mapMarkers.set(n.id, marker);
-    });
-
-    highlightSelectedOnMap();
-    }
-
-    function highlightSelectedOnMap() {
-    if (!leafletMap) return;
-    // Reset all marker styles
-    mapMarkers.forEach((m, id) => {
-    const n = data.nodes.find(nd => nd.id === id);
-    if (!n) return;
-    let col = mapColorFromTeam(n);
-    const hc = document.body.classList.contains('high-contrast');
-    if (highlightMode && highlightSet.size > 0) {
-    col = highlightSet.has(n.id)
-    ? (highlightMode === 'payoff' ? resolveCssVar(hc ? 'var(--accent)' : '#00e5ff')
-    : resolveCssVar(hc ? 'var(--danger)' : '#ff8a65'))
-    : (hc ? '#3a4a5a' : '#2b3642');
-    }
-    m.setStyle({ radius: 6, weight: 1.5, color: col, fillColor: col, fillOpacity: 0.9 });
-    });
-
-    if (selectedNode && mapMarkers.has(selectedNode.id)) {
-    const m = mapMarkers.get(selectedNode.id);
-    m.setStyle({ radius: 9, weight: 2.5, color: '#000', fillColor: mapColorFromTeam(selectedNode), fillOpacity: 0.95 });
-    m.bringToFront();
-    m.bindPopup(`<strong>${selectedNode.name}</strong><br/><span style="color:var(--muted)">${selectedNode.id}</span>`, { autoPan: true }).openPopup();
-    if (selectedNode.lat != null && selectedNode.lon != null) {
-    leafletMap.setView([selectedNode.lat, selectedNode.lon], Math.max(leafletMap.getZoom(), 3), { animate: true });
-    }
-    }
-    refreshMapLinks();
-    }
-
-    function refreshMapLinks() {
-    if (!mapLinksLayer) return;
-    mapLinksLayer.clearLayers();
-    if (!mapModeEnabled || !selectedNode) return;
-    if (selectedNode.lat == null || selectedNode.lon == null) return;
-
-    const neighbors = [];
-    data.links.forEach(l => {
-      const s = l.source?.id ?? l.source;
-      const t = l.target?.id ?? l.target;
-      if (s === selectedNode.id || t === selectedNode.id) {
-        const neighborId = s === selectedNode.id ? t : s;
-        const n = data.nodes.find(nd => nd.id === neighborId);
-        if (n && n.lat != null && n.lon != null) neighbors.push(n);
-      }
-    });
-    neighbors.forEach(n => {
-      L.polyline([[selectedNode.lat, selectedNode.lon], [n.lat, n.lon]], {
-        color: resolveCssVar('var(--accent)'),
-        weight: 3,
-        opacity: 0.85
-      }).addTo(mapLinksLayer);
-    });
-    }
-
-    function fitMapToMarkers() {
-    if (!leafletMap || mapMarkers.size === 0) {
-    if (leafletMap) leafletMap.setView([20, 0], 2);
-    return;
-    }
-    const group = L.featureGroup(Array.from(mapMarkers.values()));
-    try {
-    leafletMap.fitBounds(group.getBounds().pad(0.15), { animate: true });
-    } catch {}
-    }
+    // refreshMapMarkers / highlightSelectedOnMap / refreshMapLinks / fitMapToMarkers
+    // now live in MapModule (map.js); aliased to globals in wireMapModule() so existing
+    // call sites keep working.
 
     // --- MCOO VIEW (Three.js mini-scene) ---
     const mcooConfig = {
@@ -3948,7 +3759,7 @@
 
     // Resize handling for map
     window.addEventListener('resize', () => {
-    if (mapModeEnabled && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
+    if (mapModeEnabled && MapModule.getMap()) setTimeout(() => MapModule.invalidateSize(), 50);
     if (selectedNode && !mapModeEnabled) setTimeout(() => updateNodePopupPosition(selectedNode), 30);
     if (orgModeEnabled) setTimeout(renderOrgChart, 80);
     if (mcooModeEnabled && mcooInitialized) setTimeout(updateMcooSize, 50);
@@ -4062,7 +3873,30 @@
     // engine settle that actually has nodes, so later data changes never re-frame.
     let initialViewDone = false;
 
+    // Wire the Leaflet map module (map.js): inject live accessors for the script-scoped
+    // state it reads, plus the two tile constants, then alias its public methods onto
+    // their original global names so the existing scattered call sites keep working.
+    function wireMapModule() {
+      if (typeof MapModule === 'undefined') return;
+      MapModule.init({
+        getSelectedNode: () => selectedNode,
+        getHighlightMode: () => highlightMode,
+        getHighlightSet: () => highlightSet,
+        isMapMode: () => mapModeEnabled,
+        tileBasePath: TILE_BASE_PATH,
+        blankTileDataUrl: BLANK_TILE_DATAURL
+      });
+      window.ensureMap = MapModule.ensureMap;
+      window.refreshMapMarkers = MapModule.refreshMapMarkers;
+      window.highlightSelectedOnMap = MapModule.highlightSelectedOnMap;
+      window.refreshMapLinks = MapModule.refreshMapLinks;
+      window.fitMapToMarkers = MapModule.fitMapToMarkers;
+      window.openMapPopup = MapModule.openMapPopup;
+      window.closeMapPopup = MapModule.closeMapPopup;
+    }
+
     async function init() {
+    wireMapModule();
     bindEventListeners();
     initUI();
 
