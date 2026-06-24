@@ -195,3 +195,43 @@
 
 - **Uncertainties / follow-up**
   - This intentionally overrides the previous "reset = neutral fit" choice; the neutral fit was visibly broken given the panel coverage. If a reviewer wants a non-angled overhead reset, the right fix is a dedicated panel-aware fit helper (offset the fit center for the covered canvas width), not a bare `zoomToFit`.
+
+### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
+- **What changed**
+  - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.
+  - Rewired `runMonteCarlo()` in `DST2040.HTML` to prefer the worker, update the progress bar from worker messages, send cancellation to the worker, and fall back to the existing animation-frame chunk loop when workers are unavailable (notably `file://`).
+  - Fixed simulation spend accounting in the shared/main fallback path: typed KE/EW/JAM/SOF budgets now report actual spend instead of returning zero when only type buckets were decremented.
+  - Reintroduced `assets/earth-blue-marble-indopac-3072.jpg` as the primary Leaflet theater overlay using tight operational bounds `[[ -13.5, 57.5 ], [62.5, 173.5]]`, while keeping the generated Web Mercator full-world Blue Marble underneath at low opacity.
+  - Added CSS treatment for global/theater satellite layers so the regional layer reads as a crisp command-center satellite picture without overpowering unit markers.
+  - Stopped probing optional `tiles/` by default. Local tiles now opt in with `?tiles=1`, avoiding a fresh-checkout `tiles/0/0/0.png` 404 in DevTools.
+  - Added a data-URI favicon and filtered only the exact known vendor warning `WARNING: Multiple instances of Three.js being imported.` so real app warnings/errors still surface.
+
+- **Why**
+  - This finally moves the expensive default MC run out of the main thread instead of merely yielding between chunks. The UI remains interactive while large risk checks run.
+  - The map now satisfies the product-owner's "high-stakes operational satellite picture" ask without abandoning the prior geospatial lesson: the world Mercator layer provides honest global context, and the Indo-Pacific image is used where it is visually strongest.
+  - Fresh-checkout credibility matters. Optional assets should not create red-console noise when absent.
+
+- **How verified**
+  - Reused the local static server at `http://localhost:8000/DST2040.HTML`.
+  - Drove a fresh headless Chrome target through Map and Geo:
+    - status `View: 3D Network · Geo ON (224 nodes pinned by lat/lon)`;
+    - basemap `Basemap: theater satellite + coastlines`;
+    - overlays loaded: `assets/earth-blue-marble-webmercator-2048.jpg` and `assets/earth-blue-marble-indopac-3072.jpg`;
+    - `Log.takeEntries()` and console event capture both returned empty on a fresh reload.
+  - Captured `/tmp/strike-sim-map-verify.png`; visual inspection shows the theater image filling China/Japan/Taiwan/Philippines/Indonesia/Papua with unit markers over recognizable coastlines.
+  - Built a two-step COA in-browser, ran `1,500` worker trials, and confirmed:
+    - progress reached `100%`;
+    - note read `Worker run complete. UI stayed responsive during computation.`;
+    - UI tick probe advanced `187` times during the run;
+    - run button restored to `Run 1,500 Trials`;
+    - no toast errors, `Log.takeEntries()=[]`, and no console events.
+  - Syntax checks:
+    - `node --check sim-worker.js`
+    - `node --check map.js`
+    - `node --check engine.js`
+    - extracted inline `DST2040.HTML` script compiled via `vm.Script`.
+
+- **Uncertainties / follow-up**
+  - `sim-worker.js` intentionally duplicates the current simulation kernel instead of importing it because the app has no build step and `sim.js` assumes `window`. The next architecture move should extract a pure shared kernel that both main-thread preview and worker MC import.
+  - The Indo-Pacific JPG still lacks source projection metadata. The new bounds are a pragmatic theater registration tuned against visible coastlines; if exact metadata appears later, replace the bounds rather than cargo-culting them.
+  - Worker fallback remains important for `file://` launches. The static-server path is now the premium path.
