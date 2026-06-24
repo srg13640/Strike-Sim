@@ -99,12 +99,43 @@
       padding: 16px;
       backdrop-filter: blur(10px);
     }
+    .workflow-presets {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .workflow-presets button.active {
+      border-color: var(--accent);
+      background: rgba(0,216,255,0.13);
+      color: #e8fbff;
+    }
+    .workflow-presets button {
+      min-height: 36px;
+      white-space: normal;
+      line-height: 1.15;
+    }
     .progress-container { background: rgba(0,0,0,0.4); border-radius: 8px; overflow: hidden; margin: 12px 0; border: 1px solid var(--border); }
     .progress-bar { height: 24px; background: linear-gradient(90deg, var(--accent2) 0%, var(--accent) 100%); transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600; }
     .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 16px 0; }
     .result-metric { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
     .result-value { font-size: 20px; font-weight: 600; color: var(--accent); display: block; }
     .result-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+    .interpretation-strip {
+      margin-top: 10px;
+      border-left: 3px solid var(--accent);
+      background: rgba(0,216,255,0.08);
+      border-radius: 6px;
+      padding: 9px 10px;
+      color: #cfe7ff;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .interpretation-strip strong { color: var(--text); }
+    .interpretation-strip .row { margin-top: 8px; flex-wrap: wrap; }
+    .interpretation-strip[data-tone="good"] { border-left-color: var(--success); background: rgba(81,207,102,0.09); }
+    .interpretation-strip[data-tone="warn"] { border-left-color: var(--warning); background: rgba(255,169,77,0.09); }
+    .interpretation-strip[data-tone="bad"] { border-left-color: var(--danger); background: rgba(255,77,109,0.08); }
 
     /* Enhanced modal + tabs */
     .modal-xl { width: min(90vw, 1200px); max-height: 85vh; }
@@ -1240,11 +1271,24 @@
 
     <div class="panel monte-carlo-panel" aria-labelledby="mc-title">
       <h3 id="mc-title">Monte Carlo Simulation</h3>
+      <div class="workflow-presets" role="group" aria-label="Monte Carlo presets">
+        <button id="mc-preset-quick" type="button" class="secondary" data-mc-preset="quick">Quick</button>
+        <button id="mc-preset-balanced" type="button" class="secondary active" data-mc-preset="balanced">Balanced</button>
+        <button id="mc-preset-confidence" type="button" class="secondary" data-mc-preset="confidence">High Confidence</button>
+      </div>
       <div class="row">
         <button id="run-mc-btn" type="button">Run 10,000 Trials</button>
         <button id="run-single-btn" type="button" class="secondary">Preview Outcome</button>
       </div>
       <div class="grid mt8 align-end">
+        <div>
+          <label for="mc-trials">Trials</label>
+          <input id="mc-trials" type="number" min="100" max="100000" step="100" value="10000" class="mt4">
+        </div>
+        <div>
+          <label for="mc-seed">Seed</label>
+          <input id="mc-seed" type="number" min="1" step="1" placeholder="auto" class="mt4">
+        </div>
         <div>
           <label for="mc-success-mode">Success Criteria</label>
           <select id="mc-success-mode" class="mt4">
@@ -1333,6 +1377,10 @@
       <div class="row mt6">
         <button id="mc-report-btn" type="button" class="secondary">Detailed Report</button>
       </div>
+    <div id="mc-interpretation" class="interpretation-strip" data-tone="warn">
+      <strong>What this means:</strong> Build or generate an attack plan, then run trials to see whether the plan is worth committing.
+      <div class="row"><button type="button" class="secondary" data-mc-action="wizard">Generate COA</button></div>
+    </div>
     <div class="muted" id="mc-details"></div>
     <div class="muted" id="mc-note">Uses the last generated COA sequence.</div>
     <div class="muted" id="mc-likely"></div>
@@ -2934,7 +2982,7 @@
       }
       if (key === 'm' || key === 'M') {
         e.preventDefault();
-        runMonteCarlo(10000);
+        runMonteCarlo(getMcTrialCount());
         return;
       }
       if ((key === 'r' || key === 'R')) {
@@ -2989,14 +3037,31 @@
     document.getElementById('coa-close-btn').addEventListener('click', closeCOAModal);
     document.getElementById('coa-simulate-btn').addEventListener('click', simulateCOA);
     // Monte Carlo
-    document.getElementById('run-mc-btn').addEventListener('click', () => runMonteCarlo(10000));
+    document.getElementById('run-mc-btn').addEventListener('click', () => {
+      if (mcRunInProgress) requestCancelMonteCarlo();
+      else runMonteCarlo(getMcTrialCount());
+    });
     document.getElementById('run-single-btn').addEventListener('click', simulatePlanOnce);
     document.getElementById('mc-report-btn').addEventListener('click', openMcReport);
     document.getElementById('mc-report-close').addEventListener('click', () => { document.getElementById('mc-report-modal').style.display = 'none'; });
     // MC controls
+    const trialsInput = document.getElementById('mc-trials');
+    if (trialsInput) trialsInput.addEventListener('input', updateMcRunButtonLabel);
+    document.querySelectorAll('[data-mc-preset]').forEach(btn => {
+      btn.addEventListener('click', () => applyMcPreset(btn.dataset.mcPreset || 'balanced'));
+    });
+    const interp = document.getElementById('mc-interpretation');
+    if (interp) {
+      interp.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-mc-action]');
+        if (!actionBtn) return;
+        handleMcAction(actionBtn.dataset.mcAction);
+      });
+    }
     const th = document.getElementById('mc-highlight-threshold');
     const thLbl = document.getElementById('mc-highlight-threshold-label');
     if (th && thLbl) th.addEventListener('input', () => { thLbl.textContent = `${Math.round(Number(th.value)*100)}%`; });
+    updateMcRunButtonLabel();
 
     // Goal planner
     const goalBtn = document.getElementById('goal-plan-btn');
@@ -3058,7 +3123,7 @@
       if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% success.`;
     });
     document.getElementById('coa-clear-btn').addEventListener('click', clearCOAPlan);
-    document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => runMonteCarlo(10000));
+    document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => runMonteCarlo(getMcTrialCount()));
 
     // COA Wizard bindings
     const wiz = {
@@ -3162,6 +3227,8 @@
     // --- Monte Carlo Simulation (COA-based) ---
     let lastCOA = null;
     let mcLastResults = null;
+    let mcRunInProgress = false;
+    let mcCancelRequested = false;
     let goalPlanCache = null;
     let goalPlanStats = null;
 
@@ -3997,14 +4064,159 @@
       ul.querySelectorAll('button[data-rm]').forEach(btn => btn.addEventListener('click', () => removeCOAStep(Number(btn.dataset.rm))));
     }
 
-    async function runMonteCarlo(trials = 10000) {
+    function mean(arr) {
+      return arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    }
+
+    function getMcTrialCount() {
+      const el = document.getElementById('mc-trials');
+      let value = Number(el?.value || 10000);
+      if (!Number.isFinite(value)) value = 10000;
+      value = Math.max(100, Math.min(100000, Math.round(value)));
+      if (el) el.value = String(value);
+      return value;
+    }
+
+    function getMcSeedOverride() {
+      const raw = document.getElementById('mc-seed')?.value?.trim();
+      if (!raw) return null;
+      const value = Math.floor(Number(raw));
+      if (!Number.isFinite(value) || value <= 0) return null;
+      return (value % 2147483647) || 1;
+    }
+
+    function updateMcRunButtonLabel() {
+      const btn = document.getElementById('run-mc-btn');
+      if (!btn || mcRunInProgress) return;
+      btn.textContent = `Run ${getMcTrialCount().toLocaleString()} Trials`;
+      btn.classList.remove('warn');
+    }
+
+    function requestCancelMonteCarlo() {
+      if (!mcRunInProgress) return;
+      mcCancelRequested = true;
+      const btn = document.getElementById('run-mc-btn');
+      if (btn) btn.textContent = 'Canceling...';
+      const note = document.getElementById('mc-note');
+      if (note) note.textContent = 'Cancel requested. Finishing current simulation chunk...';
+    }
+
+    function yieldToFrame() {
+      return new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+        else setTimeout(resolve, 0);
+      });
+    }
+
+    function setActiveMcPreset(name) {
+      document.querySelectorAll('[data-mc-preset]').forEach(btn => btn.classList.toggle('active', btn.dataset.mcPreset === name));
+    }
+
+    function applyMcPreset(name) {
+      const presets = {
+        quick: { trials: 2500, highlight: 0.45, goalTrials: 150, goalBeam: 15 },
+        balanced: { trials: 10000, highlight: 0.5, goalTrials: 300, goalBeam: 25 },
+        confidence: { trials: 25000, highlight: 0.65, goalTrials: 600, goalBeam: 40 }
+      };
+      const p = presets[name] || presets.balanced;
+      const trialsEl = document.getElementById('mc-trials'); if (trialsEl) trialsEl.value = String(p.trials);
+      const hEl = document.getElementById('mc-highlight-threshold'); if (hEl) hEl.value = String(p.highlight);
+      const hLbl = document.getElementById('mc-highlight-threshold-label'); if (hLbl) hLbl.textContent = `${Math.round(p.highlight * 100)}%`;
+      const goalTrials = document.getElementById('goal-trials'); if (goalTrials) goalTrials.value = String(p.goalTrials);
+      const wizTrials = document.getElementById('coa-w-goal-trials'); if (wizTrials) wizTrials.value = String(p.goalTrials);
+      const beam = document.getElementById('goal-beam'); if (beam) beam.value = String(p.goalBeam);
+      setActiveMcPreset(name);
+      updateMcRunButtonLabel();
+      addEvent({ type: 'MC', text: `Monte Carlo preset set to ${name}.` });
+    }
+
+    function buildNodeOdds(neutralizedCounts, denominator) {
+      const odds = [];
+      neutralizedCounts.forEach((count, id) => {
+        const n = data.nodes.find(node => node.id === id);
+        if (!n || n.team !== 'red') return;
+        odds.push({ id, name: n.name || id, p: Math.round((count / denominator) * 100) });
+      });
+      odds.sort((a, b) => b.p - a.p);
+      return odds;
+    }
+
+    function mcInterpretationFor(result) {
+      if (!result) {
+        return {
+          tone: 'warn',
+          text: 'Build or generate an attack plan, then run trials to see whether the plan is worth committing.',
+          action: 'wizard',
+          actionLabel: 'Generate COA'
+        };
+      }
+      const pct = Math.round(result.successRate * 100);
+      const avgBlueLost = mean(result.blueNeutralizedArr || []);
+      if (result.cancelled) {
+        return {
+          tone: 'warn',
+          text: `Partial run only: ${result.trials.toLocaleString()} of ${result.requestedTrials.toLocaleString()} trials completed. Treat the ${pct}% success estimate as directional, not decision-grade.`,
+          action: 'rerun',
+          actionLabel: 'Finish Full Run'
+        };
+      }
+      if (pct >= 75 && avgBlueLost <= 1) {
+        return {
+          tone: 'good',
+          text: `${pct}% success with ${avgBlueLost.toFixed(1)} average friendly losses. This plan is strong enough to inspect a concrete sample path before briefing.`,
+          action: 'preview',
+          actionLabel: 'Preview Outcome'
+        };
+      }
+      if (pct >= 50) {
+        return {
+          tone: 'warn',
+          text: `${pct}% success is playable but brittle. Add one recommended step or raise confidence before treating this as the primary COA.`,
+          action: 'recommend',
+          actionLabel: 'Recommend Next Step'
+        };
+      }
+      return {
+        tone: 'bad',
+        text: `${pct}% success is too low for a primary COA. Generate a goal plan with more steps or loosen the friendly-loss constraint.`,
+        action: 'goal',
+        actionLabel: 'Generate Goal Plan'
+      };
+    }
+
+    function renderMcInterpretation(result) {
+      const el = document.getElementById('mc-interpretation');
+      if (!el) return;
+      const interp = mcInterpretationFor(result);
+      el.dataset.tone = interp.tone;
+      el.innerHTML = `
+        <strong>What this means:</strong> ${interp.text}
+        <div class="row"><button type="button" class="secondary" data-mc-action="${interp.action}">${interp.actionLabel}</button></div>
+      `;
+    }
+
+    function handleMcAction(action) {
+      const reportModal = document.getElementById('mc-report-modal');
+      if (reportModal) reportModal.style.display = 'none';
+      if (action === 'wizard') openCOAWizard();
+      else if (action === 'goal') document.getElementById('goal-plan-btn')?.click();
+      else if (action === 'recommend') document.getElementById('coa-recommend-btn')?.click();
+      else if (action === 'preview') simulatePlanOnce();
+      else if (action === 'rerun') runMonteCarlo(getMcTrialCount());
+    }
+
+    async function runMonteCarlo(trials = null) {
+      if (mcRunInProgress) {
+        requestCancelMonteCarlo();
+        return;
+      }
+      trials = Math.max(100, Math.min(100000, Math.round(Number(trials || getMcTrialCount()))));
       const btn = document.getElementById('run-mc-btn');
       const bar = document.getElementById('mc-progress');
       const outSuccess = document.getElementById('mc-success');
       const outDmg = document.getElementById('mc-exp-dmg');
       const outTime = document.getElementById('mc-time');
       const singleBtn = document.getElementById('run-single-btn');
-      const btnLabel = btn ? btn.textContent : '';
       const singleLabel = singleBtn ? singleBtn.textContent : '';
 
       let actionPlan = null;
@@ -4020,11 +4232,14 @@
       if (!actionPlan) {
         addEvent({ type: 'MC', text: 'Build or generate a COA first, then run Monte Carlo.' });
         showToast('Build or generate a COA first, then run Monte Carlo.', 'warn');
+        renderMcInterpretation(null);
         return;
       }
 
       try {
-        if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+        mcRunInProgress = true;
+        mcCancelRequested = false;
+        if (btn) { btn.disabled = false; btn.textContent = 'Cancel Run'; btn.classList.add('warn'); }
         if (singleBtn) singleBtn.disabled = true;
         if (bar) { bar.style.width = '0%'; bar.textContent = '0%'; }
 
@@ -4036,10 +4251,14 @@
 
         const context = buildSimContext();
         const prioritySet = (successMode === 'nodes') ? getTopPayoffRedIds(Number(successN)) : null;
+        const seedOverride = getMcSeedOverride();
+        const baseSeed = seedOverride ?? (Date.now() % 2147483647);
 
         let trialsSuccess = 0;
         let totalImpactOnSuccess = 0;
         let totalStepsToSuccess = 0;
+        let completedTrials = 0;
+        let cancelled = false;
         const successImpacts = [];
         const stepsToSuccessArr = [];
         const redNeutralizedArr = [];
@@ -4051,9 +4270,12 @@
         const damageHitCounts = new Map();
 
         const chunk = Math.max(100, Math.floor(trials / 100));
-        const baseSeed = Date.now() % 2147483647;
 
         for (let t = 1; t <= trials; t++) {
+          if (mcCancelRequested) {
+            cancelled = true;
+            break;
+          }
           const rng = createRng(baseSeed + t);
           const result = simulateTrial(actionPlan, {
             context,
@@ -4065,6 +4287,7 @@
             regenFrac,
             logSteps: false
           });
+          completedTrials = t;
 
           if (result.success) {
             trialsSuccess++;
@@ -4091,11 +4314,12 @@
             const pct = Math.round((t / trials) * 100);
             bar.style.width = `${pct}%`;
             bar.textContent = `${pct}%`;
-            await new Promise(r => setTimeout(r, 0));
+            await yieldToFrame();
           }
         }
 
-        const successRate = trialsSuccess / trials;
+        const effectiveTrials = Math.max(1, completedTrials);
+        const successRate = trialsSuccess / effectiveTrials;
         const expImpact = trialsSuccess ? (totalImpactOnSuccess / trialsSuccess) : 0;
         const avgSteps = trialsSuccess ? (totalStepsToSuccess / trialsSuccess) : 0;
         const p50Impact = percentile(successImpacts, 0.5);
@@ -4115,23 +4339,32 @@
         const p90El = document.getElementById('mc-impact-p90'); if (p90El) p90El.textContent = Math.round(p90Impact);
         const p50S = document.getElementById('mc-steps-p50'); if (p50S) p50S.textContent = Math.round(p50Steps);
         const p90S = document.getElementById('mc-steps-p90'); if (p90S) p90S.textContent = Math.round(p90Steps);
-        const rn = document.getElementById('mc-red-neutral-avg'); if (rn) rn.textContent = (redNeutralizedArr.reduce((a,b)=>a+b,0)/trials).toFixed(1);
-        const bn = document.getElementById('mc-blue-lost-avg'); if (bn) bn.textContent = (blueNeutralizedArr.reduce((a,b)=>a+b,0)/trials).toFixed(1);
-        const bs = document.getElementById('mc-blue-spend-avg'); if (bs) bs.textContent = Math.round(blueSpendArr.reduce((a,b)=>a+b,0)/trials);
-        const rs = document.getElementById('mc-red-spend-avg'); if (rs) rs.textContent = Math.round(redSpendArr.reduce((a,b)=>a+b,0)/trials);
+        const rn = document.getElementById('mc-red-neutral-avg'); if (rn) rn.textContent = mean(redNeutralizedArr).toFixed(1);
+        const bn = document.getElementById('mc-blue-lost-avg'); if (bn) bn.textContent = mean(blueNeutralizedArr).toFixed(1);
+        const bs = document.getElementById('mc-blue-spend-avg'); if (bs) bs.textContent = Math.round(mean(blueSpendArr));
+        const rs = document.getElementById('mc-red-spend-avg'); if (rs) rs.textContent = Math.round(mean(redSpendArr));
 
-        const likely = [];
-        neutralizedCounts.forEach((count, id) => {
-          const odds = count / trials;
-          if (odds >= highlightThresh) {
-            const n = data.nodes.find(n => n.id === id);
-            likely.push({ id, name: n?.name || id, p: Math.round(odds * 100) });
-          }
-        });
-        likely.sort((a,b)=>b.p-a.p);
+        const nodeOdds = buildNodeOdds(neutralizedCounts, effectiveTrials);
+        const likely = nodeOdds.filter(o => (o.p / 100) >= highlightThresh);
         const likelyEl = document.getElementById('mc-likely');
         if (likelyEl) {
           likelyEl.innerHTML = likely.length ? `Likely neutralized (≥${Math.round(highlightThresh*100)}%): ${likely.map(l=>`${l.name} (${l.p}%)`).join(', ')}` : 'No nodes consistently neutralized at current threshold.';
+        }
+
+        const details = document.getElementById('mc-details');
+        if (details) {
+          const planCost = builtCOA && builtCOA.length
+            ? builtCOA.reduce((s, st) => s + (strikeMethods[st.methodKey]?.cost || 0), 0)
+            : actionPlan.length;
+          const blueBudget = teamResources?.blue ?? 0;
+          const margin = blueBudget - planCost;
+          details.innerHTML = [
+            `Plan length: ${actionPlan.length} steps.`,
+            `${Math.round(successRate * 100)}% success across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
+            `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
+            `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
+          ].join('<br>');
         }
 
         highlightMode = 'coa';
@@ -4140,7 +4373,15 @@
         if (mapModeEnabled) refreshMapMarkers();
 
         mcLastResults = {
-          trials,
+          trials: effectiveTrials,
+          requestedTrials: trials,
+          cancelled,
+          seed: baseSeed,
+          seedSource: seedOverride == null ? 'auto' : 'manual',
+          rng: 'LCG',
+          successMode,
+          successN,
+          victoryThreshold,
           successRate,
           avgSteps: avgSteps.toFixed(1),
           expImpact: Math.round(expImpact),
@@ -4150,14 +4391,22 @@
           blueNeutralizedArr,
           blueSpendArr,
           redSpendArr,
-          nodeOdds: likely
+          nodeOdds
         };
+        renderMcInterpretation(mcLastResults);
+        const pct = Math.round(successRate * 100);
+        const runStatus = cancelled ? `MC canceled after ${effectiveTrials.toLocaleString()} of ${trials.toLocaleString()} trials` : `MC(${effectiveTrials.toLocaleString()}) complete`;
+        if (bar && cancelled) bar.textContent = `Canceled at ${Math.round((effectiveTrials / trials) * 100)}%`;
+        addEvent({ type: 'MC', text: `${runStatus}: ${pct}% success, ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
+        showToast(`${runStatus}: ${pct}% success.`, cancelled ? 'warn' : 'success', 5000);
       } catch (err) {
         console.error('Monte Carlo failed', err);
         addEvent({ type: 'MC', text: 'Monte Carlo failed (see console).' });
         showToast('Monte Carlo failed (see console).', 'error');
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = btnLabel || 'Run 10,000 Trials'; }
+        mcRunInProgress = false;
+        mcCancelRequested = false;
+        updateMcRunButtonLabel();
         if (singleBtn) { singleBtn.disabled = false; singleBtn.textContent = singleLabel || 'Preview Outcome'; }
       }
     }
@@ -4753,15 +5002,24 @@
         body.innerHTML = '<p class="muted">Run Monte Carlo first to generate a report.</p>';
       } else {
         const r = mcLastResults;
-        const avgRN = (r.redNeutralizedArr ? (r.redNeutralizedArr.reduce((a,b)=>a+b,0)/r.trials) : 0).toFixed(1);
-        const avgBL = (r.blueNeutralizedArr ? (r.blueNeutralizedArr.reduce((a,b)=>a+b,0)/r.trials) : 0).toFixed(1);
-        const avgBS = r.blueSpendArr ? Math.round(r.blueSpendArr.reduce((a,b)=>a+b,0)/r.trials) : 0;
-        const avgRS = r.redSpendArr ? Math.round(r.redSpendArr.reduce((a,b)=>a+b,0)/r.trials) : 0;
+        const avgRN = mean(r.redNeutralizedArr || []).toFixed(1);
+        const avgBL = mean(r.blueNeutralizedArr || []).toFixed(1);
+        const avgBS = Math.round(mean(r.blueSpendArr || []));
+        const avgRS = Math.round(mean(r.redSpendArr || []));
+        const interp = mcInterpretationFor(r);
+        const runStatus = r.cancelled ? `Partial (${r.trials.toLocaleString()} / ${r.requestedTrials.toLocaleString()})` : 'Complete';
         const oddsTable = (r.nodeOdds && r.nodeOdds.length) ? (`<h3 class=\"muted\" style=\"margin-top:10px;\">Neutralization Odds by Node (Top 10)</h3>` +
           `<div>${r.nodeOdds.slice(0,10).map(o=>`<div class=\\\"kv-row\\\"><span>${o.name} (${o.id})</span><strong>${o.p}%</strong></div>`).join('')}</div>`) : '';
         body.innerHTML = `
+          <div class="interpretation-strip" data-tone="${interp.tone}">
+            <strong>What this means:</strong> ${interp.text}
+            <div class="row"><button type="button" class="secondary" data-mc-action="${interp.action}">${interp.actionLabel}</button></div>
+          </div>
           <div class="grid">
+            <div class="kv-row"><span>Run Status</span><strong>${runStatus}</strong></div>
             <div class="kv-row"><span>Trials</span><strong>${r.trials.toLocaleString()}</strong></div>
+            <div class="kv-row"><span>Seed / RNG</span><strong>${r.seed} / ${r.rng}</strong></div>
+            <div class="kv-row"><span>Success Rule</span><strong>${r.successMode === 'impact' ? `Impact ≥ ${r.victoryThreshold}` : `Neutralize ${r.successN}`}</strong></div>
             <div class="kv-row"><span>Chance of Success</span><strong>${Math.round(r.successRate*100)}%</strong></div>
             <div class="kv-row"><span>Avg Steps (wins)</span><strong>${r.avgSteps}</strong></div>
             <div class="kv-row"><span>Avg Impact (wins)</span><strong>${r.expImpact}</strong></div>
@@ -4772,8 +5030,11 @@
             <div class="kv-row"><span>Red Spend (avg)</span><strong>${avgRS}</strong></div>
           </div>
           ${oddsTable}
-          <p class="muted">Success is defined by the selector in the Monte Carlo panel (default: effect ≥ 100). Use Preview Outcome for a single concrete run with targets and effects.</p>
+          <p class="muted">The seed is recorded for traceability. Reuse it with the same plan and settings to reproduce this run family.</p>
         `;
+        body.querySelectorAll('[data-mc-action]').forEach(btn => {
+          btn.addEventListener('click', () => handleMcAction(btn.dataset.mcAction));
+        });
       }
       modal.style.display = 'flex';
     }
@@ -4796,7 +5057,12 @@
       const modal = document.getElementById('mc-report-modal');
       const body = document.getElementById('mc-report-body');
       const planCost = builtCOA.reduce((s, st) => s + (strikeMethods[st.methodKey]?.cost || 0), 0);
+      const previewTone = result.success ? 'good' : 'warn';
+      const previewText = result.success
+        ? `This sample path meets the current success rule in ${result.stepsToGoal} steps. Use the full Monte Carlo result for confidence before committing.`
+        : `This sample path misses the current success rule. Add a step or run a full Monte Carlo check before briefing the plan.`;
       const sum = [
+        `<div class="interpretation-strip" data-tone="${previewTone}"><strong>What this means:</strong> ${previewText}</div>`,
         `<div class="grid">`,
         `<div class=\"kv-row\"><span>Enemy Neutralized</span><strong>${result.redNeutralized.size}</strong></div>`,
         `<div class=\"kv-row\"><span>Friendly Lost</span><strong>${result.blueNeutralized.size}</strong></div>`,

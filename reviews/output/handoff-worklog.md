@@ -84,3 +84,24 @@
 
 - **Uncertainties / follow-up**
   - Left rail open by default intentionally trades graph width for discoverability. If the reviewer wants a denser default, keep the fixed toggle behavior and start collapsed only after adding an obvious primary workflow strip elsewhere.
+
+### Change 5 — Make Monte Carlo runs controllable, cancelable, and interpretable
+- **What changed**
+  - Added Monte Carlo presets (`Quick`, `Balanced`, `High Confidence`) that tune trial count, highlight threshold, and planner search budget.
+  - Added explicit `Trials` and optional `Seed` inputs. Completed reports now record seed, seed source, RNG (`LCG`), success rule, run status, and whether the result is partial.
+  - Changed the run button into a cancel button while MC is active. The engine now yields via animation frames and can stop cleanly at a chunk boundary, then reports partial-run confidence instead of pretending the run finished.
+  - Added a plain-language interpretation strip in the MC panel and detailed report with a recommended next operator action (`Generate COA`, `Generate Goal Plan`, `Recommend Next Step`, `Preview Outcome`, or `Finish Full Run`).
+  - Fixed the detailed report's node-odds source so it uses all observed red neutralization odds, not only the nodes above the highlight threshold.
+  - Added a compact MC details line with plan length, completed trials, impact, seed/RNG, and Blue resource margin.
+
+- **Why**
+  - The old MC panel gave numbers but little judgment, and the fixed 10k run did not expose reproducibility or cancellation. Operators need to know what the result means, whether it is decision-grade, and what to do next.
+
+- **How verified**
+  - Reloaded the app from the local static server with a clean console except the known Three.js duplicate-import warning.
+  - Built a one-step COA, set `Trials=500` and `Seed=42`, ran MC, and confirmed progress reaches `100%`, the run button label restores to `Run 500 Trials`, interpretation shows a low-confidence recommendation, and the event log records the run.
+  - Opened the detailed report and confirmed it shows interpretation, seed/RNG, success rule, trial count, and run status.
+  - Set `Trials=100000`, started MC, clicked the run button again, and confirmed cancellation produced a partial result (`47,000 / 100,000` in the verification run) with `Canceled at 47%` progress and a partial-run interpretation.
+
+- **Uncertainties / follow-up**
+  - This keeps MC on the main thread with frame-yield chunking rather than moving it to a Worker. It is materially more controllable now, but a true Worker remains the right architecture if reviewers want large runs while dragging the 3D scene continuously.
