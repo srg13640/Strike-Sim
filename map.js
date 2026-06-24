@@ -77,16 +77,23 @@ window.MapModule = (function () {
     });
     new BlankGrid({ minZoom: 0, maxZoom: 8, tileSize: 256 }).addTo(leafletMap);
 
+    // Dedicated pane for the vector basemap, BELOW the markers/overlay pane (z 400) and
+    // above the tiles (z 200). Without this the land — loaded async — lands in the same
+    // SVG as the circle markers and, being added later, paints over them.
+    leafletMap.createPane('basemapPane');
+    leafletMap.getPane('basemapPane').style.zIndex = 250;
+    leafletMap.getPane('basemapPane').style.pointerEvents = 'none';
+
     // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
     // top of the blank grid so the operator sees actual geography (China coast, Japan,
     // Taiwan, Philippines, …) with NO map tiles. Relative path -> within OFFLINE_MODE.
-    // Lives in the overlay pane, beneath the marker pane, so markers stay on top.
     try {
       fetch('assets/land.geojson', { cache: 'force-cache' })
         .then(r => (r && r.ok) ? r.json() : null)
         .then(geo => {
           if (!geo || !leafletMap) return;
           L.geoJSON(geo, {
+            pane: 'basemapPane',
             interactive: false,
             style: { color: '#33617f', weight: 0.7, opacity: 0.85, fillColor: '#15293a', fillOpacity: 1 }
           }).addTo(leafletMap);
