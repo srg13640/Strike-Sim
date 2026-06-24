@@ -258,6 +258,30 @@
   - The board itself (3D/Map) still shows all nodes and prior battle damage to whoever is at the screen — that damage is public knowledge (past resolutions are announced), so this is intentional; true sensor-range visibility (hiding undetected enemy nodes entirely) would need a recon model and is a larger future option.
   - Vulnerabilities are treated as known out-of-band intel; if a stricter fog is wanted, those could also be masked until first contact.
 
+### Change 14 — Rebrand to StrikeSim 2040 + the Stage Manager (reliability foundation)
+- **Context**
+  - Product owner reported the real, recurring failure: going full screen or resizing the window during a live session breaks the layout, distorts the map, misaligns nodes, and can leave the 3D view permanently dead ("3D view unavailable: WebGL context failed"). Their stated need is **reliability over features**. Decisions taken: name = **StrikeSim 2040**; **reliability first** (this change only — no new sim features); rename the main file.
+  - Diagnosis (grounded in the code, not assumed): the only resize handler (`window.resize`) re-sized **only the Leaflet map, only in Map mode** — nothing re-sized the Three.js renderer or fixed its camera aspect (→ node misalignment), there was **no Fullscreen support**, and there were **zero** `webglcontextlost`/`restored` handlers (→ any context drop was permanent). The map-stuck-in-a-corner symptom in the PO screenshot was the same resize gap hitting Leaflet after the 3D fell back to Map at load.
+
+- **What changed**
+  - **Rebrand**: `<title>`, the in-app `#app-title` header, the launcher (`Open StrikeSim 2040.command`), and filename/path references in README, HANDOFF, and module comments. The main file is renamed `DST2040.HTML` → `StrikeSim2040.html` (launcher + docs updated to match). "MDSC" is kept where it is genuine multi-domain terminology rather than the product name — a blind global replace there would corrupt real domain language.
+  - **New [`stage.js`](../../stage.js) — the Stage Manager**, the single authority for "render the active surface at the current size and survive a GPU drop":
+    - One debounced `apply()` driven by a `ResizeObserver` on `#graph`/`#map`/`#app`, plus `window.resize` and `fullscreenchange`. It sizes the **3D renderer + camera** (via the ForceGraph3D `width()/height()` setters) and calls Leaflet `invalidateSize`, and **guards against the 0×0 size** that corrupts a hidden canvas. Observing `#graph`/`#map` also catches the display:none→block flip on view switches, so a surface sized while hidden is corrected the moment it appears.
+    - **WebGL context-loss recovery**: `webglcontextlost` → `preventDefault()` (the line that *permits* recovery) + a calm operator toast; `webglcontextrestored` → re-size + data refresh. three.js (r128) rebuilds its GL resources on restore; without the preventDefault the context was gone for good.
+    - **Fullscreen**: a `⛶ Fullscreen` button (and `F` shortcut) using the Fullscreen API on the app shell; `fullscreenchange` re-syncs through the same `apply()`.
+    - Debounce uses `setTimeout`, **not** `requestAnimationFrame`: rAF is fully paused in a backgrounded tab, which would drop a resize that happened while hidden; `setTimeout` always eventually reconciles.
+  - **Renderer hardening** (`engine.js`): pass `rendererConfig` to `ForceGraph3D` with `failIfMajorPerformanceCaveat:false` (lets weak / software-fallback GPUs still acquire a context instead of throwing the "WebGL context failed" error) plus `powerPreference:'high-performance'`.
+
+- **How verified (in-browser)**
+  - Rebrand visible: tab title and right-panel header read **StrikeSim 2040**; the `⛶ Fullscreen` button renders next to War Game.
+  - **Renderer matches its container**: on load the canvas auto-sized to the stage box (483×803, matched); after changing the stage size the renderer reconciled to the new box (820×700, then 1000-wide), proving `apply()` sizes correctly at any dimension.
+  - **WebGL recovery**: forced a real context loss via `WEBGL_lose_context` — `webglcontextlost` fired, then `restoreContext()` fired `webglcontextrestored`, and the app survived intact (context alive, 224 nodes preserved). Pre-change this was the permanent-death path.
+  - **Map view fixed**: Map mode now renders the Blue Marble satellite with units on correct West-Pacific geography — the corner-stuck/floating-units symptom from the PO screenshot is gone. Console clean (only the benign Three.js dup warning).
+
+- **Uncertainties / follow-up**
+  - The automatic `ResizeObserver`/`window.resize` *firing* could not be exercised in the headless preview because the preview tab is backgrounded, where Chrome pauses `ResizeObserver` and `requestAnimationFrame` (a probe observer fired 0 times). The `apply()` logic itself is proven correct at every size via direct invocation, and the observer/`window.resize`/`fullscreenchange` wiring is the standard set that fires in a real foreground browser — so the PO should confirm live: full screen on each monitor, drag-resize, and switching Map/3D/Geo while resized.
+  - This is Phase 1 (reliability) only. Phases 2–5 (edges schema + Three.js line/tube rendering, temporal sim, instanced rendering, exports/scenario tools) are sequenced to land on this now-stable base, one verified phase at a time.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDSC 3D Network Visualizer 3.0 - Enhanced</title>
+  <title>StrikeSim 2040 — Indo-Pacific Multi-Domain Wargaming</title>
   <link rel="icon" href="data:,">
 
   <!-- Leaflet (Map) -->
@@ -22,6 +22,9 @@
   <script src="map.js"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js"></script>
+  <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
+       Owns sizing the active surface and surviving GPU context drops. -->
+  <script src="stage.js"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
@@ -1186,7 +1189,7 @@
     <span class="arrow" aria-hidden="true">◀</span>
     </div>
     <header aria-labelledby="app-title">
-    <h1 id="app-title">MDSC Network Viz</h1>
+    <h1 id="app-title">StrikeSim 2040</h1>
     <div class="header-actions">
       <button id="right-panel-collapse-btn" type="button" class="secondary">Collapse</button>
       <span class="sub" id="counts">0 nodes · 0 links</span>

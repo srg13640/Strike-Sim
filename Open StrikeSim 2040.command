@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  Open Strike Sim
+#  Open StrikeSim 2040
 #  Just DOUBLE-CLICK this file. The app opens in your browser.
 #  (You can close the little black window that appears.)
 # ============================================================
@@ -8,10 +8,10 @@
 # Move into the folder this file lives in (works on any machine).
 cd "$(dirname "$0")" || exit 1
 
-# Reuse a real Strike Sim server on 8000 if it is already up. If some other
+# Reuse a real StrikeSim 2040 server on 8000 if it is already up. If some other
 # process owns 8000, pick the next free port instead of opening the wrong app.
 PORT=""
-if command -v curl >/dev/null 2>&1 && curl -fsI "http://localhost:8000/DST2040.HTML" >/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1 && curl -fsI "http://localhost:8000/StrikeSim2040.html" >/dev/null 2>&1; then
   PORT=8000
 else
   for candidate in $(seq 8000 8020); do
@@ -33,12 +33,12 @@ if [ -z "$PORT" ]; then
 fi
 
 # Open the app in the default web browser.
-open "http://localhost:${PORT}/DST2040.HTML"
+open "http://localhost:${PORT}/StrikeSim2040.html"
 
 echo ""
-echo "   ✅  Strike Sim is opening in your browser..."
+echo "   ✅  StrikeSim 2040 is opening in your browser..."
 echo ""
 echo "   You can close this window now."
 echo "   (Leave it running and the app stays available at"
-echo "    http://localhost:${PORT}/DST2040.HTML )"
+echo "    http://localhost:${PORT}/StrikeSim2040.html )"
 echo ""

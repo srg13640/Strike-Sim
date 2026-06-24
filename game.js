@@ -2,7 +2,7 @@
  * game.js — turn-based War Game engine for the MDSC visualizer.
  *
  * This is the "game" layer that sits on top of the existing simulation math. The
- * Monte Carlo sim in DST2040.HTML answers "if Blue executes this plan, how does it
+ * Monte Carlo sim in StrikeSim2040.html answers "if Blue executes this plan, how does it
  * tend to go?"; the War Game answers "two commanders each issue orders, resolve them,
  * repeat until someone wins." Red is promoted from a purely reactive counter-profile
  * into a first-class playable side.

@@ -342,7 +342,19 @@ window.EngineModule = (function () {
    */
   function create(containerId, opts) {
     opts = opts || {};
-    graphInstance = ForceGraph3D()(document.getElementById(containerId))
+    // Harden WebGL context acquisition: failIfMajorPerformanceCaveat:false lets weaker /
+    // software-fallback GPUs still get a context (rather than throwing the "WebGL context
+    // failed" error and dropping to the Map fallback), and powerPreference hints toward a
+    // stable adapter. preserveDrawingBuffer:false keeps memory pressure low.
+    graphInstance = ForceGraph3D({
+      rendererConfig: {
+        antialias: true,
+        alpha: false,
+        powerPreference: 'high-performance',
+        failIfMajorPerformanceCaveat: false,
+        preserveDrawingBuffer: false
+      }
+    })(document.getElementById(containerId))
       .graphData({ nodes: [], links: [] }) // Start empty
       .nodeLabel(opts.nodeLabel || (n => `${n.name} (${n.id})`))
       .nodeColor(opts.nodeColor || (n => n.color || '#ffffff'))

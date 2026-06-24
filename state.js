@@ -7,7 +7,7 @@
  * means the future "multiple named scenarios" capability (switch/compare) becomes an
  * additive change rather than a rewrite.
  *
- * Contract relied on by DST2040.HTML:
+ * Contract relied on by StrikeSim2040.html:
  *   - AppState.activeGraph()            -> the active scenario's { nodes, links } object
  *   - AppState.replaceActiveGraph(g)    -> swaps the active scenario's graph, returns it
  * The main script binds its `data` variable to activeGraph(), so all existing in-place
