@@ -27,12 +27,14 @@ window.MapModule = (function () {
   let markersLayer = null;
   let mapLinksLayer = null;
   const mapMarkers = new Map(); // id -> marker
-  // The bundled satellite image is a square East Asia / western Pacific crop. Keep its
-  // Leaflet imageOverlay bounds square in Web Mercator space; a loose lat/lon rectangle
-  // stretches the raster and makes the offline coastline layer drift badly.
-  const INDO_PAC_BOUNDS = [[-12.0126, 85], [56, 165]];
-  const INDO_PAC_SATELLITE = 'assets/earth-blue-marble-indopac-3072.jpg';
-  let indopacSatelliteLoaded = false;
+  // Leaflet renders EPSG:3857. The regional Indo-Pacific JPG is visually useful, but
+  // using it directly as a lat/lon rectangle makes the coastlines drift by latitude.
+  // This generated asset is warped from the bundled equirectangular Blue Marble image
+  // into a true full-world Web Mercator square, so markers and coastlines share one CRS.
+  const WEB_MERCATOR_MAX_LAT = 85.05112878;
+  const SATELLITE_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, -180], [WEB_MERCATOR_MAX_LAT, 180]];
+  const SATELLITE_BASEMAP = 'assets/earth-blue-marble-webmercator-2048.jpg';
+  let satelliteBasemapLoaded = false;
 
   // --- Injected context (overridden by init); safe defaults so nothing throws ---
   let ctx = {
@@ -99,9 +101,9 @@ window.MapModule = (function () {
     };
     const refreshBasemapStatus = () => {
       if (realTilesLoaded) {
-        setBasemapStatus(indopacSatelliteLoaded ? 'Basemap: local tiles + Indo-Pacific satellite' : 'Basemap: local tiles', 'ok');
-      } else if (indopacSatelliteLoaded) {
-        setBasemapStatus(coastlinesLoaded ? 'Basemap: Indo-Pacific satellite + coastlines' : 'Basemap: Indo-Pacific satellite', 'ok');
+        setBasemapStatus(satelliteBasemapLoaded ? 'Basemap: local tiles + satellite' : 'Basemap: local tiles', 'ok');
+      } else if (satelliteBasemapLoaded) {
+        setBasemapStatus(coastlinesLoaded ? 'Basemap: satellite + coastlines' : 'Basemap: satellite', 'ok');
       } else if (coastlinesLoaded) {
         setBasemapStatus('Basemap: coastlines (offline)', 'ok');
       } else {
@@ -109,17 +111,17 @@ window.MapModule = (function () {
       }
     };
 
-    // Indo-Pacific satellite basemap behind coastlines so markers and links remain visible.
-    const addIndoPacificBasemap = () => {
+    // Offline satellite basemap behind coastlines so markers and links remain visible.
+    const addSatelliteBasemap = () => {
       try {
-        fetch(INDO_PAC_SATELLITE, { method: 'HEAD', cache: 'force-cache' })
+        fetch(SATELLITE_BASEMAP, { method: 'HEAD', cache: 'force-cache' })
           .then(r => {
             if (!(r && r.ok) || !leafletMap) return;
-            indopacSatelliteLoaded = true;
-            L.imageOverlay(INDO_PAC_SATELLITE, INDO_PAC_BOUNDS, {
+            satelliteBasemapLoaded = true;
+            L.imageOverlay(SATELLITE_BASEMAP, SATELLITE_BOUNDS, {
               pane: 'basemapPane',
               interactive: false,
-              opacity: 0.98
+              opacity: 1
             }).addTo(leafletMap);
             refreshBasemapStatus();
           })
@@ -128,7 +130,7 @@ window.MapModule = (function () {
         // No-op: offline fallback stack remains in place.
       }
     };
-    addIndoPacificBasemap();
+    addSatelliteBasemap();
 
     // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
     // top of the blank grid so the operator sees actual geography (China coast, Japan,
@@ -141,7 +143,7 @@ window.MapModule = (function () {
           L.geoJSON(geo, {
             pane: 'basemapPane',
             interactive: false,
-            style: { color: '#78c9ff', weight: 0.75, opacity: 0.72, fillColor: '#15293a', fillOpacity: 0.12 }
+            style: { color: '#78c9ff', weight: 0.7, opacity: 0.58, fillColor: '#15293a', fillOpacity: 0.045 }
           }).addTo(leafletMap);
           coastlinesLoaded = true;
           refreshBasemapStatus();

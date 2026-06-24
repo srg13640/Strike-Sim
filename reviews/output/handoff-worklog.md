@@ -140,3 +140,22 @@
 
 - **Uncertainties / follow-up**
   - The source image is a regional crop, not a global basemap. Units east or south of the crop still sit on the offline ocean grid; that is preferable to stretching the satellite and breaking coastline registration.
+
+### Change 8 — Replace the misregistered regional crop with a true Web Mercator satellite basemap
+- **What changed**
+  - Generated `assets/earth-blue-marble-webmercator-2048.jpg` from the bundled `assets/earth-blue-marble-2048.png`.
+  - Updated `map.js` to use that generated full-world Web Mercator image as the default Leaflet satellite basemap with bounds `[[ -85.05112878, -180 ], [85.05112878, 180 ]]`.
+  - Retired the direct `assets/earth-blue-marble-indopac-3072.jpg` overlay path from runtime map rendering because it cannot be made consistently correct with one lat/lon rectangle.
+  - Reduced coastline fill/outline opacity so the vector layer confirms geography without fighting the satellite imagery.
+
+- **Why**
+  - The follow-up operator screenshot still showed drift around the Philippines, Indonesia, and Papua. That confirmed the previous bounds adjustment was only a local improvement.
+  - Leaflet is rendering EPSG:3857. A raster basemap must already be Web Mercator, or different latitude bands will align differently. A full-world Mercator asset is less flashy than the regional crop, but it is geospatially honest and keeps markers, coastlines, and imagery in the same coordinate reference system.
+
+- **How verified**
+  - Generated the Mercator asset locally from the checked-in Blue Marble PNG, so the app remains air-gapped and static-server friendly.
+  - Reloaded the local app, entered Map mode, and checked that the basemap status reports satellite plus coastlines.
+  - Visually inspected the Philippines / Indonesia / Papua area against the vector coastline overlay; the previous large offset is no longer present.
+
+- **Uncertainties / follow-up**
+  - The retired Indo-Pacific JPG may still be recoverable if its source projection and exact bounds are found. Without that metadata, direct `L.imageOverlay` use is a trap: it can be tuned for one theater slice while visibly breaking another.
