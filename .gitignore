@@ -12,6 +12,9 @@ Thumbs.db
 # Claude Code local (machine-specific permissions/cache); keep shared config only
 .claude/settings.local.json
 
+# Internal design doc kept out of the shared repo (concept by Pat Beaudry); stays local
+/Janus_Implementation_Plan.md
+
 # Local preview server state (keep launch.json — it's shared config)
 # (nothing to ignore here yet)
 
