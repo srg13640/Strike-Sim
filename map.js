@@ -27,6 +27,9 @@ window.MapModule = (function () {
   let markersLayer = null;
   let mapLinksLayer = null;
   const mapMarkers = new Map(); // id -> marker
+  const INDO_PAC_BOUNDS = [[-35, 85], [65, 180]];
+  const INDO_PAC_SATELLITE = 'assets/earth-blue-marble-indopac-3072.jpg';
+  let indopacSatelliteLoaded = false;
 
   // --- Injected context (overridden by init); safe defaults so nothing throws ---
   let ctx = {
@@ -84,6 +87,46 @@ window.MapModule = (function () {
     leafletMap.getPane('basemapPane').style.zIndex = 250;
     leafletMap.getPane('basemapPane').style.pointerEvents = 'none';
 
+    // Basemap status helper: keep one status signal even as layers come online asynchronously.
+    const setBasemapStatus = (text, state) => {
+      const el = document.querySelector('.basemap-status');
+      if (!el) return;
+      el.textContent = text;
+      if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
+    };
+    const refreshBasemapStatus = () => {
+      if (realTilesLoaded) {
+        setBasemapStatus(indopacSatelliteLoaded ? 'Basemap: local tiles + Indo-Pacific satellite' : 'Basemap: local tiles', 'ok');
+      } else if (indopacSatelliteLoaded) {
+        setBasemapStatus('Basemap: Indo-Pacific satellite', 'ok');
+      } else if (coastlinesLoaded) {
+        setBasemapStatus('Basemap: coastlines (offline)', 'ok');
+      } else {
+        setBasemapStatus('Basemap: offline grid', 'offline');
+      }
+    };
+
+    // Indo-Pacific satellite basemap behind coastlines so markers and links remain visible.
+    const addIndoPacificBasemap = () => {
+      try {
+        fetch(INDO_PAC_SATELLITE, { method: 'HEAD', cache: 'force-cache' })
+          .then(r => {
+            if (!(r && r.ok) || !leafletMap) return;
+            indopacSatelliteLoaded = true;
+            L.imageOverlay(INDO_PAC_SATELLITE, INDO_PAC_BOUNDS, {
+              pane: 'basemapPane',
+              interactive: false,
+              opacity: 0.98
+            }).addTo(leafletMap);
+            refreshBasemapStatus();
+          })
+          .catch(() => {});
+      } catch (err) {
+        // No-op: offline fallback stack remains in place.
+      }
+    };
+    addIndoPacificBasemap();
+
     // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
     // top of the blank grid so the operator sees actual geography (China coast, Japan,
     // Taiwan, Philippines, …) with NO map tiles. Relative path -> within OFFLINE_MODE.
@@ -98,7 +141,7 @@ window.MapModule = (function () {
             style: { color: '#33617f', weight: 0.7, opacity: 0.85, fillColor: '#15293a', fillOpacity: 1 }
           }).addTo(leafletMap);
           coastlinesLoaded = true;
-          if (!realTilesLoaded) setBasemapStatus('Basemap: coastlines (offline)', 'ok');
+          refreshBasemapStatus();
         })
         .catch(() => {});
     } catch (e) { /* non-fatal */ }
@@ -127,12 +170,6 @@ window.MapModule = (function () {
       }
     });
     new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
-    const setBasemapStatus = (text, state) => {
-      const el = document.querySelector('.basemap-status');
-      if (!el) return;
-      el.textContent = text;
-      if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
-    };
 
     // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
     // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
@@ -144,11 +181,11 @@ window.MapModule = (function () {
       L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
         minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
       }).addTo(leafletMap);
-      setBasemapStatus('Basemap: local tiles', 'ok');
+      refreshBasemapStatus();
     };
     // If no raster tiles, the offline coastline basemap is still shown, so only fall back
     // to the bare-grid message when even that hasn't loaded.
-    const noTiles = () => { if (!coastlinesLoaded) setBasemapStatus('Basemap: offline grid', 'offline'); };
+    const noTiles = () => { refreshBasemapStatus(); };
     try {
       fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
         .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
