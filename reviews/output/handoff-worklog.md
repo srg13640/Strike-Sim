@@ -196,6 +196,31 @@
 - **Uncertainties / follow-up**
   - This intentionally overrides the previous "reset = neutral fit" choice; the neutral fit was visibly broken given the panel coverage. If a reviewer wants a non-angled overhead reset, the right fix is a dedicated panel-aware fit helper (offset the fit center for the covered canvas width), not a bare `zoomToFit`.
 
+### Change 11 — New `game.js`: a turn-based War Game engine (Phase 1 of "make it a wargame")
+- **Context**
+  - Product owner asked whether this could become a real, deliberate-turn wargame: Red vs Blue, human-vs-human or human-vs-AI. Decisions taken: **simultaneous orders** (both sides commit blind, resolve together), **any side can be human or AI** (so hotseat / solo-vs-AI / AI-vs-AI all work), and **networked play eventually** (which in an air-gapped tool must be *serverless* WebRTC — last phase, rides on the serializable state below).
+  - This change is **Phase 1: the engine only.** No UI yet (next change). The existing app is completely unaffected until the UI mode is wired — `game.js` only defines `window.GameModule` and is otherwise dormant.
+
+- **What changed**
+  - Added [`game.js`](../../game.js) and loaded it after `sim.js` in `DST2040.HTML`.
+  - The engine is **self-contained and deterministic**: combat constants (the 4 strike methods, difficulty modifiers, cascade alpha 0.25, domain-affinity and vulnerability models) are copied from the live sim so the game *feels* consistent, but the resolver has no hidden cross-script dependency. `resolveTurn(board, orders, cfg, rng)` is a pure function; the per-turn RNG is seeded from `(matchSeed, turn)`, so a turn always resolves identically — the basis for replay, reproducible AI, and (later) trustless network sync.
+  - **Simultaneity** is real: defensive orders (harden/repair) are read against the start-of-turn board, strikes accumulate damage against that same snapshot, damage applies, this-turn kills cascade once to neighbors, then repairs land. A node destroyed this turn still gets to act this turn.
+  - **Red is now a first-class side** with the same four offensive methods as Blue (not just reactive counters). Asymmetry is preserved by action-point budgets (Blue 4 precise / Red 5 mass).
+  - **AI commander** (`planOrders`) is deterministic from `(board, side, turn)`: value-ranks enemy targets, picks each target's best-vulnerability method, spends ~70% of AP striking and the rest hardening/repairing exposed own nodes. `easy`/`hard` knobs.
+  - **Scoring/victory**: a side scores the enemy objective-value (importance×cascade) it removes each turn — which automatically credits cascade kills. A side is defeated if its alive objective value drops below 35% of its start; otherwise the turn limit decides by score.
+  - **Non-destructive + serializable**: `newMatch` snapshots and resets the scenario to full strength for a clean board; `endMatch` restores the scenario exactly. `serialize()/deserialize()` round-trip the whole match (for save/load and the future network layer).
+
+- **How verified (headless, via console against the live page)**
+  - Ran a full deterministic AI-vs-AI match: board built (Blue 104 / Red 120 nodes, objective values 2776 / 3087), 10 turns each producing hits/misses/kills/cascades and accumulating score, victory decided by score at the turn limit.
+  - Confirmed **determinism**: same seed → identical score trace across 3 independent matches; different seed → different result.
+  - Confirmed the **human order path**: strikes queue, striking your own node is rejected, harden/repair queue, AP is bounded (4 orders max for Blue), commit gathers the AI side's 5 orders and resolves.
+  - Confirmed **scenario restore**: after `endMatch`, 0 nodes neutralized and all combatant nodes back to full health.
+
+- **Uncertainties / follow-up**
+  - **Balance**: with the symmetric greedy AI, Red's higher AP + larger roster wins AI-vs-AI consistently. That is a knob, not a bug — Blue's edge is precision a human can exploit. Tuning levers: Blue AP, per-method damage, or making Blue strikes ignore some hardening. Revisit once humans play it.
+  - Cascades are single-level by design (matches the sim and keeps resolution deterministic and bounded). Multi-level chains would be a deliberate future option.
+  - The next change wires the UI (War Game mode, order queue, commit/resolve, turn/score HUD) on top of this engine.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.

@@ -24,6 +24,9 @@
   <script src="engine.js"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js"></script>
+  <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
+       deterministic + serializable (depends on state.js at call time). -->
+  <script src="game.js"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js"></script>
   <script src="inline-datasets.js"></script>
