@@ -22,12 +22,18 @@ turns their reactions into an actual to-do list.
 
 ## How to run it
 
-1. Open `persona-1-curmudgeon.md`, paste it into an LLM that can see this repo (bonus if
-   it can open and click the app). Save its output.
-2. Do the same with `persona-2-gamer.md`. Save its output.
-3. Open `persona-3-developer.md`, paste **both** saved outputs into the marked spots, and
-   run it. Out comes an ordered engineering backlog.
-4. Bring Dana's backlog back to your engineer (Claude) to implement and verify.
+Each prompt tells the reviewer where to save its output. They all land in
+**`reviews/output/`**:
+
+1. Run `persona-1-curmudgeon.md` → saves **`reviews/output/review-1-hank.md`**.
+2. Run `persona-2-gamer.md` → saves **`reviews/output/review-2-alex.md`**.
+3. Run `persona-3-developer.md` → reads both of the above and saves the engineering
+   backlog to **`reviews/output/backlog.md`**.
+4. Bring `reviews/output/backlog.md` back to your engineer (Claude) to implement and
+   verify.
+
+(If a reviewer can't write files, it'll print its output and tell you the exact path to
+save it to — same result.)
 
 ## Also available
 

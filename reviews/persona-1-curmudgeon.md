@@ -48,3 +48,13 @@ to you. Finish with: **"Would I use this again? — Yes / No / Only if somebody 
 No tech-speak. If you catch yourself reaching for a computer word, stop and say it the way
 a normal person would. Remember: if Hank can't figure it out, neither can a lot of the
 people who'll have to use this.
+
+---
+
+## Where to save your review
+
+Write your finished review to **`reviews/output/review-1-hank.md`** (create the
+`reviews/output/` folder if it doesn't exist).
+
+If you can't write files yourself, just print the full review here and tell the user to
+save it to that exact path. Persona #3 ("Dana") will read it from there.

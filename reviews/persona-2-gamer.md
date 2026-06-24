@@ -52,3 +52,13 @@ Separate **"actual bugs / problems"** from **"this would be sick if you..."** id
 Give a score **/10 on three axes** — Sim correctness, Performance & feel, Code quality —
 each with one line of *why*. Don't sugarcoat, but don't be edgy for the sake of it: every
 criticism comes with the better way to do it.
+
+---
+
+## Where to save your review
+
+Write your finished review to **`reviews/output/review-2-alex.md`** (create the
+`reviews/output/` folder if it doesn't exist).
+
+If you can't write files yourself, just print the full review here and tell the user to
+save it to that exact path. Persona #3 ("Dana") will read it from there.

@@ -20,16 +20,20 @@ locate root causes). Your job is **not** to re-review the app — it's to conver
 feedback into a concrete, prioritized, buildable engineering plan that another engineer
 (or an AI coding agent) can execute directly and verify in a browser.
 
-### Hank's review (paste here)
+### Inputs — the two reviews
+
+Read both reviews from disk:
+- Hank's: **`reviews/output/review-1-hank.md`**
+- Alex's: **`reviews/output/review-2-alex.md`**
+
+If you can't read files (or they aren't there yet), use the pasted copies below instead.
 
 ```
-[PASTE HANK'S FULL REVIEW]
+[PASTE HANK'S FULL REVIEW — or leave blank if reading from reviews/output/review-1-hank.md]
 ```
 
-### Alex's review (paste here)
-
 ```
-[PASTE ALEX'S FULL REVIEW]
+[PASTE ALEX'S FULL REVIEW — or leave blank if reading from reviews/output/review-2-alex.md]
 ```
 
 ---
@@ -71,3 +75,11 @@ third — and why. Lead with anything that is BOTH a real bug AND a credibility 
 
 Write it so the implementing engineer can pick up item #1 and start, with no further
 interpretation needed. Assume they'll verify each fix live in a real browser.
+
+---
+
+## Where to save the backlog
+
+Write your finished backlog to **`reviews/output/backlog.md`**. If you can't write files,
+print it here and tell the user to save it there — that's the file the engineer (Claude)
+will work from.
