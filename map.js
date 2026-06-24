@@ -49,6 +49,8 @@ window.MapModule = (function () {
 
   function ensureMap() {
     if (leafletMap) return;
+    let coastlinesLoaded = false;   // offline vector basemap (assets/land.geojson)
+    let realTilesLoaded = false;    // raster tiles found under ./tiles/
     leafletMap = L.map('map', {
       zoomControl: true,
       worldCopyJump: true,
@@ -74,6 +76,25 @@ window.MapModule = (function () {
       }
     });
     new BlankGrid({ minZoom: 0, maxZoom: 8, tileSize: 256 }).addTo(leafletMap);
+
+    // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
+    // top of the blank grid so the operator sees actual geography (China coast, Japan,
+    // Taiwan, Philippines, …) with NO map tiles. Relative path -> within OFFLINE_MODE.
+    // Lives in the overlay pane, beneath the marker pane, so markers stay on top.
+    try {
+      fetch('assets/land.geojson', { cache: 'force-cache' })
+        .then(r => (r && r.ok) ? r.json() : null)
+        .then(geo => {
+          if (!geo || !leafletMap) return;
+          L.geoJSON(geo, {
+            interactive: false,
+            style: { color: '#33617f', weight: 0.7, opacity: 0.85, fillColor: '#15293a', fillOpacity: 1 }
+          }).addTo(leafletMap);
+          coastlinesLoaded = true;
+          if (!realTilesLoaded) setBasemapStatus('Basemap: coastlines (offline)', 'ok');
+        })
+        .catch(() => {});
+    } catch (e) { /* non-fatal */ }
 
     // Map overlays: scale + compass
     L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
@@ -112,17 +133,21 @@ window.MapModule = (function () {
     // them on the blank grid; otherwise keep the grid and say so plainly. Relative path,
     // so it stays within OFFLINE_MODE; any failure (e.g. file://) degrades to offline.
     const enableRealTiles = () => {
+      realTilesLoaded = true;
       L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
         minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
       }).addTo(leafletMap);
       setBasemapStatus('Basemap: local tiles', 'ok');
     };
+    // If no raster tiles, the offline coastline basemap is still shown, so only fall back
+    // to the bare-grid message when even that hasn't loaded.
+    const noTiles = () => { if (!coastlinesLoaded) setBasemapStatus('Basemap: offline grid', 'offline'); };
     try {
       fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
-        .then(r => { if (r && r.ok) enableRealTiles(); else setBasemapStatus('Basemap: offline — no tiles', 'offline'); })
-        .catch(() => setBasemapStatus('Basemap: offline — no tiles', 'offline'));
+        .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
+        .catch(noTiles);
     } catch (err) {
-      setBasemapStatus('Basemap: offline — no tiles', 'offline');
+      noTiles();
     }
 
     markersLayer = L.layerGroup().addTo(leafletMap);
