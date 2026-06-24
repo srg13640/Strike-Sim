@@ -11,6 +11,9 @@
     href="vendor/leaflet.css"
   >
 
+  <!-- UI notification primitives (toasts + event log). Loads first so its globals
+       (showToast/addEvent/…) exist before any other script runs. -->
+  <script src="ui.js"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
   <script src="state.js"></script>
@@ -1514,7 +1517,7 @@
     // window.graphInstance; bare `graphInstance` references below resolve to it.
     let selectedNode = null;
     let simStats = { strikes: 0, successes: 0, neutralized: 0 };
-    let simEvents = [];
+    // simEvents (event-log buffer) is owned by UiModule (ui.js)
     let highlightMode = null;
     let highlightSet = new Set();
     let geoModeEnabled = false; // app-level mode flag; geo 3D layout lives in EngineModule
@@ -1627,15 +1630,7 @@
     }
 
     // --- UI HELPERS ---
-    function showToast(message, type = 'info', timeout = 4200) {
-      const container = document.getElementById('toast-container');
-      if (!container || !message) return;
-      const el = document.createElement('div');
-      el.className = `toast ${type}`;
-      el.textContent = message;
-      container.appendChild(el);
-      setTimeout(() => el.remove(), timeout);
-    }
+    // showToast now lives in UiModule (ui.js); aliased to window.showToast at load.
 
     function hideNodePopup() {
       const pop = document.getElementById('node-popup');
@@ -2215,38 +2210,8 @@
     }
 
     // --- EVENT LOG, I/O, SIM LOOP ---
-    function addEvent(evt) {
-    evt.time = new Date();
-    simEvents.unshift(evt);
-    if (simEvents.length > 100) simEvents.pop();
-    renderEventLog();
-    }
-
-    function eventTypeClass(type) {
-    const t = String(type || '').toLowerCase();
-    if (t.includes('success')) return 'success';
-    if (t.includes('fail')) return 'fail';
-    return 'warning';
-    }
-
-    function renderEventLog() {
-    const list = document.getElementById('event-list');
-    if (!list) return;
-    list.innerHTML = simEvents.slice(0, 50).map((e, idx) => {
-    const isFailure = e.type === 'Failed' && e.strikeName;
-    const failureClass = isFailure ? 'failed-event' : '';
-    const failureAttrs = isFailure ? `data-strike-name="${e.strikeName}" data-target-name="${e.targetName}"` : '';
-    return `
-    <div class="item" data-idx="${idx}">
-    <span class="type ${eventTypeClass(e.type)}">${e.type}</span>
-    <span class="${failureClass}" ${failureAttrs}>${e.text || ''}</span>
-    <span class="meta">${e.time.toLocaleTimeString()}</span>
-    </div>`;
-    }).join('');
-    }
-
-    function toggleEventLog() { document.getElementById('event-log').classList.toggle('collapsed'); }
-    function clearEventLog() { simEvents = []; renderEventLog(); }
+    // addEvent / eventTypeClass / renderEventLog / toggleEventLog / clearEventLog now
+    // live in UiModule (ui.js); aliased to their original global names at load.
 
     function exportJSON() {
     const state = { data, simStats, settings };
@@ -2461,7 +2426,7 @@
     function resetApplicationState() {
     simTime = 0; playing = false;
     if (playTimer) clearInterval(playTimer);
-    playTimer = null; simEvents = [];
+    playTimer = null; clearEventLog();
     simStats = { strikes: 0, successes: 0, neutralized: 0 };
     selectedNode = null; highlightMode = null; highlightSet.clear();
     const strikeLog = document.getElementById('strike-log');
@@ -3136,7 +3101,7 @@
     }
     const item = e.target.closest('.item');
     if (item) {
-    const evt = simEvents[Number(item.dataset.idx)];
+    const evt = UiModule.getEvent(Number(item.dataset.idx));
     if (evt?.nodeId) selectNodeById(evt.nodeId);
     }
     });
