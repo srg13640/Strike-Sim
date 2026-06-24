@@ -29,6 +29,77 @@ window.EngineModule = (function () {
   // would otherwise ReferenceError.
   if (!('graphInstance' in window)) window.graphInstance = null;
 
+  // --- Geo mode (globe backdrop + lat/lon layout) ---
+  let earthMesh = null;                          // globe backdrop, lazily created
+  const EARTH_RADIUS = 398;                      // slightly less than node radius for depth sorting
+  const EARTH_TEX_URL = 'assets/earth-dark.jpg';
+
+  function latLonToXYZ(lat, lon, radius) {
+    if (radius === undefined) radius = 400;
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = (lon + 180) * Math.PI / 180;
+    const x = -(radius * Math.sin(phi) * Math.cos(theta));
+    const z =  radius * Math.sin(phi) * Math.sin(theta);
+    const y =  radius * Math.cos(phi);
+    return { x, y, z };
+  }
+
+  function ensureEarthSphere() {
+    try {
+      if (!graphInstance || !window.THREE) return;
+      if (earthMesh) return;
+      const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
+      const geom = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
+      const mat = new THREE.MeshPhongMaterial({ map: tex });
+      earthMesh = new THREE.Mesh(geom, mat);
+      earthMesh.name = 'EarthSphere';
+      earthMesh.visible = false;
+      const scene = graphInstance.scene && graphInstance.scene();
+      if (scene) scene.add(earthMesh);
+    } catch (e) {
+      addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
+    }
+  }
+
+  // Pin nodes onto the globe by lat/lon and switch off the force layout. Nodes with no
+  // coordinates are pooled in a ring below the globe. Mutates the passed node objects.
+  function applyGeoLayout(nodes) {
+    if (!graphInstance) return;
+    ensureEarthSphere();
+    if (earthMesh) earthMesh.visible = true;
+    (nodes || []).forEach(node => {
+      if (node.lat != null && node.lon != null) {
+        const pos = latLonToXYZ(node.lat, node.lon, 400 + (node.alt || 0));
+        node.fx = pos.x; node.fy = pos.y; node.fz = pos.z;
+        node.x  = pos.x; node.y  = pos.y; node.z  = pos.z;
+      } else {
+        const angle = Math.random() * 2 * Math.PI;
+        const r = 50 + Math.random() * 20;
+        const px = r * Math.cos(angle);
+        const pz = r * Math.sin(angle);
+        node.fx = px; node.fy = -500; node.fz = pz;
+        node.x  = px; node.y  = -500; node.z  = pz;
+      }
+    });
+    graphInstance
+      .d3Force('link', null)
+      .d3Force('charge', null)
+      .d3Force('center', null)
+      .d3ReheatSimulation();
+  }
+
+  // Release the pinned positions, restore the default forces, and hide the globe.
+  function clearGeoLayout(nodes) {
+    if (!graphInstance) return;
+    if (earthMesh) earthMesh.visible = false;
+    (nodes || []).forEach(node => { delete node.fx; delete node.fy; delete node.fz; });
+    graphInstance
+      .d3Force('link', d3.forceLink().distance(60))
+      .d3Force('charge', d3.forceManyBody().strength(-150))
+      .d3Force('center', d3.forceCenter());
+    graphInstance.d3ReheatSimulation();
+  }
+
   /**
    * Build the ForceGraph3D instance in the given container. Throws if WebGL context
    * creation fails (the caller handles the Map/Table fallback). Publishes the instance
@@ -121,5 +192,5 @@ window.EngineModule = (function () {
   function getGraph() { return graphInstance; }
   function isInitialViewDone() { return initialViewDone; }
 
-  return { create, frameBlueToRed, getGraph, isInitialViewDone };
+  return { create, frameBlueToRed, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
 })();

@@ -1612,10 +1612,7 @@
     let simEvents = [];
     let highlightMode = null;
     let highlightSet = new Set();
-    let geoModeEnabled = false;
-    let earthMesh = null; // globe backdrop in Geo Mode
-    const EARTH_RADIUS = 398; // slightly less than node radius for depth sorting
-    const EARTH_TEX_URL = 'assets/earth-dark.jpg';
+    let geoModeEnabled = false; // app-level mode flag; geo 3D layout lives in EngineModule
     let importCounter = 0;
     let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, ew:0, jam:0, sof:0 }, redTypes: { ke:0, ew:0, jam:0, sof:0 } };
 
@@ -1832,39 +1829,12 @@
     }
 
     // --- GEOSPATIAL & TEAM HELPERS ---
-    function latLonToXYZ(lat, lon, radius = 400) {
-    const phi = (90 - lat) * Math.PI / 180;
-    const theta = (lon + 180) * Math.PI / 180;
-    const x = -(radius * Math.sin(phi) * Math.cos(theta));
-    const z =  radius * Math.sin(phi) * Math.sin(theta);
-    const y =  radius * Math.cos(phi);
-    return { x, y, z };
-    }
-
+    // Geo mode: the 3D layout transform (lat/lon positioning, globe, force toggling)
+    // lives in EngineModule (engine.js). These thin wrappers own the app-level mode
+    // flag, the button label, and event/refresh orchestration.
     function enableGeoMode() {
     if (!graphInstance) return;
-    ensureEarthSphere();
-    if (earthMesh) earthMesh.visible = true;
-    data.nodes.forEach(node => {
-    if (node.lat != null && node.lon != null) {
-    const pos = latLonToXYZ(node.lat, node.lon, 400 + (node.alt || 0));
-    // Fix positions and also set current coordinates so update is immediate
-    node.fx = pos.x; node.fy = pos.y; node.fz = pos.z;
-    node.x = pos.x;  node.y = pos.y;  node.z = pos.z;
-    } else {
-    const angle = Math.random() * 2 * Math.PI;
-    const r = 50 + Math.random() * 20;
-    const px = r * Math.cos(angle);
-    const pz = r * Math.sin(angle);
-    node.fx = px; node.fy = -500; node.fz = pz;
-    node.x  = px; node.y  = -500; node.z  = pz;
-    }
-    });
-    graphInstance
-    .d3Force('link', null)
-    .d3Force('charge', null)
-    .d3Force('center', null)
-    .d3ReheatSimulation();
+    EngineModule.applyGeoLayout(data.nodes);
     geoModeEnabled = true;
     document.getElementById('geo-mode-btn').textContent = "Forces On";
     addEvent({ type: 'View', text: 'Geo Mode enabled.' });
@@ -1873,33 +1843,10 @@
 
     function disableGeoMode() {
     if (!graphInstance) return;
-    if (earthMesh) earthMesh.visible = false;
-    data.nodes.forEach(node => { delete node.fx; delete node.fy; delete node.fz; });
-    graphInstance
-    .d3Force('link', d3.forceLink().distance(60))
-    .d3Force('charge', d3.forceManyBody().strength(-150))
-    .d3Force('center', d3.forceCenter());
-    graphInstance.d3ReheatSimulation();
+    EngineModule.clearGeoLayout(data.nodes);
     geoModeEnabled = false;
     document.getElementById('geo-mode-btn').textContent = "Geo Mode";
     addEvent({ type: 'View', text: 'Geo Mode disabled.' });
-    }
-
-    function ensureEarthSphere() {
-    try {
-      if (!graphInstance || !window.THREE) { return; }
-      if (earthMesh) { return; }
-      const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
-      const geom = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
-      const mat = new THREE.MeshPhongMaterial({ map: tex });
-      earthMesh = new THREE.Mesh(geom, mat);
-      earthMesh.name = 'EarthSphere';
-      earthMesh.visible = false;
-      const scene = graphInstance.scene && graphInstance.scene();
-      if (scene) scene.add(earthMesh);
-    } catch (e) {
-      addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
-    }
     }
 
     function colorFromTeam(n) {
