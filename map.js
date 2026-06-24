@@ -27,7 +27,10 @@ window.MapModule = (function () {
   let markersLayer = null;
   let mapLinksLayer = null;
   const mapMarkers = new Map(); // id -> marker
-  const INDO_PAC_BOUNDS = [[-35, 85], [65, 180]];
+  // The bundled satellite image is a square East Asia / western Pacific crop. Keep its
+  // Leaflet imageOverlay bounds square in Web Mercator space; a loose lat/lon rectangle
+  // stretches the raster and makes the offline coastline layer drift badly.
+  const INDO_PAC_BOUNDS = [[-12.0126, 85], [56, 165]];
   const INDO_PAC_SATELLITE = 'assets/earth-blue-marble-indopac-3072.jpg';
   let indopacSatelliteLoaded = false;
 
@@ -70,9 +73,9 @@ window.MapModule = (function () {
         const size = this.getTileSize();
         tile.width = size.x; tile.height = size.y;
         const c = tile.getContext('2d');
-        c.fillStyle = '#0b131b';
+        c.fillStyle = '#020814';
         c.fillRect(0, 0, size.x, size.y);
-        c.strokeStyle = '#1e2a38';
+        c.strokeStyle = '#10202b';
         c.lineWidth = 1;
         c.strokeRect(0.5, 0.5, size.x - 1, size.y - 1);
         return tile;

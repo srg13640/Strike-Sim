@@ -121,3 +121,22 @@
 
 - **Uncertainties / follow-up**
   - The script still assumes `python3` is installed. README already lists Python 3 as a prerequisite; a future packaged launcher could detect Python and fall back to another local static server.
+
+### Change 7 — Correct Indo-Pacific map registration
+- **What changed**
+  - Replaced the satellite overlay bounds in `map.js` from `[[ -35, 85 ], [65, 180]]` to `[[ -12.0126, 85 ], [56, 165]]`.
+  - The new bounds keep the square satellite crop square in Web Mercator space, which matches how Leaflet renders `L.imageOverlay`.
+  - Darkened the offline fallback grid and map background so the edge of the regional satellite crop blends into ocean instead of a bright grid.
+  - Hid the 3D loading label when entering Map mode so graph settling text cannot float over the map.
+
+- **Why**
+  - The previous bounds stretched the raster vertically and eastward. Vector coastlines and the satellite coastlines visibly diverged, especially around Japan, Taiwan, the Philippines, and Indonesia.
+  - The product-owner screenshot showed exactly this registration failure.
+
+- **How verified**
+  - Generated local overlay previews by drawing `assets/land.geojson` over the satellite crop with the old and new bounds.
+  - Reloaded `http://localhost:8000/DST2040.HTML`, entered Map mode, and confirmed the status badge reads `Basemap: Indo-Pacific satellite + coastlines`.
+  - Confirmed 224 markers render and `#graph-loading` is hidden in Map mode.
+
+- **Uncertainties / follow-up**
+  - The source image is a regional crop, not a global basemap. Units east or south of the crop still sit on the offline ocean grid; that is preferable to stretching the satellite and breaking coastline registration.

@@ -279,7 +279,7 @@
     bottom: 0;
     display: none;
     z-index: 1;
-    background: #0b131b;
+    background: #020814;
     }
 
     /* Org Chart Surface (hidden by default) */
@@ -1490,9 +1490,9 @@
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 256;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0b131b';
+      ctx.fillStyle = '#020814';
       ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = '#1e2a38';
+      ctx.strokeStyle = '#10202b';
       ctx.lineWidth = 1;
       ctx.strokeRect(0.5, 0.5, 255, 255);
       return canvas.toDataURL('image/png');
@@ -2767,6 +2767,8 @@
     document.getElementById('map-btn').textContent = mapModeEnabled ? '3D' : 'Map';
 
     if (mapModeEnabled) {
+    const loader = document.getElementById('graph-loading');
+    if (loader) loader.style.display = 'none';
     ensureMap();
     refreshMapMarkers();
     hideNodePopup();
