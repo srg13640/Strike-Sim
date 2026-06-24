@@ -270,59 +270,6 @@
     .org-node .selected rect { stroke: var(--accent); }
     #org-chart .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
-    /* MCOO Surface */
-    #mcoo {
-    position: absolute;
-    left: 0;
-    top: 0;
-    right: var(--side-width);
-    bottom: 0;
-    display: none;
-    z-index: 1;
-    overflow: hidden;
-    background: #0a0a0a;
-    color: #fff;
-    }
-    #mcoo-canvas { width: 100%; height: 100%; }
-    .mcoo-panel {
-    position: absolute;
-    background: rgba(20,20,30,0.95);
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 12px;
-    z-index: 5;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    #mcoo-sidebar {
-    top: 12px; left: 12px; width: 280px; max-height: calc(100% - 24px); overflow-y: auto;
-    }
-    #mcoo-legend { bottom: 12px; right: 12px; min-width: 200px; }
-    #mcoo-minimap { top: 12px; right: 12px; width: 200px; height: 200px; }
-    #mcoo-time { bottom: 12px; left: 12px; width: 280px; }
-    #mcoo-tooltip {
-    position: absolute;
-    background: rgba(0,0,0,0.9);
-    border: 1px solid #4fc3f7;
-    border-radius: 6px;
-    padding: 10px;
-    pointer-events: none;
-    display: none;
-    z-index: 10;
-    max-width: 320px;
-    font-size: 12px;
-    }
-    #mcoo-tooltip h4 { margin: 0 0 6px 0; color: #4fc3f7; font-size: 14px; }
-    #mcoo-tooltip p { margin: 2px 0; color: #ddd; }
-    .mcoo-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 6px; }
-    .mcoo-legend-swatch { width: 18px; height: 18px; border-radius: 3px; border: 1px solid #666; }
-    .mcoo-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
-    .mcoo-slider { width: 100%; }
-    .mcoo-btn {
-    width: 100%; padding: 8px; margin-top: 8px; border: none; border-radius: 4px;
-    background: #1976d2; color: #fff; cursor: pointer; font-weight: 600;
-    }
-    .mcoo-btn.export { background: #388e3c; }
-    .mcoo-btn:hover { filter: brightness(1.05); }
 
     /* Table Surface (hidden by default) */
     #table {
@@ -1084,48 +1031,6 @@
         </div>
         <div class="mt6 hint">C2-style wiring by team. Click the Blue/Red header box to expand/collapse. Drag to pan, scroll to zoom, click nodes to select.</div>
       </section>
-      <section id="mcoo" aria-label="Multi-domain MCOO view">
-        <div id="mcoo-canvas"></div>
-        <div id="mcoo-sidebar" class="mcoo-panel">
-          <h3 style="margin:0 0 8px 0;">Pacific MCOO Control</h3>
-          <div>
-            <div class="mcoo-toggle"><input type="checkbox" id="mcoo-toggle-physical" checked> <label for="mcoo-toggle-physical">Physical Terrain</label></div>
-            <div class="mcoo-toggle"><input type="checkbox" id="mcoo-toggle-ew" checked> <label for="mcoo-toggle-ew">EW / Electromagnetic</label></div>
-            <div class="mcoo-toggle"><input type="checkbox" id="mcoo-toggle-space" checked> <label for="mcoo-toggle-space">Space Domain</label></div>
-            <div class="mcoo-toggle"><input type="checkbox" id="mcoo-toggle-cyber" checked> <label for="mcoo-toggle-cyber">Cyber Domain</label></div>
-            <div class="mcoo-toggle"><input type="checkbox" id="mcoo-toggle-human" checked> <label for="mcoo-toggle-human">Human / Population</label></div>
-          </div>
-          <div style="margin-top:10px;">
-            <label for="mcoo-ew-range">EW Range (km)</label>
-            <input id="mcoo-ew-range" class="mcoo-slider" type="range" min="200" max="1000" step="50" value="600">
-            <div class="muted" id="mcoo-ew-range-val">600 km</div>
-          </div>
-          <div style="margin-top:10px;">
-            <label for="mcoo-sat-footprint">Sat Footprint (km)</label>
-            <input id="mcoo-sat-footprint" class="mcoo-slider" type="range" min="100" max="500" step="25" value="250">
-            <div class="muted" id="mcoo-sat-footprint-val">250 km</div>
-          </div>
-          <button class="mcoo-btn" id="mcoo-reset-camera">Reset Camera</button>
-          <button class="mcoo-btn export" id="mcoo-export">Export PNG</button>
-        </div>
-        <div id="mcoo-legend" class="mcoo-panel">
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:#8b7355;"></span><span>Terrain / Islands</span></div>
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:rgba(255,50,50,0.3);"></span><span>PLA EW Range</span></div>
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:rgba(50,150,255,0.3);"></span><span>Allied EW Range</span></div>
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:#ffeb3b;"></span><span>Satellites</span></div>
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:#00ffff;"></span><span>Cyber Nodes</span></div>
-          <div class="mcoo-legend-item"><span class="mcoo-legend-swatch" style="background:#ff9800;"></span><span>Population Centers</span></div>
-        </div>
-        <div id="mcoo-time" class="mcoo-panel">
-          <div style="display:flex;align-items:center;justify-content:space-between;"><span>Time Control</span><span id="mcoo-time-label" class="muted">12:00 (Day)</span></div>
-          <input type="range" id="mcoo-time-slider" min="0" max="24" step="0.5" value="12" class="mcoo-slider">
-        </div>
-        <div id="mcoo-minimap" class="mcoo-panel"></div>
-        <div id="mcoo-tooltip">
-          <h4 id="mcoo-tooltip-title"></h4>
-          <p id="mcoo-tooltip-desc"></p>
-        </div>
-      </section>
       <div class="loading" id="graph-loading">Initializing 3D Graph...</div>
 
     <!-- Left hover controls panel -->
@@ -1623,10 +1528,6 @@
     let orgModeEnabled = false;
     let orgZoomBehavior = null;
     const orgExpandedTeams = new Set(); // teams that are expanded in org view
-    // MCOO state
-    let mcooModeEnabled = false;
-    let mcooInitialized = false;
-    let mcoo = null;
     // Table state
     let tableModeEnabled = false;
     // Legend state
@@ -2037,7 +1938,6 @@
     if (mapModeEnabled) refreshMapMarkers();
     if (tableModeEnabled) refreshTable();
     if (orgModeEnabled) renderOrgChart();
-    if (mcooModeEnabled && mcooInitialized) updateMcooSize();
     }
 
     function updateDetails(node) {
@@ -2601,10 +2501,6 @@
     const tbl = document.getElementById('table'); if (tbl) tbl.scrollTop = 0;
     } else if (mapModeEnabled) {
     fitMapToMarkers();
-    } else if (mcooModeEnabled && mcooInitialized && mcoo?.camera && mcoo?.controls) {
-    mcoo.camera.position.set(400, 300, 400);
-    mcoo.controls.target.set(0, 0, 0);
-    mcoo.controls.update();
     } else if (graphInstance) {
     if (geoModeEnabled) graphInstance.cameraPosition({ x: 0, y: 0, z: 1200 }, null, 1000);
     else graphInstance.zoomToFit(400);
@@ -2760,11 +2656,6 @@
       document.getElementById('org-chart').style.display = 'none';
       const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
     }
-    if (mapModeEnabled && mcooModeEnabled) {
-      mcooModeEnabled = false;
-      document.getElementById('mcoo').style.display = 'none';
-      const mbtn = document.getElementById('mcoo-btn'); if (mbtn) mbtn.textContent = 'MCOO';
-    }
     // If switching to Map, ensure Table is off
     if (mapModeEnabled && tableModeEnabled) {
       const restoreLegend = legendWasVisibleBeforeTable;
@@ -2834,11 +2725,6 @@
         document.getElementById('org-chart').style.display = 'none';
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
       }
-      if (tableModeEnabled && mcooModeEnabled) {
-        mcooModeEnabled = false;
-        document.getElementById('mcoo').style.display = 'none';
-        const mbtn = document.getElementById('mcoo-btn'); if (mbtn) mbtn.textContent = 'MCOO';
-      }
       if (tableModeEnabled && mapModeEnabled) {
         // turn off map if switching to table
         mapModeEnabled = false;
@@ -2873,364 +2759,6 @@
     // now live in MapModule (map.js); aliased to globals in wireMapModule() so existing
     // call sites keep working.
 
-    // --- MCOO VIEW (Three.js mini-scene) ---
-    const mcooConfig = {
-      islands: [
-        { name: 'Okinawa', x: 100, z: 200, size: 30, height: 15, type: 'airfield' },
-        { name: 'Taiwan', x: -50, z: 0, size: 60, height: 40, type: 'mountain' },
-        { name: 'Luzon', x: -100, z: -200, size: 50, height: 35, type: 'mountain' },
-        { name: 'Spratlys', x: -200, z: -100, size: 15, height: 5, type: 'atoll' }
-      ],
-      ports: [
-        { name: 'Kaohsiung Port', x: -50, z: 20, island: 'Taiwan' },
-        { name: 'Subic Bay', x: -100, z: -180, island: 'Luzon' }
-      ],
-      ewEmitters: [
-        { name: 'PLA EW Site 1', x: -250, z: 100, range: 600, color: 0xff3232, faction: 'PLA' },
-        { name: 'PLA EW Site 2', x: -280, z: -50, range: 600, color: 0xff3232, faction: 'PLA' },
-        { name: 'Okinawa EW', x: 100, z: 200, range: 500, color: 0x3296ff, faction: 'Allied' },
-        { name: 'Luzon EW', x: -100, z: -200, range: 450, color: 0x3296ff, faction: 'Allied' }
-      ],
-      satellites: [
-        { name: 'ISR-SAT-1', orbitRadius: 400, speed: 0.0005, angle: 0, footprint: 250 },
-        { name: 'ISR-SAT-2', orbitRadius: 450, speed: 0.0004, angle: Math.PI, footprint: 250 }
-      ],
-      cyberNodes: [
-        { name: 'Taiwan Fiber Landing', x: -50, z: 0, type: 'fiber' },
-        { name: 'Luzon Fiber Landing', x: -100, z: -200, type: 'fiber' },
-        { name: 'Okinawa Data Hub', x: 100, z: 200, type: 'hub' }
-      ],
-      populations: [
-        { name: 'Taipei', x: -50, z: -20, population: 2.5 },
-        { name: 'Manila', x: -100, z: -220, population: 1.8 },
-        { name: 'Kaohsiung', x: -50, z: 30, population: 1.5 },
-        { name: 'Naha', x: 100, z: 200, population: 0.3 }
-      ]
-    };
-
-    function initMcooScene() {
-      if (mcooInitialized) return;
-      if (!window.THREE || !THREE.OrbitControls) {
-        addEvent({ type: 'View', text: 'MCOO unavailable: THREE/OrbitControls missing.' });
-        return;
-      }
-      const container = document.getElementById('mcoo-canvas');
-      if (!container) return;
-
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0a0a1a);
-      scene.fog = new THREE.Fog(0x0a0a1a, 500, 2000);
-
-      const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 1, 5000);
-      camera.position.set(400, 300, 400);
-
-      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.shadowMap.enabled = true;
-      container.appendChild(renderer.domElement);
-
-      const controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-
-      const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
-      scene.add(ambientLight);
-      const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-      sunLight.position.set(200, 400, 200);
-      sunLight.castShadow = true;
-      scene.add(sunLight);
-      const hemi = new THREE.HemisphereLight(0x87ceeb, 0x0a0a1a, 0.6);
-      scene.add(hemi);
-
-      const ocean = new THREE.Mesh(
-        new THREE.PlaneGeometry(2000, 2000),
-        new THREE.MeshStandardMaterial({ color: 0x001a33, roughness: 0.3, metalness: 0.5 })
-      );
-      ocean.rotation.x = -Math.PI / 2;
-      ocean.receiveShadow = true;
-      scene.add(ocean);
-
-      const grid = new THREE.GridHelper(2000, 40, 0x444444, 0x222222);
-      scene.add(grid);
-
-      const groups = {
-        physical: new THREE.Group(),
-        ew: new THREE.Group(),
-        space: new THREE.Group(),
-        cyber: new THREE.Group(),
-        human: new THREE.Group()
-      };
-      scene.add(groups.physical, groups.ew, groups.space, groups.cyber, groups.human);
-
-      const interactiveObjects = [];
-      const raycaster = new THREE.Raycaster();
-      const mouse = new THREE.Vector2();
-
-      // Islands
-      mcooConfig.islands.forEach(island => {
-        const geom = new THREE.ConeGeometry(island.size, island.height, 8);
-        const mat = new THREE.MeshStandardMaterial({ color: island.type === 'mountain' ? 0x8b7355 : 0xa0826d, roughness: 0.9 });
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.position.set(island.x, island.height / 2, island.z);
-        mesh.castShadow = mesh.receiveShadow = true;
-        groups.physical.add(mesh);
-        if (island.type === 'airfield' || island.type === 'mountain') {
-          const marker = new THREE.Mesh(
-            new THREE.CylinderGeometry(3, 3, island.height + 10, 8),
-            new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.35, wireframe: true })
-          );
-          marker.position.set(island.x, (island.height + 10) / 2, island.z);
-          groups.physical.add(marker);
-        }
-      });
-
-      // Ports
-      mcooConfig.ports.forEach(port => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 8), new THREE.MeshStandardMaterial({ color: 0x4a4a4a }));
-        mesh.position.set(port.x, 2.5, port.z);
-        mesh.userData = { name: port.name, desc: `Strategic port facility on ${port.island}` };
-        groups.physical.add(mesh);
-        interactiveObjects.push(mesh);
-      });
-
-      // EW
-      const ewMeshes = [];
-      mcooConfig.ewEmitters.forEach(emitter => {
-        const node = new THREE.Mesh(
-          new THREE.SphereGeometry(5, 16, 16),
-          new THREE.MeshStandardMaterial({ color: emitter.color, emissive: emitter.color, emissiveIntensity: 0.5 })
-        );
-        node.position.set(emitter.x, 10, emitter.z);
-        node.userData = { name: emitter.name, desc: `${emitter.faction} EW facility - Range: ${emitter.range}km`, baseRange: emitter.range };
-        groups.ew.add(node);
-        interactiveObjects.push(node);
-
-        const range = new THREE.Mesh(
-          new THREE.CylinderGeometry(emitter.range / 10, emitter.range / 10, 2, 32),
-          new THREE.MeshBasicMaterial({ color: emitter.color, transparent: true, opacity: 0.15, side: THREE.DoubleSide })
-        );
-        range.position.set(emitter.x, 1, emitter.z);
-        range.userData.emitterNode = node;
-        groups.ew.add(range);
-        ewMeshes.push({ node, range, baseRange: emitter.range });
-      });
-
-      // Satellites
-      const satelliteMeshes = [];
-      mcooConfig.satellites.forEach(sat => {
-        const mesh = new THREE.Mesh(
-          new THREE.OctahedronGeometry(8, 0),
-          new THREE.MeshStandardMaterial({ color: 0xffeb3b, emissive: 0xffeb3b, emissiveIntensity: 0.7 })
-        );
-        mesh.userData = { name: sat.name, desc: `ISR satellite - Footprint: ${sat.footprint}km` };
-        groups.space.add(mesh);
-        interactiveObjects.push(mesh);
-
-        const footprint = new THREE.Mesh(
-          new THREE.CircleGeometry(sat.footprint / 10, 32),
-          new THREE.MeshBasicMaterial({ color: 0xffeb3b, transparent: true, opacity: 0.2, side: THREE.DoubleSide })
-        );
-        footprint.rotation.x = -Math.PI / 2;
-        groups.space.add(footprint);
-
-        satelliteMeshes.push({ mesh, footprint, orbitRadius: sat.orbitRadius, speed: sat.speed, angle: sat.angle, baseFootprint: sat.footprint });
-      });
-
-      // Cyber nodes
-      const cyberMeshes = [];
-      mcooConfig.cyberNodes.forEach(node => {
-        const mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(6, 15, 6),
-          new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.3, transparent: true, opacity: 0.8 })
-        );
-        mesh.position.set(node.x, 7.5, node.z);
-        mesh.userData = { name: node.name, desc: node.type === 'hub' ? 'Major data hub' : 'Undersea fiber landing station' };
-        groups.cyber.add(mesh);
-        interactiveObjects.push(mesh);
-        cyberMeshes.push(mesh);
-      });
-      for (let i = 0; i < mcooConfig.cyberNodes.length - 1; i++) {
-        const a = mcooConfig.cyberNodes[i];
-        const b = mcooConfig.cyberNodes[i + 1];
-        const line = new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(a.x, 7.5, a.z), new THREE.Vector3(b.x, 7.5, b.z)]),
-          new THREE.LineDashedMaterial({ color: 0x00ffff, dashSize: 5, gapSize: 3, transparent: true, opacity: 0.6 })
-        );
-        line.computeLineDistances();
-        groups.cyber.add(line);
-      }
-
-      // Population
-      mcooConfig.populations.forEach((pop, i) => {
-        const height = pop.population * 20;
-        const mesh = new THREE.Mesh(
-          new THREE.CylinderGeometry(8, 8, height, 16),
-          new THREE.MeshStandardMaterial({ color: 0xff9800, transparent: true, opacity: 0.7 })
-        );
-        mesh.position.set(pop.x, height / 2, pop.z);
-        mesh.userData = { name: pop.name, desc: `Population: ${pop.population}M` };
-        groups.human.add(mesh);
-        interactiveObjects.push(mesh);
-      });
-
-      // Tooltip
-      const tooltip = document.getElementById('mcoo-tooltip');
-      renderer.domElement.addEventListener('mousemove', (event) => {
-        const rect = renderer.domElement.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interactiveObjects);
-        if (intersects.length > 0) {
-          const obj = intersects[0].object;
-          if (obj.userData?.name) {
-            tooltip.style.display = 'block';
-            tooltip.style.left = `${event.clientX + 12}px`;
-            tooltip.style.top = `${event.clientY + 12}px`;
-            document.getElementById('mcoo-tooltip-title').textContent = obj.userData.name;
-            document.getElementById('mcoo-tooltip-desc').textContent = obj.userData.desc || '';
-            renderer.domElement.style.cursor = 'pointer';
-            return;
-          }
-        }
-        tooltip.style.display = 'none';
-        renderer.domElement.style.cursor = 'default';
-      });
-
-      // Minimap
-      const minimapScene = new THREE.Scene();
-      minimapScene.background = new THREE.Color(0x0a0a1a);
-      const minimapCamera = new THREE.OrthographicCamera(-300, 300, 300, -300, 1, 1000);
-      minimapCamera.position.set(0, 500, 0);
-      minimapCamera.lookAt(0, 0, 0);
-      const minimapRenderer = new THREE.WebGLRenderer({ antialias: true });
-      minimapRenderer.setSize(200, 200);
-      document.getElementById('mcoo-minimap').appendChild(minimapRenderer.domElement);
-      mcooConfig.islands.forEach(island => {
-        const mesh = new THREE.Mesh(new THREE.CircleGeometry(island.size / 2, 16), new THREE.MeshBasicMaterial({ color: 0x8b7355 }));
-        mesh.position.set(island.x, 0, island.z);
-        mesh.rotation.x = -Math.PI / 2;
-        minimapScene.add(mesh);
-      });
-
-      // Controls wiring
-      document.getElementById('mcoo-toggle-physical')?.addEventListener('change', e => { groups.physical.visible = e.target.checked; });
-      document.getElementById('mcoo-toggle-ew')?.addEventListener('change', e => { groups.ew.visible = e.target.checked; });
-      document.getElementById('mcoo-toggle-space')?.addEventListener('change', e => { groups.space.visible = e.target.checked; });
-      document.getElementById('mcoo-toggle-cyber')?.addEventListener('change', e => { groups.cyber.visible = e.target.checked; });
-      document.getElementById('mcoo-toggle-human')?.addEventListener('change', e => { groups.human.visible = e.target.checked; });
-
-      const ewRange = document.getElementById('mcoo-ew-range');
-      const ewVal = document.getElementById('mcoo-ew-range-val');
-      if (ewRange && ewVal) {
-        ewRange.addEventListener('input', e => {
-          const range = Number(e.target.value);
-          ewVal.textContent = `${range} km`;
-          ewMeshes.forEach(({ node, range: rMesh, baseRange }) => {
-            const scale = range / baseRange;
-            rMesh.scale.set(scale, 1, scale);
-            node.userData.desc = node.userData.desc.replace(/Range: \d+km/, `Range: ${range}km`);
-          });
-        });
-      }
-
-      const satRange = document.getElementById('mcoo-sat-footprint');
-      const satVal = document.getElementById('mcoo-sat-footprint-val');
-      if (satRange && satVal) {
-        satRange.addEventListener('input', e => {
-          const val = Number(e.target.value);
-          satVal.textContent = `${val} km`;
-          satelliteMeshes.forEach(s => {
-            const scale = val / s.baseFootprint;
-            s.footprint.scale.set(scale, scale, 1);
-            s.mesh.userData.desc = s.mesh.userData.desc.replace(/Footprint: \d+km/, `Footprint: ${val}km`);
-          });
-        });
-      }
-
-      document.getElementById('mcoo-reset-camera')?.addEventListener('click', () => {
-        camera.position.set(400, 300, 400);
-        controls.target.set(0, 0, 0);
-        controls.update();
-      });
-      document.getElementById('mcoo-export')?.addEventListener('click', () => {
-        renderer.render(scene, camera);
-        const dataURL = renderer.domElement.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.download = 'mcoo_snapshot.png';
-        link.href = dataURL;
-        link.click();
-      });
-
-      const timeSlider = document.getElementById('mcoo-time-slider');
-      const timeLabel = document.getElementById('mcoo-time-label');
-      if (timeSlider && timeLabel) {
-        timeSlider.addEventListener('input', e => {
-          const time = Number(e.target.value);
-          const hours = Math.floor(time);
-          const minutes = Math.round((time % 1) * 60);
-          const period = time >= 6 && time < 18 ? 'Day' : 'Night';
-          timeLabel.textContent = `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')} (${period})`;
-          const dayIntensity = Math.max(0, Math.sin((time - 6) * Math.PI / 12));
-          sunLight.intensity = dayIntensity * 1.5;
-          ambientLight.intensity = 0.5 + dayIntensity;
-          const skyColor = period === 'Day' ? 0x0a0a1a : 0x000005;
-          scene.background.setHex(skyColor);
-        });
-      }
-
-      let tick = 0;
-      function animateMcoo() {
-        tick += 0.01;
-        satelliteMeshes.forEach(s => {
-          s.angle += s.speed;
-          const x = Math.cos(s.angle) * s.orbitRadius;
-          const z = Math.sin(s.angle) * s.orbitRadius;
-          s.mesh.position.set(x, 200, z);
-          s.footprint.position.set(x, 1, z);
-          s.mesh.rotation.y += 0.02;
-        });
-        cyberMeshes.forEach((mesh, i) => {
-          const pulse = Math.sin(tick * 2 + i) * 0.3 + 0.7;
-          mesh.material.emissiveIntensity = pulse;
-        });
-        controls.update();
-        renderer.render(scene, camera);
-        minimapRenderer.render(minimapScene, minimapCamera);
-        mcoo.animationId = requestAnimationFrame(animateMcoo);
-      }
-      animateMcoo();
-
-      mcoo = {
-        scene, camera, renderer, controls, ambientLight, sunLight,
-        groups, ewMeshes, satelliteMeshes, cyberMeshes,
-        interactiveObjects, minimapRenderer, minimapCamera, minimapScene
-      };
-      mcooInitialized = true;
-    }
-
-    function updateMcooSize() {
-      if (!mcooInitialized || !mcoo) return;
-      const container = document.getElementById('mcoo-canvas');
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      mcoo.camera.aspect = w / h;
-      mcoo.camera.updateProjectionMatrix();
-      mcoo.renderer.setSize(w, h);
-      const mini = document.getElementById('mcoo-minimap');
-      if (mini) {
-        const mw = mini.clientWidth || 200;
-        const mh = mini.clientHeight || 200;
-        mcoo.minimapRenderer.setSize(mw, mh);
-      }
-    }
-
-    function toggleMcooMode() {
-      mcooModeEnabled = !mcooModeEnabled;
-      // MCOO disabled in this build
-      addEvent({ type: 'View', text: 'MCOO view is disabled in this build.' });
-    }
 
     // --- TASK ORG / WIRE DIAGRAM ---
     function buildOrgTree(team, visibleNodes, visibleLinks, expanded) {
@@ -3527,11 +3055,6 @@
           const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = 'Table';
           if (restoreLegend) setLegendVisible(true);
         }
-        if (mcooModeEnabled) {
-          mcooModeEnabled = false;
-          document.getElementById('mcoo').style.display = 'none';
-          const mbtn = document.getElementById('mcoo-btn'); if (mbtn) mbtn.textContent = 'MCOO';
-        }
         document.getElementById('org-chart').style.display = 'block';
         document.getElementById('graph').style.display = 'none';
         document.getElementById('map').style.display = 'none';
@@ -3543,7 +3066,6 @@
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
         if (mapModeEnabled) document.getElementById('map').style.display = 'block';
         else if (tableModeEnabled) document.getElementById('table').style.display = 'block';
-        else if (mcooModeEnabled) document.getElementById('mcoo').style.display = 'block';
         else document.getElementById('graph').style.display = 'block';
         resetView();
       }
@@ -3664,7 +3186,6 @@
     if (mapModeEnabled && MapModule.getMap()) setTimeout(() => MapModule.invalidateSize(), 50);
     if (selectedNode && !mapModeEnabled) setTimeout(() => updateNodePopupPosition(selectedNode), 30);
     if (orgModeEnabled) setTimeout(renderOrgChart, 80);
-    if (mcooModeEnabled && mcooInitialized) setTimeout(updateMcooSize, 50);
     });
 
     // COA Generator
