@@ -23,6 +23,8 @@
   <script src="engine.js"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js"></script>
+  <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
+  <script src="views.js"></script>
   <script src="inline-datasets.js"></script>
   <style>
     :root {
@@ -1531,8 +1533,11 @@
     let mapModeEnabled = false;
     // Org chart state
     let orgModeEnabled = false;
-    let orgZoomBehavior = null;
+    // orgZoomBehavior now lives in ViewsModule (views.js).
     const orgExpandedTeams = new Set(); // teams that are expanded in org view
+    // Shared with ViewsModule's renderOrgChart (never reassigned, so the same Set
+    // object is visible on both sides); the main toggles mutate it.
+    window.orgExpandedTeams = orgExpandedTeams;
     // Table state
     let tableModeEnabled = false;
     // Legend state
@@ -2646,44 +2651,8 @@
     }
 
     // --- TABLE HELPERS ---
-    function displayStatusForRow(n) {
-      if (highlightMode === 'coa' && highlightSet && highlightSet.has(n.id)) return 'Likely Neutralized';
-      if (highlightMode === 'payoff' && highlightSet && highlightSet.has(n.id)) return 'High Payoff';
-      if (highlightMode === 'risk' && highlightSet && highlightSet.has(n.id)) return 'High Risk';
-      return n.status || 'Active';
-    }
-
-    function refreshTable() {
-      const tbody = document.querySelector('#nodes-table tbody');
-      if (!tbody) return;
-      const { visibleNodes } = currentVisible();
-      const hc = document.body.classList.contains('high-contrast');
-      const rows = visibleNodes.map(n => {
-        const healthMax = n.healthMax || 100;
-        const healthPct = Math.max(0, Math.min(100, Math.round((n.health / healthMax) * 100)));
-        const statusText = displayStatusForRow(n);
-        const teamColor = resolveCssVar(colorFromTeam(n));
-        const dom = (n.domain || []).join(', ');
-        const coords = (n.lat != null && n.lon != null) ? `${Number(n.lat).toFixed(2)}, ${Number(n.lon).toFixed(2)}` : '';
-        const trClass = (highlightMode && highlightSet && highlightSet.size) ? (highlightSet.has(n.id) ? 'row-highlight' : 'row-dim') : '';
-        return `
-          <tr class="${trClass}" data-id="${n.id}">
-            <td>${n.id}</td>
-            <td>${n.name || ''}</td>
-            <td><span class="swatch" style="background:${teamColor}"></span> ${(n.team||'3rd_party').replace('_',' ')}</td>
-            <td>${dom}</td>
-            <td>${n.type || ''}</td>
-            <td>${healthPct}%</td>
-            <td><span class="status-badge">${statusText}</span></td>
-            <td>${n.importance ?? ''}</td>
-            <td>${n.difficulty || ''}</td>
-            <td>${coords}</td>
-          </tr>`;
-      }).join('');
-      tbody.innerHTML = rows;
-      // Row click -> select node
-      tbody.querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => selectNodeById(tr.getAttribute('data-id'))));
-    }
+    // Table renderers (displayStatusForRow/refreshTable) now live in ViewsModule
+    // (views.js); aliased to globals at load.
 
     function toggleTableMode() {
       tableModeEnabled = !tableModeEnabled;
@@ -2728,284 +2697,8 @@
 
 
     // --- TASK ORG / WIRE DIAGRAM ---
-    function buildOrgTree(team, visibleNodes, visibleLinks, expanded) {
-      const teamNodes = visibleNodes.filter(n => (n.team || '3rd_party') === team);
-      const idToNode = new Map(teamNodes.map(n => [n.id, n]));
-      const adj = new Map();
-      teamNodes.forEach(n => adj.set(n.id, []));
-      visibleLinks.forEach(l => {
-        const s = l.source?.id ?? l.source;
-        const t = l.target?.id ?? l.target;
-        if (adj.has(s) && adj.has(t)) {
-          adj.get(s).push(t);
-          adj.get(t).push(s);
-        }
-      });
-      const commandNodes = teamNodes.filter(n => String(n.type || '').toLowerCase().includes('command'));
-      const anchors = commandNodes.length ? commandNodes : teamNodes.slice(0, Math.min(2, teamNodes.length));
-      const root = { name: `${teamLabel(team)} Task Org`, id: `${team}-root`, team, expanded, children: [] };
-      if (!expanded) return root;
-      const used = new Set();
-      const mk = (n) => ({ name: n.name || n.id, id: n.id, data: n, children: [] });
-
-      anchors.forEach(cmd => {
-        used.add(cmd.id);
-        const childIds = (adj.get(cmd.id) || []).filter(id => idToNode.has(id));
-        const children = childIds.map(id => {
-          const node = idToNode.get(id);
-          used.add(id);
-          const grandIds = (adj.get(id) || []).filter(gid => gid !== cmd.id && idToNode.has(gid) && !used.has(gid));
-          const child = mk(node);
-          child.children = grandIds.map(gid => { used.add(gid); return mk(idToNode.get(gid)); });
-          return child;
-        });
-        root.children.push({ ...mk(cmd), children });
-      });
-
-      const extras = teamNodes.filter(n => !used.has(n.id)).map(mk);
-      if (extras.length) root.children.push({ name: 'Attachments', id: `${team}-attachments`, children: extras });
-      if (!root.children.length) root.children.push({ name: 'No nodes available', id: `${team}-none`, children: [] });
-      return root;
-    }
-
-    function renderOrgChart() {
-      const wrap = document.getElementById('org-chart');
-      const svg = d3.select('#org-chart-svg');
-      if (!wrap || svg.empty()) return;
-      const { visibleNodes, visibleLinks } = currentVisible();
-      const width = wrap.clientWidth || 900;
-      const height = wrap.clientHeight || 700;
-      svg.attr('width', width).attr('height', height);
-      svg.selectAll('*').remove();
-
-      if (!orgZoomBehavior) {
-        orgZoomBehavior = d3.zoom()
-          .scaleExtent([0.4, 2.5])
-          .on('zoom', (event) => {
-            svg.select('#org-zoom').attr('transform', event.transform);
-          });
-      }
-      svg.call(orgZoomBehavior);
-
-      const zoomLayer = svg.append('g').attr('id', 'org-zoom');
-      const teams = ['blue', 'red'];
-      const colW = width / teams.length;
-      const nodeSize = { w: 180, h: 68 };
-      const nodeSpacingX = 260;
-      const levelSpacingY = 180;
-      const marginTop = 40;
-
-      teams.forEach((team, idx) => {
-        const rootData = buildOrgTree(team, visibleNodes, visibleLinks, orgExpandedTeams.has(team));
-        const root = d3.hierarchy(rootData);
-        const tree = d3.tree()
-          .nodeSize([nodeSpacingX, levelSpacingY])
-          .separation((a, b) => (a.parent === b.parent ? 1.0 : 1.8));
-        tree(root);
-        const nodes = root.descendants();
-        const minX = d3.min(nodes, d => d.x);
-        const maxX = d3.max(nodes, d => d.x);
-        const treeWidth = (maxX - minX) || nodeSpacingX;
-        const centerX = idx * colW + colW / 2;
-        const shiftX = centerX - (minX + treeWidth / 2);
-        const shiftY = marginTop;
-        const teamColor = team === 'blue' ? resolveCssVar('var(--team-blue)') : resolveCssVar('var(--team-red)');
-
-        zoomLayer.append('g')
-          .selectAll('path')
-          .data(root.links())
-          .join('path')
-          .attr('class', 'org-link')
-          .attr('stroke', teamColor)
-          .attr('d', d => {
-            const sx = shiftX + d.source.x;
-            const sy = shiftY + d.source.y + nodeSize.h;
-            const tx = shiftX + d.target.x;
-            const ty = shiftY + d.target.y;
-            const midY = (sy + ty) / 2;
-            return `M${sx},${sy} V${midY} H${tx} V${ty}`;
-          });
-
-        const nodeG = zoomLayer.append('g')
-          .selectAll('g')
-          .data(nodes)
-          .join('g')
-          .attr('class', 'org-node')
-          .attr('transform', d => `translate(${shiftX + d.x - nodeSize.w/2},${shiftY + d.y - nodeSize.h/2})`)
-          .style('cursor', d => d.depth === 0 ? 'pointer' : (d.data?.data ? 'pointer' : 'default'))
-          .on('click', (event, d) => {
-            if (d.depth === 0 && d.data?.team) {
-              toggleOrgTeam(d.data.team);
-            } else if (d.data && d.data.data) {
-              selectNodeById(d.data.data.id);
-            }
-          });
-
-        nodeG.each(function(d) {
-          drawMilBox(d3.select(this), d, teamColor);
-        });
-      });
-
-      fitOrgChartToView(svg, zoomLayer, width, height);
-    }
-
-    function fitOrgChartToView(svg, zoomLayer, width, height) {
-      try {
-        const box = zoomLayer.node().getBBox();
-        const padding = 30;
-        const scale = Math.min(
-          1.4,
-          Math.max(0.3,
-            Math.min(
-              (width - padding * 2) / box.width,
-              (height - padding * 2) / box.height
-            )
-          )
-        );
-        const tx = (width - box.width * scale) / 2 - box.x * scale;
-        const ty = (height - box.height * scale) / 2 - box.y * scale;
-        const t = d3.zoomIdentity.translate(tx, ty).scale(scale);
-        svg.transition().duration(200).call(orgZoomBehavior.transform, t);
-      } catch (e) { /* ignore fit errors */ }
-    }
-
-    function drawMilBox(group, d, strokeColor) {
-      const node = d.data.data;
-      const w = 180;
-      const h = 68;
-      const isRoot = d.depth === 0;
-      const label = d.data.name || '';
-      const sub = (() => {
-        if (isRoot && !d.data.expanded) return 'Click to expand';
-        if (!node) return '';
-        const parts = [];
-        if (node.type) parts.push(node.type);
-        if (node.domain && node.domain.length) parts.push(node.domain.join(', '));
-        return parts.join(' · ');
-      })();
-      const isSelected = node && selectedNode && node.id === selectedNode.id;
-      const stroke = isSelected ? resolveCssVar('var(--accent)') : strokeColor;
-
-      const box = group.append('g').attr('class', 'mil-box');
-      box.append('rect')
-        .attr('width', w)
-        .attr('height', h)
-        .attr('stroke', stroke);
-
-      // echelon ticks (suggest unit size)
-      const tickCount = Math.max(1, Math.min(3, (d.children?.length || 0) > 2 ? 3 : (d.children?.length || 1)));
-      const tickGroup = box.append('g').attr('class', 'ticks');
-      const spacing = 10;
-      const startX = (w - (tickCount - 1) * spacing) / 2;
-      for (let i = 0; i < tickCount; i++) {
-        tickGroup.append('line')
-          .attr('x1', startX + i * spacing)
-          .attr('x2', startX + i * spacing)
-          .attr('y1', -8)
-          .attr('y2', 0)
-          .attr('stroke', stroke);
-      }
-
-      // symbol inside box (rudimentary mil sym vibe)
-      const sym = box.append('g').attr('class', 'symbol').attr('transform', `translate(12,10)`);
-      drawSymbol(sym, node, stroke);
-
-      // circles along the bottom edge
-      const circles = box.append('g').attr('class', 'circles');
-      const circleY = h - 10;
-      const cx = [w / 2 - 18, w / 2, w / 2 + 18];
-      cx.forEach(x => {
-        circles.append('circle')
-          .attr('cx', x)
-          .attr('cy', circleY)
-          .attr('r', 4)
-          .attr('stroke', stroke);
-      });
-
-      box.append('text')
-        .attr('x', 10)
-        .attr('y', h + 16)
-        .attr('fill', '#dfe6ee')
-        .attr('font-weight', 700)
-        .text(label);
-
-      if (sub) {
-        box.append('text')
-          .attr('x', 10)
-          .attr('y', h + 30)
-          .attr('class', 'sub')
-          .text(sub);
-      }
-
-    if (isRoot) {
-      box.append('text')
-        .attr('x', w - 10)
-        .attr('y', -10)
-        .attr('text-anchor', 'end')
-        .attr('class', 'sub')
-        .text(teamLabel(node?.team || d.data.team || ''));
-      // small chevron
-      box.append('text')
-        .attr('x', w - 10)
-        .attr('y', h + 16)
-        .attr('text-anchor', 'end')
-        .attr('class', 'sub')
-        .text(d.data.expanded ? '▾' : '▸');
-    }
-    }
-
-    function drawSymbol(group, node, stroke) {
-      const w = 116;
-      const h = 36;
-      const centerX = w / 2;
-      const centerY = h / 2;
-      const type = String(node?.type || '').toLowerCase();
-      const domain = (node?.domain || []).map(s => String(s).toLowerCase());
-
-      if (!node) {
-        // root placeholder
-        group.append('rect')
-          .attr('x', 0).attr('y', 0).attr('width', w).attr('height', h)
-          .attr('rx', 4).attr('ry', 4)
-          .attr('stroke', stroke).attr('fill', 'none');
-        group.append('line').attr('x1', 10).attr('y1', centerY).attr('x2', w-10).attr('y2', centerY).attr('stroke', stroke);
-        return;
-      }
-
-      const baseRect = group.append('rect')
-        .attr('width', w)
-        .attr('height', h)
-        .attr('fill', 'none')
-        .attr('stroke', 'none');
-
-      if (type.includes('command')) {
-        group.append('line').attr('x1', 0).attr('y1', 0).attr('x2', w).attr('y2', h).attr('stroke', stroke);
-        group.append('line').attr('x1', 0).attr('y1', h).attr('x2', w).attr('y2', 0).attr('stroke', stroke);
-      } else if (domain.includes('air') || type.includes('fires')) {
-        group.append('ellipse')
-          .attr('cx', centerX)
-          .attr('cy', centerY)
-          .attr('rx', 28)
-          .attr('ry', 12)
-          .attr('stroke', stroke)
-          .attr('fill', 'none');
-      } else if (domain.includes('ew') || type.includes('relay') || type.includes('sensor')) {
-        group.append('polygon')
-          .attr('points', `${centerX},6 ${w-8},${centerY} ${centerX},${h-6} ${8},${centerY}`)
-          .attr('stroke', stroke)
-          .attr('fill', 'none');
-      } else if (type.includes('support') || type.includes('log')) {
-        group.append('rect')
-          .attr('x', centerX - 12)
-          .attr('y', centerY - 8)
-          .attr('width', 24)
-          .attr('height', 16)
-          .attr('class', 'symbol-fill');
-      } else {
-        group.append('line').attr('x1', 6).attr('y1', centerY).attr('x2', w - 6).attr('y2', centerY).attr('stroke', stroke);
-        group.append('circle').attr('cx', centerX).attr('cy', centerY).attr('r', 6).attr('stroke', stroke).attr('fill', 'none');
-      }
-    }
+    // Task-org renderers (buildOrgTree/renderOrgChart/fitOrgChartToView/drawMilBox/
+    // drawSymbol) now live in ViewsModule (views.js); aliased to globals at load.
 
     function toggleOrgMode() {
       orgModeEnabled = !orgModeEnabled;
@@ -3281,8 +2974,19 @@
       window.closeMapPopup = MapModule.closeMapPopup;
     }
 
+    // Inject the script-scoped state the table/org renderers read (see views.js).
+    function wireViewsModule() {
+      if (typeof ViewsModule === 'undefined') return;
+      ViewsModule.init({
+        getSelectedNode: () => selectedNode,
+        getHighlightMode: () => highlightMode,
+        getHighlightSet: () => highlightSet
+      });
+    }
+
     async function init() {
     wireMapModule();
+    wireViewsModule();
     bindEventListeners();
     initUI();
 
