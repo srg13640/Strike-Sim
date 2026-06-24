@@ -16,6 +16,8 @@
   <script src="state.js"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
   <script src="map.js"></script>
+  <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
+  <script src="engine.js"></script>
   <script src="inline-datasets.js"></script>
   <style>
     :root {
@@ -1603,7 +1605,8 @@
     let data = AppState.activeGraph();
     let filteredDomains = new Set();
     let filteredTeams = new Set();
-    let graphInstance = null;
+    // graphInstance is owned by EngineModule (engine.js) and published as
+    // window.graphInstance; bare `graphInstance` references below resolve to it.
     let selectedNode = null;
     let simStats = { strikes: 0, successes: 0, neutralized: 0 };
     let simEvents = [];
@@ -2661,56 +2664,8 @@
     }
     }
 
-    // Initial-load camera framing: place the camera on the Blue side looking toward
-    // Red, sized so the whole battlespace fits. Fired once on first data load (see the
-    // onEngineStop handler in init). Not used for manual "Reset View" (that stays a
-    // neutral fit) or for subsequent data changes (the operator owns the camera then).
-    function frameBlueToRed(ms = 1200) {
-    if (!graphInstance) return;
-    const gd = graphInstance.graphData();
-    const nodes = (gd && gd.nodes) || [];
-    if (!nodes.length) return;
-
-    const centroid = (arr) => {
-      let x = 0, y = 0, z = 0;
-      for (const n of arr) { x += n.x || 0; y += n.y || 0; z += n.z || 0; }
-      const k = arr.length || 1;
-      return { x: x / k, y: y / k, z: z / k };
-    };
-
-    const blue = nodes.filter(n => n.team === 'blue');
-    const red  = nodes.filter(n => n.team === 'red');
-    const all  = centroid(nodes);
-    const B = blue.length ? centroid(blue) : all;
-    const R = red.length  ? centroid(red)  : all;
-
-    // Fit radius around the overall centroid. Use the 90th-percentile distance, not
-    // the absolute max, so a few far-flung outlier nodes don't inflate the frame and
-    // shrink the main battlespace. The bulk of the network fills the view; the rare
-    // straggler may sit near an edge, which is acceptable.
-    const dists = nodes
-      .map(n => Math.hypot((n.x || 0) - all.x, (n.y || 0) - all.y, (n.z || 0) - all.z))
-      .sort((a, b) => a - b);
-    const pct = dists[Math.min(dists.length - 1, Math.floor(dists.length * 0.9))] || 0;
-    const radius = Math.max(pct, 60);
-
-    // Look direction = from Blue toward Red. Fall back to +Z if the two centroids
-    // coincide (e.g. a single-team scenario) so the camera never lands on the target.
-    let dx = R.x - B.x, dy = R.y - B.y, dz = R.z - B.z;
-    let len = Math.hypot(dx, dy, dz);
-    if (len < 1e-3) { dx = 0; dy = 0; dz = 1; len = 1; }
-    dx /= len; dy /= len; dz /= len;
-
-    // Camera sits behind Blue (opposite the look direction), slightly elevated, far
-    // enough that all nodes fit a ~75° vertical FOV with padding.
-    const dist = radius * 2.0;
-    const camPos = {
-      x: all.x - dx * dist,
-      y: all.y - dy * dist + radius * 0.4,
-      z: all.z - dz * dist
-    };
-    graphInstance.cameraPosition(camPos, all, ms);
-    }
+    // frameBlueToRed (the Blue-perspective opening shot) now lives in EngineModule
+    // (engine.js); init() passes it as the onFirstSettle hook.
 
     function applyHighlight() {
     const legendModeEl = document.getElementById('legend-mode');
@@ -3869,10 +3824,6 @@
     }
     }
 
-    // Guards the one-time Blue-perspective opening shot. Set true after the first
-    // engine settle that actually has nodes, so later data changes never re-frame.
-    let initialViewDone = false;
-
     // Wire the Leaflet map module (map.js): inject live accessors for the script-scoped
     // state it reads, plus the two tile constants, then alias its public methods onto
     // their original global names so the existing scattered call sites keep working.
@@ -3901,29 +3852,18 @@
     initUI();
 
     try {
-      // Initialize graph immediately - colors are resolved at render time
-      graphInstance = ForceGraph3D()(document.getElementById('graph'))
-      .graphData({ nodes: [], links: [] }) // Start empty
-      .nodeLabel(n => `${n.name} (${n.id})`)
-      .nodeColor(n => {
-        const color = colorFromTeam(n);
-        return resolveCssVar(color);
-      })
-      .onNodeClick(selectNode)
-      .onBackgroundClick(() => selectNode(null))
-      .onEngineStop(() => {
-        const loader = document.getElementById('graph-loading');
-        if (loader) loader.style.display = 'none';
-        // Frame the opening shot exactly once, on the first settle that has nodes.
-        // The graph is created empty, so that first (empty) settle is skipped. After
-        // this, strikes/imports/filters reheat the engine but never move the camera
-        // (operator owns it; the "Reset View" button is the manual recenter).
-        const gd = graphInstance.graphData();
-        const hasNodes = gd && gd.nodes && gd.nodes.length > 0;
-        if (!initialViewDone && hasNodes) {
-          initialViewDone = true;
+      // Build the 3D engine (EngineModule owns the instance; colors resolved at render
+      // time). The onFirstSettle hook keeps the opening-shot decision here in the main
+      // script, where the view-mode flags live.
+      EngineModule.create('graph', {
+        nodeLabel: n => `${n.name} (${n.id})`,
+        nodeColor: n => resolveCssVar(colorFromTeam(n)),
+        onNodeClick: selectNode,
+        onBackgroundClick: () => selectNode(null),
+        onFirstSettle: () => {
+          // The "Reset View" button is the manual recenter; this fires once on load.
           if (geoModeEnabled || mapModeEnabled || tableModeEnabled) resetView();
-          else frameBlueToRed(1200);
+          else EngineModule.frameBlueToRed(1200);
         }
       });
     } catch (err) {
