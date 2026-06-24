@@ -626,6 +626,25 @@
     .leaflet-control.basemap-status[data-state="ok"]::before { background: var(--success); }
     .leaflet-control.basemap-status[data-state="offline"] { color: var(--warning); }
     .leaflet-control.basemap-status[data-state="offline"]::before { background: var(--warning); }
+    /* Persistent current-view indicator in the header — tells the operator which view
+       is active (and Geo on/off), since button labels alone are easy to miss. */
+    #view-status {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--accent);
+      background: rgba(0,216,255,0.08);
+      border: 1px solid rgba(0,216,255,0.25);
+      border-radius: 6px;
+      padding: 3px 9px;
+      display: inline-block;
+    }
+    #view-status[data-geo="on"] {
+      color: var(--success);
+      background: rgba(81,207,102,0.10);
+      border-color: rgba(81,207,102,0.30);
+    }
     .leaflet-control-scale {
     background: rgba(10,15,20,0.9);
     border: 1px solid var(--border);
@@ -1110,6 +1129,7 @@
       <button id="right-panel-collapse-btn" type="button" class="secondary">Collapse</button>
       <span class="sub" id="counts">0 nodes · 0 links</span>
     </div>
+    <div id="view-status" role="status" aria-live="polite">View: 3D Network</div>
     </header>
 
     <div id="side-content">
@@ -1735,13 +1755,35 @@
     // Geo mode: the 3D layout transform (lat/lon positioning, globe, force toggling)
     // lives in EngineModule (engine.js). These thin wrappers own the app-level mode
     // flag, the button label, and event/refresh orchestration.
+    // Persistent header indicator of the active view (and Geo on/off + pinned count),
+    // so mode changes are never signalled by a button label alone.
+    function updateViewStatus() {
+    const el = document.getElementById('view-status');
+    if (!el) return;
+    let view = '3D Network';
+    if (mapModeEnabled) view = 'Map';
+    else if (tableModeEnabled) view = 'Table';
+    else if (orgModeEnabled) view = 'Task Org';
+    const geoOn = geoModeEnabled && !mapModeEnabled && !tableModeEnabled && !orgModeEnabled;
+    if (geoOn) {
+      const g = (window.AppState && window.AppState.activeGraph()) || { nodes: [] };
+      const pinned = g.nodes.filter(n => n.lat != null && n.lon != null).length;
+      el.textContent = `View: 3D Network · Geo ON (${pinned} nodes pinned by lat/lon)`;
+      el.setAttribute('data-geo', 'on');
+    } else {
+      el.textContent = `View: ${view}`;
+      el.removeAttribute('data-geo');
+    }
+    }
+
     function enableGeoMode() {
     if (!graphInstance) return;
     EngineModule.applyGeoLayout(data.nodes);
     geoModeEnabled = true;
-    document.getElementById('geo-mode-btn').textContent = "Forces On";
+    document.getElementById('geo-mode-btn').textContent = "Exit Geo";
     addEvent({ type: 'View', text: 'Geo Mode enabled.' });
     refreshGraph();
+    updateViewStatus();
     }
 
     function disableGeoMode() {
@@ -1750,6 +1792,7 @@
     geoModeEnabled = false;
     document.getElementById('geo-mode-btn').textContent = "Geo Mode";
     addEvent({ type: 'View', text: 'Geo Mode disabled.' });
+    updateViewStatus();
     }
 
     function colorFromTeam(n) {
@@ -2648,6 +2691,7 @@
     } else {
     resetView();
     }
+    updateViewStatus();
     }
 
     // --- TABLE HELPERS ---
@@ -2679,6 +2723,7 @@
       document.getElementById('graph').style.display = tableModeEnabled ? 'none' : (mapModeEnabled ? 'none' : 'block');
       const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = tableModeEnabled ? '3D' : 'Table';
       if (tableModeEnabled) refreshTable();
+      updateViewStatus();
     }
 
     function setLegendVisible(vis) {
@@ -2729,6 +2774,7 @@
         else document.getElementById('graph').style.display = 'block';
         resetView();
       }
+      updateViewStatus();
     }
 
     function toggleOrgTeam(team) {
@@ -3020,6 +3066,7 @@
     refreshGraph();
     // Ensure legend button reflects initial state
     setLegendVisible(true);
+    updateViewStatus();
     }
 
     // --- Monte Carlo Simulation (COA-based) ---
