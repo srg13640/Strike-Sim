@@ -221,6 +221,27 @@
   - Cascades are single-level by design (matches the sim and keeps resolution deterministic and bounded). Multi-level chains would be a deliberate future option.
   - The next change wires the UI (War Game mode, order queue, commit/resolve, turn/score HUD) on top of this engine.
 
+### Change 12 — New `wargame.js`: the playable War Game UI (Phase 2)
+- **What changed**
+  - Added [`wargame.js`](../../wargame.js), loaded after `game.js`. It is **fully self-contained**: injects its own stylesheet, builds its own `⚔ War Game` launch button and a right-side HUD entirely via the DOM, and talks only to `window.GameModule` plus a few existing globals at call time (`selectedNode`, `selectNode`/`selectNodeById`, `applyHighlight`, `refreshMapMarkers`, `addEvent`). It edits none of the existing control HTML — the analyst tool is untouched until the operator clicks the button.
+  - **Setup screen**: per-side Human/Computer toggles (so hotseat, solo-vs-AI, and AI-vs-AI all start from here), match length (6/10/16 turns), and AI difficulty.
+  - **Play loop**: a live scoreboard (score + surviving-force bars per side), a "Selected target" panel that reads the currently-selected node and offers context actions — the four strike methods against an enemy node (flagging which ones it is **▲ vulnerable** to) or Harden/Repair on a friendly one — an order queue bounded by action points, and a one-click "Top enemy targets" shortlist so the player can act without hunting the 3D scene.
+  - **Commit → resolve**: one button gathers any AI side's orders, resolves the turn, recolors the graph/map (neutralized nodes go grey via the existing color path), and shows a color-coded resolution log with the per-side score delta, then a "Next Turn" button. Game over shows a winner banner and "New Match".
+  - **Targeting integrates with the real views**: you select a node the normal way (click it in 3D / Map / Geo, or via the shortlist) and the HUD acts on it — so the wargame inherits the geography for free.
+  - **Clean exit**: the × restores the scenario to its exact pre-match health/status (the engine snapshots it at `newMatch`), so leaving the War Game never strands battle damage in the analysis tool.
+
+- **How verified (in-browser, via the live HUD)**
+  - Opened the HUD, ran setup, started a Human-Blue vs AI-Red match.
+  - Picked the top Red command node from the shortlist; the strike panel correctly flagged Cyber and SOF as the vulnerabilities of that Buried target; queued strikes and watched action points decrement.
+  - Committed: both Blue (human) and Red (AI, 5 orders) resolved simultaneously, the scoreboard and force bars updated, and the resolution log listed every hit/miss/kill with the score delta (RED +40 after it neutralized a Blue node).
+  - Stepped Next Turn (orders cleared, AP reset), then fast-forwarded to the turn limit and confirmed the "RED WINS" banner + New Match.
+  - Confirmed clean exit: 3 nodes neutralized mid-match → after ×, 0 neutralized and all nodes at full health, match ended, launch button restored. Console clean (only the benign Three.js dup warning).
+
+- **Uncertainties / follow-up**
+  - **No fog of war yet** — in a two-human hotseat both players currently see each other's queued orders (you switch sides with the in-HUD toggle). Fog (hide the other side's orders/queue, and optionally their force details) is the obvious Phase-2.5 add and is cheap given the existing filter system.
+  - Balance still favors the side with more action points under AI play; unchanged from the engine note. Now that it is playable, this is the first thing to tune with real games.
+  - Phase 3 (serverless-WebRTC networked play) rides on `GameModule.serialize()/deserialize()`, which already round-trip the full match.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.
