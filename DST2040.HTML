@@ -11,6 +11,9 @@
     href="vendor/leaflet.css"
   >
 
+  <!-- Scenario-centric application state. Must load before the main script so the
+       active scenario's graph exists when `data` is bound to it. -->
+  <script src="state.js"></script>
   <script src="inline-datasets.js"></script>
   <style>
     :root {
@@ -1592,7 +1595,10 @@
     let simTime = 0;
     let playing = false;
     let playTimer = null;
-    let data = { nodes: [], links: [] };
+    // `data` is the active scenario's live graph object (see state.js). In-place
+    // mutations (push/splice/filter) flow through to the owning scenario; the single
+    // reassignment site (replace-import) goes via AppState.replaceActiveGraph().
+    let data = AppState.activeGraph();
     let filteredDomains = new Set();
     let filteredTeams = new Set();
     let graphInstance = null;
@@ -2514,7 +2520,8 @@
     } else { // replace
     resetApplicationState();
     importedData.nodes.forEach(node => node.team = assignedTeam);
-    data = importedData;
+    // Swap the active scenario's graph via the store, keeping `data` in sync with it.
+    data = AppState.replaceActiveGraph(importedData);
     addEvent({ type: 'Import', text: `Replaced graph with ${data.nodes.length} nodes.` });
     showToast(`Replaced graph with ${data.nodes.length} nodes.`, 'success');
     // Save last import ids
