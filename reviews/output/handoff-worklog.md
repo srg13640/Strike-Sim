@@ -181,3 +181,17 @@
   - All new globe objects are created with `window.THREE` (three.min.js r128) and added to 3d-force-graph's bundled-THREE scene. This cross-instance pattern already worked for the existing globe; the Fresnel `ShaderMaterial` and `Points` extend it and rendered correctly, but it remains the one place to look first if a future THREE bump changes behavior.
   - Stars are intentionally subtle (ops tool, not a planetarium). If a reviewer wants them more prominent, raise `PointsMaterial.size` or the bright-star ratio in `makeStarField()`.
   - Note on testing this locally: `python3 -m http.server` sends no `Cache-Control`, so browsers heuristically cache `engine.js` after an edit. A plain reload can run stale JS — hard-reload or append a `?cb=` query to force fresh module fetch when verifying.
+
+### Change 10 — Fix "Reset View" framing the 3D network as a tiny stranded blob
+- **What changed**
+  - `resetView()` in `DST2040.HTML` now reuses `EngineModule.frameBlueToRed(700)` for the 3D branch instead of `graphInstance.zoomToFit(400)`.
+
+- **Why**
+  - The `#graph` canvas spans the full window, but the left and right operator panels opaquely cover roughly half of it. `zoomToFit` frames the network to the *full* canvas, so after a reset the whole network sat behind the panels and only a small cluster showed in the visible middle strip (camera standoff ~2056 units). The Blue-perspective opening shot already stands off at a fixed multiple of an outlier-robust (90th-percentile) radius, which fills the visible gap. Reusing it makes Reset View a recognizable "home" and also fixes the worse variant of this where resetting right after exiting Geo mode (nodes still spread across the globe) shrank the network to a speck.
+
+- **How verified**
+  - Fresh load, dragged the camera far out to z=6000, clicked Reset View: camera returned to ~1233 units with the network filling the visible middle strip (screenshot), versus the prior ~2056-unit blob.
+  - Confirmed Geo reset (`frameGeo`) and Map reset (`fitMapToMarkers`) branches are unchanged.
+
+- **Uncertainties / follow-up**
+  - This intentionally overrides the previous "reset = neutral fit" choice; the neutral fit was visibly broken given the panel coverage. If a reviewer wants a non-angled overhead reset, the right fix is a dedicated panel-aware fit helper (offset the fit center for the covered canvas width), not a bare `zoomToFit`.

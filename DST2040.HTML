@@ -2601,12 +2601,17 @@
       fitMapToMarkers();
     } else if (graphInstance) {
       if (geoModeEnabled) EngineModule.frameGeo(1000);
-      else graphInstance.zoomToFit(400);
+      // Reset to the canonical Blue-perspective home shot rather than a raw zoomToFit.
+      // zoomToFit frames the network to the *full* canvas, but the left/right operator
+      // panels opaquely cover ~half of it, so the network ended up a small blob stranded
+      // in the visible middle strip. frameBlueToRed stands off at a fixed multiple of an
+      // outlier-robust radius, which fills the visible gap and gives a recognizable home.
+      else EngineModule.frameBlueToRed(700);
     }
   }
 
     // frameBlueToRed (the Blue-perspective opening shot) now lives in EngineModule
-    // (engine.js); init() passes it as the onFirstSettle hook.
+    // (engine.js); init() passes it as the onFirstSettle hook, and Reset View reuses it.
 
     function applyHighlight() {
     const legendModeEl = document.getElementById('legend-mode');
