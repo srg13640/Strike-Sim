@@ -645,6 +645,17 @@
       background: rgba(81,207,102,0.10);
       border-color: rgba(81,207,102,0.30);
     }
+    #control-hints {
+      margin-top: 6px;
+      font-size: 11px;
+      line-height: 1.2;
+      color: var(--muted);
+      opacity: 0.95;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
     .leaflet-control-scale {
     background: rgba(10,15,20,0.9);
     border: 1px solid var(--border);
@@ -1129,8 +1140,9 @@
       <button id="right-panel-collapse-btn" type="button" class="secondary">Collapse</button>
       <span class="sub" id="counts">0 nodes · 0 links</span>
     </div>
-    <div id="view-status" role="status" aria-live="polite">View: 3D Network</div>
-    </header>
+      <div id="view-status" role="status" aria-live="polite">View: 3D Network</div>
+      <div id="control-hints" class="muted">Shortcuts: M=Run MC · Shift/Alt+M=Map · R=Reset · [ ]=Target · Space=Pause</div>
+      </header>
 
     <div id="side-content">
     <div class="panel" aria-labelledby="team-summary-title">
@@ -1951,33 +1963,36 @@
     }
 
     function refreshGraph() {
-    const { visibleNodes, visibleLinks } = currentVisible();
-    if (graphInstance) {
-    graphInstance.graphData({ nodes: visibleNodes, links: visibleLinks });
-    // Always re-apply colors to ensure they're correct
-    applyHighlight();
-    // Force a re-render of node colors
-    if (visibleNodes.length > 0) {
-      graphInstance.nodeColor(n => {
-        if (highlightMode && highlightSet.size > 0) {
-          const hc = document.body.classList.contains('high-contrast');
-          const baseDim = hc ? '#3a4a5a' : '#2b3642';
-          const payoffColor = hc ? 'var(--accent)' : '#00e5ff';
-          const riskColor = hc ? 'var(--danger)' : '#ff8a65';
-          const highlightColor = highlightMode === 'payoff' ? payoffColor : (highlightMode === 'risk' ? riskColor : null);
-          if (highlightColor) {
-            return resolveCssVar(highlightSet.has(n.id) ? highlightColor : baseDim);
-          }
+      const { visibleNodes, visibleLinks } = currentVisible();
+      if (graphInstance) {
+        graphInstance.graphData({ nodes: visibleNodes, links: visibleLinks });
+        if (geoModeEnabled) {
+          EngineModule.applyGeoLayout(visibleNodes);
         }
-        return resolveCssVar(colorFromTeam(n));
-      });
-    }
-    if (selectedNode && !visibleNodes.find(n => n.id === selectedNode.id)) {
-      selectNode(null);
-    } else if (selectedNode && !mapModeEnabled) {
-      showNodePopup(selectedNode);
-    }
-    }
+        // Always re-apply colors to ensure they're correct
+        applyHighlight();
+        // Force a re-render of node colors
+        if (visibleNodes.length > 0) {
+          graphInstance.nodeColor(n => {
+            if (highlightMode && highlightSet.size > 0) {
+              const hc = document.body.classList.contains('high-contrast');
+              const baseDim = hc ? '#3a4a5a' : '#2b3642';
+              const payoffColor = hc ? 'var(--accent)' : '#00e5ff';
+              const riskColor = hc ? 'var(--danger)' : '#ff8a65';
+              const highlightColor = highlightMode === 'payoff' ? payoffColor : (highlightMode === 'risk' ? riskColor : null);
+              if (highlightColor) {
+                return resolveCssVar(highlightSet.has(n.id) ? highlightColor : baseDim);
+              }
+            }
+            return resolveCssVar(colorFromTeam(n));
+          });
+        }
+        if (selectedNode && !visibleNodes.find(n => n.id === selectedNode.id)) {
+          selectNode(null);
+        } else if (selectedNode && !mapModeEnabled) {
+          showNodePopup(selectedNode);
+        }
+      }
     computeCounts();
     updateTeamSummary();
     if (mapModeEnabled) refreshMapMarkers();
@@ -2019,6 +2034,18 @@
     } else {
     closeMapPopup();
     }
+    }
+
+    function cycleVisibleSelection(step) {
+      const { visibleNodes } = currentVisible();
+      if (!visibleNodes.length) return;
+      if (!selectedNode) {
+        selectNode(visibleNodes[0]);
+        return;
+      }
+      const idx = visibleNodes.findIndex(n => n.id === selectedNode.id);
+      const next = visibleNodes[(idx + step + visibleNodes.length) % visibleNodes.length];
+      selectNode(next);
     }
 
     function onFind() {
@@ -2515,12 +2542,12 @@
     // no-op for table; could scroll to top if desired
     const tbl = document.getElementById('table'); if (tbl) tbl.scrollTop = 0;
     } else if (mapModeEnabled) {
-    fitMapToMarkers();
+      fitMapToMarkers();
     } else if (graphInstance) {
-    if (geoModeEnabled) graphInstance.cameraPosition({ x: 0, y: 0, z: 1200 }, null, 1000);
-    else graphInstance.zoomToFit(400);
+      if (geoModeEnabled) EngineModule.frameGeo(1000);
+      else graphInstance.zoomToFit(400);
     }
-    }
+  }
 
     // frameBlueToRed (the Blue-perspective opening shot) now lives in EngineModule
     // (engine.js); init() passes it as the onFirstSettle hook.
@@ -2863,9 +2890,54 @@
     document.getElementById('import-json-btn').addEventListener('click', openImportModal);
     document.getElementById('neutralize-btn-main').addEventListener('click', openStrikeModal);
 
-    // Global clear selection on ESC
+    const isTypingTarget = (target) => {
+      if (!target || !target.tagName) return false;
+      const tag = target.tagName.toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable === true;
+    };
+
+    // Keyboard controls:
+    // M = run Monte Carlo (10000 trials)
+    // Shift+M / Alt+M = toggle map
+    // R = reset view
+    // [ and ] = cycle selected target through visible nodes
+    // Space = pause/resume sim tick timer
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') selectNode(null);
+      if (isTypingTarget(e.target)) return;
+      const key = e.key;
+      if (key === 'Escape') {
+        selectNode(null);
+        return;
+      }
+      if ((key === 'm' || key === 'M') && (e.shiftKey || e.altKey)) {
+        e.preventDefault();
+        toggleMapMode();
+        return;
+      }
+      if (key === 'm' || key === 'M') {
+        e.preventDefault();
+        runMonteCarlo(10000);
+        return;
+      }
+      if ((key === 'r' || key === 'R')) {
+        e.preventDefault();
+        resetView();
+        return;
+      }
+      if (key === '[') {
+        e.preventDefault();
+        cycleVisibleSelection(-1);
+        return;
+      }
+      if (key === ']') {
+        e.preventDefault();
+        cycleVisibleSelection(1);
+        return;
+      }
+      if (key === ' ' || key === 'Spacebar') {
+        e.preventDefault();
+        togglePause();
+      }
     });
 
     // Import modal
