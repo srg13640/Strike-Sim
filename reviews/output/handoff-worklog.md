@@ -282,6 +282,25 @@
   - The automatic `ResizeObserver`/`window.resize` *firing* could not be exercised in the headless preview because the preview tab is backgrounded, where Chrome pauses `ResizeObserver` and `requestAnimationFrame` (a probe observer fired 0 times). The `apply()` logic itself is proven correct at every size via direct invocation, and the observer/`window.resize`/`fullscreenchange` wiring is the standard set that fires in a real foreground browser — so the PO should confirm live: full screen on each monitor, drag-resize, and switching Map/3D/Geo while resized.
   - This is Phase 1 (reliability) only. Phases 2–5 (edges schema + Three.js line/tube rendering, temporal sim, instanced rendering, exports/scenario tools) are sequenced to land on this now-stable base, one verified phase at a time.
 
+### Change 15 — Fix the broken Map view (misregistered crop, world-zoom, leaked loader) + cache-busting
+- **Context**
+  - PO screenshot showed the Map badly broken: a misaligned regional satellite rectangle floating over China, the map zoomed out to the whole world (centered near Africa), and "Initializing 3D Graph…" hanging over it. Root-caused to three independent defects that combine when the 3D context fails to initialise.
+
+- **What changed**
+  - **Removed the misregistered theater satellite crop** (`map.js`). A parallel change had re-draped `earth-blue-marble-indopac-3072.jpg` over a lat/lon rectangle on top of the world basemap. In EPSG:3857 a square image over a lat/lon rectangle stretches by latitude, so it floats out of register with the basemap and the markers — the exact failure the worklog had previously retired. Now there is **one** geospatially-honest basemap (the full-world Web Mercator Blue Marble) at full opacity; imagery, coastlines, and markers share one CRS.
+  - **`fitMapToMarkers` no longer falls back to a whole-world view** (`map.js`). The empty-markers fallback was `setView([20,0], 2)` — a world view centered near Africa, exactly the PO's zoomed-out state, which appears when the fit races ahead of marker creation. It now fits a fixed Indo-Pacific theater envelope, so an empty map still shows the theater.
+  - **The WebGL-fail fallback now clears the loader and frames the theater** (`StrikeSim2040.html`). When 3D init throws, its `onEngineStop` (which normally hides "Initializing 3D Graph…") never fires, so the label hung over the Map fallback; the fallback now hides it explicitly and runs `invalidateSize` + `fitMapToMarkers` after markers exist.
+  - **Cache-busting on local modules** (`?v=p1` on `ui/state/map/engine/stage/sim/game/wargame/views/inline-datasets`). The local `http.server` sends no `Cache-Control`, so browsers heuristically cached modules and could silently run an OLD version after an update (this bit verification repeatedly this session, and would bite an operator pulling a new build). Versioned query strings guarantee a fresh fetch. **Bump this token on every release** (or future change) so clients pick up new module code.
+
+- **How verified (in-browser)**
+  - Map mode: **exactly one** image overlay (the Web Mercator basemap), no floating crop; framed on the theater (zoom 3, centered ~127°E/16°N); 224 markers on correct West-Pacific geography (screenshot).
+  - Forced the empty-markers race (cleared markers, set a world view, called the fit): it re-framed the theater (127°E) instead of the world.
+  - Console clean. (The cache-bust was also what finally let the corrected `map.js` load at all — confirming the staleness problem was real.)
+
+- **Uncertainties / follow-up**
+  - The retired high-res theater inset could return **if** it is first reprojected into Web Mercator (like the global basemap was) and given matching bounds — draping the raw equirectangular-style crop over a lat/lon rectangle will always misregister and should not be reintroduced.
+  - The `?v=` token is manual; a future build step could stamp it automatically.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.

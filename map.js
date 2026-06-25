@@ -150,15 +150,16 @@ window.MapModule = (function () {
         // No-op: offline fallback stack remains in place.
       }
     };
+    // ONE geospatially-honest basemap: the full-world Web Mercator Blue Marble, at full
+    // opacity. The regional Indo-Pacific crop (earth-blue-marble-indopac-3072.jpg) was
+    // deliberately removed here: it is a square image draped over a lat/lon rectangle, so
+    // in EPSG:3857 it stretches by latitude and floats out of register with the basemap and
+    // the unit markers (the misaligned rectangle the operator reported). A single correctly
+    // projected basemap keeps imagery, coastlines, and markers in one coordinate system.
     addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, {
       kind: 'global',
-      opacity: 0.62,
+      opacity: 1,
       className: 'global-satellite-overlay'
-    });
-    addImageBasemap(THEATER_SATELLITE_BASEMAP, THEATER_SATELLITE_BOUNDS, {
-      kind: 'theater',
-      opacity: 0.98,
-      className: 'theater-satellite-overlay'
     });
 
     // Offline vector fallback: land/coastlines from bundled GeoJSON. It is intentionally
@@ -340,9 +341,15 @@ window.MapModule = (function () {
     });
   }
 
+  // Indo-Pacific operational frame — used whenever there are no markers to fit to yet,
+  // so the map NEVER falls back to a whole-world view (the "zoomed out, centered on Africa"
+  // state). This is a theater tool; an empty map should still show the theater.
+  const THEATER_VIEW_BOUNDS = [[-12, 95], [50, 150]];
+
   function fitMapToMarkers() {
-    if (!leafletMap || mapMarkers.size === 0) {
-      if (leafletMap) leafletMap.setView([20, 0], 2);
+    if (!leafletMap) return;
+    if (mapMarkers.size === 0) {
+      try { leafletMap.fitBounds(THEATER_VIEW_BOUNDS); } catch (e) { leafletMap.setView([18, 125], 3); }
       return;
     }
     const group = L.featureGroup(Array.from(mapMarkers.values()));

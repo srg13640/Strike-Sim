@@ -14,27 +14,27 @@
 
   <!-- UI notification primitives (toasts + event log). Loads first so its globals
        (showToast/addEvent/…) exist before any other script runs. -->
-  <script src="ui.js"></script>
+  <script src="ui.js?v=p1"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js"></script>
+  <script src="state.js?v=p1"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js"></script>
+  <script src="map.js?v=p1"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js"></script>
+  <script src="engine.js?v=p1"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js"></script>
+  <script src="stage.js?v=p1"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js"></script>
+  <script src="sim.js?v=p1"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js"></script>
+  <script src="game.js?v=p1"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js"></script>
+  <script src="wargame.js?v=p1"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js"></script>
-  <script src="inline-datasets.js"></script>
+  <script src="views.js?v=p1"></script>
+  <script src="inline-datasets.js?v=p1"></script>
   <style>
     :root {
     --bg: #0a0f14;
@@ -3251,11 +3251,18 @@
       addEvent({ type: 'View', text: '3D view unavailable: WebGL context failed.' });
       showToast('3D view unavailable (WebGL context failed). Enable hardware acceleration or use Map/Table.', 'error', 9000);
       mapModeEnabled = true;
+      // Clear the "Initializing 3D Graph…" overlay — the 3D engine never settled, so its
+      // onEngineStop (which normally hides this) will not fire and the label would otherwise
+      // hang over the Map fallback.
+      const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none';
       document.getElementById('graph').style.display = 'none';
       document.getElementById('map').style.display = 'block';
       const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
       ensureMap();
       refreshMapMarkers();
+      // Frame the theater once markers exist (ensureMap's own fit can race ahead of marker
+      // creation and otherwise leaves the map on the empty-world fallback).
+      setTimeout(() => { MapModule.invalidateSize(); fitMapToMarkers(); }, 80);
     }
 
     refreshGraph();
