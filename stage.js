@@ -100,6 +100,7 @@ window.StageModule = (function () {
   function toggleFullscreen() {
     var el = appEl();
     if (!isFs()) {
+      reparentOverlays();   // guarantee the buttons are inside the fullscreen subtree first
       var req = el.requestFullscreen || el.webkitRequestFullscreen;
       if (req) { try { req.call(el); } catch (e) {} }
     } else {
@@ -132,8 +133,24 @@ window.StageModule = (function () {
     document.body.appendChild(btn);
   }
 
+  // Re-home the floating overlay buttons (Fullscreen, War Game, Retry-3D) INTO #app.
+  // They are created as fixed-position children of <body>, so a fullscreen on #app would
+  // drop them out of the fullscreen subtree (the "buttons vanish in full screen" bug).
+  // #app has no transform, so fixed children keep their exact viewport position — zero
+  // visual change — but now they survive fullscreen whether #app OR the document root is
+  // the target. Belt-and-suspenders alongside fullscreening the document root.
+  function reparentOverlays() {
+    var app = document.getElementById('app');
+    if (!app) return;
+    ['stage-fs-btn', 'wg-launch', 'retry-3d-btn'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.parentElement !== app) app.appendChild(el);
+    });
+  }
+
   function init() {
     injectButton();
+    reparentOverlays();
 
     if (window.ResizeObserver) {
       ro = new ResizeObserver(schedule);
@@ -158,10 +175,11 @@ window.StageModule = (function () {
     });
 
     // The graph/map are created asynchronously by the main script after load; a couple of
-    // delayed kicks ensure we size and attach context-loss handlers once they exist.
-    setTimeout(schedule, 300);
-    setTimeout(schedule, 1200);
-    setTimeout(schedule, 3000);
+    // delayed kicks ensure we size and attach context-loss handlers once they exist. The
+    // War Game button is also created late (wargame.js), so re-home overlays on each kick.
+    setTimeout(function () { schedule(); reparentOverlays(); }, 300);
+    setTimeout(function () { schedule(); reparentOverlays(); }, 1200);
+    setTimeout(function () { schedule(); reparentOverlays(); }, 3000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

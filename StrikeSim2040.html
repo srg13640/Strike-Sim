@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Discourage the browser from serving a stale shell. The local http.server sends no
+       cache headers, so browsers heuristically cache this document and can run old module
+       code after an update. These hints (plus ?v= on the modules and the launcher's ?t=
+       cache-bust) keep reloads fresh. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>StrikeSim 2040 — Indo-Pacific Multi-Domain Wargaming</title>
   <link rel="icon" href="data:,">
 
@@ -14,27 +21,27 @@
 
   <!-- UI notification primitives (toasts + event log). Loads first so its globals
        (showToast/addEvent/…) exist before any other script runs. -->
-  <script src="ui.js?v=p4"></script>
+  <script src="ui.js?v=p5"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js?v=p4"></script>
+  <script src="state.js?v=p5"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p4"></script>
+  <script src="map.js?v=p5"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p4"></script>
+  <script src="engine.js?v=p5"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p4"></script>
+  <script src="stage.js?v=p5"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p4"></script>
+  <script src="sim.js?v=p5"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p4"></script>
+  <script src="game.js?v=p5"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p4"></script>
+  <script src="wargame.js?v=p5"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p4"></script>
-  <script src="inline-datasets.js?v=p4"></script>
+  <script src="views.js?v=p5"></script>
+  <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
     --bg: #0a0f14;

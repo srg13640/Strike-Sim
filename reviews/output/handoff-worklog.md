@@ -330,6 +330,20 @@
   - Headless Chrome won't grant programmatic fullscreen, so verified deterministically: both `#wg-launch` and `#stage-fs-btn` are inside `document.documentElement` (the new fullscreen target), and the served `stage.js` targets the document root, not `#app`. Clean load shows both buttons present/visible with 3D at 224 nodes.
   - Operator should confirm live: click Fullscreen and check the War Game button (and the Fullscreen toggle itself) remain on screen.
 
+### Change 18 — Fullscreen buttons, take two: re-home overlays into #app + beat the cache
+- **Context**
+  - Operator reported the War Game (and Fullscreen) buttons STILL vanished in full screen after Change 17. Two causes: (1) the cache — the document.documentElement fix from Change 17 wasn't reaching the browser because the cached HTML shell kept loading old modules; (2) even with the fix, robustness depended on which element was fullscreened.
+
+- **What changed**
+  - **`stage.js` — `reparentOverlays()`**: moves the Fullscreen, War Game, and Retry-3D buttons from `<body>` INTO `#app`. They are `position:fixed` and `#app` has no transform, so their on-screen position is identical — but now they sit inside `#app`, so they survive fullscreen whether the target is `#app` OR the document root. Called at init, on the delayed kicks (the War Game button is created late by `wargame.js`), and immediately before requesting fullscreen. This makes the fix independent of the fullscreen target.
+  - **Cache, attacked at the source** (the recurring blocker this whole effort): the launcher `Open StrikeSim 2040.command` now opens `…/StrikeSim2040.html?t=$(date +%s)` — a unique URL each launch — so a double-click always loads a fresh shell, which then loads fresh `?v=` modules. Added `Cache-Control`/`Pragma`/`Expires` no-cache `<meta>` hints to the shell too, and bumped modules to `?v=p5`.
+
+- **How verified (in-browser)**
+  - After reload, both `#wg-launch` and `#stage-fs-btn` report `parentElement === #app` and `#app.contains(...) === true`; the War Game button is at top-center (centerX == viewport center) and the Fullscreen button at the stage's top-right — positions unchanged by the re-parenting. Screenshot confirms both buttons present with 3D at 224 nodes.
+  - Real fullscreen still can't be exercised headlessly, but the buttons being inside `#app` is the deterministic guarantee that they're in the fullscreen subtree.
+
+- **Operator note**: because the browser had been caching the shell, do ONE hard reload (Cmd/Ctrl+Shift+R) to pick up this build; after that, the launcher's `?t=` cache-bust keeps every future launch fresh on its own.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.

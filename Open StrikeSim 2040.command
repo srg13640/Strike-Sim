@@ -11,7 +11,7 @@ cd "$(dirname "$0")" || exit 1
 # Reuse a real StrikeSim 2040 server on 8000 if it is already up. If some other
 # process owns 8000, pick the next free port instead of opening the wrong app.
 PORT=""
-if command -v curl >/dev/null 2>&1 && curl -fsI "http://localhost:8000/StrikeSim2040.html" >/dev/null 2>&1; then
+if command -v curl >/dev/null 2>&1 && curl -fsI "http://localhost:8000/StrikeSim2040.html?t=$(date +%s)" >/dev/null 2>&1; then
   PORT=8000
 else
   for candidate in $(seq 8000 8020); do
@@ -33,7 +33,7 @@ if [ -z "$PORT" ]; then
 fi
 
 # Open the app in the default web browser.
-open "http://localhost:${PORT}/StrikeSim2040.html"
+open "http://localhost:${PORT}/StrikeSim2040.html?t=$(date +%s)"
 
 echo ""
 echo "   ✅  StrikeSim 2040 is opening in your browser..."
