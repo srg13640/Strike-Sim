@@ -27,7 +27,11 @@ window.StageModule = (function () {
 
   function graphEl() { return document.getElementById('graph'); }
   function mapEl() { return document.getElementById('map'); }
-  function appEl() { return document.getElementById('app') || document.documentElement; }
+  // Fullscreen the whole document, NOT just #app. The War Game / Fullscreen / Retry-3D
+  // buttons are fixed-position children of <body> (siblings of #app), so fullscreening
+  // #app would drop them out of the fullscreen view entirely. Going fullscreen on the root
+  // keeps every overlay visible; #app already fills 100vw/100vh so the picture is identical.
+  function appEl() { return document.documentElement; }
   function gi() {
     try { if (window.EngineModule && EngineModule.getGraph) return EngineModule.getGraph(); } catch (e) {}
     return window.graphInstance || null;
@@ -116,8 +120,7 @@ window.StageModule = (function () {
         'background:linear-gradient(180deg,#15324a,#0d2032);color:#dff1ff;border:1px solid #2c6f9b;',
         'padding:7px 13px;border-radius:8px;font:600 12px/1 system-ui,sans-serif;letter-spacing:.03em;',
         'cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4);}',
-      '#stage-fs-btn:hover{border-color:#4bb8ff;color:#fff;}',
-      ':fullscreen #stage-fs-btn{right:14px;}'
+      '#stage-fs-btn:hover{border-color:#4bb8ff;color:#fff;}'
     ].join('');
     document.head.appendChild(css);
     var btn = document.createElement('button');

@@ -14,27 +14,27 @@
 
   <!-- UI notification primitives (toasts + event log). Loads first so its globals
        (showToast/addEvent/…) exist before any other script runs. -->
-  <script src="ui.js?v=p2"></script>
+  <script src="ui.js?v=p4"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js?v=p2"></script>
+  <script src="state.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p2"></script>
+  <script src="map.js?v=p4"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p2"></script>
+  <script src="engine.js?v=p4"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p2"></script>
+  <script src="stage.js?v=p4"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p2"></script>
+  <script src="sim.js?v=p4"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p2"></script>
+  <script src="game.js?v=p4"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p2"></script>
+  <script src="wargame.js?v=p4"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p2"></script>
-  <script src="inline-datasets.js?v=p2"></script>
+  <script src="views.js?v=p4"></script>
+  <script src="inline-datasets.js?v=p4"></script>
   <style>
     :root {
     --bg: #0a0f14;

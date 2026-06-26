@@ -322,6 +322,14 @@
 - **Uncertainties / follow-up**
   - If the operator's browser blocks WebGL entirely (hardware acceleration off *and* software GL disabled), no client code can conjure a context — but they now get accurate guidance and a one-click Retry once they flip the setting, with Map/Table fully usable meanwhile. If it still fails after this, the surfaced error text will say whether it's truly "no WebGL" or a different fault.
 
+### Change 17 — Fullscreen no longer hides the overlay buttons
+- **What changed**
+  - `stage.js`: Fullscreen now targets `document.documentElement` (the whole page) instead of `#app`. The War Game, Fullscreen, and Retry-3D buttons are fixed-position children of `<body>` (siblings of `#app`), so requesting fullscreen on `#app` dropped them out of the fullscreen view — the operator's "the War Game button disappears in full screen" report. `#app` already fills 100vw/100vh, so the picture is identical; the root simply includes the body-level overlays. Also removed a now-pointless `:fullscreen` CSS rule that would have shoved the Fullscreen button over the right panel.
+  - Cache-bust bumped to `?v=p4`.
+- **How verified**
+  - Headless Chrome won't grant programmatic fullscreen, so verified deterministically: both `#wg-launch` and `#stage-fs-btn` are inside `document.documentElement` (the new fullscreen target), and the served `stage.js` targets the document root, not `#app`. Clean load shows both buttons present/visible with 3D at 224 nodes.
+  - Operator should confirm live: click Fullscreen and check the War Game button (and the Fullscreen toggle itself) remain on screen.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.
