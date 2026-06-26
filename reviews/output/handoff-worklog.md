@@ -301,6 +301,27 @@
   - The retired high-res theater inset could return **if** it is first reprojected into Web Mercator (like the global basemap was) and given matching bounds — draping the raw equirectangular-style crop over a lat/lon rectangle will always misregister and should not be reintroduced.
   - The `?v=` token is manual; a future build step could stamp it automatically.
 
+### Change 16 — Fix "WebGL context failed": compatibility-first context + retry + honest diagnosis
+- **Context**
+  - Operator still hit "3D view unavailable (WebGL context failed)" at load. Root cause found: **Change 14's own renderer hardening set `powerPreference: 'high-performance'`**, which (confirmed honored on the live context) can make `getContext()` fail outright on machines with hardware acceleration off or a laptop whose discrete GPU is parked — the browser would rather fail than fall back. The earlier "hardening" optimised for the wrong thing (a strong GPU) instead of for *getting any context at all*.
+
+- **What changed**
+  - **`engine.js`**: default `powerPreference` is now **`'default'`** (let the browser pick any working adapter — integrated or software) instead of `'high-performance'`. `create()` now accepts `opts.rendererConfig` so callers can retry with an even more conservative profile, and a new **`dispose()`** tears down a (possibly half-built) instance — runs the lib destructor, forces context loss to free the GPU slot, and resets module + globe state — so a retry rebuilds cleanly with no duplicate canvas.
+  - **`StrikeSim2040.html`** — robust startup replacing the single try/catch:
+    - **Progressive fallback**: try the default profile, then a minimal one (`antialias:false`, `powerPreference:'low-power'`) before giving up.
+    - **Honest diagnosis**: a `webglAvailable()` probe distinguishes "the browser truly won't give a WebGL context" (→ actionable *enable hardware acceleration* guidance) from "WebGL works but the engine threw for another reason" (→ surfaces the **real** error text instead of mislabeling everything "WebGL context failed").
+    - **Exception-proof Map fallback**: the recovery affordance is shown FIRST, every fallback step is guarded, a reflow is forced before Leaflet builds tiles (prevents the 0×0 "infinite tiles" throw), and markers are drawn after `invalidateSize` — so a Map hiccup can never strand the operator on a blank screen.
+    - **No-reload "↻ Retry 3D" button**: re-attempts the engine after the operator enables hardware acceleration or frees GPU contexts; on success it switches from Map back to 3D.
+  - Cache-bust bumped `?v=p1` → `?v=p2` so the new modules load.
+
+- **How verified (in-browser)**
+  - Live context now reports `powerPreference: 'default'` and 3D renders 224 nodes normally.
+  - Forced `EngineModule.create` to throw: it made **2** attempts (progressive fallback), no exception escaped, the **Retry 3D button appeared**, it fell to Map with the loader hidden, and the event log showed the honest "3D engine failed to start: <error>" message (WebGL-available branch). No "infinite tiles" crash.
+  - Clicked **Retry 3D** (with the engine restored): 3D rebuilt with 224 nodes, the button auto-hid, the view switched back to 3D, and the container held **exactly one** canvas (clean `dispose()`).
+
+- **Uncertainties / follow-up**
+  - If the operator's browser blocks WebGL entirely (hardware acceleration off *and* software GL disabled), no client code can conjure a context — but they now get accurate guidance and a one-click Retry once they flip the setting, with Map/Table fully usable meanwhile. If it still fails after this, the surfaced error text will say whether it's truly "no WebGL" or a different fault.
+
 ### Change 11 — Worker-backed Monte Carlo and theater-grade satellite map
 - **What changed**
   - Added `sim-worker.js`, a standalone no-import Web Worker that runs Monte Carlo trials off the UI thread in cancellable chunks. It receives a frozen simulation snapshot, method/resource/settings config, success criteria, seed, and plan; it streams progress back to the UI and returns the same aggregate arrays/maps the existing report path expects.

@@ -14,27 +14,27 @@
 
   <!-- UI notification primitives (toasts + event log). Loads first so its globals
        (showToast/addEvent/…) exist before any other script runs. -->
-  <script src="ui.js?v=p1"></script>
+  <script src="ui.js?v=p2"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js?v=p1"></script>
+  <script src="state.js?v=p2"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p1"></script>
+  <script src="map.js?v=p2"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p1"></script>
+  <script src="engine.js?v=p2"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p1"></script>
+  <script src="stage.js?v=p2"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p1"></script>
+  <script src="sim.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p1"></script>
+  <script src="game.js?v=p2"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p1"></script>
+  <script src="wargame.js?v=p2"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p1"></script>
-  <script src="inline-datasets.js?v=p1"></script>
+  <script src="views.js?v=p2"></script>
+  <script src="inline-datasets.js?v=p2"></script>
   <style>
     :root {
     --bg: #0a0f14;
@@ -3225,45 +3225,138 @@
       });
     }
 
+    // ---- Robust 3D engine startup -------------------------------------------------
+    // The render callbacks, reused by the initial attempt and by any retry.
+    function graph3dOpts(rendererConfig) {
+      const o = {
+        nodeLabel: n => `${n.name} (${n.id})`,
+        nodeColor: n => resolveCssVar(colorFromTeam(n)),
+        onNodeClick: selectNode,
+        onBackgroundClick: () => selectNode(null),
+        onFirstSettle: () => {
+          if (geoModeEnabled || mapModeEnabled || tableModeEnabled) resetView();
+          else EngineModule.frameBlueToRed(1200);
+        }
+      };
+      if (rendererConfig) o.rendererConfig = rendererConfig;
+      return o;
+    }
+
+    // Can the browser hand out a WebGL context at all right now? Used to tell a genuine
+    // "no WebGL" situation apart from some other init error mislabeled as a GPU failure.
+    function webglAvailable() {
+      try {
+        const c = document.createElement('canvas');
+        const opts = { failIfMajorPerformanceCaveat: false, powerPreference: 'default' };
+        const gl = c.getContext('webgl2', opts) || c.getContext('webgl', opts) || c.getContext('experimental-webgl', opts);
+        if (!gl) return false;
+        const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+        return true;
+      } catch (e) { return false; }
+    }
+
+    // Try to build the 3D engine, escalating to progressively more conservative WebGL
+    // profiles before giving up. Returns true on success.
+    function tryInitGraph3D() {
+      const profiles = [
+        undefined,                                                                   // engine default: powerPreference 'default', antialias on, software allowed
+        { antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: false }  // minimal: cheapest possible context
+      ];
+      let lastErr = null;
+      for (let i = 0; i < profiles.length; i++) {
+        try {
+          if (i > 0) { try { EngineModule.dispose(); } catch (e) {} document.getElementById('graph').innerHTML = ''; }
+          EngineModule.create('graph', graph3dOpts(profiles[i]));
+          return true;
+        } catch (err) {
+          lastErr = err;
+          console.error('3D init attempt ' + (i + 1) + ' failed', err);
+        }
+      }
+      handleGraph3DFailure(lastErr);
+      return false;
+    }
+
+    function handleGraph3DFailure(err) {
+      const realMsg = (err && (err.message || String(err))) || 'unknown error';
+      if (webglAvailable()) {
+        // WebGL works — the engine failed for some OTHER reason; surface it honestly.
+        addEvent({ type: 'View', text: '3D engine failed to start: ' + realMsg });
+        showToast('3D failed to start: ' + realMsg + '. Using Map view — click "Retry 3D" to try again.', 'error', 13000);
+      } else {
+        addEvent({ type: 'View', text: '3D unavailable: browser provided no WebGL context.' });
+        showToast('Your browser is blocking WebGL. Turn on hardware acceleration (browser Settings → System → "Use hardware acceleration when available"), then click "Retry 3D". Map and Table views work without it.', 'error', 16000);
+      }
+      // Show the recovery affordance FIRST so a hiccup anywhere in the Map fallback can
+      // never strand the operator without a way back to 3D.
+      showRetry3dButton();
+      // Graceful fallback to the Map view — every step guarded so one failure can't abort
+      // the rest (a degraded Map still beats a blank screen).
+      mapModeEnabled = true;
+      try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
+      try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
+      const mapEl = document.getElementById('map');
+      try {
+        mapEl.style.display = 'block';
+        // Force a reflow so the container has a real size before Leaflet builds tiles —
+        // creating a map in a 0x0 box can throw "infinite tiles".
+        void mapEl.offsetHeight;
+      } catch (e) {}
+      try { const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D'; } catch (e) {}
+      try { ensureMap(); } catch (e) { console.error('Map fallback ensureMap failed', e); }
+      // Size first, THEN draw markers, so neither runs against a 0-size container.
+      setTimeout(() => {
+        try { MapModule.invalidateSize(); } catch (e) {}
+        try { refreshMapMarkers(); } catch (e) { console.error('Map fallback markers failed', e); }
+        try { fitMapToMarkers(); } catch (e) {}
+      }, 90);
+      try { updateViewStatus(); } catch (e) {}
+    }
+
+    function showRetry3dButton() {
+      let b = document.getElementById('retry-3d-btn');
+      if (!b) {
+        b = document.createElement('button');
+        b.id = 'retry-3d-btn';
+        b.type = 'button';
+        b.textContent = '↻ Retry 3D';
+        b.title = 'Re-attempt the 3D view (use after enabling hardware acceleration or closing other GPU-heavy tabs)';
+        b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1500;' +
+          'background:linear-gradient(180deg,#6a3a16,#3f2010);color:#ffe9d6;border:1px solid #b5651d;' +
+          'padding:8px 16px;border-radius:8px;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);';
+        b.addEventListener('click', retry3D);
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+
+    // Re-attempt 3D without a page reload — recovers after the operator enables hardware
+    // acceleration or frees GPU contexts. On success, switch from the Map fallback to 3D.
+    function retry3D() {
+      try { EngineModule.dispose(); } catch (e) {}
+      document.getElementById('graph').innerHTML = '';
+      if (!tryInitGraph3D()) return;   // still failing — fallback path already re-messaged
+      const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
+      mapModeEnabled = false;
+      document.getElementById('map').style.display = 'none';
+      document.getElementById('graph').style.display = 'block';
+      const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = 'Map';
+      refreshGraph();
+      EngineModule.frameBlueToRed(1200);
+      if (window.StageModule && StageModule.resize) StageModule.resize();
+      updateViewStatus();
+      showToast('3D view started.', 'success', 3000);
+    }
+
     async function init() {
     wireMapModule();
     wireViewsModule();
     bindEventListeners();
     initUI();
 
-    try {
-      // Build the 3D engine (EngineModule owns the instance; colors resolved at render
-      // time). The onFirstSettle hook keeps the opening-shot decision here in the main
-      // script, where the view-mode flags live.
-      EngineModule.create('graph', {
-        nodeLabel: n => `${n.name} (${n.id})`,
-        nodeColor: n => resolveCssVar(colorFromTeam(n)),
-        onNodeClick: selectNode,
-        onBackgroundClick: () => selectNode(null),
-        onFirstSettle: () => {
-          // The "Reset View" button is the manual recenter; this fires once on load.
-          if (geoModeEnabled || mapModeEnabled || tableModeEnabled) resetView();
-          else EngineModule.frameBlueToRed(1200);
-        }
-      });
-    } catch (err) {
-      console.error('3D init failed (WebGL context)', err);
-      addEvent({ type: 'View', text: '3D view unavailable: WebGL context failed.' });
-      showToast('3D view unavailable (WebGL context failed). Enable hardware acceleration or use Map/Table.', 'error', 9000);
-      mapModeEnabled = true;
-      // Clear the "Initializing 3D Graph…" overlay — the 3D engine never settled, so its
-      // onEngineStop (which normally hides this) will not fire and the label would otherwise
-      // hang over the Map fallback.
-      const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none';
-      document.getElementById('graph').style.display = 'none';
-      document.getElementById('map').style.display = 'block';
-      const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
-      ensureMap();
-      refreshMapMarkers();
-      // Frame the theater once markers exist (ensureMap's own fit can race ahead of marker
-      // creation and otherwise leaves the map on the empty-world fallback).
-      setTimeout(() => { MapModule.invalidateSize(); fitMapToMarkers(); }, 80);
-    }
+    // Build the 3D engine with progressive WebGL fallback + graceful Map degradation and a
+    // no-reload "Retry 3D" path (see tryInitGraph3D / handleGraph3DFailure above).
+    tryInitGraph3D();
 
     refreshGraph();
     // Ensure legend button reflects initial state

@@ -342,19 +342,21 @@ window.EngineModule = (function () {
    */
   function create(containerId, opts) {
     opts = opts || {};
-    // Harden WebGL context acquisition: failIfMajorPerformanceCaveat:false lets weaker /
-    // software-fallback GPUs still get a context (rather than throwing the "WebGL context
-    // failed" error and dropping to the Map fallback), and powerPreference hints toward a
-    // stable adapter. preserveDrawingBuffer:false keeps memory pressure low.
-    graphInstance = ForceGraph3D({
-      rendererConfig: {
-        antialias: true,
-        alpha: false,
-        powerPreference: 'high-performance',
-        failIfMajorPerformanceCaveat: false,
-        preserveDrawingBuffer: false
-      }
-    })(document.getElementById(containerId))
+    // WebGL context acquisition, tuned for COMPATIBILITY first. The big lever is
+    // powerPreference: 'high-performance' can make getContext() FAIL outright on machines
+    // with hardware acceleration disabled or a laptop whose discrete GPU is parked — the
+    // exact "WebGL context failed" case operators hit. 'default' lets the browser pick any
+    // working adapter (integrated or software). failIfMajorPerformanceCaveat:false keeps a
+    // software/SwiftShader fallback eligible. The caller may pass opts.rendererConfig to
+    // retry with an even more conservative profile.
+    const rendererConfig = opts.rendererConfig || {
+      antialias: true,
+      alpha: false,
+      powerPreference: 'default',
+      failIfMajorPerformanceCaveat: false,
+      preserveDrawingBuffer: false
+    };
+    graphInstance = ForceGraph3D({ rendererConfig })(document.getElementById(containerId))
       .graphData({ nodes: [], links: [] }) // Start empty
       .nodeLabel(opts.nodeLabel || (n => `${n.name} (${n.id})`))
       .nodeColor(opts.nodeColor || (n => n.color || '#ffffff'))
@@ -434,5 +436,25 @@ window.EngineModule = (function () {
   function getGraph() { return graphInstance; }
   function isInitialViewDone() { return initialViewDone; }
 
-  return { create, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
+  // Tear down a (possibly half-built) graph instance so a retry can re-create cleanly:
+  // run the lib destructor, force the WebGL context loss to free the GPU slot, and reset
+  // all module state including the lazily-built globe so it rebuilds on the new instance.
+  function dispose() {
+    try {
+      if (graphInstance) {
+        const r = graphInstance.renderer && graphInstance.renderer();
+        if (graphInstance._destructor) graphInstance._destructor();
+        if (r && r.forceContextLoss) r.forceContextLoss();
+        if (r && r.dispose) r.dispose();
+      }
+    } catch (e) { /* best-effort cleanup */ }
+    graphInstance = null;
+    window.graphInstance = null;
+    initialViewDone = false;
+    earthMesh = null;
+    starField = null;
+    earthLightingDone = false;
+  }
+
+  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
 })();
