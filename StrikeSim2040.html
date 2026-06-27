@@ -3899,9 +3899,13 @@
       };
     }
 
-    function redResponseForMethod(methodKey, red) {
-      // basic policy: counter the domain of the method, sometimes reinforce
-      const roll = Math.random();
+    function redResponseForMethod(methodKey, stepIdx) {
+      // Deterministic pseudo-roll from (methodKey, stepIdx) so plan construction is
+      // reproducible — Math.random() here made two runs of the same seed differ.
+      const str = String(methodKey) + ':' + (stepIdx || 0);
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+      const roll = ((h >>> 0) % 1000) / 1000;
       if (methodKey === 'cyber') return roll < 0.8 ? 'Cyber Defense' : 'Deception';
       if (methodKey === 'ew')    return roll < 0.8 ? 'EW Countermeasure' : 'Reinforcement';
       if (methodKey === 'sof')   return roll < 0.8 ? 'SOF Interception' : 'Reinforcement';
@@ -3911,7 +3915,7 @@
     function toActionPlanFromBuilt() {
       return builtCOA.map((s, i) => {
         const methodName = strikeMethods[s.methodKey]?.name || 'Kinetic Strike';
-        const redAct = redResponseForMethod(s.methodKey);
+        const redAct = redResponseForMethod(s.methodKey, i);
         return { step: i+1, blue: methodName, blueKey: s.methodKey, targetId: s.targetId, red: redAct };
       });
     }
@@ -4840,7 +4844,13 @@
         const p50Steps = percentile(stepsToSuccessArr, 0.5);
         const p90Steps = percentile(stepsToSuccessArr, 0.9);
 
+        // 95% confidence interval (Wald) on the success proportion — so an analyst can tell
+        // whether two COAs at e.g. 62% vs 65% actually differ or are within noise.
+        const ciHalf = 1.96 * Math.sqrt(Math.max(0, successRate * (1 - successRate)) / effectiveTrials);
+        const ciPct = (ciHalf * 100).toFixed(1);
         if (outSuccess) outSuccess.textContent = `${Math.round(successRate * 100)}%`;
+        const ciEl = document.getElementById('mc-success-ci');
+        if (ciEl) ciEl.textContent = `±${ciPct}% (95% CI)`;
         if (outDmg) outDmg.textContent = Math.round(expImpact);
         if (outTime) outTime.textContent = avgSteps.toFixed(1);
         const mcHealth = Math.max(0, Math.min(100, Math.round(successRate * 100)));
@@ -4873,7 +4883,7 @@
           const margin = blueBudget - planCost;
           details.innerHTML = [
             `Plan length: ${actionPlan.length} steps.`,
-            `${Math.round(successRate * 100)}% success across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `${Math.round(successRate * 100)}% ±${ciPct}% success (95% CI) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
             `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
             `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
             `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
