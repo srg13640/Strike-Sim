@@ -147,65 +147,50 @@ window.MapModule = (function () {
       if (!visible && hasLayer) leafletMap.removeLayer(coastlineLayer);
     };
 
-    // Offline satellite basemaps behind coastlines so markers and links remain visible.
-    const addImageBasemap = (url, bounds, opts = {}) => {
-      try {
-        fetch(url, { method: 'HEAD', cache: 'force-cache' })
-          .then(r => {
-            if (!(r && r.ok) || !leafletMap) return;
-            L.imageOverlay(url, bounds, {
-              pane: 'basemapPane',
-              interactive: false,
-              opacity: opts.opacity ?? 1,
-              className: opts.className || ''
-            }).addTo(leafletMap);
-            if (opts.kind === 'theater') theaterSatelliteLoaded = true;
-            if (opts.kind === 'global') globalSatelliteLoaded = true;
-            refreshCoastlineFallback();
-            refreshBasemapStatus();
-          })
-          .catch(() => {});
-      } catch (err) {
-        // No-op: offline fallback stack remains in place.
-      }
-    };
-    // ONE geospatially-honest basemap: the full-world Web Mercator Blue Marble, at full
-    // opacity. The regional Indo-Pacific crop (earth-blue-marble-indopac-3072.jpg) was
-    // deliberately removed here: it is a square image draped over a lat/lon rectangle, so
-    // in EPSG:3857 it stretches by latitude and floats out of register with the basemap and
-    // the unit markers (the misaligned rectangle the operator reported). A single correctly
-    // projected basemap keeps imagery, coastlines, and markers in one coordinate system.
-    addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, {
-      kind: 'global',
-      opacity: 1,
-      className: 'global-satellite-overlay'
+    // ---- Basemaps: crisp online tiles with an automatic offline fallback ------------
+    // A dark "command picture" basemap by default so colored symbols and overlays pop —
+    // the convention real C2/COP tools use — with a photographic satellite option and the
+    // bundled Blue Marble image as a no-network safety net. Slippy tiles wrap across the
+    // antimeridian, so the Pacific-centered view stays seamless out to the Americas.
+    const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd', maxZoom: 19, crossOrigin: true, keepBuffer: 4,
+      attribution: '© OpenStreetMap contributors, © CARTO'
     });
-    // Second copy shifted +360° so the Pacific stays imaged across the dateline.
-    addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS_WRAP, {
-      kind: 'global',
-      opacity: 1,
-      className: 'global-satellite-overlay'
+    const satImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, crossOrigin: true, keepBuffer: 4,
+      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics'
     });
+    const satLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd', maxZoom: 19, crossOrigin: true, opacity: 0.85
+    });
+    const satLayer = L.layerGroup([satImagery, satLabels]);
+    // Offline bundled imagery (two copies so the dateline stays covered) — used when the
+    // network is unavailable, or selectable directly.
+    const offlineLayer = L.layerGroup([
+      L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' }),
+      L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS_WRAP, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' })
+    ]);
 
-    // Offline vector fallback: land/coastlines from bundled GeoJSON. It is intentionally
-    // hidden when any raster basemap loads, because drawing this vector outline over the
-    // regional satellite crop creates a visible projection mismatch.
-    try {
-      fetch('assets/land.geojson', { cache: 'force-cache' })
-        .then(r => (r && r.ok) ? r.json() : null)
-        .then(geo => {
-          if (!geo || !leafletMap) return;
-          coastlineLayer = L.geoJSON(geo, {
-            pane: 'basemapPane',
-            interactive: false,
-            style: { color: '#5fbde8', weight: 0.55, opacity: 0.48, fillColor: '#15293a', fillOpacity: 0.035 }
-          });
-          coastlinesLoaded = true;
-          refreshCoastlineFallback();
-          refreshBasemapStatus();
-        })
-        .catch(() => {});
-    } catch (e) { /* non-fatal */ }
+    darkLayer.addTo(leafletMap);
+    globalSatelliteLoaded = true; // a real basemap is up; suppress the bare-grid status
+    setBasemapStatus('Basemap: dark (online)', 'ok');
+    L.control.layers(
+      { 'Dark (command picture)': darkLayer, 'Satellite': satLayer, 'Offline imagery': offlineLayer },
+      null, { position: 'topright', collapsed: true }
+    ).addTo(leafletMap);
+    leafletMap.on('baselayerchange', (e) => setBasemapStatus('Basemap: ' + e.name, 'ok'));
+
+    // Auto-fallback: if online tiles can't load (offline / blocked), switch to the bundled
+    // imagery so the map is never blank. A handful of tile errors is the trigger.
+    let onlineTileErrors = 0, fellBack = false;
+    const fallBackToOffline = () => {
+      if (fellBack || !leafletMap) return;
+      fellBack = true;
+      if (leafletMap.hasLayer(darkLayer)) leafletMap.removeLayer(darkLayer);
+      offlineLayer.addTo(leafletMap);
+      setBasemapStatus('Basemap: offline imagery', 'offline');
+    };
+    darkLayer.on('tileerror', () => { if (++onlineTileErrors >= 4) fallBackToOffline(); });
 
     // Map overlays: scale + compass
     L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
@@ -280,6 +265,8 @@ window.MapModule = (function () {
       }
     });
     new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
+    // Now that the badge exists, reflect the active online basemap (or the fallback).
+    setBasemapStatus(fellBack ? 'Basemap: offline imagery' : 'Basemap: dark (online)', fellBack ? 'offline' : 'ok');
 
     // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
     // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
@@ -296,7 +283,7 @@ window.MapModule = (function () {
     };
     // If no raster tiles, the offline coastline basemap is still shown, so only fall back
     // to the bare-grid message when even that hasn't loaded.
-    const noTiles = () => { refreshBasemapStatus(); };
+    const noTiles = () => { if (!globalSatelliteLoaded) refreshBasemapStatus(); };
     if (ctx.enableLocalTiles && ctx.tileBasePath) {
       try {
         fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
