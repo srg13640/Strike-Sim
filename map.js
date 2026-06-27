@@ -33,7 +33,20 @@ window.MapModule = (function () {
   // drape the PO-provided Indo-Pacific satellite image over a tight regional envelope.
   const WEB_MERCATOR_MAX_LAT = 85.05112878;
   const GLOBAL_SATELLITE_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, -180], [WEB_MERCATOR_MAX_LAT, 180]];
+  // A second copy of the world image, shifted +360° east, so imagery is continuous
+  // across the antimeridian (180°…540°) — i.e. through the Pacific into the Americas.
+  const GLOBAL_SATELLITE_BOUNDS_WRAP = [[-WEB_MERCATOR_MAX_LAT, 180], [WEB_MERCATOR_MAX_LAT, 540]];
   const GLOBAL_SATELLITE_BASEMAP = 'assets/earth-blue-marble-webmercator-2048.jpg';
+  // Pacific-centered theater frame. This is an INDOPACOM tool, so the map is centered on
+  // the dateline: Western-hemisphere longitudes (the Americas, Hawaii) are shifted +360°
+  // so Asia → the Central Pacific → the US West Coast form ONE contiguous picture instead
+  // of being torn to opposite edges of a Greenwich-centered world. pacLon() applies the
+  // shift to every marker/line/view; PACIFIC_BOUNDS is the pannable envelope (East Africa
+  // ~95°E across the Pacific to the US East Coast ~295° == -65°).
+  const PAC_CUT = -25;
+  function pacLon(lon) { return (lon != null && lon < PAC_CUT) ? lon + 360 : lon; }
+  // West edge 60°E (Indian Ocean / Diego Garcia) → east edge 295° (== -65°, US East Coast).
+  const PACIFIC_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, 60], [WEB_MERCATOR_MAX_LAT, 295]];
   // The square source image covers mainland China through Japan, the Philippines,
   // Indonesia, and Papua New Guinea. These bounds intentionally hug visible coastlines
   // so force-network nodes sit on recognizable terrain instead of an abstract grid.
@@ -70,7 +83,7 @@ window.MapModule = (function () {
       zoomControl: true,
       worldCopyJump: false,            // no repeated worlds; we lock to a single globe
       attributionControl: true,
-      maxBounds: GLOBAL_SATELLITE_BOUNDS,
+      maxBounds: PACIFIC_BOUNDS,       // Pacific-centered envelope (see PACIFIC_BOUNDS)
       maxBoundsViscosity: 1.0,         // hard wall — you cannot drag past the world imagery
       minZoom: 2,                      // refined to a real fit-to-viewport value once sized
       bounceAtZoomLimits: false
@@ -163,6 +176,12 @@ window.MapModule = (function () {
     // the unit markers (the misaligned rectangle the operator reported). A single correctly
     // projected basemap keeps imagery, coastlines, and markers in one coordinate system.
     addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, {
+      kind: 'global',
+      opacity: 1,
+      className: 'global-satellite-overlay'
+    });
+    // Second copy shifted +360° so the Pacific stays imaged across the dateline.
+    addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS_WRAP, {
       kind: 'global',
       opacity: 1,
       className: 'global-satellite-overlay'
@@ -302,7 +321,7 @@ window.MapModule = (function () {
     if (!leafletMap) return;
     try {
       // inside=true -> the smallest zoom at which the view fits *inside* the world bounds.
-      const fit = leafletMap.getBoundsZoom(GLOBAL_SATELLITE_BOUNDS, true);
+      const fit = leafletMap.getBoundsZoom(PACIFIC_BOUNDS, true);
       const minZ = Math.ceil(fit * 100) / 100; // tiny epsilon so edges never peek through
       leafletMap.setMinZoom(minZ);
       if (leafletMap.getZoom() < minZ) leafletMap.setZoom(minZ);
@@ -338,7 +357,7 @@ window.MapModule = (function () {
           icon = L.divIcon(window.SymbolModule.divIcon(n, { size }));
         } catch (e) { icon = null; }
         if (icon) {
-          marker = L.marker([n.lat, n.lon], { icon, riseOnHover: true, keyboard: false })
+          marker = L.marker([n.lat, pacLon(n.lon)], { icon, riseOnHover: true, keyboard: false })
             .addTo(markersLayer)
             .on('click', () => selectNodeById(n.id));
         }
@@ -346,7 +365,7 @@ window.MapModule = (function () {
       if (!marker) {
         // Fallback: original colored circle marker.
         const col = mapColorFromTeam(n);
-        marker = L.circleMarker([n.lat, n.lon], {
+        marker = L.circleMarker([n.lat, pacLon(n.lon)], {
           radius: 6, color: col, fillColor: col, fillOpacity: 0.9, weight: 1.5
         }).addTo(markersLayer).on('click', () => selectNodeById(n.id));
       }
@@ -404,7 +423,7 @@ window.MapModule = (function () {
       const m = mapMarkers.get(selectedNode.id);
       m.bindPopup(`<strong>${selectedNode.name}</strong><br/><span style="color:var(--muted)">${selectedNode.id}</span>`, { autoPan: true }).openPopup();
       if (selectedNode.lat != null && selectedNode.lon != null) {
-        leafletMap.setView([selectedNode.lat, selectedNode.lon], Math.max(leafletMap.getZoom(), 3), { animate: true });
+        leafletMap.setView([selectedNode.lat, pacLon(selectedNode.lon)], Math.max(leafletMap.getZoom(), 3), { animate: true });
       }
     }
     refreshMapLinks();
@@ -429,7 +448,7 @@ window.MapModule = (function () {
       }
     });
     neighbors.forEach(n => {
-      L.polyline([[selectedNode.lat, selectedNode.lon], [n.lat, n.lon]], {
+      L.polyline([[selectedNode.lat, pacLon(selectedNode.lon)], [n.lat, pacLon(n.lon)]], {
         color: resolveCssVar('var(--accent)'),
         weight: 3,
         opacity: 0.85
@@ -464,7 +483,7 @@ window.MapModule = (function () {
     const m = mapMarkers.get(node.id);
     if (m) {
       m.openPopup();
-      if (leafletMap && node.lat != null && node.lon != null) leafletMap.setView([node.lat, node.lon], Math.max(leafletMap.getZoom(), 3), { animate: true });
+      if (leafletMap && node.lat != null && node.lon != null) leafletMap.setView([node.lat, pacLon(node.lon)], Math.max(leafletMap.getZoom(), 3), { animate: true });
     }
   }
 
