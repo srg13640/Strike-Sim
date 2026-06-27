@@ -691,6 +691,9 @@
     }
     .left-actions button { width: 100%; }
     .left-actions .full { grid-column: 1 / -1; }
+    .qa-group { margin-bottom: 12px; }
+    .qa-group:last-child { margin-bottom: 0; }
+    .qa-label { font-family: 'Oswald','Inter',system-ui,sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin: 0 0 6px 1px; }
 
     .leaflet-control.compass-control {
     background: rgba(10,15,20,0.9);
@@ -1228,20 +1231,30 @@
     </header>
     <div id="left-panel-content">
       <div class="panel" aria-labelledby="left-actions-title">
-        <h2 id="left-actions-title">Quick Actions</h2>
-        <div class="left-actions">
-          <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
-          <button id="reset-view-btn" type="button" class="secondary" title="Re-center the current view">Reset View</button>
-          <button id="map-btn" type="button" class="secondary" title="Toggle map overlay">Map</button>
-          <button id="table-btn" type="button" class="secondary" title="Switch to tabular view">Table</button>
-          <button id="org-btn" type="button" class="secondary" title="Task org / wiring view">Task Org</button>
-          <button id="legend-btn" type="button" class="secondary" title="Show or hide legend">Hide Legend</button>
-          <button id="geo-mode-btn" type="button" class="secondary" title="Pin nodes to globe / restore forces">Geo Mode</button>
-          <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
-          <button id="toggle-payoff-btn" type="button" class="secondary" title="Highlight high-payoff targets">High Payoff</button>
-          <button id="toggle-risk-btn" type="button" class="secondary" title="Highlight high-risk targets">High Risk</button>
-          <button id="toggle-contrast-btn" type="button" class="secondary" title="Toggle high-contrast palette">Contrast</button>
-          <button id="summary-btn" type="button" class="full" title="Quick status summary">Summary</button>
+        <h2 id="left-actions-title">Controls</h2>
+        <div class="qa-group"><div class="qa-label">View</div>
+          <div class="left-actions">
+            <button id="reset-view-btn" type="button" class="secondary" title="Re-center the current view">Recenter</button>
+            <button id="geo-mode-btn" type="button" class="secondary" title="Pin nodes to globe / restore forces">Geo Mode</button>
+            <button id="map-btn" type="button" class="secondary" title="Toggle map overlay">Map</button>
+            <button id="table-btn" type="button" class="secondary" title="Switch to tabular view">Table</button>
+            <button id="org-btn" type="button" class="secondary" title="Task org / wiring view">Task Org</button>
+          </div>
+        </div>
+        <div class="qa-group"><div class="qa-label">Highlight</div>
+          <div class="left-actions">
+            <button id="toggle-payoff-btn" type="button" class="secondary" title="Highlight high-value, easy-to-hit targets (top 20%)">High Payoff</button>
+            <button id="toggle-risk-btn" type="button" class="secondary" title="Highlight well-defended / high-counter targets (top 20%)">High Risk</button>
+            <button id="toggle-contrast-btn" type="button" class="secondary" title="Toggle high-contrast palette">Contrast</button>
+            <button id="legend-btn" type="button" class="secondary" title="Show or hide legend">Hide Legend</button>
+          </div>
+        </div>
+        <div class="qa-group"><div class="qa-label">Session</div>
+          <div class="left-actions">
+            <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
+            <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
+            <button id="summary-btn" type="button" class="secondary" title="Quick status summary">Summary</button>
+          </div>
         </div>
       </div>
       <div class="panel" aria-labelledby="left-io-title">
