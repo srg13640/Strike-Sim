@@ -27,6 +27,7 @@ window.MapModule = (function () {
   let markersLayer = null;
   let mapLinksLayer = null;
   let coastlineLayer = null;
+  let rangeRingsLayer = null;   // notional weapon-engagement zones (toggleable overlay)
   const mapMarkers = new Map(); // id -> marker
   // Leaflet renders EPSG:3857. Keep a generated full-world Web Mercator Blue Marble
   // underneath the operational theater so panning never falls back to a dead grid, then
@@ -118,6 +119,12 @@ window.MapModule = (function () {
     leafletMap.getPane('basemapPane').style.zIndex = 250;
     leafletMap.getPane('basemapPane').style.pointerEvents = 'none';
 
+    // Pane for weapon-engagement zones — above the basemap, below the unit symbols.
+    leafletMap.createPane('ringsPane');
+    leafletMap.getPane('ringsPane').style.zIndex = 350;
+    leafletMap.getPane('ringsPane').style.pointerEvents = 'none';
+    rangeRingsLayer = L.layerGroup().addTo(leafletMap);
+
     // Basemap status helper: keep one status signal even as layers come online asynchronously.
     const setBasemapStatus = (text, state) => {
       const el = document.querySelector('.basemap-status');
@@ -176,7 +183,8 @@ window.MapModule = (function () {
     setBasemapStatus('Basemap: dark (online)', 'ok');
     L.control.layers(
       { 'Dark (command picture)': darkLayer, 'Satellite': satLayer, 'Offline imagery': offlineLayer },
-      null, { position: 'topright', collapsed: true }
+      { 'Engagement zones (notional)': rangeRingsLayer },
+      { position: 'topright', collapsed: true }
     ).addTo(leafletMap);
     leafletMap.on('baselayerchange', (e) => setBasemapStatus('Basemap: ' + e.name, 'ok'));
 
@@ -222,7 +230,8 @@ window.MapModule = (function () {
             `<div class="mil-leg-head"><strong>SYMBOLOGY</strong><button type="button" class="mil-leg-toggle" aria-expanded="true" title="Show/hide legend">–</button></div>` +
             `<div class="mil-leg-body"><div class="mil-leg-sub">Affiliation (frame)</div><div class="mil-leg-grid">${affRow}</div>` +
             `<div class="mil-leg-sub">Function (glyph)</div><div class="mil-leg-grid">${fnRow}</div>` +
-            `<div class="mil-leg-note">Air = dome · Sea = wave · dashed/✕ = degraded/destroyed</div></div>`;
+            `<div class="mil-leg-note">Air = dome · Sea = wave · dashed/✕ = degraded/destroyed</div>` +
+            `<div class="mil-leg-note">Rings (notional): solid = fires reach · dashed = air defense · dotted = sensor</div></div>`;
           L.DomEvent.disableClickPropagation(div);
           const btn = div.querySelector('.mil-leg-toggle');
           const body = div.querySelector('.mil-leg-body');
@@ -362,7 +371,66 @@ window.MapModule = (function () {
       mapMarkers.set(n.id, marker);
     });
 
+    refreshRangeRings();
     highlightSelectedOnMap();
+  }
+
+  // --- Weapon-engagement zones (notional) ------------------------------------------
+  // Range rings around key fires / air-defense / sensor nodes — the overlay that makes a
+  // map read as an operational planning picture. Radii are NOTIONAL, derived from node
+  // type + importance (clearly labeled in the legend/layer name), not real weapon data.
+  function engagementZone(n) {
+    const ty = String(n.type || '').toLowerCase();
+    const sub = String(n.subsystem || '').toLowerCase();
+    const imp = Math.max(1, Math.min(12, Number(n.importance) || 4));
+    if (ty.includes('fire') || /firepower|strike|missile|artil/.test(sub)) {
+      return { km: 260 + imp * 145, kind: 'fires' };          // offensive strike reach
+    }
+    if (ty.includes('protect') || ty.includes('defen') || /air ?defen|sam|ada/.test(sub)) {
+      return { km: 120 + imp * 26, kind: 'airdef' };          // missile-engagement zone
+    }
+    if (ty.includes('sensor') || ty.includes('isr') || ty.includes('radar')) {
+      return { km: 220 + imp * 38, kind: 'sensor' };          // detection coverage
+    }
+    return null;
+  }
+
+  // Per-kind / per-affiliation styling. Red threats warm, Blue cool; fires solid,
+  // air-defense dashed, sensors dotted and fainter.
+  function ringStyle(kind, team) {
+    const red = team === 'red';
+    const base = red ? [228, 76, 60] : [80, 168, 224];
+    const rgba = (a) => `rgba(${base[0]},${base[1]},${base[2]},${a})`;
+    if (kind === 'fires') return { color: rgba(0.55), weight: 1.4, fillColor: rgba(1), fillOpacity: 0.06, dashArray: null };
+    if (kind === 'airdef') return { color: rgba(0.6), weight: 1.3, fillColor: rgba(1), fillOpacity: 0.05, dashArray: '6 5' };
+    return { color: rgba(0.4), weight: 1, fillColor: rgba(1), fillOpacity: 0.025, dashArray: '2 5' }; // sensor
+  }
+
+  const MAX_RINGS = 22;   // show the biggest threat/defense envelopes only — readable, not noisy
+  function refreshRangeRings() {
+    if (!rangeRingsLayer) return;
+    rangeRingsLayer.clearLayers();
+    const { visibleNodes } = currentVisible();
+    const candidates = [];
+    visibleNodes.forEach(n => {
+      if (n.lat == null || n.lon == null) return;
+      const imp = Number(n.importance) || 0;
+      if (imp < 6) return;
+      const z = engagementZone(n);
+      if (z) candidates.push({ n, z, imp });
+    });
+    // Keep the highest-importance systems so the overlay reads as the key engagement
+    // envelopes rather than a wall of overlapping circles.
+    candidates.sort((a, b) => b.imp - a.imp);
+    candidates.slice(0, MAX_RINGS).forEach(({ n, z }) => {
+      const st = ringStyle(z.kind, n.team);
+      L.circle([n.lat, pacLon(n.lon)], {
+        pane: 'ringsPane', interactive: false, radius: z.km * 1000,
+        color: st.color, weight: st.weight, opacity: 0.9,
+        fillColor: st.fillColor, fillOpacity: st.fillOpacity,
+        dashArray: st.dashArray
+      }).addTo(rangeRingsLayer);
+    });
   }
 
   // Apply current highlight/selection state to a single marker, handling both the
