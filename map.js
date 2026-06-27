@@ -407,9 +407,11 @@ window.MapModule = (function () {
     const red = team === 'red';
     const base = red ? [228, 76, 60] : [80, 168, 224];
     const rgba = (a) => `rgba(${base[0]},${base[1]},${base[2]},${a})`;
-    if (kind === 'fires') return { color: rgba(0.55), weight: 1.4, fillColor: rgba(1), fillOpacity: 0.06, dashArray: null };
-    if (kind === 'airdef') return { color: rgba(0.6), weight: 1.3, fillColor: rgba(1), fillOpacity: 0.05, dashArray: '6 5' };
-    return { color: rgba(0.4), weight: 1, fillColor: rgba(1), fillOpacity: 0.025, dashArray: '2 5' }; // sensor
+    // Big fires rings are outline-only (their fills would blanket the view in a haze);
+    // the smaller air-defense / sensor envelopes get a faint fill to read as coverage.
+    if (kind === 'fires') return { color: rgba(0.6), weight: 1.5, fillColor: rgba(1), fillOpacity: 0, dashArray: null };
+    if (kind === 'airdef') return { color: rgba(0.7), weight: 1.4, fillColor: rgba(1), fillOpacity: 0.04, dashArray: '6 5' };
+    return { color: rgba(0.5), weight: 1.1, fillColor: rgba(1), fillOpacity: 0.025, dashArray: '2 5' }; // sensor
   }
 
   const MAX_RINGS = 22;   // show the biggest threat/defense envelopes only — readable, not noisy

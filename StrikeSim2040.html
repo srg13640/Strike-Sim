@@ -37,7 +37,7 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p3"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p11"></script>
+  <script src="map.js?v=p12"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p5"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
@@ -2062,8 +2062,12 @@
 
     function currentVisible() {
     const visibleNodes = data.nodes.filter(n => {
-    const passesDomain = !filteredDomains.size || (n.domain || []).some(d => filteredDomains.has(d));
-    const passesTeam = !filteredTeams.size || filteredTeams.has(n.team || '3rd_party');
+    // Checkboxes are "show these": a node passes a filter group only if one of its values
+    // is selected. Unchecking everything in a group therefore hides everything (it no
+    // longer means "no filter"). Domainless nodes can't be domain-filtered, so they pass.
+    const doms = n.domain || [];
+    const passesDomain = doms.length ? doms.some(d => filteredDomains.has(d)) : true;
+    const passesTeam = filteredTeams.has(n.team || '3rd_party');
     return passesDomain && passesTeam;
     });
     const nodeIds = new Set(visibleNodes.map(n => n.id));
@@ -3010,6 +3014,9 @@
     document.getElementById('filter-all-btn').addEventListener('click', () => { document.querySelectorAll('#filters input').forEach(cb => cb.checked = true); applyFilters(); });
     document.getElementById('filter-none-btn').addEventListener('click', () => { document.querySelectorAll('#filters input').forEach(cb => cb.checked = false); applyFilters(); });
     document.getElementById('filter-apply-btn').addEventListener('click', applyFilters);
+    // Live filtering: toggling any checkbox applies immediately (no need to hit Apply).
+    document.getElementById('filters').addEventListener('change', applyFilters);
+    document.getElementById('team-filters').addEventListener('change', applyTeamFilters);
     document.getElementById('team-filter-all-btn').addEventListener('click', () => { document.querySelectorAll('#team-filters input').forEach(cb => cb.checked = true); applyTeamFilters(); });
     document.getElementById('team-filter-none-btn').addEventListener('click', () => { document.querySelectorAll('#team-filters input').forEach(cb => cb.checked = false); applyTeamFilters(); });
     document.getElementById('team-filter-apply-btn').addEventListener('click', applyTeamFilters);
