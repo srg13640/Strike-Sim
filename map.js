@@ -68,9 +68,15 @@ window.MapModule = (function () {
     let realTilesLoaded = false;    // raster tiles found under ./tiles/
     leafletMap = L.map('map', {
       zoomControl: true,
-      worldCopyJump: true,
-      attributionControl: true
+      worldCopyJump: false,            // no repeated worlds; we lock to a single globe
+      attributionControl: true,
+      maxBounds: GLOBAL_SATELLITE_BOUNDS,
+      maxBoundsViscosity: 1.0,         // hard wall — you cannot drag past the world imagery
+      minZoom: 2,                      // refined to a real fit-to-viewport value once sized
+      bounceAtZoomLimits: false
     });
+    // Deep-ocean backdrop so any sub-pixel sliver reads as sea, never as a black void.
+    try { leafletMap.getContainer().style.background = '#05101d'; } catch (e) {}
     leafletMap.on('click', () => selectNode(null));
 
     // Base layer: a blank grid drawn locally on a canvas — makes ZERO network requests,
@@ -90,7 +96,7 @@ window.MapModule = (function () {
         return tile;
       }
     });
-    new BlankGrid({ minZoom: 0, maxZoom: 8, tileSize: 256 }).addTo(leafletMap);
+    new BlankGrid({ minZoom: 0, maxZoom: 8, tileSize: 256, noWrap: true }).addTo(leafletMap);
 
     // Dedicated pane for the vector basemap, BELOW the markers/overlay pane (z 400) and
     // above the tiles (z 200). Without this the land — loaded async — lands in the same
@@ -265,7 +271,7 @@ window.MapModule = (function () {
       realTilesLoaded = true;
       refreshCoastlineFallback();
       L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
-        minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
+        minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles', noWrap: true
       }).addTo(leafletMap);
       refreshBasemapStatus();
     };
@@ -286,7 +292,21 @@ window.MapModule = (function () {
 
     markersLayer = L.layerGroup().addTo(leafletMap);
     mapLinksLayer = L.layerGroup().addTo(leafletMap);
-    setTimeout(() => { leafletMap.invalidateSize(); fitMapToMarkers(); }, 50);
+    setTimeout(() => { leafletMap.invalidateSize(); clampMinZoom(); fitMapToMarkers(); }, 50);
+  }
+
+  // Set the minimum zoom to exactly the level at which the world imagery fills the
+  // viewport — so you can never zoom out into empty space. Recomputed on every resize
+  // because the right zoom depends on the container's pixel size.
+  function clampMinZoom() {
+    if (!leafletMap) return;
+    try {
+      // inside=true -> the smallest zoom at which the view fits *inside* the world bounds.
+      const fit = leafletMap.getBoundsZoom(GLOBAL_SATELLITE_BOUNDS, true);
+      const minZ = Math.ceil(fit * 100) / 100; // tiny epsilon so edges never peek through
+      leafletMap.setMinZoom(minZ);
+      if (leafletMap.getZoom() < minZ) leafletMap.setZoom(minZ);
+    } catch (e) { /* keep the static minZoom fallback */ }
   }
 
   // Are MIL-STD-2525-style symbols available + enabled? Falls back to dots otherwise.
@@ -310,7 +330,9 @@ window.MapModule = (function () {
         // Tactical symbol marker (symbols.js). Importance gently scales size so the
         // high-payoff nodes read first, without breaking the affiliation/function coding.
         const imp = Math.max(0, Math.min(12, Number(n.importance) || 4));
-        const size = Math.round(28 + imp * 1.4);
+        // milsymbol renders ~1.4x the size value, so keep the base modest to avoid a
+        // pile-up of oversized symbols in dense clusters; importance gives a gentle range.
+        const size = Math.round(17 + imp * 0.9);
         let icon;
         try {
           icon = L.divIcon(window.SymbolModule.divIcon(n, { size }));
@@ -448,7 +470,7 @@ window.MapModule = (function () {
 
   // Called by the main script's mode toggle and window-resize handler.
   function invalidateSize() {
-    if (leafletMap) leafletMap.invalidateSize();
+    if (leafletMap) { leafletMap.invalidateSize(); clampMinZoom(); }
   }
 
   function getMap() { return leafletMap; }
