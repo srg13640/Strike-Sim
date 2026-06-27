@@ -29,6 +29,16 @@
   function otherSide(s) { return s === 'blue' ? 'red' : 'blue'; }
   function hpBand(h, max) { var f = max ? h / max : 0; return f > 0.66 ? 'Intact' : (f > 0.33 ? 'Damaged' : 'Critical'); }
   function fogActive(cfg) { return !!(cfg && cfg.fog); }
+  // Mirror of the engine's tempo-role test (game.js nodeTempoRole) so the UI can flag
+  // command/logistics targets whose loss throttles the enemy's action points.
+  function tempoRole(n) {
+    if (!n) return null;
+    var s = (String(n.type || '') + ' ' + String(n.subsystem || '')).toLowerCase();
+    if (/command/.test(s)) return 'Command';
+    if (/logist|support|sustain/.test(s)) return 'Logistics';
+    if (/relay|comm/.test(s)) return 'Relay';
+    return null;
+  }
 
   // ---- styles --------------------------------------------------------------------
   var CSS = [
@@ -66,6 +76,10 @@
     '.wg-bar>i{display:block;height:100%;border-radius:3px;}',
     '.wg-card.blue .wg-bar>i{background:linear-gradient(90deg,#2b6aa0,#6cc0ff);}',
     '.wg-card.red .wg-bar>i{background:linear-gradient(90deg,#a04848,#ff8585);}',
+    '.wg-meta.wg-tempo{margin-top:5px;color:#d9c79a;}.wg-meta.wg-tempo b{color:#ffd86b;}',
+    '.wg-bar.wg-tempo-bar{background:#241a0e;}.wg-bar.wg-tempo-bar>i{background:linear-gradient(90deg,#a07a2b,#ffd86b);}',
+    '.wg-tempo-tag{display:inline-block;font-size:10px;color:#1a1206;background:#ffd86b;border-radius:10px;padding:1px 7px;margin-top:4px;font-weight:700;}',
+    '.wg-strat{font-size:11px;color:#d9c79a;border:1px solid #5a4a22;background:rgba(60,48,18,.25);border-radius:6px;padding:6px 8px;margin-top:8px;}',
     '.wg-btn{background:#13314a;color:#dff1ff;border:1px solid #2c5f86;border-radius:6px;padding:7px 10px;',
       'font:600 12px system-ui,sans-serif;cursor:pointer;transition:.12s;}',
     '.wg-btn:hover{border-color:#4bb8ff;background:#184466;}',
@@ -202,7 +216,8 @@
       '<div class="wg-sec"><h4>Fog of war</h4><div class="wg-toggle" id="wg-fog">' +
         '<button data-fog="on">On</button><button data-fog="off">Off</button></div>' +
         '<p class="wg-hint" style="margin-top:6px;">On: enemy strength is masked while you plan, and a two-human match hands off blind so neither side sees the other\'s orders.</p></div>' +
-      '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. A side is defeated if its surviving force value falls below 35% of its start, otherwise the higher score at the final turn wins.</p>';
+      '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. A side is defeated if its surviving force value falls below 35% of its start, otherwise the higher score at the final turn wins.</p>' +
+      '<p class="wg-strat">⚡ <b>Command tempo:</b> your action points each turn come from your surviving <b>Command</b> &amp; <b>Logistics</b> nodes. Strike the enemy\'s C2/sustainment to throttle how many orders they can issue — or protect your own to keep your tempo up.</p>';
     document.getElementById('wg-foot').innerHTML = '<button class="wg-btn primary" data-act="start">Start Match</button>';
     // defaults
     setToggle('wg-ctl-blue', 'human'); setToggle('wg-ctl-red', 'ai');
@@ -332,12 +347,13 @@
     if (state.phase === 'over' && state.winner) {
       banner = '<div class="wg-banner ' + state.winner + '">' + (state.winner === 'blue' ? 'BLUE' : 'RED') + ' WINS</div>';
     }
+    var tempo = state.tempo || {};
     var blueCard = maskEnemy === 'blue'
       ? maskedCard('blue', 'BLUE', state.alive.blue, state.rosters.blue)
-      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB);
+      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB, tempo.blue);
     var redCard = maskEnemy === 'red'
       ? maskedCard('red', 'RED', state.alive.red, state.rosters.red)
-      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR);
+      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR, tempo.red);
     return banner + '<div class="wg-sec"><div class="wg-score">' + blueCard + redCard + '</div></div>';
   }
   function maskedCard(side, label, alive, total) {
@@ -345,11 +361,19 @@
       '<div class="wg-pts">— · —</div><div class="wg-meta">' + alive + '/' + total + ' active · strength unknown</div>' +
       '<div class="wg-bar"></div></div>';
   }
-  function card(side, label, score, alive, total, frac) {
+  function card(side, label, score, alive, total, frac, tempo) {
+    var tempoRow = '';
+    if (tempo) {
+      var tfrac = Math.max(0, Math.min(1, tempo.frac == null ? 1 : tempo.frac));
+      tempoRow = '<div class="wg-meta wg-tempo">⚡ <b>' + tempo.ap + ' AP</b>' +
+        ' · C2 ' + tempo.c2 + ' · Logi ' + tempo.logi + '</div>' +
+        '<div class="wg-bar wg-tempo-bar"><i style="width:' + Math.round(tfrac * 100) + '%"></i></div>';
+    }
     return '<div class="wg-card ' + side + '"><div class="wg-team">' + label + '</div>' +
       '<div class="wg-pts">' + Math.round(score) + '</div>' +
       '<div class="wg-meta">' + alive + '/' + total + ' active · force ' + Math.round(frac * 100) + '%</div>' +
-      '<div class="wg-bar"><i style="width:' + Math.round(frac * 100) + '%"></i></div></div>';
+      '<div class="wg-bar"><i style="width:' + Math.round(frac * 100) + '%"></i></div>' +
+      tempoRow + '</div>';
   }
 
   function ordersSection(state) {
@@ -404,7 +428,13 @@
           m.label + (vuln ? '<span class="vh">▲ vulnerable</span>' : '') + '</button>';
       }).join('') + '</div>';
     }
-    holder.innerHTML = head + actions;
+    var role = tempoRole(bn);
+    var tnote = (!isMine && role && bn.alive)
+      ? '<div class="wg-strat">⚡ <b>' + role + ' node.</b> Neutralizing it cuts the enemy\'s action points next turn — decapitation, not just attrition.</div>'
+      : (isMine && role && bn.alive)
+        ? '<div class="wg-strat">⚡ <b>' + role + ' node.</b> Holds up your tempo — keep it alive (Harden/Repair) to preserve your action points.</div>'
+        : '';
+    holder.innerHTML = head + tnote + actions;
   }
 
   // A few one-click suggested targets (highest-value living enemy nodes) so the player

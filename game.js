@@ -130,6 +130,46 @@ window.GameModule = (function () {
 
   function nodeValue(n) { return (n.importance || 5) * (n.casc || 1); }
 
+  // ---- Command-tempo economy ------------------------------------------------------
+  // The force network drives operational tempo: surviving command, logistics, and relay
+  // nodes generate the action points a side can spend each turn. Degrade an enemy's C2 /
+  // sustainment and you throttle how many orders they can issue — making decapitation a
+  // real strategy alongside raw attrition. Pure + deterministic (read-only over board).
+  function nodeTempoRole(n) {
+    const ty = String(n.type || '').toLowerCase();
+    const sub = String(n.subsystem || '').toLowerCase();
+    if (ty.includes('command') || sub.includes('command')) return 'command';
+    if (ty.includes('logist') || ty.includes('support') || sub.includes('logist') || sub.includes('sustain')) return 'logistics';
+    if (ty.includes('relay') || ty.includes('comm')) return 'relay';
+    return null;
+  }
+  const TEMPO_W = { command: 1.0, logistics: 0.7, relay: 0.45 };
+  function commandTempo(board, side) {
+    let v = 0;
+    (board.rosters[side] || []).forEach(id => {
+      const n = board.nodes[id];
+      if (!n || !n.alive) return;
+      const role = nodeTempoRole(n);
+      if (!role) return;
+      v += TEMPO_W[role] * (n.health / (n.healthMax || 100));
+    });
+    return v;
+  }
+  function tempoCounts(board, side) {
+    let c2 = 0, logi = 0, relay = 0;
+    (board.rosters[side] || []).forEach(id => {
+      const n = board.nodes[id];
+      if (!n || !n.alive) return;
+      const role = nodeTempoRole(n);
+      if (role === 'command') c2++;
+      else if (role === 'logistics') logi++;
+      else if (role === 'relay') relay++;
+    });
+    return { c2, logi, relay };
+  }
+  // How much the AI should prize hitting / protecting a tempo node.
+  function tempoWeightOf(n) { const r = nodeTempoRole(n); return r ? TEMPO_W[r] : 0; }
+
   // ---- Board construction ---------------------------------------------------------
   // A board is a pure, serializable snapshot: per-node combat fields + health/alive,
   // adjacency, and the team rosters. It is the single source of truth a match mutates.
@@ -333,10 +373,14 @@ window.GameModule = (function () {
     const foe = enemyOf(side);
     const easy = difficulty === 'easy';
 
+    // Targeting prizes high force-value AND tempo nodes (C2/logistics) — striking the
+    // enemy's command network throttles their action points, so a smart commander
+    // weighs decapitation against attrition. 'easy' ignores the tempo bonus.
+    const tempoTargetBonus = (n) => easy ? 1 : (1 + tempoWeightOf(n) * 0.2);
     const enemies = board.rosters[foe]
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
-      .map(n => ({ n, score: nodeValue(n) * (DIFF[n.difficulty] || 1) * (0.85 + rng.next() * 0.3) }))
+      .map(n => ({ n, score: nodeValue(n) * (DIFF[n.difficulty] || 1) * tempoTargetBonus(n) * (0.85 + rng.next() * 0.3) }))
       .sort((a, b) => b.score - a.score);
 
     const bestMethodFor = (n) => {
@@ -377,9 +421,11 @@ window.GameModule = (function () {
     let remaining = ap - used;
     if (remaining > 0) {
       const own = board.rosters[side].map(id => board.nodes[id]).filter(n => n && n.alive);
+      // Protecting C2 / logistics preserves tempo, so weight them up when shoring up.
+      const protVal = (n) => nodeValue(n) * (1 + (easy ? 0 : tempoWeightOf(n)));
       const damaged = own.filter(n => n.health < n.healthMax * 0.8)
-        .sort((a, b) => (nodeValue(b) * (1 - b.health / b.healthMax)) - (nodeValue(a) * (1 - a.health / a.healthMax)));
-      const healthy = own.slice().sort((a, b) => nodeValue(b) - nodeValue(a));
+        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)));
+      const healthy = own.slice().sort((a, b) => protVal(b) - protVal(a));
       while (remaining > 0) {
         if (damaged.length && (!easy || rng.next() < 0.6)) {
           orders.push({ side, kind: 'repair', targetId: damaged.shift().id });
@@ -401,7 +447,20 @@ window.GameModule = (function () {
 
   function init(context) { ctx = Object.assign({}, ctx, context || {}); }
 
-  function apFor(side) { return side === 'blue' ? match.cfg.apBlue : match.cfg.apRed; }
+  // Action points for a side this turn. When the economy is dynamic for that side, AP
+  // scales from the side's base down to a floor of 2 as its command-tempo degrades
+  // (full tempo -> base AP; total C2/logistics loss -> 2 AP). An explicitly-set AP
+  // (campaign handoff / tests) is honored verbatim with the economy disabled.
+  function apFor(side) {
+    if (!match) return 0;
+    const fixed = side === 'blue' ? match.cfg.apBlue : match.cfg.apRed;
+    if (!match.dynamicAp || !match.dynamicAp[side]) return fixed;
+    const base = (match.baseAp && match.baseAp[side]) || fixed;
+    const start = (match.startTempo && match.startTempo[side]) || 0;
+    if (start <= 0) return base;
+    const frac = clamp(commandTempo(match.board, side) / start, 0, 1);
+    return clamp(Math.round(base * (0.6 + 0.4 * frac)), 2, base);
+  }
 
   function newMatch(cfgOverrides) {
     const graph = (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] };
@@ -421,11 +480,23 @@ window.GameModule = (function () {
       });
     }
     const board = buildBoard(graph);
-    if (!cfgOverrides || cfgOverrides.apBlue == null) cfg.apBlue = resourceAp(board, 'blue', DEFAULT_CFG.apBlue);
-    if (!cfgOverrides || cfgOverrides.apRed == null) cfg.apRed = resourceAp(board, 'red', DEFAULT_CFG.apRed);
+    // Command-tempo economy setup: derive each side's BASE action points, then let AP
+    // float per-turn with surviving C2/logistics (see apFor). An explicit AP override
+    // fixes that side's AP and disables the economy for it.
+    const apBlueFixed = !!(cfgOverrides && cfgOverrides.apBlue != null);
+    const apRedFixed = !!(cfgOverrides && cfgOverrides.apRed != null);
+    const baseAp = {
+      blue: apBlueFixed ? cfg.apBlue : resourceAp(board, 'blue', DEFAULT_CFG.apBlue),
+      red: apRedFixed ? cfg.apRed : resourceAp(board, 'red', DEFAULT_CFG.apRed)
+    };
+    cfg.apBlue = baseAp.blue;
+    cfg.apRed = baseAp.red;
+    const dynamicAp = { blue: !apBlueFixed, red: !apRedFixed };
+    const startTempo = { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') };
     const seed = (cfgOverrides && cfgOverrides.seed) || hashSeed('match', graph.nodes ? graph.nodes.length : 0, Object.keys(board.nodes).join('').length);
     match = {
       cfg, board, seed,
+      baseAp, dynamicAp, startTempo,
       turn: 1,
       phase: 'plan',            // 'plan' | 'resolved' | 'over'
       orders: { blue: [], red: [] },
@@ -461,7 +532,24 @@ window.GameModule = (function () {
         blue: match.board.rosters.blue.filter(id => match.board.nodes[id].alive).length,
         red: match.board.rosters.red.filter(id => match.board.nodes[id].alive).length
       },
+      tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
       aar: match.phase === 'over' ? buildAar() : null
+    };
+  }
+
+  // Per-side tempo snapshot for the UI: current AP, base AP, the tempo fraction relative
+  // to the start of the match, and surviving command/logistics counts.
+  function tempoInfo(side) {
+    const start = (match.startTempo && match.startTempo[side]) || 0;
+    const now = commandTempo(match.board, side);
+    const counts = tempoCounts(match.board, side);
+    return {
+      ap: apFor(side),
+      base: (match.baseAp && match.baseAp[side]) || apFor(side),
+      dynamic: !!(match.dynamicAp && match.dynamicAp[side]),
+      frac: start > 0 ? Math.round((now / start) * 100) / 100 : 1,
+      c2: counts.c2,
+      logi: counts.logi
     };
   }
 
@@ -731,6 +819,7 @@ window.GameModule = (function () {
     return {
       v: 1, seed: match.seed, turn: match.turn, phase: match.phase,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
+      baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
       orders: match.orders, winner: match.winner, health
     };
   }
@@ -739,8 +828,12 @@ window.GameModule = (function () {
     const graph = (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] };
     const board = buildBoard(graph);
     if (s.health) for (const id in s.health) { if (board.nodes[id]) { board.nodes[id].health = s.health[id].h; board.nodes[id].alive = s.health[id].a; } }
+    const dcfg = Object.assign({}, DEFAULT_CFG, s.cfg);
     match = {
-      cfg: Object.assign({}, DEFAULT_CFG, s.cfg), board, seed: s.seed,
+      cfg: dcfg, board, seed: s.seed,
+      baseAp: s.baseAp || { blue: dcfg.apBlue, red: dcfg.apRed },
+      dynamicAp: s.dynamicAp || { blue: false, red: false },
+      startTempo: s.startTempo || { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: [], winner: s.winner || null, lastReport: null
