@@ -36,7 +36,20 @@ window.GameModule = (function () {
     sof:     { name: 'SOF Mission',    label: 'SOF',     short: 'SOF', baseProb: 0.90, dmg: [60, 90], vuln: 'SOF' }
   };
   const METHOD_KEYS = ['kinetic', 'cyber', 'ew', 'sof'];
-  const DIFF = { Soft: 1.2, Medium: 1.0, Mobile: 0.9, Hardened: 0.7, Fortified: 0.65, Buried: 0.5 };
+  // Strike-probability multiplier by target difficulty (higher = easier to hit). Covers every
+  // difficulty label present in the shipped scenarios; unknown labels warn once and use 1.0 so
+  // future data drift is caught rather than silently treated as Medium.
+  const DIFF = {
+    Soft: 1.2, Exposed: 1.25, Medium: 1.0, Fixed: 1.0, Mobile: 0.9, Dispersed: 0.9,
+    Distributed: 0.85, Camouflaged: 0.85, Hardened: 0.7, Fortified: 0.65, Buried: 0.5,
+    Orbital: 0.55, Submerged: 0.5
+  };
+  const _warnedDiff = {};
+  function diffMult(label) {
+    if (label != null && DIFF[label] != null) return DIFF[label];
+    if (label && !_warnedDiff[label]) { _warnedDiff[label] = true; try { console.warn('[game] unknown difficulty "' + label + '" -> 1.0; add it to DIFF'); } catch (e) {} }
+    return 1.0;
+  }
   const CASCADE_ALPHA = 0.25;
   const HARDEN_MULT = 0.55;     // incoming strike success multiplier on a hardened node (this turn)
   const REPAIR_AMOUNT = 30;     // health restored by a Repair order at end of turn
@@ -176,10 +189,15 @@ window.GameModule = (function () {
   // the game rewards taking key terrain / decapitating the network, not just attrition.
   const OBJ_COUNT = 8;
   const OBJ_LOSS_FRAC = 0.25;   // a side is defeated if it holds <= 25% of its objectives
+  // Designate objectives by value × survivability (value / strike-difficulty) so each side
+  // picks its most DEFENSIBLE crown jewels — not just its highest-value but most-exposed
+  // nodes. This keeps the "deny the enemy's key terrain" win condition a two-way contest
+  // instead of a near-automatic loss for whichever side fields softer high-value units.
+  function objectiveScore(n) { return nodeValue(n) / diffMult(n.difficulty); }
   function pickObjectives(board, side) {
     return (board.rosters[side] || [])
       .map(id => board.nodes[id]).filter(n => n && n.alive)
-      .sort((a, b) => nodeValue(b) - nodeValue(a))
+      .sort((a, b) => objectiveScore(b) - objectiveScore(a))
       .slice(0, OBJ_COUNT).map(n => n.id);
   }
 
@@ -272,7 +290,7 @@ window.GameModule = (function () {
         continue;
       }
       const m = METHODS[o.methodKey] || METHODS.kinetic;
-      let p = m.baseProb * (DIFF[tgt.difficulty] || 1.0) * vulnMult(tgt, m);
+      let p = m.baseProb * diffMult(tgt.difficulty) * vulnMult(tgt, m);
       if (hardened.has(o.targetId)) p *= HARDEN_MULT;
       p = clamp(p, 0.05, 0.98);
       const hit = rng.next() < p;
@@ -319,7 +337,7 @@ window.GameModule = (function () {
         nn.health = Math.max(0, nn.health - cd);
         if (nn.health <= 0 && nn.alive) {
           nn.alive = false;
-          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, sourceId: id, damage: before, text: `Cascade from ${src.name} took down ${nn.name}.` });
+          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, sourceId: id, damage: Math.min(before, cd), text: `Cascade from ${src.name} took down ${nn.name}.` });
         }
       }
     }
@@ -393,7 +411,7 @@ window.GameModule = (function () {
     const enemies = board.rosters[foe]
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
-      .map(n => ({ n, score: nodeValue(n) * (DIFF[n.difficulty] || 1) * tempoTargetBonus(n) * (0.85 + rng.next() * 0.3) }))
+      .map(n => ({ n, score: nodeValue(n) * diffMult(n.difficulty) * tempoTargetBonus(n) * (0.85 + rng.next() * 0.3) }))
       .sort((a, b) => b.score - a.score);
 
     const bestMethodFor = (n) => {
@@ -403,7 +421,7 @@ window.GameModule = (function () {
         const source = sourceForMethod(board, side, k, n, rng);
         if (!source) continue;
         const m = METHODS[k];
-        const ev = m.baseProb * (DIFF[n.difficulty] || 1) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2) *
+        const ev = m.baseProb * diffMult(n.difficulty) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2) *
           Math.sqrt(resourceForMethod(source, k));
         if (ev > bestEV) { bestEV = ev; best = k; bestSource = source; }
       }
@@ -642,6 +660,9 @@ window.GameModule = (function () {
   function evaluateVictory(force) {
     const objBlue = objectiveValue(match.board, 'blue');
     const objRed = objectiveValue(match.board, 'red');
+    // Guard degenerate boards: a side with no starting objective value can't "collapse" from
+    // nothing (0 <= 0). Without this, an empty or one-sided roster declares a bogus winner.
+    if (!(match.startObj.blue > 0) || !(match.startObj.red > 0)) { match.winner = null; return; }
     const blueCollapsed = objBlue <= match.startObj.blue * match.cfg.collapseFrac;
     const redCollapsed = objRed <= match.startObj.red * match.cfg.collapseFrac;
     // Key-terrain / decapitation loss: a side that loses most of its key objectives is
@@ -857,6 +878,7 @@ window.GameModule = (function () {
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
       objectives: match.objectives,
+      history: match.history,
       orders: match.orders, winner: match.winner, health
     };
   }
@@ -874,7 +896,7 @@ window.GameModule = (function () {
       objectives: s.objectives || { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
-      history: [], winner: s.winner || null, lastReport: null
+      history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null, lastReport: null
     };
     syncBoardToGraph();
     ctx.onState(getState());
