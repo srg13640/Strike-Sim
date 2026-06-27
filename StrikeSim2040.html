@@ -3308,11 +3308,16 @@
         addEvent({ type: 'View', text: '3D unavailable: browser provided no WebGL context.' });
         showToast('Your browser is blocking WebGL. Turn on hardware acceleration (browser Settings → System → "Use hardware acceleration when available"), then click "Retry 3D". Map and Table views work without it.', 'error', 16000);
       }
-      // Show the recovery affordance FIRST so a hiccup anywhere in the Map fallback can
-      // never strand the operator without a way back to 3D.
+      degradeToMap();
+    }
+
+    // Switch the app into the Map view (the full operational picture) — used both as the
+    // WebGL-failure fallback and as the default landing when WebGL is unavailable up front.
+    // Every step is guarded so one failure can't abort the rest (a degraded Map beats a
+    // blank screen), and the "Retry 3D" affordance is shown first so the operator is never
+    // stranded without a way back to 3D.
+    function degradeToMap() {
       showRetry3dButton();
-      // Graceful fallback to the Map view — every step guarded so one failure can't abort
-      // the rest (a degraded Map still beats a blank screen).
       mapModeEnabled = true;
       try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
       try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
@@ -3375,9 +3380,17 @@
     bindEventListeners();
     initUI();
 
-    // Build the 3D engine with progressive WebGL fallback + graceful Map degradation and a
-    // no-reload "Retry 3D" path (see tryInitGraph3D / handleGraph3DFailure above).
-    tryInitGraph3D();
+    // Pick the landing view by capability. If WebGL is available, build the 3D engine
+    // (with its own progressive fallback). If not, don't even attempt it — that only
+    // throws a scary error — go straight to the Map view, which carries the full
+    // operational picture (symbols, threat rings, strikes) and needs no GPU.
+    if (webglAvailable()) {
+      tryInitGraph3D();
+    } else {
+      addEvent({ type: 'View', text: 'WebGL unavailable — opened the Map view (full operational picture).' });
+      showToast('Opened the Map view — your full operational picture (symbols, threat rings, the works). The 3D globe needs browser hardware acceleration; enable it and click "Retry 3D" anytime.', 'warn', 11000);
+      degradeToMap();
+    }
 
     refreshGraph();
     // Ensure legend button reflects initial state
