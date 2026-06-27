@@ -1,0 +1,10 @@
+iter	complexity	max_nesting	loc	status	description
+0	53	5	825	baseline	unmodified campaign planner
+1	47	5	820	keep	collapse click action dispatch chain
+2	45	5	818	keep	replace assessment branch chain with ordered cases
+3	44	5	817	keep	simplify render setup campaign dispatch
+4	40	5	816	keep	collapse graph signal team counter branches
+5	36	5	828	keep	table drive campaign synergy effects
+6	35	5	828	keep	filter unaddressed NDS penalties
+7	33	5	824	keep	simplify campaign completion rendering branches
+8	31	5	827	keep	compute export phase lines without branch checks

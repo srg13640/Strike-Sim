@@ -1,0 +1,7 @@
+# seed-base	42
+# matches	100
+iter	penalty	blue_win_rate	avg_turns	p1	p2	p3	p4	gate	status	description
+0	135	0	10	false	false	false	false	pass	baseline	unmodified wargame resource ties
+1	56	0.04	10	false	true	true	true	pass	keep	plumb resources subsystem source ids and importance cascades
+2	23	0.12	10	true	true	true	true	pass	keep	map scenario vulnerability aliases to wargame methods
+3	0	0.39	10	true	true	true	true	pass	keep	derive AP from strike capacity and support posture

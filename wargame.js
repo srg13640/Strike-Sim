@@ -97,6 +97,25 @@
     '.wg-log{list-style:none;margin:0;padding:0;max-height:170px;overflow-y:auto;}',
     '.wg-log li{padding:3px 0;border-bottom:1px solid #112536;font-size:11.5px;color:#a9c3d8;}',
     '.wg-log li.kill{color:#ff9a9a;font-weight:600;}.wg-log li.hit{color:#cfe6ff;}.wg-log li.repair{color:#9fe7b8;}.wg-log li.miss{color:#6f8295;}',
+    '.wg-aar-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}',
+    '.wg-aar-metric{border:1px solid #173249;border-radius:7px;background:rgba(18,36,54,.45);padding:7px 8px;}',
+    '.wg-aar-metric b{display:block;color:#eaf4ff;font-size:17px;line-height:1.1;margin-bottom:2px;}',
+    '.wg-aar-metric span{display:block;color:#87a6bf;font-size:10px;letter-spacing:.04em;text-transform:uppercase;}',
+    '.wg-aar-callout{border:1px solid #244d6e;border-left:3px solid #4bb8ff;border-radius:8px;background:rgba(16,42,64,.42);padding:8px 9px;color:#cfe6ff;}',
+    '.wg-aar-callout.red{border-left-color:#ff8585;}.wg-aar-callout.blue{border-left-color:#6cc0ff;}',
+    '.wg-aar-table{width:100%;border-collapse:collapse;font-size:11px;}',
+    '.wg-aar-table th{color:#7fa3c0;text-align:left;font-weight:700;border-bottom:1px solid #173249;padding:4px 3px;}',
+    '.wg-aar-table td{border-bottom:1px solid #112536;padding:4px 3px;color:#bfd4e7;vertical-align:top;}',
+    '.wg-aar-table td.num{text-align:right;color:#eaf4ff;font-variant-numeric:tabular-nums;}',
+    '.wg-aar-list{list-style:none;margin:0;padding:0;}',
+    '.wg-aar-list li{padding:5px 0;border-bottom:1px solid #112536;color:#a9c3d8;font-size:11.5px;}',
+    '.wg-aar-list b{color:#eaf4ff;}',
+    '.wg-turn-chart{display:grid;gap:4px;}',
+    '.wg-turn-row{display:grid;grid-template-columns:32px 1fr 42px;align-items:center;gap:6px;font-size:11px;color:#8fafc8;}',
+    '.wg-turn-bars{display:grid;gap:2px;}',
+    '.wg-turn-bars i{display:block;height:4px;border-radius:3px;}',
+    '.wg-turn-bars .blue{background:#6cc0ff;}.wg-turn-bars .red{background:#ff8585;}',
+    '.wg-aar-pill{display:inline-block;border:1px solid #274967;border-radius:999px;padding:1px 6px;margin:2px 3px 0 0;color:#bcd6ec;background:rgba(20,40,60,.4);font-size:10px;}',
     '.wg-banner{text-align:center;padding:12px;border-radius:8px;font-weight:700;letter-spacing:.05em;margin-bottom:10px;}',
     '.wg-banner.blue{background:linear-gradient(180deg,#16466e,#0e2c47);color:#bfe4ff;border:1px solid #2b6aa0;}',
     '.wg-banner.red{background:linear-gradient(180deg,#6e2424,#3f1414);color:#ffd0d0;border:1px solid #a04848;}',
@@ -282,6 +301,7 @@
     }
 
     if (state.phase === 'resolved' || state.phase === 'over') {
+      if (state.phase === 'over') html += aarSection(state);
       html += logSection(state);
     }
     body.innerHTML = html;
@@ -411,6 +431,93 @@
     }).join('');
     var dl = 'Blue +' + Math.round(rep.scoreDelta.blue) + ' · Red +' + Math.round(rep.scoreDelta.red);
     return '<div class="wg-sec"><h4>Turn ' + rep.turn + ' resolution — ' + dl + '</h4><ul class="wg-log">' + (items || '<li>No effects.</li>') + '</ul></div>';
+  }
+
+  function aarSection(state) {
+    var aar = state.aar;
+    if (!aar) return '';
+    var winner = aar.winner || 'none';
+    var margin = aar.scoreMargin || 0;
+    var winLabel = winner === 'blue' ? 'Blue' : (winner === 'red' ? 'Red' : 'No side');
+    var blue = aar.sides.blue;
+    var red = aar.sides.red;
+    return '<div class="wg-sec">' +
+      '<h4>After action summary</h4>' +
+      '<div class="wg-aar-callout ' + winner + '"><b>' + esc(winLabel) + ' won by ' + Math.abs(Math.round(margin)) + ' points</b><br>' +
+        esc(aar.reason) + ' after ' + aar.turns + ' resolved turns.</div>' +
+      '<div class="wg-aar-grid" style="margin-top:8px;">' +
+        aarMetric('Blue damage', blue.damage) +
+        aarMetric('Red damage', red.damage) +
+        aarMetric('Blue hit rate', pct(blue.hits, blue.strikes)) +
+        aarMetric('Red hit rate', pct(red.hits, red.strikes)) +
+        aarMetric('Blue kills', blue.kills + blue.cascades) +
+        aarMetric('Red kills', red.kills + red.cascades) +
+      '</div></div>' +
+      aarScoreSection(aar) +
+      aarMethodSection('Blue method effectiveness', blue) +
+      aarMethodSection('Red method effectiveness', red) +
+      aarTargetSection('Key targets damaged', aar.topDamaged, true) +
+      aarTargetSection('High-value neutralized', aar.topNeutralized, false) +
+      aarSourcesSection('Primary Blue firing sources', blue.topSources) +
+      aarSourcesSection('Primary Red firing sources', red.topSources);
+  }
+
+  function aarMetric(label, value) {
+    return '<div class="wg-aar-metric"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function pct(n, d) {
+    return d ? Math.round((n / d) * 100) + '%' : '0%';
+  }
+
+  function fmt(n) {
+    return Math.round(Number(n || 0));
+  }
+
+  function aarScoreSection(aar) {
+    if (!aar.scoreByTurn || !aar.scoreByTurn.length) return '';
+    var maxScore = aar.scoreByTurn.reduce(function (m, r) { return Math.max(m, r.blueScore, r.redScore); }, 1);
+    var rows = aar.scoreByTurn.map(function (r) {
+      var bw = Math.max(2, Math.round((r.blueScore / maxScore) * 100));
+      var rw = Math.max(2, Math.round((r.redScore / maxScore) * 100));
+      return '<div class="wg-turn-row"><span>T' + r.turn + '</span><span class="wg-turn-bars">' +
+        '<i class="blue" style="width:' + bw + '%"></i><i class="red" style="width:' + rw + '%"></i></span>' +
+        '<span>' + fmt(r.blueScore) + '-' + fmt(r.redScore) + '</span></div>';
+    }).join('');
+    return '<div class="wg-sec"><h4>Score progression</h4><div class="wg-turn-chart">' + rows + '</div></div>';
+  }
+
+  function aarMethodSection(title, sideStats) {
+    var rows = W.methodKeys().map(function (k) {
+      var m = sideStats.methods[k] || { attempts: 0, hits: 0, kills: 0, damage: 0 };
+      if (!m.attempts && !m.damage && !m.kills) return '';
+      return '<tr><td>' + esc(W.methods()[k].label) + '</td><td class="num">' + m.attempts + '</td><td class="num">' +
+        pct(m.hits, m.attempts) + '</td><td class="num">' + m.kills + '</td><td class="num">' + fmt(m.damage) + '</td></tr>';
+    }).join('');
+    if (!rows) return '';
+    return '<div class="wg-sec"><h4>' + esc(title) + '</h4><table class="wg-aar-table"><thead><tr>' +
+      '<th>Method</th><th>Atk</th><th>Hit</th><th>K</th><th>Dmg</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function aarTargetSection(title, list, showDamage) {
+    if (!list || !list.length) return '';
+    var items = list.slice(0, 5).map(function (t) {
+      var detail = '<span class="wg-aar-pill">' + String(t.team || '').toUpperCase() + '</span>';
+      if (showDamage) detail += '<span class="wg-aar-pill">' + fmt(t.damage) + ' dmg</span>';
+      if (t.cascaded) detail += '<span class="wg-aar-pill">cascade</span>';
+      if (t.killed) detail += '<span class="wg-aar-pill">neutralized</span>';
+      return '<li><b>' + esc(t.name) + '</b><br>' + detail + '</li>';
+    }).join('');
+    return '<div class="wg-sec"><h4>' + esc(title) + '</h4><ul class="wg-aar-list">' + items + '</ul></div>';
+  }
+
+  function aarSourcesSection(title, list) {
+    if (!list || !list.length) return '';
+    var items = list.slice(0, 4).map(function (s) {
+      return '<li><b>' + esc(s.name) + '</b><br><span class="wg-aar-pill">' + esc(s.subsystem || 'Unassigned') +
+        '</span><span class="wg-aar-pill">' + s.strikes + ' strikes</span></li>';
+    }).join('');
+    return '<div class="wg-sec"><h4>' + esc(title) + '</h4><ul class="wg-aar-list">' + items + '</ul></div>';
   }
 
   // ---- actions -------------------------------------------------------------------

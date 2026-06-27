@@ -194,6 +194,55 @@ window.MapModule = (function () {
     });
     new CompassControl({ position: 'topright' }).addTo(leafletMap);
 
+    // Symbology legend — lets a viewer decode the COP cold. Only shown when the
+    // tactical-symbol renderer is present; collapsible to stay out of the way.
+    if (symbolsEnabled()) {
+      const Sym = window.SymbolModule;
+      const sample = (team, type, dom) => Sym.svg(
+        { team, type, domain: [dom || 'Land'], health: 100, healthMax: 100 }, { size: 26 });
+      const affRow = [['blue', 'Friend'], ['red', 'Hostile'], ['green', 'Neutral'], ['unk', 'Unknown']]
+        .map(([t, label]) => `<div class="mil-leg-item">${sample(t, 'Support')}<span>${label}</span></div>`).join('');
+      const fnRow = [['Command', 'Cmd'], ['Fires', 'Fires'], ['Sensor', 'ISR'], ['Comms', 'Comms'],
+        ['Assault', 'Maneuver'], ['Protection', 'Air Def'], ['EW/Cyber', 'EW/Cyber'], ['Logistics', 'Sustain']]
+        .map(([ty, label]) => `<div class="mil-leg-item">${sample('blue', ty)}<span>${label}</span></div>`).join('');
+      const LegendControl = L.Control.extend({
+        onAdd() {
+          const div = L.DomUtil.create('div', 'leaflet-control mil-legend');
+          div.innerHTML =
+            `<div class="mil-leg-head"><strong>SYMBOLOGY</strong><button type="button" class="mil-leg-toggle" aria-expanded="true" title="Show/hide legend">–</button></div>` +
+            `<div class="mil-leg-body"><div class="mil-leg-sub">Affiliation (frame)</div><div class="mil-leg-grid">${affRow}</div>` +
+            `<div class="mil-leg-sub">Function (glyph)</div><div class="mil-leg-grid">${fnRow}</div>` +
+            `<div class="mil-leg-note">Air = dome · Sea = wave · dashed/✕ = degraded/destroyed</div></div>`;
+          L.DomEvent.disableClickPropagation(div);
+          const btn = div.querySelector('.mil-leg-toggle');
+          const body = div.querySelector('.mil-leg-body');
+          btn.addEventListener('click', () => {
+            const open = body.style.display !== 'none';
+            body.style.display = open ? 'none' : 'block';
+            btn.textContent = open ? '+' : '–';
+            btn.setAttribute('aria-expanded', String(!open));
+          });
+          return div;
+        }
+      });
+      new LegendControl({ position: 'topleft' }).addTo(leafletMap);
+      if (typeof document !== 'undefined' && !document.getElementById('mil-legend-css')) {
+        const st = document.createElement('style');
+        st.id = 'mil-legend-css';
+        st.textContent =
+          '.mil-legend{background:rgba(8,18,28,.92);border:1px solid #1d3343;border-radius:6px;padding:6px 8px;' +
+          'color:#cfe6f5;font:11px/1.3 system-ui,Segoe UI,Arial;max-width:170px;box-shadow:0 2px 10px rgba(0,0,0,.5)}' +
+          '.mil-leg-head{display:flex;align-items:center;justify-content:space-between;gap:6px;letter-spacing:.06em;color:#9ec6dd}' +
+          '.mil-leg-toggle{background:none;border:none;color:#9ec6dd;font-size:15px;line-height:1;cursor:pointer;padding:0 2px}' +
+          '.mil-leg-sub{margin:6px 0 3px;color:#7fa6bf;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em}' +
+          '.mil-leg-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 6px}' +
+          '.mil-leg-item{display:flex;align-items:center;gap:4px}.mil-leg-item svg{flex:0 0 auto}' +
+          '.mil-leg-item span{font-size:10px;color:#cfe6f5}' +
+          '.mil-leg-note{margin-top:6px;color:#6f93a8;font-size:9px}';
+        (document.head || document.documentElement).appendChild(st);
+      }
+    }
+
     // Persistent basemap status badge + offline-aware tile auto-detection.
     const BasemapStatusControl = L.Control.extend({
       onAdd() {
@@ -240,40 +289,47 @@ window.MapModule = (function () {
     setTimeout(() => { leafletMap.invalidateSize(); fitMapToMarkers(); }, 50);
   }
 
+  // Are MIL-STD-2525-style symbols available + enabled? Falls back to dots otherwise.
+  function symbolsEnabled() {
+    return ctx.useMilSymbols !== false && typeof window !== 'undefined' && window.SymbolModule;
+  }
+
   function refreshMapMarkers() {
     if (!leafletMap || !markersLayer) return;
     markersLayer.clearLayers();
     mapMarkers.clear();
 
     const { visibleNodes } = currentVisible();
-    const hc = document.body.classList.contains('high-contrast');
-    const highlightMode = ctx.getHighlightMode();
-    const highlightSet = ctx.getHighlightSet();
+    const useSym = symbolsEnabled();
 
     visibleNodes.forEach(n => {
       if (n.lat == null || n.lon == null) return;
 
-      // Determine marker colors under highlight modes
-      let col = mapColorFromTeam(n);
-      if (highlightMode && highlightSet.size > 0) {
-        if (!highlightSet.has(n.id)) {
-          col = hc ? '#3a4a5a' : '#2b3642';
-        } else {
-          col = highlightMode === 'payoff' ? resolveCssVar(hc ? 'var(--accent)' : '#00e5ff')
-            : resolveCssVar(hc ? 'var(--danger)' : '#ff8a65');
+      let marker;
+      if (useSym) {
+        // Tactical symbol marker (symbols.js). Importance gently scales size so the
+        // high-payoff nodes read first, without breaking the affiliation/function coding.
+        const imp = Math.max(0, Math.min(12, Number(n.importance) || 4));
+        const size = Math.round(28 + imp * 1.4);
+        let icon;
+        try {
+          icon = L.divIcon(window.SymbolModule.divIcon(n, { size }));
+        } catch (e) { icon = null; }
+        if (icon) {
+          marker = L.marker([n.lat, n.lon], { icon, riseOnHover: true, keyboard: false })
+            .addTo(markersLayer)
+            .on('click', () => selectNodeById(n.id));
         }
       }
+      if (!marker) {
+        // Fallback: original colored circle marker.
+        const col = mapColorFromTeam(n);
+        marker = L.circleMarker([n.lat, n.lon], {
+          radius: 6, color: col, fillColor: col, fillOpacity: 0.9, weight: 1.5
+        }).addTo(markersLayer).on('click', () => selectNodeById(n.id));
+      }
 
-      const marker = L.circleMarker([n.lat, n.lon], {
-        radius: 6,
-        color: col,
-        fillColor: col,
-        fillOpacity: 0.9,
-        weight: 1.5
-      })
-        .addTo(markersLayer)
-        .on('click', () => selectNodeById(n.id));
-
+      marker.__node = n;
       marker.bindPopup(`<strong>${n.name}</strong><br>${n.id}`);
       mapMarkers.set(n.id, marker);
     });
@@ -281,31 +337,49 @@ window.MapModule = (function () {
     highlightSelectedOnMap();
   }
 
-  function highlightSelectedOnMap() {
-    if (!leafletMap) return;
+  // Apply current highlight/selection state to a single marker, handling both the
+  // symbol (L.marker/divIcon) and fallback (L.circleMarker) representations.
+  function styleMarker(marker, n) {
+    if (!marker || !n) return;
     const selectedNode = ctx.getSelectedNode();
     const highlightMode = ctx.getHighlightMode();
     const highlightSet = ctx.getHighlightSet();
-    const nodes = graph().nodes;
-    // Reset all marker styles
-    mapMarkers.forEach((m, id) => {
-      const n = nodes.find(nd => nd.id === id);
-      if (!n) return;
-      let col = mapColorFromTeam(n);
+    const isSel = !!(selectedNode && selectedNode.id === n.id);
+    const dimmed = !!(highlightMode && highlightSet.size > 0 && !highlightSet.has(n.id));
+
+    if (typeof marker.setStyle === 'function') {
+      // Circle fallback: preserve the original recolor behavior.
       const hc = document.body.classList.contains('high-contrast');
+      let col = mapColorFromTeam(n);
       if (highlightMode && highlightSet.size > 0) {
         col = highlightSet.has(n.id)
           ? (highlightMode === 'payoff' ? resolveCssVar(hc ? 'var(--accent)' : '#00e5ff')
             : resolveCssVar(hc ? 'var(--danger)' : '#ff8a65'))
           : (hc ? '#3a4a5a' : '#2b3642');
       }
-      m.setStyle({ radius: 6, weight: 1.5, color: col, fillColor: col, fillOpacity: 0.9 });
+      if (isSel) marker.setStyle({ radius: 9, weight: 2.5, color: '#000', fillColor: mapColorFromTeam(n), fillOpacity: 0.95 });
+      else marker.setStyle({ radius: 6, weight: 1.5, color: col, fillColor: col, fillOpacity: 0.9 });
+      if (isSel) marker.bringToFront();
+    } else if (marker._icon) {
+      // Symbol marker: dim non-highlighted, glow the selected one.
+      marker._icon.classList.toggle('mil-dimmed', dimmed);
+      marker._icon.classList.toggle('mil-selected', isSel);
+      try { marker.setZIndexOffset(isSel ? 1000 : 0); } catch (e) {}
+    }
+  }
+
+  function highlightSelectedOnMap() {
+    if (!leafletMap) return;
+    const selectedNode = ctx.getSelectedNode();
+    const nodes = graph().nodes;
+    // Re-apply highlight/selection styling to every marker (symbol or circle).
+    mapMarkers.forEach((m, id) => {
+      const n = nodes.find(nd => nd.id === id);
+      if (n) styleMarker(m, n);
     });
 
     if (selectedNode && mapMarkers.has(selectedNode.id)) {
       const m = mapMarkers.get(selectedNode.id);
-      m.setStyle({ radius: 9, weight: 2.5, color: '#000', fillColor: mapColorFromTeam(selectedNode), fillOpacity: 0.95 });
-      m.bringToFront();
       m.bindPopup(`<strong>${selectedNode.name}</strong><br/><span style="color:var(--muted)">${selectedNode.id}</span>`, { autoPan: true }).openPopup();
       if (selectedNode.lat != null && selectedNode.lon != null) {
         leafletMap.setView([selectedNode.lat, selectedNode.lon], Math.max(leafletMap.getZoom(), 3), { animate: true });

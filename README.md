@@ -38,6 +38,9 @@ server. That's it.
 - **Table & Task-Org views** — sortable data table and a military-symbol task-org chart.
 - **COA simulation** — build a course of action and run Monte Carlo trials (success
   rates, expected steps, Blue/Red losses); a wizard can auto-generate goal-seeking plans.
+- **NDS Campaign Planner** — design a higher-level campaign around homeland defense,
+  Indo-Pacific deterrence-by-denial, allies/partners, and defense-industrial-base
+  endurance; then hand the resulting posture into the turn-based War Game.
 - **Import / export** — load additional scenarios or export the current graph as JSON.
 
 ---
@@ -55,6 +58,7 @@ static server.
 | `ui.js` (`UiModule`) | UI notification primitives: toasts + the event log. |
 | `state.js` (`AppState`) | Scenario-centric application state. A *scenario* owns the graph; foundation for future multi-scenario support. |
 | `sim.js` (`SimModule`) | Simulation foundation: seeded RNG, action/counter profiles, statistics, and the graph→context snapshot builder. |
+| `campaign.js` (`CampaignModule`) | NDS-aligned campaign game layer: phase planning, strategic metrics, campaign brief export, and War Game posture handoff. |
 | `map.js` (`MapModule`) | Leaflet 2D map rendering: markers, links, popups, offline tile detection. |
 | `engine.js` (`EngineModule`) | 3D engine lifecycle (3d-force-graph / Three.js), the Blue→Red opening camera shot, and geo-mode layout. |
 | `views.js` (`ViewsModule`) | Alternate render views: the data table and the D3 task-org chart. |
@@ -72,6 +76,9 @@ static server.
   getters via a `Module.init({...})` call. Modules never reach into the shell directly.
 - **State through `AppState`.** The active scenario's graph is read via
   `AppState.activeGraph()`, not a global `data` variable.
+- **Campaign before battle.** `campaign.js` keeps strategic assumptions separate from
+  tactical adjudication. Its metrics influence War Game setup, but it does not mutate
+  the force graph until the operator explicitly launches the War Game.
 
 ### Offline design
 
@@ -112,7 +119,7 @@ A link is `{ "source": "<id>", "target": "<id>" }`. Bundled scenarios:
 ```
 .
 ├── StrikeSim2040.html          # app shell + orchestration + sim engine
-├── ui.js  state.js  sim.js  map.js  engine.js  views.js
+├── ui.js  state.js  sim.js  map.js  engine.js  campaign.js  views.js
 ├── inline-datasets.js    # startup scenario auto-loader
 ├── grok150red.json  grokblue90.json   # bundled scenarios
 ├── vendor/               # offline-vendored libraries
@@ -131,4 +138,5 @@ A link is `{ "source": "<id>", "target": "<id>" }`. Bundled scenarios:
   fatigue / logistics extension to the simulation engine. *Concept by Pat Beaudry.*
 - **Multiple named scenarios.** `AppState` is already scenario-centric; a scenario
   switcher UI is the intended next feature on that foundation.
-```
+- **Campaign save/resume.** The Campaign Planner can export a Markdown brief today;
+  persisting playable campaign state is the natural next increment.

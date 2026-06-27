@@ -25,8 +25,12 @@
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
   <script src="state.js?v=p5"></script>
+  <!-- Tactical symbology: MIL-STD-2525/APP-6-flavored SVG symbols + marker CSS.
+       Offline, zero-dependency. Loads before map.js so symbols are available at
+       first marker render; map.js degrades to colored dots if it is absent. -->
+  <script src="symbols.js?v=p1"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p5"></script>
+  <script src="map.js?v=p6"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p5"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
@@ -36,9 +40,12 @@
   <script src="sim.js?v=p5"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p5"></script>
+  <script src="game.js?v=p7"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p5"></script>
+  <script src="wargame.js?v=p7"></script>
+  <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
+       and War Game posture handoff. -->
+  <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p5"></script>
   <script src="inline-datasets.js?v=p5"></script>

@@ -210,12 +210,11 @@ window.GameModule = (function () {
 
     // Pass 2: offensive strikes, accumulated vs the START state (true simultaneity).
     const dmg = {};
-    const hitMeta = {};
     for (const o of sorted) {
       if (o.kind !== 'strike') continue;
       const tgt = board.nodes[o.targetId];
       if (!tgt || tgt.team === o.side || !startAlive[o.targetId]) {
-        events.push({ side: o.side, kind: 'void', targetId: o.targetId, sourceId: o.sourceId || null, text: 'Order voided (invalid or already-down target).' });
+        events.push({ side: o.side, kind: 'void', text: 'Order voided (invalid or already-down target).' });
         continue;
       }
       const m = METHODS[o.methodKey] || METHODS.kinetic;
@@ -226,16 +225,10 @@ window.GameModule = (function () {
       if (hit) {
         const d = m.dmg[0] + rng.next() * (m.dmg[1] - m.dmg[0]);
         dmg[o.targetId] = (dmg[o.targetId] || 0) + d;
-        if (!hitMeta[o.targetId] || d > hitMeta[o.targetId].damage) {
-          hitMeta[o.targetId] = { method: o.methodKey, sourceId: o.sourceId || null, damage: d };
-        }
-        const actual = Math.min(startHealth[o.targetId] || tgt.healthMax || 100, d);
         events.push({ side: o.side, kind: 'hit', method: o.methodKey, targetId: o.targetId,
-          sourceId: o.sourceId || null, damage: actual, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} hit ${tgt.name} (-${Math.round(d)})${hardened.has(o.targetId) ? ' [hardened]' : ''}.` });
       } else {
         events.push({ side: o.side, kind: 'miss', method: o.methodKey, targetId: o.targetId,
-          sourceId: o.sourceId || null, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} missed ${tgt.name}.` });
       }
     }
@@ -246,12 +239,7 @@ window.GameModule = (function () {
       const n = board.nodes[id];
       if (!startAlive[id]) continue;
       n.health = Math.max(0, n.health - dmg[id]);
-      if (n.health <= 0 && n.alive) {
-        const meta = hitMeta[id] || {};
-        n.alive = false;
-        kills.push(id);
-        events.push({ side: enemyOf(n.team), kind: 'kill', targetId: id, sourceId: meta.sourceId || null, method: meta.method || null, text: `${n.name} NEUTRALIZED.` });
-      }
+      if (n.health <= 0 && n.alive) { n.alive = false; kills.push(id); events.push({ side: enemyOf(n.team), kind: 'kill', targetId: id, text: `${n.name} NEUTRALIZED.` }); }
     }
 
     // Single-level cascades radiating from this-turn kills.
@@ -262,11 +250,10 @@ window.GameModule = (function () {
         const nn = board.nodes[nid];
         if (!nn || !nn.alive) continue;
         const cd = 5 * (src.casc || 1) * Math.max(0.5, src.importance || 5) / 5 * CASCADE_ALPHA * affinity(src, nn);
-        const before = nn.health;
         nn.health = Math.max(0, nn.health - cd);
         if (nn.health <= 0 && nn.alive) {
           nn.alive = false;
-          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, sourceId: id, damage: before, text: `Cascade from ${src.name} took down ${nn.name}.` });
+          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, text: `Cascade from ${src.name} took down ${nn.name}.` });
         }
       }
     }
@@ -277,7 +264,7 @@ window.GameModule = (function () {
       if (n && n.alive) {
         const before = n.health;
         n.health = Math.min(n.healthMax, n.health + (cfg.repairAmount || REPAIR_AMOUNT));
-        if (n.health > before) events.push({ side: o.side, kind: 'repair', targetId: o.targetId, amount: n.health - before, text: `${n.name} repaired (+${Math.round(n.health - before)}).` });
+        if (n.health > before) events.push({ side: o.side, kind: 'repair', targetId: o.targetId, text: `${n.name} repaired (+${Math.round(n.health - before)}).` });
       }
     }
 
@@ -314,18 +301,9 @@ window.GameModule = (function () {
       .reduce((sum, n) => sum + METHOD_KEYS.reduce((s, k) => s + resourceForMethod(n, k), 0), 0);
   }
 
-  function postureSupportCount(board, side) {
-    return board.rosters[side]
-      .map(id => board.nodes[id])
-      .filter(n => n && n.alive)
-      .filter(n => /command|sustainment|logistics|enabler|coalition/i.test(n.subsystem || ''))
-      .length;
-  }
-
   function resourceAp(board, side, fallback) {
-    const strikeBand = sideStrikeCapacity(board, side) >= 220 ? 1 : 0;
-    const postureBand = postureSupportCount(board, side) >= 30 ? 1 : 0;
-    return clamp(4 + strikeBand + postureBand, Math.max(3, fallback - 1), 6);
+    const power = objectiveValue(board, side) + sideStrikeCapacity(board, side) * 4;
+    return clamp(Math.round(3 + power / 1800), Math.max(3, fallback - 1), 6);
   }
 
   function planOrders(board, side, ap, difficulty, rng) {
@@ -460,8 +438,7 @@ window.GameModule = (function () {
       alive: {
         blue: match.board.rosters.blue.filter(id => match.board.nodes[id].alive).length,
         red: match.board.rosters.red.filter(id => match.board.nodes[id].alive).length
-      },
-      aar: match.phase === 'over' ? buildAar() : null
+      }
     };
   }
 
@@ -540,174 +517,6 @@ window.GameModule = (function () {
       if (match.score.blue !== match.score.red) match.winner = match.score.blue > match.score.red ? 'blue' : 'red';
       else match.winner = objBlue >= objRed ? 'blue' : 'red';
     }
-  }
-
-  function emptyMethodStats() {
-    const out = {};
-    METHOD_KEYS.forEach(k => { out[k] = { attempts: 0, hits: 0, misses: 0, kills: 0, damage: 0 }; });
-    return out;
-  }
-
-  function emptySideAar(side) {
-    return {
-      side,
-      orders: 0,
-      strikes: 0,
-      harden: 0,
-      repair: 0,
-      hits: 0,
-      misses: 0,
-      kills: 0,
-      cascades: 0,
-      damage: 0,
-      repaired: 0,
-      methods: emptyMethodStats(),
-      sources: {}
-    };
-  }
-
-  function round1(v) { return Math.round((Number(v) || 0) * 10) / 10; }
-
-  function recordSource(sideStats, node, order) {
-    const name = node ? node.name : (order.sourceId || 'Unassigned source');
-    const key = node ? node.id : name;
-    if (!sideStats.sources[key]) {
-      sideStats.sources[key] = {
-        id: key,
-        name,
-        subsystem: node ? node.subsystem : '',
-        strikes: 0
-      };
-    }
-    sideStats.sources[key].strikes += 1;
-  }
-
-  function targetRecord(targets, node, id) {
-    const key = id || (node && node.id) || 'unknown';
-    if (!targets[key]) {
-      targets[key] = {
-        id: key,
-        name: node ? node.name : key,
-        team: node ? node.team : '',
-        damage: 0,
-        hits: 0,
-        killed: false,
-        cascaded: false,
-        value: node ? nodeValue(node) : 0
-      };
-    }
-    return targets[key];
-  }
-
-  function buildAar() {
-    if (!match) return null;
-    const sides = { blue: emptySideAar('blue'), red: emptySideAar('red') };
-    const targets = {};
-    const scoreByTurn = [];
-    const cumulative = { blue: 0, red: 0 };
-
-    match.history.forEach(h => {
-      const row = {
-        turn: h.turn,
-        blueDelta: round1(h.report.scoreDelta.blue),
-        redDelta: round1(h.report.scoreDelta.red),
-        blueScore: 0,
-        redScore: 0,
-        kills: { blue: 0, red: 0 }
-      };
-
-      ['blue', 'red'].forEach(side => {
-        (h.orders[side] || []).forEach(o => {
-          const sideStats = sides[side];
-          sideStats.orders += 1;
-          if (o.kind === 'strike') {
-            const m = sideStats.methods[o.methodKey] || sideStats.methods.kinetic;
-            sideStats.strikes += 1;
-            m.attempts += 1;
-            recordSource(sideStats, match.board.nodes[o.sourceId], o);
-          } else if (o.kind === 'harden') {
-            sideStats.harden += 1;
-          } else if (o.kind === 'repair') {
-            sideStats.repair += 1;
-          }
-        });
-      });
-
-      (h.report.events || []).forEach(e => {
-        const side = e.side;
-        const sideStats = sides[side];
-        const target = match.board.nodes[e.targetId];
-        if (!sideStats) return;
-        if (e.kind === 'hit' || e.kind === 'miss') {
-          const m = sideStats.methods[e.method] || sideStats.methods.kinetic;
-          if (e.kind === 'hit') {
-            const damage = Number(e.damage || 0);
-            sideStats.hits += 1;
-            sideStats.damage += damage;
-            m.hits += 1;
-            m.damage += damage;
-            const rec = targetRecord(targets, target, e.targetId);
-            rec.damage += damage;
-            rec.hits += 1;
-          } else {
-            sideStats.misses += 1;
-            m.misses += 1;
-          }
-        } else if (e.kind === 'kill') {
-          sideStats.kills += 1;
-          if (e.method && sideStats.methods[e.method]) sideStats.methods[e.method].kills += 1;
-          row.kills[side] += 1;
-          const rec = targetRecord(targets, target, e.targetId);
-          rec.killed = true;
-        } else if (e.kind === 'cascade') {
-          const damage = Number(e.damage || 0);
-          sideStats.cascades += 1;
-          sideStats.damage += damage;
-          row.kills[side] += 1;
-          const rec = targetRecord(targets, target, e.targetId);
-          rec.damage += damage;
-          rec.killed = true;
-          rec.cascaded = true;
-        } else if (e.kind === 'repair') {
-          sideStats.repaired += Number(e.amount || 0);
-        }
-      });
-
-      cumulative.blue += h.report.scoreDelta.blue;
-      cumulative.red += h.report.scoreDelta.red;
-      row.blueScore = round1(cumulative.blue);
-      row.redScore = round1(cumulative.red);
-      scoreByTurn.push(row);
-    });
-
-    ['blue', 'red'].forEach(side => {
-      const s = sides[side];
-      s.damage = round1(s.damage);
-      s.repaired = round1(s.repaired);
-      Object.keys(s.methods).forEach(k => { s.methods[k].damage = round1(s.methods[k].damage); });
-      s.topSources = Object.values(s.sources).sort((a, b) => b.strikes - a.strikes).slice(0, 4);
-      delete s.sources;
-    });
-
-    const objNow = { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') };
-    const blueCollapsed = objNow.blue <= match.startObj.blue * match.cfg.collapseFrac;
-    const redCollapsed = objNow.red <= match.startObj.red * match.cfg.collapseFrac;
-    const reason = blueCollapsed && redCollapsed ? 'Mutual collapse tie-breaker'
-      : redCollapsed ? 'Red force collapsed'
-        : blueCollapsed ? 'Blue force collapsed'
-          : 'Turn-limit score decision';
-
-    const targetList = Object.values(targets);
-    return {
-      winner: match.winner,
-      reason,
-      turns: match.history.length,
-      scoreMargin: round1(match.score.blue - match.score.red),
-      scoreByTurn,
-      sides,
-      topDamaged: targetList.slice().sort((a, b) => b.damage - a.damage).slice(0, 6),
-      topNeutralized: targetList.filter(t => t.killed).sort((a, b) => b.value - a.value).slice(0, 6)
-    };
   }
 
   // Push board health/status onto the live scenario nodes so the existing 3D / Map /
