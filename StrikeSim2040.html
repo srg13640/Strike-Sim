@@ -54,7 +54,7 @@
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p6"></script>
+  <script src="views.js?v=p7"></script>
   <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
@@ -347,6 +347,8 @@
     .org-node .symbol-fill { fill: #dfe6ee; stroke: #dfe6ee; stroke-width: 1.6px; }
     .mil-box.selected .org-card { stroke: var(--accent); filter: drop-shadow(0 0 5px rgba(0,229,255,.45)); }
     .org-node image { pointer-events: none; }
+    .org-node .org-group { opacity: 0.92; }
+    .org-node .org-band { font-family: 'Oswald', 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .1em; opacity: .9; }
     #org-chart .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 
@@ -2151,6 +2153,8 @@
     } else {
     closeMapPopup();
     }
+    // Reflect selection in the Task Org view (so the selected card highlights).
+    if (orgModeEnabled && typeof renderOrgChart === 'function') renderOrgChart();
     }
 
     function cycleVisibleSelection(step) {
@@ -2916,6 +2920,7 @@
         document.getElementById('map').style.display = 'none';
         document.getElementById('table').style.display = 'none';
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = '3D';
+        if (typeof resetOrgFraming === 'function') resetOrgFraming();   // re-frame each time the view opens
         renderOrgChart();
       } else {
         document.getElementById('org-chart').style.display = 'none';
