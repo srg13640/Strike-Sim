@@ -25,10 +25,12 @@
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
   <script src="state.js?v=p5"></script>
-  <!-- Tactical symbology: MIL-STD-2525/APP-6-flavored SVG symbols + marker CSS.
-       Offline, zero-dependency. Loads before map.js so symbols are available at
-       first marker render; map.js degrades to colored dots if it is absent. -->
-  <script src="symbols.js?v=p1"></script>
+  <!-- milsymbol.js (MIT) — authoritative MIL-STD-2525C/APP-6 renderer. Exposes global
+       `ms`. symbols.js uses it when present and falls back to its built-in renderer if not. -->
+  <script src="vendor/milsymbol.js"></script>
+  <!-- Tactical symbology adapter: builds 2525C SIDCs from node fields, renders via
+       milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
+  <script src="symbols.js?v=p2"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
   <script src="map.js?v=p6"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->

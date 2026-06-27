@@ -163,10 +163,10 @@
   }
 
   /**
-   * Build the SVG markup string for a node's tactical symbol.
-   * opts.size (px) sets width/height; default 40. opts.idTag adds a small id label.
+   * Built-in (dependency-free) SVG symbol. Used as the fallback whenever milsymbol.js
+   * is not loaded. opts.size (px) sets width/height; opts.idTag adds a small id label.
    */
-  function svg(node, opts) {
+  function builtinSvg(node, opts) {
     opts = opts || {};
     var size = opts.size || 40;
     var affil = affiliation(node);
@@ -190,6 +190,83 @@
       frame + dim + glyph + st.overlay + idTag + '</svg>';
   }
 
+  // ---- milsymbol.js adapter (real MIL-STD-2525C) ----------------------------------
+  // When vendor/milsymbol.js is loaded it exposes a global `ms`. We build a 2525C SIDC
+  // from the same node fields and let milsymbol render an authoritative symbol; if it is
+  // absent (or anything fails) we transparently fall back to the built-in renderer above.
+  var AFF_CH = { friend: 'F', hostile: 'H', neutral: 'N', unknown: 'U' };
+  var DIM_CH = { land: 'G', cyber: 'G', ew: 'G', sea: 'S', air: 'A', space: 'P' };
+  // 2525C ground function IDs (positions 5–10) per normalized function key.
+  var FN_2525 = {
+    command: 'UC----', sensor: 'UCR---', comms: 'UCS---', fires: 'UCF---',
+    assault: 'UCI---', blockade: 'UCN---', ew: 'UUSW--', logistics: 'USS---',
+    protection: 'UCD---', support: 'US----'
+  };
+
+  function getMs() {
+    try {
+      if (typeof window !== 'undefined' && window.ms && window.ms.Symbol) return window.ms;
+      if (typeof ms !== 'undefined' && ms && ms.Symbol) return ms; // eslint-disable-line
+    } catch (e) {}
+    return null;
+  }
+
+  function sidcFor(node) {
+    var aff = AFF_CH[affiliation(node)] || 'U';
+    var dim = DIM_CH[domainOf(node)] || 'G';
+    var fn = FN_2525[functionId(node)] || 'U-----';
+    return 'S' + aff + dim + 'P' + fn;
+  }
+
+  // Returns { svg, width, height, anchor } from milsymbol, or null if unavailable.
+  function milSymbol(node, opts) {
+    var lib = getMs();
+    if (!lib) return null;
+    opts = opts || {};
+    var size = opts.size || 34;
+    var aff = AFF_CH[affiliation(node)] || 'U';
+    var fn = FN_2525[functionId(node)] || 'U-----';
+    var r = healthRatio(node);
+    var status = (node && node.status || '').toString().toLowerCase();
+    var cond = (r <= 0.001 || status === 'destroyed' || status === 'killed') ? 'destroyed'
+      : (r < 0.5 ? 'damaged' : null);
+    // Try the domain's dimension first, then ground, then a generic function — always
+    // landing on a valid, well-framed symbol (cross-dimension function IDs can be invalid).
+    var attempts = [
+      [DIM_CH[domainOf(node)] || 'G', fn],
+      ['G', fn],
+      ['G', 'U-----']
+    ];
+    var sym = null;
+    for (var i = 0; i < attempts.length; i++) {
+      var sidc = 'S' + aff + attempts[i][0] + 'P' + attempts[i][1];
+      var o = { size: size, colorMode: 'Light', fill: true, frame: true };
+      if (cond) o.operationalCondition = cond;
+      try {
+        var s = new lib.Symbol(sidc, o);
+        if (s.isValid && s.isValid()) { sym = s; break; }
+        if (!sym) sym = s;
+      } catch (e) {}
+    }
+    if (!sym) return null;
+    try {
+      var sz = sym.getSize ? sym.getSize() : { width: size, height: size };
+      var anc = sym.getAnchor ? sym.getAnchor() : { x: (sz.width || size) / 2, y: (sz.height || size) / 2 };
+      return { svg: sym.asSVG(), width: sz.width || size, height: sz.height || size, anchor: anc };
+    } catch (e) { return null; }
+  }
+
+  // Public SVG: prefer milsymbol; fall back to built-in. opts.engine==='builtin' forces fallback.
+  function svg(node, opts) {
+    if (!opts || opts.engine !== 'builtin') {
+      var m = milSymbol(node, opts);
+      if (m && m.svg) return m.svg;
+    }
+    return builtinSvg(node, opts);
+  }
+
+  function usingMil() { return !!getMs(); }
+
   /**
    * Leaflet-friendly descriptor. map.js does: L.divIcon(SymbolModule.divIcon(node)).
    * Returns a plain object so this module never depends on Leaflet being loaded.
@@ -197,12 +274,22 @@
   function divIcon(node, opts) {
     opts = opts || {};
     var size = opts.size || 34;
+    var cls = 'mil-symbol-icon' + (opts.className ? ' ' + opts.className : '');
+    if (opts.engine !== 'builtin') {
+      var m = milSymbol(node, { size: size });
+      if (m && m.svg) {
+        var w = Math.round(m.width), h = Math.round(m.height);
+        return {
+          className: cls, html: m.svg,
+          iconSize: [w, h],
+          iconAnchor: [Math.round(m.anchor.x), Math.round(m.anchor.y)],
+          popupAnchor: [0, -Math.round(m.anchor.y)]
+        };
+      }
+    }
     return {
-      className: 'mil-symbol-icon' + (opts.className ? ' ' + opts.className : ''),
-      html: svg(node, { size: size }),
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
-      popupAnchor: [0, -size / 2]
+      className: cls, html: builtinSvg(node, { size: size }),
+      iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2]
     };
   }
 
@@ -213,6 +300,8 @@
     domainOf: domainOf,
     functionId: functionId,
     healthRatio: healthRatio,
+    sidcFor: sidcFor,
+    usingMil: usingMil,
     AFFIL: AFFIL,
     FUNCTIONS: ['command', 'sensor', 'comms', 'fires', 'assault', 'blockade', 'ew', 'logistics', 'protection', 'support']
   };

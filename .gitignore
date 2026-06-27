@@ -21,3 +21,6 @@ Thumbs.db
 # Local map tiles are environment-specific; bundle deliberately, not by accident.
 # Uncomment if tiles should stay out of version control:
 # /tiles/
+
+# stray npm package dir (the vendored single file lives in vendor/)
+milsymbol/
