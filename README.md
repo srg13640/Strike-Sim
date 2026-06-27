@@ -1,9 +1,11 @@
-# MDSC 3D Network Visualizer
+# StrikeSim 2040
+
+*A multi-domain strike-planning wargame.* (Formerly "MDSC 3D Network Visualizer.")
 
 An offline-capable, browser-based tool for visualizing and war-gaming multi-domain
 force networks. It renders a Blue-vs-Red battlespace as an interactive 3D force-graph,
-overlays it on a 2D geographic map, and runs Monte Carlo course-of-action (COA)
-simulations against it.
+overlays it on a 2D geographic map with MIL-STD-2525 symbology, runs Monte Carlo
+course-of-action (COA) simulations, and includes a turn-based War Game.
 
 > **Status:** working prototype, refactored into a clean modular architecture.
 > Runs fully offline (air-gap / IL5–IL6 friendly) — no external network calls at runtime.
