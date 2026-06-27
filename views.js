@@ -133,10 +133,10 @@ window.ViewsModule = (function () {
       const zoomLayer = svg.append('g').attr('id', 'org-zoom');
       const teams = ['blue', 'red'];
       const colW = width / teams.length;
-      const nodeSize = { w: 180, h: 68 };
-      const nodeSpacingX = 260;
-      const levelSpacingY = 180;
-      const marginTop = 40;
+      const nodeSize = { w: 216, h: 58 };
+      const nodeSpacingX = 252;
+      const levelSpacingY = 132;
+      const marginTop = 44;
 
       teams.forEach((team, idx) => {
         const rootData = buildOrgTree(team, visibleNodes, visibleLinks, orgExpandedTeams.has(team));
@@ -214,87 +214,72 @@ window.ViewsModule = (function () {
 
     function drawMilBox(group, d, strokeColor) {
       const node = d.data.data;
-      const w = 180;
-      const h = 68;
       const isRoot = d.depth === 0;
-      const label = d.data.name || '';
-      const sub = (() => {
-        if (isRoot && !d.data.expanded) return 'Click to expand';
-        if (!node) return '';
-        const parts = [];
-        if (node.type) parts.push(node.type);
-        if (node.domain && node.domain.length) parts.push(node.domain.join(', '));
-        return parts.join(' · ');
-      })();
+      const w = 216, h = 58;
+      const team = node?.team || d.data.team || '';
+      const accent = resolveCssVar('var(--accent)');
       const isSelected = node && ctx.getSelectedNode() && node.id === ctx.getSelectedNode().id;
-      const stroke = isSelected ? resolveCssVar('var(--accent)') : strokeColor;
+      const box = group.append('g').attr('class', 'mil-box' + (isSelected ? ' selected' : ''));
 
-      const box = group.append('g').attr('class', 'mil-box');
-      box.append('rect')
-        .attr('width', w)
-        .attr('height', h)
-        .attr('stroke', stroke);
-
-      // echelon ticks (suggest unit size)
-      const tickCount = Math.max(1, Math.min(3, (d.children?.length || 0) > 2 ? 3 : (d.children?.length || 1)));
-      const tickGroup = box.append('g').attr('class', 'ticks');
-      const spacing = 10;
-      const startX = (w - (tickCount - 1) * spacing) / 2;
-      for (let i = 0; i < tickCount; i++) {
-        tickGroup.append('line')
-          .attr('x1', startX + i * spacing)
-          .attr('x2', startX + i * spacing)
-          .attr('y1', -8)
-          .attr('y2', 0)
-          .attr('stroke', stroke);
+      // --- Team header card (the tree root) ---
+      if (isRoot) {
+        box.append('rect')
+          .attr('class', 'org-header')
+          .attr('width', w).attr('height', h).attr('rx', 9)
+          .attr('fill', team === 'red' ? '#241218' : '#10243a')
+          .attr('stroke', strokeColor);
+        const count = (d.descendants ? d.descendants().length - 1 : 0);
+        box.append('text').attr('x', 16).attr('y', 25).attr('class', 'org-title')
+          .attr('fill', '#eef4fb').text(teamLabel(team).toUpperCase());
+        box.append('text').attr('x', 16).attr('y', 43).attr('class', 'sub')
+          .text(count ? count + ' units · click to ' + (d.data.expanded ? 'collapse' : 'expand') : 'Task organization');
+        box.append('text').attr('x', w - 14).attr('y', 32).attr('text-anchor', 'end')
+          .attr('class', 'org-chevron').attr('fill', strokeColor).text(d.data.expanded ? '▾' : '▸');
+        return;
       }
 
-      // symbol inside box (rudimentary mil sym vibe)
-      const sym = box.append('g').attr('class', 'symbol').attr('transform', `translate(12,10)`);
-      drawSymbol(sym, node, stroke);
+      // --- Unit card ---
+      box.append('rect').attr('class', 'org-card').attr('width', w).attr('height', h).attr('rx', 7)
+        .attr('stroke', isSelected ? accent : strokeColor);
+      box.append('rect').attr('x', 0).attr('y', 0).attr('width', 4).attr('height', h)
+        .attr('rx', 2).attr('fill', strokeColor);   // affiliation accent stripe
 
-      // circles along the bottom edge
-      const circles = box.append('g').attr('class', 'circles');
-      const circleY = h - 10;
-      const cx = [w / 2 - 18, w / 2, w / 2 + 18];
-      cx.forEach(x => {
-        circles.append('circle')
-          .attr('cx', x)
-          .attr('cy', circleY)
-          .attr('r', 4)
-          .attr('stroke', stroke);
-      });
-
-      box.append('text')
-        .attr('x', 10)
-        .attr('y', h + 16)
-        .attr('fill', '#dfe6ee')
-        .attr('font-weight', 700)
-        .text(label);
-
-      if (sub) {
-        box.append('text')
-          .attr('x', 10)
-          .attr('y', h + 30)
-          .attr('class', 'sub')
-          .text(sub);
+      // Real MIL-STD-2525 symbol (milsymbol via SymbolModule), embedded as an image.
+      let placedSymbol = false;
+      try {
+        if (window.SymbolModule && node) {
+          const svgStr = window.SymbolModule.svg(node, { size: 30 });
+          const uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+          box.append('image').attr('href', uri).attr('xlink:href', uri)
+            .attr('x', 8).attr('y', (h - 40) / 2).attr('width', 40).attr('height', 40)
+            .attr('preserveAspectRatio', 'xMidYMid meet');
+          placedSymbol = true;
+        }
+      } catch (e) { /* fall through to the built-in glyph */ }
+      if (!placedSymbol) {
+        const sym = box.append('g').attr('class', 'symbol').attr('transform', 'translate(9,11)');
+        drawSymbol(sym, node, strokeColor);
       }
 
-    if (isRoot) {
-      box.append('text')
-        .attr('x', w - 10)
-        .attr('y', -10)
-        .attr('text-anchor', 'end')
-        .attr('class', 'sub')
-        .text(teamLabel(node?.team || d.data.team || ''));
-      // small chevron
-      box.append('text')
-        .attr('x', w - 10)
-        .attr('y', h + 16)
-        .attr('text-anchor', 'end')
-        .attr('class', 'sub')
-        .text(d.data.expanded ? '▾' : '▸');
-    }
+      const tx = 58;
+      const rawName = d.data.name || '';
+      const name = rawName.length > 24 ? rawName.slice(0, 23) + '…' : rawName;
+      box.append('text').attr('x', tx).attr('y', 21).attr('class', 'org-name')
+        .attr('fill', '#eef4fb').text(name);
+      const sub = [node && node.type, (node && node.domain || []).join('/')].filter(Boolean).join(' · ');
+      box.append('text').attr('x', tx).attr('y', 36).attr('class', 'sub').text(sub);
+
+      if (node) {
+        const hm = node.healthMax || 100;
+        const hf = Math.max(0, Math.min(1, (node.health == null ? hm : node.health) / hm));
+        const barW = w - tx - 14;
+        box.append('rect').attr('x', tx).attr('y', 43).attr('width', barW).attr('height', 5).attr('rx', 2.5).attr('fill', '#1b2a38');
+        const hc = hf > 0.66 ? '#46d57e' : (hf > 0.33 ? '#e8b54a' : '#e8584a');
+        box.append('rect').attr('x', tx).attr('y', 43).attr('width', Math.max(2, barW * hf)).attr('height', 5).attr('rx', 2.5).attr('fill', hc);
+        if (node.importance != null) {
+          box.append('text').attr('x', w - 12).attr('y', 21).attr('text-anchor', 'end').attr('class', 'org-imp').text('★ ' + node.importance);
+        }
+      }
     }
 
     function drawSymbol(group, node, stroke) {

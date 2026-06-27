@@ -54,7 +54,7 @@
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p5"></script>
+  <script src="views.js?v=p6"></script>
   <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
@@ -334,15 +334,19 @@
     }
     #org-chart .org-chart-wrap { min-height: 100%; }
     #org-chart-svg { width: 100%; height: calc(100% - 28px); min-height: 420px; display: block; }
-    .org-link { fill: none; stroke-width: 2; opacity: 0.95; stroke: #dfe6ee; }
-    .org-node rect { fill: #0b131b; stroke: #dfe6ee; stroke-width: 2px; rx: 6px; ry: 6px; }
-    .org-node text { fill: #dfe6ee; font-size: 12px; font-weight: 600; }
-    .org-node .sub { fill: #9db2c9; font-size: 11px; font-weight: 500; }
-    .org-node .ticks line { stroke: #dfe6ee; stroke-width: 2px; }
-    .org-node .circles circle { stroke: #dfe6ee; stroke-width: 2px; fill: none; }
+    .org-link { fill: none; stroke-width: 1.5; opacity: 0.45; }
+    .org-node .org-card { fill: #0d1825; stroke-width: 1.4px; }
+    .org-node .org-header { stroke-width: 1.6px; }
+    .org-node text { fill: #eef4fb; font-size: 12px; font-weight: 600; font-family: 'Inter', system-ui, sans-serif; }
+    .org-node .org-name { font-size: 12.5px; font-weight: 700; }
+    .org-node .org-title { font-size: 14px; font-weight: 700; letter-spacing: .06em; font-family: 'Oswald', 'Inter', system-ui, sans-serif; }
+    .org-node .org-chevron { font-size: 16px; }
+    .org-node .org-imp { fill: #ffd86b; font-size: 10.5px; font-weight: 700; }
+    .org-node .sub { fill: #8fa8c0; font-size: 10.5px; font-weight: 500; }
     .org-node .symbol { stroke: #dfe6ee; stroke-width: 2px; fill: none; }
     .org-node .symbol-fill { fill: #dfe6ee; stroke: #dfe6ee; stroke-width: 1.6px; }
-    .org-node .selected rect { stroke: var(--accent); }
+    .mil-box.selected .org-card { stroke: var(--accent); filter: drop-shadow(0 0 5px rgba(0,229,255,.45)); }
+    .org-node image { pointer-events: none; }
     #org-chart .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 
@@ -1675,7 +1679,7 @@
     // Org chart state
     let orgModeEnabled = false;
     // orgZoomBehavior now lives in ViewsModule (views.js).
-    const orgExpandedTeams = new Set(); // teams that are expanded in org view
+    const orgExpandedTeams = new Set(['blue', 'red']); // both task orgs expanded by default
     // Shared with ViewsModule's renderOrgChart (never reassigned, so the same Set
     // object is visible on both sides); the main toggles mutate it.
     window.orgExpandedTeams = orgExpandedTeams;
@@ -3300,13 +3304,18 @@
 
     function handleGraph3DFailure(err) {
       const realMsg = (err && (err.message || String(err))) || 'unknown error';
-      if (webglAvailable()) {
-        // WebGL works — the engine failed for some OTHER reason; surface it honestly.
-        addEvent({ type: 'View', text: '3D engine failed to start: ' + realMsg });
-        showToast('3D failed to start: ' + realMsg + '. Using Map view — click "Retry 3D" to try again.', 'error', 13000);
+      // Notify once, calmly — repeated red errors over an environmental limitation are noise.
+      if (!window.__webglNoticeShown) {
+        window.__webglNoticeShown = true;
+        if (webglAvailable()) {
+          addEvent({ type: 'View', text: '3D engine failed to start: ' + realMsg });
+          showToast('3D didn\'t start (' + realMsg + '). Showing the Map view, which has the full operational picture. "Retry 3D" is up top.', 'warn', 9000);
+        } else {
+          addEvent({ type: 'View', text: '3D unavailable: no WebGL context on this machine.' });
+          showToast('This machine can\'t open a 3D (WebGL) view — common on virtual/remote displays or a blocked GPU, even with acceleration on. No problem: the Map and Table views are the full tool.', 'warn', 11000);
+        }
       } else {
-        addEvent({ type: 'View', text: '3D unavailable: browser provided no WebGL context.' });
-        showToast('Your browser is blocking WebGL. Turn on hardware acceleration (browser Settings → System → "Use hardware acceleration when available"), then click "Retry 3D". Map and Table views work without it.', 'error', 16000);
+        addEvent({ type: 'View', text: '3D still unavailable (no WebGL context).' });
       }
       degradeToMap();
     }
@@ -3359,6 +3368,12 @@
     // Re-attempt 3D without a page reload — recovers after the operator enables hardware
     // acceleration or frees GPU contexts. On success, switch from the Map fallback to 3D.
     function retry3D() {
+      // If there's still no WebGL, don't re-attempt — that just spams the console with
+      // Three.js context errors. Tell the operator calmly and stay on the 2D views.
+      if (!webglAvailable()) {
+        showToast('Still no WebGL on this machine (likely a virtual/remote display or a blocked GPU). The Map and Table views have everything — no 3D needed.', 'warn', 8000);
+        return;
+      }
       try { EngineModule.dispose(); } catch (e) {}
       document.getElementById('graph').innerHTML = '';
       if (!tryInitGraph3D()) return;   // still failing — fallback path already re-messaged
