@@ -4480,6 +4480,15 @@
       else if (action === 'rerun') runMonteCarlo(getMcTrialCount());
     }
 
+    // Avalanche-mix (base, trialIndex) -> a well-spread 32-bit seed, so adjacent trials are
+    // independent rather than near-linear in t. Same routine is used in sim-worker.js.
+    function mcMixSeed(base, t) {
+      let x = ((base >>> 0) ^ Math.imul(t, 0x9E3779B1)) >>> 0;
+      x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+      x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+      return (x ^ (x >>> 16)) >>> 0;
+    }
+
     async function runMonteCarlo(trials = null) {
       if (mcRunInProgress) {
         requestCancelMonteCarlo();
@@ -4603,7 +4612,10 @@
               cancelled = true;
               break;
             }
-            const rng = createRng(baseSeed + t);
+            // Decorrelate per-trial seeds: consecutive integers (baseSeed+t) leave the LCG's
+            // first draw a near-linear function of t, so trials weren't independent and the
+            // success rate was biased. Avalanche-mix the seed instead.
+            const rng = createRng(mcMixSeed(baseSeed, t));
             const result = simulateTrial(actionPlan, {
               context,
               rng,
