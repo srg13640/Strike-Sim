@@ -335,6 +335,29 @@ window.MapModule = (function () {
     return ctx.useMilSymbols !== false && typeof window !== 'undefined' && window.SymbolModule;
   }
 
+  // Build a per-node lat/lon offset that spreads markers sharing (near-)identical coordinates
+  // into a small golden-angle spiral so none are fully hidden. Returns Map<id,[dLat,dLon]>.
+  function computeDeclutter(nodes) {
+    const groups = {};
+    nodes.forEach(n => {
+      if (n.lat == null || n.lon == null) return;
+      const key = (Math.round(n.lat * 8) / 8) + ',' + (Math.round(pacLon(n.lon) * 8) / 8); // ~0.125° cells
+      (groups[key] = groups[key] || []).push(n);
+    });
+    const out = new Map();
+    Object.keys(groups).forEach(k => {
+      const arr = groups[k];
+      if (arr.length <= 1) return;
+      arr.sort((a, b) => (Number(b.importance) || 0) - (Number(a.importance) || 0));
+      arr.forEach((n, i) => {
+        if (i === 0) { out.set(n.id, [0, 0]); return; }  // most-important keeps the true spot
+        const ang = i * 2.39996323, rad = 0.085 * Math.sqrt(i + 0.5); // ~0.1–0.35° spiral
+        out.set(n.id, [Math.sin(ang) * rad, Math.cos(ang) * rad]);
+      });
+    });
+    return out;
+  }
+
   function refreshMapMarkers() {
     if (!leafletMap || !markersLayer) return;
     markersLayer.clearLayers();
@@ -343,8 +366,15 @@ window.MapModule = (function () {
     const { visibleNodes } = currentVisible();
     const useSym = symbolsEnabled();
 
+    // Declutter: nodes sharing near-identical coordinates (the data has stacks at Okinawa,
+    // Tokyo, the Taiwan Strait, etc.) are spread in a small golden-angle spiral so each unit
+    // stays individually visible/clickable. The highest-importance unit keeps the true spot.
+    const offsetById = computeDeclutter(visibleNodes);
+
     visibleNodes.forEach(n => {
       if (n.lat == null || n.lon == null) return;
+      const off = offsetById.get(n.id) || [0, 0];
+      const mlat = n.lat + off[0], mlon = pacLon(n.lon) + off[1];
 
       let marker;
       if (useSym) {
@@ -359,15 +389,17 @@ window.MapModule = (function () {
           icon = L.divIcon(window.SymbolModule.divIcon(n, { size }));
         } catch (e) { icon = null; }
         if (icon) {
-          marker = L.marker([n.lat, pacLon(n.lon)], { icon, riseOnHover: true, keyboard: false })
+          marker = L.marker([mlat, mlon], { icon, riseOnHover: true, keyboard: false })
             .addTo(markersLayer)
             .on('click', () => selectNodeById(n.id));
+          // High-importance units sit above the clutter so they're never hidden.
+          try { marker.setZIndexOffset(Math.round(imp * 40)); } catch (e) {}
         }
       }
       if (!marker) {
         // Fallback: original colored circle marker.
         const col = mapColorFromTeam(n);
-        marker = L.circleMarker([n.lat, pacLon(n.lon)], {
+        marker = L.circleMarker([mlat, mlon], {
           radius: 6, color: col, fillColor: col, fillOpacity: 0.9, weight: 1.5
         }).addTo(markersLayer).on('click', () => selectNodeById(n.id));
       }

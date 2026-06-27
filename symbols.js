@@ -195,12 +195,18 @@
   // from the same node fields and let milsymbol render an authoritative symbol; if it is
   // absent (or anything fails) we transparently fall back to the built-in renderer above.
   var AFF_CH = { friend: 'F', hostile: 'H', neutral: 'N', unknown: 'U' };
+  // 2525C battle-dimension code per node domain. Subsurface (U) is detected separately by name.
   var DIM_CH = { land: 'G', cyber: 'G', ew: 'G', sea: 'S', air: 'A', space: 'P' };
-  // 2525C ground function IDs (positions 5–10) per normalized function key.
-  var FN_2525 = {
-    command: 'UC----', sensor: 'UCR---', comms: 'UCS---', fires: 'UCF---',
-    assault: 'UCI---', blockade: 'UCN---', ew: 'UUSW--', logistics: 'USS---',
-    protection: 'UCD---', support: 'US----'
+  // Function IDs (SIDC positions 5–10) are DIMENSION-SPECIFIC: a ground infantry code is
+  // invalid in the air, so air/sea/space units need their own function tables. Each table is
+  // keyed by our normalized function key, with a per-dimension generic default. All entries
+  // verified valid against milsymbol 3.x.
+  var DIM_FUNC = {
+    G: { command: 'UC----', sensor: 'UCR---', comms: 'UCS---', fires: 'UCF---', assault: 'UCI---', blockade: 'UCN---', ew: 'UUSW--', logistics: 'USS---', protection: 'UCD---', support: 'US----', _default: 'U-----' },
+    A: { command: 'MF----', sensor: 'MFR---', comms: 'MFC---', fires: 'MFF---', assault: 'MFF---', blockade: 'MFB---', ew: 'MFR---', logistics: 'MFC---', protection: 'MFQ---', support: 'MF----', _default: 'MF----' },
+    S: { command: 'CLCV--', sensor: 'CLFF--', comms: 'CLFF--', fires: 'CLBB--', assault: 'CLBB--', blockade: 'CLFF--', ew: 'CLFF--', logistics: 'CL----', protection: 'CLFF--', support: 'CLFF--', _default: 'CLFF--' },
+    U: { _default: 'SF----' },   // subsurface (submarines)
+    P: { _default: 'S-----' }    // space
   };
 
   function getMs() {
@@ -211,11 +217,21 @@
     return null;
   }
 
+  // Battle dimension for a node: domain, but submarines (by name) are subsurface.
+  function dimOf(node) {
+    var nm = (node && node.name || '').toString().toLowerCase();
+    if (/submarine|\bssn\b|\bssk\b|\bssbn\b|\bssgn\b/.test(nm)) return 'U';
+    return DIM_CH[domainOf(node)] || 'G';
+  }
+  function funcFor(node, dim) {
+    var table = DIM_FUNC[dim] || DIM_FUNC.G;
+    return table[functionId(node)] || table._default;
+  }
+
   function sidcFor(node) {
     var aff = AFF_CH[affiliation(node)] || 'U';
-    var dim = DIM_CH[domainOf(node)] || 'G';
-    var fn = FN_2525[functionId(node)] || 'U-----';
-    return 'S' + aff + dim + 'P' + fn;
+    var dim = dimOf(node);
+    return 'S' + aff + dim + 'P' + funcFor(node, dim);
   }
 
   // Returns { svg, width, height, anchor } from milsymbol, or null if unavailable.
@@ -225,16 +241,17 @@
     opts = opts || {};
     var size = opts.size || 34;
     var aff = AFF_CH[affiliation(node)] || 'U';
-    var fn = FN_2525[functionId(node)] || 'U-----';
+    var dim = dimOf(node);
     var r = healthRatio(node);
     var status = (node && node.status || '').toString().toLowerCase();
     var cond = (r <= 0.001 || status === 'destroyed' || status === 'killed') ? 'destroyed'
       : (r < 0.5 ? 'damaged' : null);
-    // Try the domain's dimension first, then ground, then a generic function — always
-    // landing on a valid, well-framed symbol (cross-dimension function IDs can be invalid).
+    // Build a dimension-correct SIDC; the candidates degrade only the FUNCTION (keeping the
+    // right air/sea/space FRAME), then finally fall back to ground, so every node renders a
+    // valid, dimension-true symbol.
     var attempts = [
-      [DIM_CH[domainOf(node)] || 'G', fn],
-      ['G', fn],
+      [dim, funcFor(node, dim)],
+      [dim, (DIM_FUNC[dim] || DIM_FUNC.G)._default],
       ['G', 'U-----']
     ];
     var sym = null;
