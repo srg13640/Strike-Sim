@@ -900,10 +900,10 @@
     #strike-options .strike-details { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
     body.high-contrast {
-    --bg: #0000;
+    --bg: #04080c;
     --panel: #0b0f14;
     --border: #335577;
-    --text: #ffff;
+    --text: #ffffff;
     --muted: #d0e0ff;
     --accent: #16f1ff;
     --accent2: #9e7bff;
@@ -2183,13 +2183,22 @@
     resultsEl.textContent = 'No results found';
     return;
     }
-    resultsEl.innerHTML = matches.slice(0, 5).map(n =>
+    // Only fly to / select matches that are actually visible — otherwise the camera flies to
+    // an empty region for a filtered-out node. If every match is hidden, say so instead.
+    const visibleIds = new Set(currentVisible().visibleNodes.map(n => n.id));
+    const visible = matches.filter(n => visibleIds.has(n.id));
+    const hidden = matches.length - visible.length;
+    if (!visible.length) {
+    resultsEl.innerHTML = `${matches.length} match(es) hidden by active filters — clear filters to view.`;
+    return;
+    }
+    resultsEl.innerHTML = visible.slice(0, 5).map(n =>
     `<span class="badge" data-node-id="${n.id}">${n.name} (${n.id})</span>`
-    ).join(' ');
+    ).join(' ') + (hidden ? ` <span class="muted-note">+${hidden} hidden by filters</span>` : '');
     resultsEl.querySelectorAll('.badge').forEach(badge => {
     badge.addEventListener('click', () => selectNodeById(badge.dataset.nodeId));
     });
-    if (matches[0]) selectNode(matches[0]);
+    selectNode(visible[0]);
     }
 
     function selectNodeById(id) {
@@ -2425,6 +2434,19 @@
     function openImportModal() { document.getElementById('import-modal').style.display = 'flex'; }
     function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
 
+    // Validate a normalized payload BEFORE anything destructive happens. Drops unusable
+    // records and returns an error if nothing valid remains, so a malformed-but-parseable
+    // file can never wipe the working scenario with a false "success".
+    function validateImportedGraph(g) {
+      if (!g || !Array.isArray(g.nodes) || g.nodes.length === 0) return { ok: false, error: 'No nodes found in the file.' };
+      const valid = g.nodes.filter(n => n && typeof n === 'object' && !Array.isArray(n) && n.id != null && (typeof n.id === 'string' || typeof n.id === 'number'));
+      if (!valid.length) return { ok: false, error: 'File has no valid nodes (each node needs an id).' };
+      const dropped = g.nodes.length - valid.length;
+      g.nodes = valid;
+      if (!Array.isArray(g.links)) g.links = [];
+      return { ok: true, dropped };
+    }
+
     function normalizeImportedPayload(importedRaw) {
     if (!importedRaw) return null;
     if (importedRaw.data) {
@@ -2512,6 +2534,10 @@
     const importedRaw = JSON.parse(e.target.result);
     const importedData = normalizeImportedPayload(importedRaw);
     if (!importedData) throw new Error('Unrecognized file format');
+    // Validate BEFORE any destructive action (esp. replace, which resets state).
+    const check = validateImportedGraph(importedData);
+    if (!check.ok) throw new Error(check.error);
+    if (check.dropped) showToast(`Note: skipped ${check.dropped} invalid record(s) in the file.`, 'warn');
 
     if (mode === 'add') {
     const stats = addImportedNodes(importedData, assignedTeam);
