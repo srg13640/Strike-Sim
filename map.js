@@ -125,6 +125,12 @@ window.MapModule = (function () {
     leafletMap.getPane('ringsPane').style.pointerEvents = 'none';
     rangeRingsLayer = L.layerGroup().addTo(leafletMap);
 
+    // FX pane for strike tracers / impacts — drawn over everything for the brief flash.
+    leafletMap.createPane('fxPane');
+    leafletMap.getPane('fxPane').style.zIndex = 640;
+    leafletMap.getPane('fxPane').style.pointerEvents = 'none';
+    injectFxCss();
+
     // Basemap status helper: keep one status signal even as layers come online asynchronously.
     const setBasemapStatus = (text, state) => {
       const el = document.querySelector('.basemap-status');
@@ -547,6 +553,74 @@ window.MapModule = (function () {
     if (leafletMap) { leafletMap.invalidateSize(); clampMinZoom(); }
   }
 
+  // ---- Strike FX: animated tracer arcs + impact flashes ---------------------------
+  let fxCssInjected = false;
+  function injectFxCss() {
+    if (fxCssInjected || typeof document === 'undefined') return;
+    fxCssInjected = true;
+    const st = document.createElement('style');
+    st.id = 'wg-fx-css';
+    st.textContent =
+      '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}' +
+      '@keyframes wgFade{0%{opacity:0}14%{opacity:1}72%{opacity:1}100%{opacity:0}}' +
+      '.wg-strike-fx{stroke-linecap:round;animation:wgTracer .55s linear,wgFade 1.25s ease forwards}' +
+      '.wg-impact-fx span{display:block;width:12px;height:12px;border-radius:50%;border:2.5px solid #fff;box-sizing:border-box;animation:wgImpact .85s ease-out forwards}' +
+      '@keyframes wgImpact{0%{transform:scale(.35);opacity:.95}100%{transform:scale(5);opacity:0}}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function nodeById(id) { return graph().nodes.find(n => n.id === id) || null; }
+  function mapVisible() {
+    try { return leafletMap && leafletMap.getContainer().offsetParent !== null; } catch (e) { return false; }
+  }
+
+  // Quadratic-bezier arc (list of [lat,lon]) bowed off the straight line for a ballistic feel.
+  function arcPoints(from, to, bend, n) {
+    const lat1 = from[0], lon1 = from[1], lat2 = to[0], lon2 = to[1];
+    const mx = (lat1 + lat2) / 2, my = (lon1 + lon2) / 2;
+    const dLat = lat2 - lat1, dLon = lon2 - lon1;
+    const cLat = mx - dLon * bend, cLon = my + dLat * bend; // perpendicular control point
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+      pts.push([a * lat1 + b * cLat + c * lat2, a * lon1 + b * cLon + c * lon2]);
+    }
+    return pts;
+  }
+
+  // Animate a strike from one node to another. opts: { team:'red'|'blue', kill:bool }.
+  function flashStrike(srcId, dstId, opts) {
+    opts = opts || {};
+    if (!leafletMap || !mapVisible()) return;
+    const s = nodeById(srcId), d = nodeById(dstId);
+    if (!d || d.lat == null || d.lon == null) return;
+    const team = opts.team === 'blue' ? 'blue' : 'red';
+    const color = team === 'blue' ? '#6fe0ff' : '#ff8a4a';
+    if (s && s.lat != null && s.lon != null) {
+      const from = [s.lat, pacLon(s.lon)], to = [d.lat, pacLon(d.lon)];
+      const line = L.polyline(arcPoints(from, to, 0.18, 30), {
+        pane: 'fxPane', interactive: false, color, weight: opts.kill ? 3.2 : 2.2,
+        opacity: 0.95, dashArray: '4 9', className: 'wg-strike-fx'
+      }).addTo(leafletMap);
+      setTimeout(() => { try { leafletMap.removeLayer(line); } catch (e) {} }, 1300);
+    }
+    // Impact flash at the target (always), brighter on a kill.
+    const icon = L.divIcon({ className: 'wg-impact-fx', html: '<span style="border-color:' + (opts.kill ? '#fff' : color) + '"></span>', iconSize: [12, 12], iconAnchor: [6, 6] });
+    const m = L.marker([d.lat, pacLon(d.lon)], { icon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+    setTimeout(() => { try { leafletMap.removeLayer(m); } catch (e) {} }, 900);
+  }
+
+  // Play a turn's resolution events as a staggered volley.
+  function playStrikes(events) {
+    if (!Array.isArray(events) || !mapVisible()) return;
+    const shots = events.filter(e => e && (e.kind === 'hit' || e.kind === 'kill') && e.targetId);
+    shots.forEach((e, i) => {
+      setTimeout(() => flashStrike(e.sourceId, e.targetId, {
+        team: e.side === 'blue' ? 'blue' : 'red', kill: e.kind === 'kill'
+      }), i * 130);
+    });
+  }
+
   function getMap() { return leafletMap; }
   function getMarkers() { return mapMarkers; }
 
@@ -560,6 +634,8 @@ window.MapModule = (function () {
     openMapPopup,
     closeMapPopup,
     invalidateSize,
+    flashStrike,
+    playStrikes,
     getMap,
     getMarkers
   };

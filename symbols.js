@@ -315,7 +315,8 @@
       'filter:drop-shadow(0 1px 1px rgba(0,0,0,.65));transition:opacity .12s ease}' +
       '.mil-symbol-icon svg{overflow:visible}' +
       '.mil-symbol-icon.mil-dimmed{opacity:.22}' +
-      '.mil-symbol-icon.mil-selected{filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 2px #fff);z-index:1000}';
+      '.mil-symbol-icon.mil-selected{z-index:1000;animation:milSelPulse 1.5s ease-in-out infinite}' +
+      '@keyframes milSelPulse{0%,100%{filter:drop-shadow(0 0 2px #fff)}50%{filter:drop-shadow(0 0 7px #fff) drop-shadow(0 0 3px #cfe9ff)}}';
     (document.head || document.documentElement).appendChild(style);
   }
 

@@ -170,6 +170,19 @@ window.GameModule = (function () {
   // How much the AI should prize hitting / protecting a tempo node.
   function tempoWeightOf(n) { const r = nodeTempoRole(n); return r ? TEMPO_W[r] : 0; }
 
+  // ---- Key objectives (hold / deny) -----------------------------------------------
+  // Each side has a set of designated key nodes — its highest-value systems. Holding
+  // yours and denying (destroying) the enemy's is a win condition in its own right, so
+  // the game rewards taking key terrain / decapitating the network, not just attrition.
+  const OBJ_COUNT = 8;
+  const OBJ_LOSS_FRAC = 0.25;   // a side is defeated if it holds <= 25% of its objectives
+  function pickObjectives(board, side) {
+    return (board.rosters[side] || [])
+      .map(id => board.nodes[id]).filter(n => n && n.alive)
+      .sort((a, b) => nodeValue(b) - nodeValue(a))
+      .slice(0, OBJ_COUNT).map(n => n.id);
+  }
+
   // ---- Board construction ---------------------------------------------------------
   // A board is a pure, serializable snapshot: per-node combat fields + health/alive,
   // adjacency, and the team rosters. It is the single source of truth a match mutates.
@@ -493,10 +506,11 @@ window.GameModule = (function () {
     cfg.apRed = baseAp.red;
     const dynamicAp = { blue: !apBlueFixed, red: !apRedFixed };
     const startTempo = { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') };
+    const objectives = { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') };
     const seed = (cfgOverrides && cfgOverrides.seed) || hashSeed('match', graph.nodes ? graph.nodes.length : 0, Object.keys(board.nodes).join('').length);
     match = {
       cfg, board, seed,
-      baseAp, dynamicAp, startTempo,
+      baseAp, dynamicAp, startTempo, objectives,
       turn: 1,
       phase: 'plan',            // 'plan' | 'resolved' | 'over'
       orders: { blue: [], red: [] },
@@ -533,8 +547,18 @@ window.GameModule = (function () {
         red: match.board.rosters.red.filter(id => match.board.nodes[id].alive).length
       },
       tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
+      objectives: { blue: objectiveStatus('blue'), red: objectiveStatus('red') },
+      objectiveIds: { blue: (match.objectives && match.objectives.blue || []).slice(), red: (match.objectives && match.objectives.red || []).slice() },
       aar: match.phase === 'over' ? buildAar() : null
     };
+  }
+
+  // Key-objective status for a side: how many of its designated key nodes are still alive.
+  function objectiveStatus(side) {
+    const ids = (match.objectives && match.objectives[side]) || [];
+    let held = 0;
+    ids.forEach(id => { const n = match.board.nodes[id]; if (n && n.alive) held++; });
+    return { total: ids.length, held, lost: ids.length - held };
   }
 
   // Per-side tempo snapshot for the UI: current AP, base AP, the tempo fraction relative
@@ -620,9 +644,16 @@ window.GameModule = (function () {
     const objRed = objectiveValue(match.board, 'red');
     const blueCollapsed = objBlue <= match.startObj.blue * match.cfg.collapseFrac;
     const redCollapsed = objRed <= match.startObj.red * match.cfg.collapseFrac;
-    if (blueCollapsed && redCollapsed) { match.winner = objBlue >= objRed ? 'blue' : 'red'; return; }
-    if (redCollapsed) { match.winner = 'blue'; return; }
-    if (blueCollapsed) { match.winner = 'red'; return; }
+    // Key-terrain / decapitation loss: a side that loses most of its key objectives is
+    // defeated even if its overall force is otherwise intact.
+    const oB = objectiveStatus('blue'), oR = objectiveStatus('red');
+    const blueKeyLost = oB.total > 0 && (oB.held / oB.total) <= OBJ_LOSS_FRAC;
+    const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
+    const blueDown = blueCollapsed || blueKeyLost;
+    const redDown = redCollapsed || redKeyLost;
+    if (blueDown && redDown) { match.winner = objBlue >= objRed ? 'blue' : 'red'; return; }
+    if (redDown) { match.winner = 'blue'; return; }
+    if (blueDown) { match.winner = 'red'; return; }
     if (force || match.turn > match.cfg.turnLimit) {
       // Time limit: decide by score, then by remaining objective value.
       if (match.score.blue !== match.score.red) match.winner = match.score.blue > match.score.red ? 'blue' : 'red';
@@ -780,10 +811,15 @@ window.GameModule = (function () {
     const objNow = { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') };
     const blueCollapsed = objNow.blue <= match.startObj.blue * match.cfg.collapseFrac;
     const redCollapsed = objNow.red <= match.startObj.red * match.cfg.collapseFrac;
-    const reason = blueCollapsed && redCollapsed ? 'Mutual collapse tie-breaker'
-      : redCollapsed ? 'Red force collapsed'
-        : blueCollapsed ? 'Blue force collapsed'
-          : 'Turn-limit score decision';
+    const oB = objectiveStatus('blue'), oR = objectiveStatus('red');
+    const blueKeyLost = oB.total > 0 && (oB.held / oB.total) <= OBJ_LOSS_FRAC;
+    const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
+    const reason = (blueCollapsed || blueKeyLost) && (redCollapsed || redKeyLost) ? 'Mutual collapse tie-breaker'
+      : redKeyLost ? `Red lost its key objectives (${oR.lost}/${oR.total})`
+        : blueKeyLost ? `Blue lost its key objectives (${oB.lost}/${oB.total})`
+          : redCollapsed ? 'Red force collapsed'
+            : blueCollapsed ? 'Blue force collapsed'
+              : 'Turn-limit score decision';
 
     const targetList = Object.values(targets);
     return {
@@ -820,6 +856,7 @@ window.GameModule = (function () {
       v: 1, seed: match.seed, turn: match.turn, phase: match.phase,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
+      objectives: match.objectives,
       orders: match.orders, winner: match.winner, health
     };
   }
@@ -834,6 +871,7 @@ window.GameModule = (function () {
       baseAp: s.baseAp || { blue: dcfg.apBlue, red: dcfg.apRed },
       dynamicAp: s.dynamicAp || { blue: false, red: false },
       startTempo: s.startTempo || { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') },
+      objectives: s.objectives || { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: [], winner: s.winner || null, lastReport: null

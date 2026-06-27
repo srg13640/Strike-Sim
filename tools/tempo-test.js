@@ -105,5 +105,22 @@ const rate = blueWins / N;
 console.log('  blue win rate:', rate.toFixed(2), '(' + blueWins + '/' + N + ')');
 ok(rate >= 0.3 && rate <= 0.7, 'win rate within 0.30–0.70 (competitive)');
 
+console.log('\n[6] Objectives: exposed in state, and losing key objectives ends the match');
+{
+  const g = loadGame(combinedGraph());
+  g.init({});
+  const st0 = g.newMatch({ control: { blue: 'ai', red: 'ai' }, turnLimit: 10, seed: 5 });
+  ok(st0.objectives && st0.objectives.blue.total === 8 && st0.objectives.red.total === 8, 'each side has 8 key objectives');
+  ok(Array.isArray(st0.objectiveIds.blue) && st0.objectiveIds.blue.length === 8, 'objective ids exposed for UI highlighting');
+  // Kill 7 of Blue's 8 objectives via the save/load path, then resolve -> Blue defeated.
+  const objIds = st0.objectiveIds.blue.slice();
+  const blob = g.serialize();
+  objIds.slice(0, 7).forEach(id => { blob.health[id] = { h: 0, a: false }; });
+  g.deserialize(blob);
+  g.commitTurn();
+  const after = g.getState();
+  ok(after.winner === 'red', 'Blue losing 7/8 key objectives => Red wins (got ' + after.winner + ')');
+}
+
 console.log(fails === 0 ? '\nALL TEMPO TESTS PASSED' : '\n' + fails + ' TEMPO TEST(S) FAILED');
 process.exit(fails === 0 ? 0 : 1);

@@ -78,6 +78,9 @@
     '.wg-card.red .wg-bar>i{background:linear-gradient(90deg,#a04848,#ff8585);}',
     '.wg-meta.wg-tempo{margin-top:5px;color:#d9c79a;}.wg-meta.wg-tempo b{color:#ffd86b;}',
     '.wg-bar.wg-tempo-bar{background:#241a0e;}.wg-bar.wg-tempo-bar>i{background:linear-gradient(90deg,#a07a2b,#ffd86b);}',
+    '.wg-meta.wg-obj{margin-top:5px;color:#bcd6ec;}.wg-meta.wg-obj b{color:#eaf4ff;}',
+    '.wg-meta.wg-obj-crit{color:#ffb0a8;}.wg-meta.wg-obj-crit b{color:#ff7a6e;}',
+    '.wg-bar.wg-obj-bar{background:#0e2230;}.wg-bar.wg-obj-bar>i{background:linear-gradient(90deg,#2e7d6b,#5fe0c0);}',
     '.wg-tempo-tag{display:inline-block;font-size:10px;color:#1a1206;background:#ffd86b;border-radius:10px;padding:1px 7px;margin-top:4px;font-weight:700;}',
     '.wg-strat{font-size:11px;color:#d9c79a;border:1px solid #5a4a22;background:rgba(60,48,18,.25);border-radius:6px;padding:6px 8px;margin-top:8px;}',
     '.wg-btn{background:#13314a;color:#dff1ff;border:1px solid #2c5f86;border-radius:6px;padding:7px 10px;',
@@ -144,7 +147,10 @@
     '.wg-curtain .ttl{font-weight:800;letter-spacing:.12em;color:#eaf4ff;font-size:15px;}',
     '.wg-curtain p{color:#9fbdd6;font-size:13px;margin:2px 0 8px;}',
     '.wg-curtain b.blue{color:#6cc0ff;}.wg-curtain b.red{color:#ff8585;}',
-    '.wg-curtain .wg-btn{min-width:220px;}'
+    '.wg-curtain .wg-btn{min-width:220px;}',
+    // Sharper COP typography (Inter body, Oswald condensed titles); system-ui fallback.
+    '#wg-hud,#wg-launch{font-family:Inter,system-ui,Segoe UI,sans-serif;}',
+    '#wg-hud .wg-title,#wg-hud .wg-team,.wg-banner,.wg-curtain .ttl{font-family:Oswald,Inter,system-ui,sans-serif;letter-spacing:.07em;}'
   ].join('');
 
   function injectCss() {
@@ -217,7 +223,8 @@
         '<button data-fog="on">On</button><button data-fog="off">Off</button></div>' +
         '<p class="wg-hint" style="margin-top:6px;">On: enemy strength is masked while you plan, and a two-human match hands off blind so neither side sees the other\'s orders.</p></div>' +
       '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. A side is defeated if its surviving force value falls below 35% of its start, otherwise the higher score at the final turn wins.</p>' +
-      '<p class="wg-strat">⚡ <b>Command tempo:</b> your action points each turn come from your surviving <b>Command</b> &amp; <b>Logistics</b> nodes. Strike the enemy\'s C2/sustainment to throttle how many orders they can issue — or protect your own to keep your tempo up.</p>';
+      '<p class="wg-strat">⚡ <b>Command tempo:</b> your action points each turn come from your surviving <b>Command</b> &amp; <b>Logistics</b> nodes. Strike the enemy\'s C2/sustainment to throttle how many orders they can issue — or protect your own to keep your tempo up.</p>' +
+      '<p class="wg-strat">🎯 <b>Key objectives:</b> each side has 8 high-value nodes. Lose most of yours and you\'re defeated outright — so it\'s hold-your-key-terrain and deny-theirs, not just attrition.</p>';
     document.getElementById('wg-foot').innerHTML = '<button class="wg-btn primary" data-act="start">Start Match</button>';
     // defaults
     setToggle('wg-ctl-blue', 'human'); setToggle('wg-ctl-red', 'ai');
@@ -348,12 +355,13 @@
       banner = '<div class="wg-banner ' + state.winner + '">' + (state.winner === 'blue' ? 'BLUE' : 'RED') + ' WINS</div>';
     }
     var tempo = state.tempo || {};
+    var obj = state.objectives || {};
     var blueCard = maskEnemy === 'blue'
       ? maskedCard('blue', 'BLUE', state.alive.blue, state.rosters.blue)
-      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB, tempo.blue);
+      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB, tempo.blue, obj.blue);
     var redCard = maskEnemy === 'red'
       ? maskedCard('red', 'RED', state.alive.red, state.rosters.red)
-      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR, tempo.red);
+      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR, tempo.red, obj.red);
     return banner + '<div class="wg-sec"><div class="wg-score">' + blueCard + redCard + '</div></div>';
   }
   function maskedCard(side, label, alive, total) {
@@ -361,7 +369,7 @@
       '<div class="wg-pts">— · —</div><div class="wg-meta">' + alive + '/' + total + ' active · strength unknown</div>' +
       '<div class="wg-bar"></div></div>';
   }
-  function card(side, label, score, alive, total, frac, tempo) {
+  function card(side, label, score, alive, total, frac, tempo, obj) {
     var tempoRow = '';
     if (tempo) {
       var tfrac = Math.max(0, Math.min(1, tempo.frac == null ? 1 : tempo.frac));
@@ -369,11 +377,18 @@
         ' · C2 ' + tempo.c2 + ' · Logi ' + tempo.logi + '</div>' +
         '<div class="wg-bar wg-tempo-bar"><i style="width:' + Math.round(tfrac * 100) + '%"></i></div>';
     }
+    var objRow = '';
+    if (obj && obj.total) {
+      var ofrac = obj.held / obj.total;
+      var crit = ofrac <= 0.4 ? ' wg-obj-crit' : '';
+      objRow = '<div class="wg-meta wg-obj' + crit + '">🎯 Key objectives <b>' + obj.held + '/' + obj.total + '</b> held</div>' +
+        '<div class="wg-bar wg-obj-bar"><i style="width:' + Math.round(ofrac * 100) + '%"></i></div>';
+    }
     return '<div class="wg-card ' + side + '"><div class="wg-team">' + label + '</div>' +
       '<div class="wg-pts">' + Math.round(score) + '</div>' +
       '<div class="wg-meta">' + alive + '/' + total + ' active · force ' + Math.round(frac * 100) + '%</div>' +
       '<div class="wg-bar"><i style="width:' + Math.round(frac * 100) + '%"></i></div>' +
-      tempoRow + '</div>';
+      tempoRow + objRow + '</div>';
   }
 
   function ordersSection(state) {
@@ -635,6 +650,8 @@
   }
   function onResolved(report, state) {
     refreshVisuals();
+    // Cinematic: play the turn's strikes as animated tracer arcs on the map (if visible).
+    try { if (window.MapModule && report && report.events) window.MapModule.playStrikes(report.events); } catch (e) {}
     if (typeof addEvent === 'function' && report) {
       var kills = report.events.filter(function (e) { return e.kind === 'kill' || e.kind === 'cascade'; }).length;
       addEvent({ type: 'War', text: 'Turn ' + report.turn + ' resolved — ' + kills + ' node(s) neutralized.' });
