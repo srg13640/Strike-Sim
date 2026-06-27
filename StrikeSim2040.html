@@ -69,6 +69,10 @@
     --success: #51cf66;
     --warning: #ffa94d;
     --side-width: 380px;
+    --bar-h: 54px;
+    /* Coherent z-index scale (was ad-hoc per module) */
+    --z-canvas: 1; --z-rail: 30; --z-popup: 40; --z-mapctl: 50; --z-modal: 200;
+    --z-toast: 600; --z-hud: 1200; --z-bar: 1600; --z-intro: 4000;
 
     /* Team Colors */
     --team-blue: #4dabf7;
@@ -254,7 +258,7 @@
 
     /* Node popup */
     #node-popup {
-    position: absolute;
+    position: fixed;   /* coords are computed viewport-relative; fixed avoids #app's offset */
     min-width: 220px;
     max-width: 320px;
     background: rgba(15,23,32,0.95);
@@ -262,7 +266,7 @@
     border-radius: 10px;
     padding: 10px 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    z-index: 6;
+    z-index: var(--z-popup);
     display: none;
     pointer-events: auto;
     }
@@ -286,9 +290,32 @@
     #app {
     position: relative;
     width: 100vw;
-    height: 100vh;
+    height: calc(100vh - var(--bar-h));
+    margin-top: var(--bar-h);   /* clear the fixed command bar */
     overflow: hidden;
     }
+
+    /* ---- Top command bar (operations console chrome) ---- */
+    #cmd-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--bar-h); z-index: var(--z-bar);
+      display: flex; align-items: center; gap: 14px; padding: 0 14px;
+      background: linear-gradient(180deg, #102234, #0a1826);
+      border-bottom: 1px solid rgba(75,184,255,.45);
+      box-shadow: 0 2px 14px rgba(0,0,0,.5);
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    #cmd-bar .cb-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    #cmd-bar .cb-mark { width: 16px; height: 22px; background: var(--accent); opacity: .85; clip-path: polygon(0 0, 100% 0, 70% 100%, 0 100%); }
+    #cmd-bar .cb-name { font-family: 'Oswald','Inter',system-ui,sans-serif; font-weight: 700; letter-spacing: 3px; font-size: 17px; color: #eaf6ff; line-height: 1; }
+    #cmd-bar .cb-sub { font-size: 9px; letter-spacing: 1.4px; color: #7f9fb8; margin-top: 3px; }
+    #cmd-bar .cb-spacer { flex: 1; }
+    #cmd-bar .cb-switch { display: flex; background: #0b1825; border: 1px solid #1d3447; border-radius: 8px; padding: 2px; }
+    #cmd-bar .cb-switch button { background: transparent; border: none; color: var(--muted); font: 600 12px 'Inter',system-ui; letter-spacing: .5px; padding: 7px 16px; border-radius: 6px; cursor: pointer; }
+    #cmd-bar .cb-switch button.active { background: #18466a; color: #eaf6ff; }
+    #cmd-bar .cb-switch button:hover:not(.active) { color: #cfe6ff; }
+    #cmd-bar #cmd-actions { display: flex; align-items: center; gap: 8px; }
+    /* Normalize relocated module buttons (War Game / Campaign / Fullscreen / Retry 3D) into the bar */
+    #cmd-actions > button { position: static !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; transform: none !important; margin: 0 !important; box-shadow: none !important; height: 32px; }
 
     /* 3D Surface */
     #graph {
@@ -986,6 +1013,24 @@
 
 </head>
 <body>
+  <!-- Operations-console command bar: brand · view switcher · global actions. The four
+       module buttons (Campaign / War Game / Fullscreen / Retry 3D) relocate into #cmd-actions
+       on load instead of free-floating over the canvas (see relocateBarButtons()). -->
+  <div id="cmd-bar">
+    <div class="cb-brand">
+      <div class="cb-mark"></div>
+      <div><div class="cb-name">STRIKESIM 2040</div><div class="cb-sub">MULTI-DOMAIN STRIKE WARGAME · NOTIONAL // UNCLASS</div></div>
+    </div>
+    <div class="cb-spacer"></div>
+    <div class="cb-switch" id="cb-switch" role="tablist" aria-label="View">
+      <button type="button" data-view="3d" onclick="setView('3d')">3D</button>
+      <button type="button" data-view="map" onclick="setView('map')">MAP</button>
+      <button type="button" data-view="table" onclick="setView('table')">TABLE</button>
+      <button type="button" data-view="org" onclick="setView('org')">TASK ORG</button>
+    </div>
+    <div class="cb-spacer"></div>
+    <div id="cmd-actions"></div>
+  </div>
   <div id="failurePopup" class="failure-popup">
     <span class="close-btn" onclick="closeFailurePopup()">×</span>
     <h3>Strike Failed</h3>
@@ -1821,8 +1866,14 @@
       let top = rect.top + coords.y - pop.offsetHeight / 2;
       const margin = 8;
       const maxTop = window.innerHeight - pop.offsetHeight - margin;
-      pop.style.left = `${Math.max(margin, Math.min(left, window.innerWidth - pop.offsetWidth - margin))}px`;
-      pop.style.top = `${Math.max(margin, Math.min(top, maxTop))}px`;
+      // Never let the popup slide under the left rail or the command bar.
+      const lp = document.getElementById('left-panel');
+      let minLeft = margin;
+      if (lp && !lp.classList.contains('locked-collapsed')) { const r = lp.getBoundingClientRect(); if (r.width > 40) minLeft = r.right + 8; }
+      const barH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 54;
+      const minTop = barH + margin;
+      pop.style.left = `${Math.max(minLeft, Math.min(left, window.innerWidth - pop.offsetWidth - margin))}px`;
+      pop.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
     }
 
     function showNodePopup(node) {
@@ -1929,6 +1980,33 @@
     });
     const gb = document.getElementById('geo-mode-btn');
     if (gb) { gb.classList.toggle('view-active', !!geoOn); gb.setAttribute('aria-pressed', String(!!geoOn)); }
+    // Light the command-bar view switcher (single source of truth for "you are here").
+    const curView = mapModeEnabled ? 'map' : tableModeEnabled ? 'table' : orgModeEnabled ? 'org' : '3d';
+    document.querySelectorAll('#cb-switch button').forEach(b => {
+      const on = b.getAttribute('data-view') === curView;
+      b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on));
+    });
+    }
+
+    // Command-bar view switcher: set the app to exactly one view. Reuses the existing
+    // toggle functions (which already turn the other views off).
+    function setView(v) {
+      if (v === '3d') { if (mapModeEnabled) toggleMapMode(); if (tableModeEnabled) toggleTableMode(); if (orgModeEnabled) toggleOrgMode(); }
+      else if (v === 'map' && !mapModeEnabled) toggleMapMode();
+      else if (v === 'table' && !tableModeEnabled) toggleTableMode();
+      else if (v === 'org' && !orgModeEnabled) toggleOrgMode();
+      updateViewStatus();
+    }
+
+    // Re-home the modules' floating top buttons (Campaign / War Game / Fullscreen / Retry 3D)
+    // into the command bar so they stop overlapping the canvas and each other.
+    function relocateBarButtons() {
+      const bar = document.getElementById('cmd-actions');
+      if (!bar) return;
+      const order = ['cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
+      const move = () => order.forEach(id => { const el = document.getElementById(id); if (el && el.parentElement !== bar) bar.appendChild(el); });
+      move();
+      try { new MutationObserver(move).observe(document.body, { childList: true }); } catch (e) {}
     }
 
     function enableGeoMode() {
@@ -3477,6 +3555,7 @@
     // Ensure legend button reflects initial state
     setLegendVisible(true);
     updateViewStatus();
+    try { relocateBarButtons(); } catch (e) {}
     try { maybeShowFirstRun(); } catch (e) {}
     }
 
