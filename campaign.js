@@ -352,6 +352,181 @@
     }
   ];
 
+  /* ── Persistence ─────────────────────────────────────────── */
+
+  var STORAGE_KEY = 'strikesim_campaign_v1';
+  var SCHEMA_VERSION = 1;
+  var _saveTimer = null;
+
+  /** Return a plain-data snapshot of module-level state safe for JSON. */
+  function buildSavePayload() {
+    return {
+      __version: SCHEMA_VERSION,
+      savedAt: Date.now(),
+      selectedCampaignId: selectedCampaignId,
+      selectedLensId: selectedLensId,
+      state: state ? {
+        campaignId: state.campaignId,
+        lensId: state.lensId,
+        phaseIndex: state.phaseIndex,
+        metrics: Object.assign({}, state.metrics),
+        selected: state.selected.slice(),
+        log: state.log.map(function (r) {
+          return {
+            phase: r.phase,
+            actions: r.actions.slice(),
+            before: Object.assign({}, r.before),
+            after: Object.assign({}, r.after),
+            effects: Object.assign({}, r.effects),
+            notes: r.notes.slice(),
+            score: r.score
+          };
+        }),
+        results: state.results.map(function (r) {
+          return {
+            phase: r.phase,
+            actions: r.actions.slice(),
+            before: Object.assign({}, r.before),
+            after: Object.assign({}, r.after),
+            effects: Object.assign({}, r.effects),
+            notes: r.notes.slice(),
+            score: r.score
+          };
+        }),
+        graphSignal: state.graphSignal ? Object.assign({}, state.graphSignal) : null,
+        complete: state.complete
+      } : null
+    };
+  }
+
+  /** Validate a parsed payload enough to trust loading it. */
+  function isValidPayload(p) {
+    if (!p || typeof p !== 'object') return false;
+    if (p.__version !== SCHEMA_VERSION) return false;
+    if (typeof p.selectedCampaignId !== 'string') return false;
+    if (typeof p.selectedLensId !== 'string') return false;
+    if (p.state !== null && typeof p.state === 'object') {
+      var s = p.state;
+      if (typeof s.campaignId !== 'string') return false;
+      if (typeof s.phaseIndex !== 'number') return false;
+      if (!s.metrics || typeof s.metrics !== 'object') return false;
+      if (!Array.isArray(s.selected)) return false;
+      if (!Array.isArray(s.log)) return false;
+      if (!Array.isArray(s.results)) return false;
+    }
+    return true;
+  }
+
+  function saveCampaign() {
+    try {
+      var payload = buildSavePayload();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      toast('Campaign saved.', 'ok');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function loadCampaign() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { toast('No saved campaign found.', 'warn'); return false; }
+      var payload = JSON.parse(raw);
+      if (!isValidPayload(payload)) { toast('Saved data failed validation — ignored.', 'warn'); return false; }
+      selectedCampaignId = payload.selectedCampaignId;
+      selectedLensId = payload.selectedLensId;
+      state = payload.state;
+      render();
+      toast('Campaign loaded.', 'ok');
+      return true;
+    } catch (e) {
+      toast('Could not load campaign: ' + e.message, 'warn');
+      return false;
+    }
+  }
+
+  function resetCampaign() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    selectedCampaignId = 'indopacom-denial';
+    selectedLensId = 'army';
+    state = null;
+    render();
+    toast('Campaign reset to defaults.', 'ok');
+  }
+
+  function exportCampaign() {
+    try {
+      var payload = buildSavePayload();
+      var text = JSON.stringify(payload, null, 2);
+      var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'strikesim-campaign.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 0);
+      toast('Campaign JSON exported.', 'ok');
+    } catch (e) {
+      toast('Export failed: ' + e.message, 'warn');
+    }
+  }
+
+  function importCampaign(file) {
+    if (!(file instanceof File)) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        var payload = JSON.parse(ev.target.result);
+        if (!isValidPayload(payload)) { toast('Import failed: invalid campaign file.', 'warn'); return; }
+        selectedCampaignId = payload.selectedCampaignId;
+        selectedLensId = payload.selectedLensId;
+        state = payload.state;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
+        render();
+        toast('Campaign imported.', 'ok');
+      } catch (e) {
+        toast('Import failed: ' + e.message, 'warn');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /** Debounced autosave — called after any state mutation. */
+  function scheduleAutosave() {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(function () {
+      try {
+        var payload = buildSavePayload();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {}
+    }, 400);
+  }
+
+  /** Restore on init from localStorage (silent, never throws). */
+  function restoreOnInit() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var payload = JSON.parse(raw);
+      if (!isValidPayload(payload)) return;
+      selectedCampaignId = payload.selectedCampaignId;
+      selectedLensId = payload.selectedLensId;
+      state = payload.state;
+    } catch (e) {}
+  }
+
+  /** Emit feedback via the app's toast or event log (both guarded). */
+  function toast(text, tone) {
+    try {
+      if (typeof window.showToast === 'function') { window.showToast(text, tone); return; }
+    } catch (e) {}
+    note(text);
+  }
+
+  /* ── End Persistence ─────────────────────────────────────── */
+
   var CSS = [
     '#cp-launch{position:fixed;top:14px;left:14px;z-index:1399;',
       'background:linear-gradient(180deg,#20351f,#102214);color:#e9ffe7;border:1px solid #4f8a48;',
@@ -421,7 +596,22 @@
     '.cp-btn:disabled{opacity:.45;cursor:not-allowed;}',
     '.cp-assess{border-radius:8px;border:1px solid #244932;background:rgba(18,36,24,.62);padding:10px;}',
     '.cp-assess.good{border-color:#79ce72;}.cp-assess.warn{border-color:#ffd166;}.cp-assess.bad{border-color:#ff6b6b;}',
-    '.cp-score{font-size:30px;font-weight:900;color:#f1fff2;line-height:1;margin:3px 0 5px;}'
+    '.cp-score{font-size:30px;font-weight:900;color:#f1fff2;line-height:1;margin:3px 0 5px;}',
+    /* persistence controls */
+    '.cp-persist{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;}',
+    '.cp-persist-btn{font:700 11px/1 var(--mono,\'Courier New\',monospace);letter-spacing:.04em;cursor:pointer;',
+      'border-radius:6px;padding:5px 9px;border:1px solid;transition:border-color .15s,background .15s;}',
+    '.cp-persist-btn.cyan{color:#7fffd4;border-color:#20544a;background:rgba(15,40,35,.72);}',
+    '.cp-persist-btn.cyan:hover{border-color:var(--accent,#7fffd4);background:rgba(30,70,55,.82);}',
+    '.cp-persist-btn.amber{color:#ffd166;border-color:#4a3d10;background:rgba(35,28,5,.72);}',
+    '.cp-persist-btn.amber:hover{border-color:var(--amber,#ffd166);background:rgba(60,45,8,.82);}',
+    '.cp-persist-btn.danger{color:#ff9a9a;border-color:#4a1a1a;background:rgba(35,10,10,.72);}',
+    '.cp-persist-btn.danger:hover{border-color:#ff6b6b;background:rgba(55,15,15,.82);}',
+    '.cp-import-label{font:700 11px/1 var(--mono,\'Courier New\',monospace);letter-spacing:.04em;cursor:pointer;',
+      'border-radius:6px;padding:5px 9px;border:1px solid;color:#b0d4ff;border-color:#1e3560;',
+      'background:rgba(12,25,50,.72);transition:border-color .15s,background .15s;}',
+    '.cp-import-label:hover{border-color:#4d8aff;background:rgba(20,40,80,.82);}',
+    '.cp-import-input{display:none;}'
   ].join('');
 
   function injectCss() {
@@ -531,6 +721,7 @@
       complete: false
     };
     note('Campaign Planner started: ' + c.name + ' using ' + SERVICE_LENSES[selectedLensId].name + '.');
+    scheduleAutosave();
     render();
   }
 
@@ -555,6 +746,7 @@
     } else {
       note('Campaign Planner: action rejected, phase budget exceeded.');
     }
+    scheduleAutosave();
     render();
   }
 
@@ -634,6 +826,7 @@
     state.phaseIndex += 1;
     state.complete = state.phaseIndex >= c.phases.length;
     note('Campaign Planner resolved phase: ' + phase.name + ' (score ' + result.score + ').');
+    scheduleAutosave();
     render();
   }
 
@@ -660,11 +853,24 @@
     (state ? renderCampaign : renderSetup)();
   }
 
+  function persistControlsHtml() {
+    var importId = 'cp-import-' + Math.random().toString(36).slice(2, 7);
+    return '<div class="cp-persist">' +
+      '<button class="cp-persist-btn cyan" data-persist-save title="Save campaign to browser storage">Save</button>' +
+      '<button class="cp-persist-btn cyan" data-persist-load title="Load last saved campaign">Load</button>' +
+      '<button class="cp-persist-btn danger" data-persist-reset title="Clear saved data and restore defaults">Reset</button>' +
+      '<button class="cp-persist-btn amber" data-persist-exportjson title="Download campaign state as JSON">Export JSON</button>' +
+      '<label class="cp-import-label" for="' + importId + '" title="Import a previously exported JSON file">Import JSON' +
+        '<input id="' + importId + '" class="cp-import-input" type="file" accept=".json,application/json" data-persist-import></label>' +
+      '</div>';
+  }
+
   function renderSetup() {
     document.getElementById('cp-sub').textContent = 'NDS-aligned campaign game';
     var body = document.getElementById('cp-body');
     var foot = document.getElementById('cp-foot');
     body.innerHTML =
+      persistControlsHtml() +
       '<div class="cp-sec"><div class="cp-brief"><strong>Design spine:</strong> defend the homeland, deny Indo-Pacific aggression, make allies operationally consequential, and test defense-industrial-base endurance. This mode uses unclassified abstractions over the loaded force network.</div></div>' +
       '<div class="cp-sec"><h4>Campaign frame</h4>' + CAMPAIGNS.map(function (c) {
         return '<button class="cp-campaign ' + (c.id === selectedCampaignId ? 'on' : '') + '" data-campaign="' + esc(c.id) + '">' +
@@ -706,6 +912,7 @@
       : '<div class="cp-row"><button class="cp-btn secondary" data-export>Export Brief</button><button class="cp-btn secondary" data-reset>New Campaign</button></div>' +
         '<button class="cp-btn primary" style="margin-top:8px;" data-resolve' + (state.selected.length ? '' : ' disabled') + '>Resolve Phase</button>';
     var html =
+      persistControlsHtml() +
       '<div class="cp-sec"><div class="cp-brief"><strong>' + esc(c.name) + '</strong><br>' + esc(c.objective) +
       '<div class="cp-note" style="margin-top:6px;">Lens: ' + esc(SERVICE_LENSES[state.lensId].name) + ' - ' + esc(SERVICE_LENSES[state.lensId].focus) + '</div></div></div>' +
       '<div class="cp-sec"><h4>Campaign score</h4>' + renderAssessment(score) + '</div>' +
@@ -828,26 +1035,42 @@
   }
 
   function onClick(ev) {
+    /* persistence buttons */
+    var p = ev.target.closest('[data-persist-save],[data-persist-load],[data-persist-reset],[data-persist-exportjson]');
+    if (p) {
+      if (p.hasAttribute('data-persist-save'))       { saveCampaign(); return; }
+      if (p.hasAttribute('data-persist-load'))       { loadCampaign(); return; }
+      if (p.hasAttribute('data-persist-reset'))      { resetCampaign(); return; }
+      if (p.hasAttribute('data-persist-exportjson')) { exportCampaign(); return; }
+    }
     var t = ev.target.closest('[data-campaign],[data-start],[data-action],[data-resolve],[data-reset],[data-export],[data-wargame]');
     if (!t) return;
     var action = ['campaign', 'start', 'action', 'resolve', 'reset', 'export', 'wargame']
       .find(function (name) { return t.hasAttribute('data-' + name); });
     if (!action) return;
     ({
-      campaign: function () { selectedCampaignId = t.getAttribute('data-campaign'); render(); },
+      campaign: function () { selectedCampaignId = t.getAttribute('data-campaign'); scheduleAutosave(); render(); },
       start: startCampaign,
       action: function () { toggleAction(t.getAttribute('data-action')); },
       resolve: resolvePhase,
-      reset: function () { state = null; render(); },
+      reset: function () { state = null; scheduleAutosave(); render(); },
       export: exportBrief,
       wargame: launchWarGameFromPosture
     })[action]();
   }
 
   function onChange(ev) {
-    if (ev.target && ev.target.hasAttribute('data-lens')) {
+    if (!ev.target) return;
+    if (ev.target.hasAttribute('data-lens')) {
       selectedLensId = ev.target.value;
+      scheduleAutosave();
       render();
+      return;
+    }
+    if (ev.target.hasAttribute('data-persist-import')) {
+      var file = ev.target.files && ev.target.files[0];
+      if (file) importCampaign(file);
+      ev.target.value = '';
     }
   }
 
@@ -858,6 +1081,7 @@
   }
 
   function boot() {
+    restoreOnInit();
     injectCss();
     build();
   }
@@ -866,6 +1090,12 @@
     start: startCampaign,
     getState: function () { return state; },
     score: function () { return state ? campaignScore(state.metrics) : null; },
+    /* persistence public API */
+    saveCampaign: saveCampaign,
+    loadCampaign: loadCampaign,
+    resetCampaign: resetCampaign,
+    exportCampaign: exportCampaign,
+    importCampaign: importCampaign,
     _internal: {
       graphSignal: graphSignal,
       campaignScore: campaignScore,

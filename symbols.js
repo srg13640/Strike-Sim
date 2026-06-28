@@ -202,7 +202,7 @@
   // keyed by our normalized function key, with a per-dimension generic default. All entries
   // verified valid against milsymbol 3.x.
   var DIM_FUNC = {
-    G: { command: 'UC----', sensor: 'UCR---', comms: 'UCS---', fires: 'UCF---', assault: 'UCI---', blockade: 'UCN---', ew: 'UUSW--', logistics: 'USS---', protection: 'UCD---', support: 'US----', _default: 'U-----' },
+    G: { command: 'UC----', sensor: 'UCR---', comms: 'UCS---', fires: 'UCF---', assault: 'UCI---', blockade: 'UCM---', ew: 'UUSW--', logistics: 'USS---', protection: 'UCD---', support: 'US----', _default: 'U-----' },
     A: { command: 'MF----', sensor: 'MFR---', comms: 'MFC---', fires: 'MFF---', assault: 'MFF---', blockade: 'MFB---', ew: 'MFR---', logistics: 'MFC---', protection: 'MFQ---', support: 'MF----', _default: 'MF----' },
     S: { command: 'CLCV--', sensor: 'CLFF--', comms: 'CLFF--', fires: 'CLBB--', assault: 'CLBB--', blockade: 'CLFF--', ew: 'CLFF--', logistics: 'CL----', protection: 'CLFF--', support: 'CLFF--', _default: 'CLFF--' },
     U: { _default: 'SF----' },   // subsurface (submarines)
