@@ -36,7 +36,20 @@ window.GameModule = (function () {
     sof:     { name: 'SOF Mission',    label: 'SOF',     short: 'SOF', baseProb: 0.90, dmg: [60, 90], vuln: 'SOF' }
   };
   const METHOD_KEYS = ['kinetic', 'cyber', 'ew', 'sof'];
-  const DIFF = { Soft: 1.2, Medium: 1.0, Mobile: 0.9, Hardened: 0.7, Fortified: 0.65, Buried: 0.5 };
+  // Strike-probability multiplier by target difficulty (higher = easier to hit). Covers every
+  // difficulty label present in the shipped scenarios; unknown labels warn once and use 1.0 so
+  // future data drift is caught rather than silently treated as Medium.
+  const DIFF = {
+    Soft: 1.2, Exposed: 1.25, Medium: 1.0, Fixed: 1.0, Mobile: 0.9, Dispersed: 0.9,
+    Distributed: 0.85, Camouflaged: 0.85, Hardened: 0.7, Fortified: 0.65, Buried: 0.5,
+    Orbital: 0.55, Submerged: 0.5
+  };
+  const _warnedDiff = {};
+  function diffMult(label) {
+    if (label != null && DIFF[label] != null) return DIFF[label];
+    if (label && !_warnedDiff[label]) { _warnedDiff[label] = true; try { console.warn('[game] unknown difficulty "' + label + '" -> 1.0; add it to DIFF'); } catch (e) {} }
+    return 1.0;
+  }
   const CASCADE_ALPHA = 0.25;
   const HARDEN_MULT = 0.55;     // incoming strike success multiplier on a hardened node (this turn)
   const REPAIR_AMOUNT = 30;     // health restored by a Repair order at end of turn
@@ -50,6 +63,18 @@ window.GameModule = (function () {
     control: { blue: 'human', red: 'ai' },
     difficulty: { blue: 'hard', red: 'hard' },   // AI strength when a side is 'ai'
     fog: false
+  };
+  const METHOD_RESOURCE_KEYS = {
+    kinetic: ['kinetic'],
+    cyber: ['jam', 'ew'],
+    ew: ['ew', 'jam'],
+    sof: ['sof']
+  };
+  const VULN_ALIASES = {
+    Kinetic: ['Kinetic', 'Missile', 'Deep Strike', 'Precision Strike', 'Air', 'ASCM', 'Torpedo', 'Counter-battery', 'Artillery', 'Shore Fire'],
+    Cyber: ['Cyber', 'ASAT', 'EMP', 'ISR'],
+    EW: ['EW', 'ARMs', 'SAM', 'Air-to-Air', 'MANPADS'],
+    SOF: ['SOF', 'Sabotage', 'Physical', 'MCM']
   };
 
   // ---- Deterministic RNG (same LCG family as sim.js createRng) --------------------
@@ -75,8 +100,32 @@ window.GameModule = (function () {
   // ---- Combat helpers (copies of the live sim's, kept self-contained) -------------
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
+  function resourceGenByType(node) {
+    const r = node.resourceGenByType || {};
+    return {
+      kinetic: Number(r.kinetic || 0),
+      ew: Number(r.ew || 0),
+      jam: Number(r.jam || 0),
+      sof: Number(r.sof || 0)
+    };
+  }
+
+  function resourceForMethod(node, methodKey) {
+    const keys = METHOD_RESOURCE_KEYS[methodKey] || [];
+    const r = node.resourceGenByType || {};
+    return keys.reduce((sum, key) => sum + Number(r[key] || 0), 0);
+  }
+
+  function canSourceStrike(node) {
+    if (!node || !node.alive) return false;
+    const subsystem = String(node.subsystem || '').toLowerCase();
+    if (subsystem.includes('logistics') || subsystem.includes('sustainment')) return false;
+    return METHOD_KEYS.some(k => resourceForMethod(node, k) > 0);
+  }
+
   function vulnMult(node, method) {
-    return (node.vulns || []).includes(method.vuln) ? 1.25 : 0.85;
+    const aliases = VULN_ALIASES[method.vuln] || [method.vuln];
+    return (node.vulns || []).some(v => aliases.includes(v)) ? 1.25 : 0.85;
   }
 
   function affinity(src, dst, methodKey) {
@@ -93,6 +142,64 @@ window.GameModule = (function () {
   }
 
   function nodeValue(n) { return (n.importance || 5) * (n.casc || 1); }
+
+  // ---- Command-tempo economy ------------------------------------------------------
+  // The force network drives operational tempo: surviving command, logistics, and relay
+  // nodes generate the action points a side can spend each turn. Degrade an enemy's C2 /
+  // sustainment and you throttle how many orders they can issue — making decapitation a
+  // real strategy alongside raw attrition. Pure + deterministic (read-only over board).
+  function nodeTempoRole(n) {
+    const ty = String(n.type || '').toLowerCase();
+    const sub = String(n.subsystem || '').toLowerCase();
+    if (ty.includes('command') || sub.includes('command')) return 'command';
+    if (ty.includes('logist') || ty.includes('support') || sub.includes('logist') || sub.includes('sustain')) return 'logistics';
+    if (ty.includes('relay') || ty.includes('comm')) return 'relay';
+    return null;
+  }
+  const TEMPO_W = { command: 1.0, logistics: 0.7, relay: 0.45 };
+  function commandTempo(board, side) {
+    let v = 0;
+    (board.rosters[side] || []).forEach(id => {
+      const n = board.nodes[id];
+      if (!n || !n.alive) return;
+      const role = nodeTempoRole(n);
+      if (!role) return;
+      v += TEMPO_W[role] * (n.health / (n.healthMax || 100));
+    });
+    return v;
+  }
+  function tempoCounts(board, side) {
+    let c2 = 0, logi = 0, relay = 0;
+    (board.rosters[side] || []).forEach(id => {
+      const n = board.nodes[id];
+      if (!n || !n.alive) return;
+      const role = nodeTempoRole(n);
+      if (role === 'command') c2++;
+      else if (role === 'logistics') logi++;
+      else if (role === 'relay') relay++;
+    });
+    return { c2, logi, relay };
+  }
+  // How much the AI should prize hitting / protecting a tempo node.
+  function tempoWeightOf(n) { const r = nodeTempoRole(n); return r ? TEMPO_W[r] : 0; }
+
+  // ---- Key objectives (hold / deny) -----------------------------------------------
+  // Each side has a set of designated key nodes — its highest-value systems. Holding
+  // yours and denying (destroying) the enemy's is a win condition in its own right, so
+  // the game rewards taking key terrain / decapitating the network, not just attrition.
+  const OBJ_COUNT = 8;
+  const OBJ_LOSS_FRAC = 0.25;   // a side is defeated if it holds <= 25% of its objectives
+  // Designate objectives by value × survivability (value / strike-difficulty) so each side
+  // picks its most DEFENSIBLE crown jewels — not just its highest-value but most-exposed
+  // nodes. This keeps the "deny the enemy's key terrain" win condition a two-way contest
+  // instead of a near-automatic loss for whichever side fields softer high-value units.
+  function objectiveScore(n) { return nodeValue(n) / diffMult(n.difficulty); }
+  function pickObjectives(board, side) {
+    return (board.rosters[side] || [])
+      .map(id => board.nodes[id]).filter(n => n && n.alive)
+      .sort((a, b) => objectiveScore(b) - objectiveScore(a))
+      .slice(0, OBJ_COUNT).map(n => n.id);
+  }
 
   // ---- Board construction ---------------------------------------------------------
   // A board is a pure, serializable snapshot: per-node combat fields + health/alive,
@@ -113,6 +220,8 @@ window.GameModule = (function () {
         vulns: Array.isArray(n.vulnerabilities) ? n.vulnerabilities.slice() : [],
         casc: Math.max(1, Number(n.cascScore || 1)),
         importance: Number(n.importance || 5),
+        subsystem: n.subsystem || '',
+        resourceGenByType: resourceGenByType(n),
         domain: Array.isArray(n.domain) ? n.domain.slice() : (n.domain ? [n.domain] : []),
         type: n.type || '',
         healthMax,
@@ -172,25 +281,32 @@ window.GameModule = (function () {
 
     // Pass 2: offensive strikes, accumulated vs the START state (true simultaneity).
     const dmg = {};
+    const hitMeta = {};
     for (const o of sorted) {
       if (o.kind !== 'strike') continue;
       const tgt = board.nodes[o.targetId];
       if (!tgt || tgt.team === o.side || !startAlive[o.targetId]) {
-        events.push({ side: o.side, kind: 'void', text: 'Order voided (invalid or already-down target).' });
+        events.push({ side: o.side, kind: 'void', targetId: o.targetId, sourceId: o.sourceId || null, text: 'Order voided (invalid or already-down target).' });
         continue;
       }
       const m = METHODS[o.methodKey] || METHODS.kinetic;
-      let p = m.baseProb * (DIFF[tgt.difficulty] || 1.0) * vulnMult(tgt, m);
+      let p = m.baseProb * diffMult(tgt.difficulty) * vulnMult(tgt, m);
       if (hardened.has(o.targetId)) p *= HARDEN_MULT;
       p = clamp(p, 0.05, 0.98);
       const hit = rng.next() < p;
       if (hit) {
         const d = m.dmg[0] + rng.next() * (m.dmg[1] - m.dmg[0]);
         dmg[o.targetId] = (dmg[o.targetId] || 0) + d;
+        if (!hitMeta[o.targetId] || d > hitMeta[o.targetId].damage) {
+          hitMeta[o.targetId] = { method: o.methodKey, sourceId: o.sourceId || null, damage: d };
+        }
+        const actual = Math.min(startHealth[o.targetId] || tgt.healthMax || 100, d);
         events.push({ side: o.side, kind: 'hit', method: o.methodKey, targetId: o.targetId,
+          sourceId: o.sourceId || null, damage: actual, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} hit ${tgt.name} (-${Math.round(d)})${hardened.has(o.targetId) ? ' [hardened]' : ''}.` });
       } else {
         events.push({ side: o.side, kind: 'miss', method: o.methodKey, targetId: o.targetId,
+          sourceId: o.sourceId || null, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} missed ${tgt.name}.` });
       }
     }
@@ -201,7 +317,12 @@ window.GameModule = (function () {
       const n = board.nodes[id];
       if (!startAlive[id]) continue;
       n.health = Math.max(0, n.health - dmg[id]);
-      if (n.health <= 0 && n.alive) { n.alive = false; kills.push(id); events.push({ side: enemyOf(n.team), kind: 'kill', targetId: id, text: `${n.name} NEUTRALIZED.` }); }
+      if (n.health <= 0 && n.alive) {
+        const meta = hitMeta[id] || {};
+        n.alive = false;
+        kills.push(id);
+        events.push({ side: enemyOf(n.team), kind: 'kill', targetId: id, sourceId: meta.sourceId || null, method: meta.method || null, text: `${n.name} NEUTRALIZED.` });
+      }
     }
 
     // Single-level cascades radiating from this-turn kills.
@@ -211,11 +332,12 @@ window.GameModule = (function () {
       for (const nid of neigh) {
         const nn = board.nodes[nid];
         if (!nn || !nn.alive) continue;
-        const cd = 5 * (src.casc || 1) * CASCADE_ALPHA * affinity(src, nn);
+        const cd = 5 * (src.casc || 1) * Math.max(0.5, src.importance || 5) / 5 * CASCADE_ALPHA * affinity(src, nn);
+        const before = nn.health;
         nn.health = Math.max(0, nn.health - cd);
         if (nn.health <= 0 && nn.alive) {
           nn.alive = false;
-          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, text: `Cascade from ${src.name} took down ${nn.name}.` });
+          events.push({ side: enemyOf(nn.team), kind: 'cascade', targetId: nid, sourceId: id, damage: Math.min(before, cd), text: `Cascade from ${src.name} took down ${nn.name}.` });
         }
       }
     }
@@ -226,7 +348,7 @@ window.GameModule = (function () {
       if (n && n.alive) {
         const before = n.health;
         n.health = Math.min(n.healthMax, n.health + (cfg.repairAmount || REPAIR_AMOUNT));
-        if (n.health > before) events.push({ side: o.side, kind: 'repair', targetId: o.targetId, text: `${n.name} repaired (+${Math.round(n.health - before)}).` });
+        if (n.health > before) events.push({ side: o.side, kind: 'repair', targetId: o.targetId, amount: n.health - before, text: `${n.name} repaired (+${Math.round(n.health - before)}).` });
       }
     }
 
@@ -245,27 +367,70 @@ window.GameModule = (function () {
   // value-rank enemy targets, choose the method each target is most vulnerable to,
   // spend ~70% of AP striking and the rest hardening/repairing the most valuable own
   // nodes that are exposed. 'easy' wastes AP and picks noisier targets.
+  function sourceForMethod(board, side, methodKey, target, rng) {
+    return board.rosters[side]
+      .map(id => board.nodes[id])
+      .filter(n => canSourceStrike(n) && resourceForMethod(n, methodKey) > 0)
+      .map(n => ({
+        n,
+        score: resourceForMethod(n, methodKey) * affinity(n, target, methodKey) * (0.9 + rng.next() * 0.2)
+      }))
+      .sort((a, b) => b.score - a.score)[0]?.n || null;
+  }
+
+  function sideStrikeCapacity(board, side) {
+    return board.rosters[side]
+      .map(id => board.nodes[id])
+      .filter(canSourceStrike)
+      .reduce((sum, n) => sum + METHOD_KEYS.reduce((s, k) => s + resourceForMethod(n, k), 0), 0);
+  }
+
+  function postureSupportCount(board, side) {
+    return board.rosters[side]
+      .map(id => board.nodes[id])
+      .filter(n => n && n.alive)
+      .filter(n => /command|sustainment|logistics|enabler|coalition/i.test(n.subsystem || ''))
+      .length;
+  }
+
+  function resourceAp(board, side, fallback) {
+    const strikeBand = sideStrikeCapacity(board, side) >= 220 ? 1 : 0;
+    const postureBand = postureSupportCount(board, side) >= 30 ? 1 : 0;
+    return clamp(4 + strikeBand + postureBand, Math.max(3, fallback - 1), 6);
+  }
+
   function planOrders(board, side, ap, difficulty, rng) {
     const orders = [];
     const foe = enemyOf(side);
     const easy = difficulty === 'easy';
 
+    // Targeting prizes high force-value AND tempo nodes (C2/logistics) — striking the
+    // enemy's command network throttles their action points, so a smart commander
+    // weighs decapitation against attrition. 'easy' ignores the tempo bonus.
+    const tempoTargetBonus = (n) => easy ? 1 : (1 + tempoWeightOf(n) * 0.2);
     const enemies = board.rosters[foe]
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
-      .map(n => ({ n, score: nodeValue(n) * (DIFF[n.difficulty] || 1) * (0.85 + rng.next() * 0.3) }))
+      .map(n => ({ n, score: nodeValue(n) * diffMult(n.difficulty) * tempoTargetBonus(n) * (0.85 + rng.next() * 0.3) }))
       .sort((a, b) => b.score - a.score);
 
     const bestMethodFor = (n) => {
       // Prefer a method the target is vulnerable to; break ties by raw expected damage.
-      let best = 'kinetic', bestEV = -1;
+      let best = null, bestEV = -1, bestSource = null;
       for (const k of METHOD_KEYS) {
+        const source = sourceForMethod(board, side, k, n, rng);
+        if (!source) continue;
         const m = METHODS[k];
-        const ev = m.baseProb * (DIFF[n.difficulty] || 1) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2);
-        if (ev > bestEV) { bestEV = ev; best = k; }
+        const ev = m.baseProb * diffMult(n.difficulty) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2) *
+          Math.sqrt(resourceForMethod(source, k));
+        if (ev > bestEV) { bestEV = ev; best = k; bestSource = source; }
       }
-      if (easy && rng.next() < 0.4) return rng.pick(METHOD_KEYS);
-      return best;
+      if (easy && rng.next() < 0.4) {
+        const available = METHOD_KEYS.map(k => ({ k, source: sourceForMethod(board, side, k, n, rng) })).filter(x => x.source);
+        const pick = available.length ? rng.pick(available) : null;
+        return pick ? pick : { k: best, source: bestSource };
+      }
+      return { k: best, source: bestSource };
     };
 
     const strikeAP = Math.max(1, Math.round(ap * (easy ? 0.85 : 0.7)));
@@ -275,7 +440,9 @@ window.GameModule = (function () {
       // Concentrate fire on the very top target to force a kill; spread the rest.
       const focus = used === 0 && !easy ? 2 : 1;
       for (let k = 0; k < focus && used < strikeAP; k++) {
-        orders.push({ side, kind: 'strike', methodKey: bestMethodFor(e.n), targetId: e.n.id });
+        const method = bestMethodFor(e.n);
+        if (!method || !method.k || !method.source) continue;
+        orders.push({ side, kind: 'strike', methodKey: method.k, targetId: e.n.id, sourceId: method.source.id });
         used++;
       }
     }
@@ -285,9 +452,11 @@ window.GameModule = (function () {
     let remaining = ap - used;
     if (remaining > 0) {
       const own = board.rosters[side].map(id => board.nodes[id]).filter(n => n && n.alive);
+      // Protecting C2 / logistics preserves tempo, so weight them up when shoring up.
+      const protVal = (n) => nodeValue(n) * (1 + (easy ? 0 : tempoWeightOf(n)));
       const damaged = own.filter(n => n.health < n.healthMax * 0.8)
-        .sort((a, b) => (nodeValue(b) * (1 - b.health / b.healthMax)) - (nodeValue(a) * (1 - a.health / a.healthMax)));
-      const healthy = own.slice().sort((a, b) => nodeValue(b) - nodeValue(a));
+        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)));
+      const healthy = own.slice().sort((a, b) => protVal(b) - protVal(a));
       while (remaining > 0) {
         if (damaged.length && (!easy || rng.next() < 0.6)) {
           orders.push({ side, kind: 'repair', targetId: damaged.shift().id });
@@ -309,7 +478,20 @@ window.GameModule = (function () {
 
   function init(context) { ctx = Object.assign({}, ctx, context || {}); }
 
-  function apFor(side) { return side === 'blue' ? match.cfg.apBlue : match.cfg.apRed; }
+  // Action points for a side this turn. When the economy is dynamic for that side, AP
+  // scales from the side's base down to a floor of 2 as its command-tempo degrades
+  // (full tempo -> base AP; total C2/logistics loss -> 2 AP). An explicitly-set AP
+  // (campaign handoff / tests) is honored verbatim with the economy disabled.
+  function apFor(side) {
+    if (!match) return 0;
+    const fixed = side === 'blue' ? match.cfg.apBlue : match.cfg.apRed;
+    if (!match.dynamicAp || !match.dynamicAp[side]) return fixed;
+    const base = (match.baseAp && match.baseAp[side]) || fixed;
+    const start = (match.startTempo && match.startTempo[side]) || 0;
+    if (start <= 0) return base;
+    const frac = clamp(commandTempo(match.board, side) / start, 0, 1);
+    return clamp(Math.round(base * (0.6 + 0.4 * frac)), 2, base);
+  }
 
   function newMatch(cfgOverrides) {
     const graph = (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] };
@@ -329,9 +511,24 @@ window.GameModule = (function () {
       });
     }
     const board = buildBoard(graph);
+    // Command-tempo economy setup: derive each side's BASE action points, then let AP
+    // float per-turn with surviving C2/logistics (see apFor). An explicit AP override
+    // fixes that side's AP and disables the economy for it.
+    const apBlueFixed = !!(cfgOverrides && cfgOverrides.apBlue != null);
+    const apRedFixed = !!(cfgOverrides && cfgOverrides.apRed != null);
+    const baseAp = {
+      blue: apBlueFixed ? cfg.apBlue : resourceAp(board, 'blue', DEFAULT_CFG.apBlue),
+      red: apRedFixed ? cfg.apRed : resourceAp(board, 'red', DEFAULT_CFG.apRed)
+    };
+    cfg.apBlue = baseAp.blue;
+    cfg.apRed = baseAp.red;
+    const dynamicAp = { blue: !apBlueFixed, red: !apRedFixed };
+    const startTempo = { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') };
+    const objectives = { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') };
     const seed = (cfgOverrides && cfgOverrides.seed) || hashSeed('match', graph.nodes ? graph.nodes.length : 0, Object.keys(board.nodes).join('').length);
     match = {
       cfg, board, seed,
+      baseAp, dynamicAp, startTempo, objectives,
       turn: 1,
       phase: 'plan',            // 'plan' | 'resolved' | 'over'
       orders: { blue: [], red: [] },
@@ -366,7 +563,35 @@ window.GameModule = (function () {
       alive: {
         blue: match.board.rosters.blue.filter(id => match.board.nodes[id].alive).length,
         red: match.board.rosters.red.filter(id => match.board.nodes[id].alive).length
-      }
+      },
+      tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
+      objectives: { blue: objectiveStatus('blue'), red: objectiveStatus('red') },
+      objectiveIds: { blue: (match.objectives && match.objectives.blue || []).slice(), red: (match.objectives && match.objectives.red || []).slice() },
+      aar: match.phase === 'over' ? buildAar() : null
+    };
+  }
+
+  // Key-objective status for a side: how many of its designated key nodes are still alive.
+  function objectiveStatus(side) {
+    const ids = (match.objectives && match.objectives[side]) || [];
+    let held = 0;
+    ids.forEach(id => { const n = match.board.nodes[id]; if (n && n.alive) held++; });
+    return { total: ids.length, held, lost: ids.length - held };
+  }
+
+  // Per-side tempo snapshot for the UI: current AP, base AP, the tempo fraction relative
+  // to the start of the match, and surviving command/logistics counts.
+  function tempoInfo(side) {
+    const start = (match.startTempo && match.startTempo[side]) || 0;
+    const now = commandTempo(match.board, side);
+    const counts = tempoCounts(match.board, side);
+    return {
+      ap: apFor(side),
+      base: (match.baseAp && match.baseAp[side]) || apFor(side),
+      dynamic: !!(match.dynamicAp && match.dynamicAp[side]),
+      frac: start > 0 ? Math.round((now / start) * 100) / 100 : 1,
+      c2: counts.c2,
+      logi: counts.logi
     };
   }
 
@@ -435,16 +660,199 @@ window.GameModule = (function () {
   function evaluateVictory(force) {
     const objBlue = objectiveValue(match.board, 'blue');
     const objRed = objectiveValue(match.board, 'red');
+    // Guard degenerate boards: a side with no starting objective value can't "collapse" from
+    // nothing (0 <= 0). Without this, an empty or one-sided roster declares a bogus winner.
+    if (!(match.startObj.blue > 0) || !(match.startObj.red > 0)) { match.winner = null; return; }
     const blueCollapsed = objBlue <= match.startObj.blue * match.cfg.collapseFrac;
     const redCollapsed = objRed <= match.startObj.red * match.cfg.collapseFrac;
-    if (blueCollapsed && redCollapsed) { match.winner = objBlue >= objRed ? 'blue' : 'red'; return; }
-    if (redCollapsed) { match.winner = 'blue'; return; }
-    if (blueCollapsed) { match.winner = 'red'; return; }
+    // Key-terrain / decapitation loss: a side that loses most of its key objectives is
+    // defeated even if its overall force is otherwise intact.
+    const oB = objectiveStatus('blue'), oR = objectiveStatus('red');
+    const blueKeyLost = oB.total > 0 && (oB.held / oB.total) <= OBJ_LOSS_FRAC;
+    const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
+    const blueDown = blueCollapsed || blueKeyLost;
+    const redDown = redCollapsed || redKeyLost;
+    if (blueDown && redDown) { match.winner = objBlue >= objRed ? 'blue' : 'red'; return; }
+    if (redDown) { match.winner = 'blue'; return; }
+    if (blueDown) { match.winner = 'red'; return; }
     if (force || match.turn > match.cfg.turnLimit) {
       // Time limit: decide by score, then by remaining objective value.
       if (match.score.blue !== match.score.red) match.winner = match.score.blue > match.score.red ? 'blue' : 'red';
       else match.winner = objBlue >= objRed ? 'blue' : 'red';
     }
+  }
+
+  function emptyMethodStats() {
+    const out = {};
+    METHOD_KEYS.forEach(k => { out[k] = { attempts: 0, hits: 0, misses: 0, kills: 0, damage: 0 }; });
+    return out;
+  }
+
+  function emptySideAar(side) {
+    return {
+      side,
+      orders: 0,
+      strikes: 0,
+      harden: 0,
+      repair: 0,
+      hits: 0,
+      misses: 0,
+      kills: 0,
+      cascades: 0,
+      damage: 0,
+      repaired: 0,
+      methods: emptyMethodStats(),
+      sources: {}
+    };
+  }
+
+  function round1(v) { return Math.round((Number(v) || 0) * 10) / 10; }
+
+  function recordSource(sideStats, node, order) {
+    const name = node ? node.name : (order.sourceId || 'Unassigned source');
+    const key = node ? node.id : name;
+    if (!sideStats.sources[key]) {
+      sideStats.sources[key] = {
+        id: key,
+        name,
+        subsystem: node ? node.subsystem : '',
+        strikes: 0
+      };
+    }
+    sideStats.sources[key].strikes += 1;
+  }
+
+  function targetRecord(targets, node, id) {
+    const key = id || (node && node.id) || 'unknown';
+    if (!targets[key]) {
+      targets[key] = {
+        id: key,
+        name: node ? node.name : key,
+        team: node ? node.team : '',
+        damage: 0,
+        hits: 0,
+        killed: false,
+        cascaded: false,
+        value: node ? nodeValue(node) : 0
+      };
+    }
+    return targets[key];
+  }
+
+  function buildAar() {
+    if (!match) return null;
+    const sides = { blue: emptySideAar('blue'), red: emptySideAar('red') };
+    const targets = {};
+    const scoreByTurn = [];
+    const cumulative = { blue: 0, red: 0 };
+
+    match.history.forEach(h => {
+      const row = {
+        turn: h.turn,
+        blueDelta: round1(h.report.scoreDelta.blue),
+        redDelta: round1(h.report.scoreDelta.red),
+        blueScore: 0,
+        redScore: 0,
+        kills: { blue: 0, red: 0 }
+      };
+
+      ['blue', 'red'].forEach(side => {
+        (h.orders[side] || []).forEach(o => {
+          const sideStats = sides[side];
+          sideStats.orders += 1;
+          if (o.kind === 'strike') {
+            const m = sideStats.methods[o.methodKey] || sideStats.methods.kinetic;
+            sideStats.strikes += 1;
+            m.attempts += 1;
+            recordSource(sideStats, match.board.nodes[o.sourceId], o);
+          } else if (o.kind === 'harden') {
+            sideStats.harden += 1;
+          } else if (o.kind === 'repair') {
+            sideStats.repair += 1;
+          }
+        });
+      });
+
+      (h.report.events || []).forEach(e => {
+        const side = e.side;
+        const sideStats = sides[side];
+        const target = match.board.nodes[e.targetId];
+        if (!sideStats) return;
+        if (e.kind === 'hit' || e.kind === 'miss') {
+          const m = sideStats.methods[e.method] || sideStats.methods.kinetic;
+          if (e.kind === 'hit') {
+            const damage = Number(e.damage || 0);
+            sideStats.hits += 1;
+            sideStats.damage += damage;
+            m.hits += 1;
+            m.damage += damage;
+            const rec = targetRecord(targets, target, e.targetId);
+            rec.damage += damage;
+            rec.hits += 1;
+          } else {
+            sideStats.misses += 1;
+            m.misses += 1;
+          }
+        } else if (e.kind === 'kill') {
+          sideStats.kills += 1;
+          if (e.method && sideStats.methods[e.method]) sideStats.methods[e.method].kills += 1;
+          row.kills[side] += 1;
+          const rec = targetRecord(targets, target, e.targetId);
+          rec.killed = true;
+        } else if (e.kind === 'cascade') {
+          const damage = Number(e.damage || 0);
+          sideStats.cascades += 1;
+          sideStats.damage += damage;
+          row.kills[side] += 1;
+          const rec = targetRecord(targets, target, e.targetId);
+          rec.damage += damage;
+          rec.killed = true;
+          rec.cascaded = true;
+        } else if (e.kind === 'repair') {
+          sideStats.repaired += Number(e.amount || 0);
+        }
+      });
+
+      cumulative.blue += h.report.scoreDelta.blue;
+      cumulative.red += h.report.scoreDelta.red;
+      row.blueScore = round1(cumulative.blue);
+      row.redScore = round1(cumulative.red);
+      scoreByTurn.push(row);
+    });
+
+    ['blue', 'red'].forEach(side => {
+      const s = sides[side];
+      s.damage = round1(s.damage);
+      s.repaired = round1(s.repaired);
+      Object.keys(s.methods).forEach(k => { s.methods[k].damage = round1(s.methods[k].damage); });
+      s.topSources = Object.values(s.sources).sort((a, b) => b.strikes - a.strikes).slice(0, 4);
+      delete s.sources;
+    });
+
+    const objNow = { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') };
+    const blueCollapsed = objNow.blue <= match.startObj.blue * match.cfg.collapseFrac;
+    const redCollapsed = objNow.red <= match.startObj.red * match.cfg.collapseFrac;
+    const oB = objectiveStatus('blue'), oR = objectiveStatus('red');
+    const blueKeyLost = oB.total > 0 && (oB.held / oB.total) <= OBJ_LOSS_FRAC;
+    const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
+    const reason = (blueCollapsed || blueKeyLost) && (redCollapsed || redKeyLost) ? 'Mutual collapse tie-breaker'
+      : redKeyLost ? `Red lost its key objectives (${oR.lost}/${oR.total})`
+        : blueKeyLost ? `Blue lost its key objectives (${oB.lost}/${oB.total})`
+          : redCollapsed ? 'Red force collapsed'
+            : blueCollapsed ? 'Blue force collapsed'
+              : 'Turn-limit score decision';
+
+    const targetList = Object.values(targets);
+    return {
+      winner: match.winner,
+      reason,
+      turns: match.history.length,
+      scoreMargin: round1(match.score.blue - match.score.red),
+      scoreByTurn,
+      sides,
+      topDamaged: targetList.slice().sort((a, b) => b.damage - a.damage).slice(0, 6),
+      topNeutralized: targetList.filter(t => t.killed).sort((a, b) => b.value - a.value).slice(0, 6)
+    };
   }
 
   // Push board health/status onto the live scenario nodes so the existing 3D / Map /
@@ -468,6 +876,9 @@ window.GameModule = (function () {
     return {
       v: 1, seed: match.seed, turn: match.turn, phase: match.phase,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
+      baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
+      objectives: match.objectives,
+      history: match.history,
       orders: match.orders, winner: match.winner, health
     };
   }
@@ -476,11 +887,16 @@ window.GameModule = (function () {
     const graph = (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] };
     const board = buildBoard(graph);
     if (s.health) for (const id in s.health) { if (board.nodes[id]) { board.nodes[id].health = s.health[id].h; board.nodes[id].alive = s.health[id].a; } }
+    const dcfg = Object.assign({}, DEFAULT_CFG, s.cfg);
     match = {
-      cfg: Object.assign({}, DEFAULT_CFG, s.cfg), board, seed: s.seed,
+      cfg: dcfg, board, seed: s.seed,
+      baseAp: s.baseAp || { blue: dcfg.apBlue, red: dcfg.apRed },
+      dynamicAp: s.dynamicAp || { blue: false, red: false },
+      startTempo: s.startTempo || { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') },
+      objectives: s.objectives || { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
-      history: [], winner: s.winner || null, lastReport: null
+      history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null, lastReport: null
     };
     syncBoardToGraph();
     ctx.onState(getState());

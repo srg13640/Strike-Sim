@@ -44,6 +44,18 @@ window.SimModule = (function () {
 
   function randIn([a, b]) { return a + Math.random() * (b - a); }
 
+  // Avalanche-mix (base, trialIndex) -> a well-spread 32-bit seed, so adjacent trials are
+  // independent rather than near-linear in t (consecutive integers leave a simple LCG's first
+  // draw near-linear in t, biasing the success rate). Same routine is used in sim-worker.js.
+  // The >>> 0 / Math.imul coercions make a NaN base or t collapse to 0; a 0 result is then
+  // remapped to a safe positive seed by createRng, so callers never get a NaN/zero RNG seed.
+  function mcMixSeed(base, t) {
+    let x = ((base >>> 0) ^ Math.imul(t, 0x9E3779B1)) >>> 0;
+    x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+    return (x ^ (x >>> 16)) >>> 0;
+  }
+
   function createRng(seed = Date.now() % 2147483647) {
     let s = seed % 2147483647;
     if (s <= 0) s += 2147483646;
@@ -107,8 +119,9 @@ window.SimModule = (function () {
   window.redProfiles = redProfiles;
   window.randIn = randIn;
   window.createRng = createRng;
+  window.mcMixSeed = mcMixSeed;
   window.percentile = percentile;
   window.buildSimContext = buildSimContext;
 
-  return { blueProfiles, redProfiles, randIn, createRng, percentile, buildSimContext };
+  return { blueProfiles, redProfiles, randIn, createRng, mcMixSeed, percentile, buildSimContext };
 })();

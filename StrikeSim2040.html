@@ -12,6 +12,11 @@
   <meta http-equiv="Expires" content="0">
   <title>StrikeSim 2040 — Indo-Pacific Multi-Domain Wargaming</title>
   <link rel="icon" href="data:,">
+  <!-- Display fonts for the command-picture chrome (Inter body, Oswald condensed titles).
+       Loaded from Google Fonts; falls back to system-ui if offline. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&family=Orbitron:wght@500;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
   <!-- Leaflet (Map) -->
   <link
@@ -25,8 +30,14 @@
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
   <script src="state.js?v=p5"></script>
+  <!-- milsymbol.js (MIT) — authoritative MIL-STD-2525C/APP-6 renderer. Exposes global
+       `ms`. symbols.js uses it when present and falls back to its built-in renderer if not. -->
+  <script src="vendor/milsymbol.js"></script>
+  <!-- Tactical symbology adapter: builds 2525C SIDCs from node fields, renders via
+       milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
+  <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p5"></script>
+  <script src="map.js?v=p13"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p5"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
@@ -36,31 +47,62 @@
   <script src="sim.js?v=p5"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p5"></script>
+  <script src="game.js?v=p10"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p5"></script>
+  <script src="wargame.js?v=p10"></script>
+  <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
+       and War Game posture handoff. -->
+  <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p5"></script>
+  <script src="views.js?v=p7"></script>
   <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
-    --bg: #0a0f14;
-    --panel: #0f1720;
-    --border: #1e2a38;
+    --bg: #050a10;
+    --panel: #0b131c;
+    --border: #163047;
     --text: #e8f0f7;
-    --muted: #9db2c9;
+    --muted: #8fa6bd;
     --accent: #00d8ff;
     --accent2: #7c4dff;
     --danger: #ff4d6d;
     --success: #51cf66;
     --warning: #ffa94d;
     --side-width: 380px;
+    --bar-h: 56px;
 
-    /* Team Colors */
-    --team-blue: #4dabf7;
-    --team-red: #ff6b6b;
-    --team-green: #51cf66;
-    --team-yellow: #ffd43b;
+    /* ── Stark-HUD overhaul tokens ───────────────────────────── */
+    --amber: #ffb000;
+    --alert: #ff3b3b;
+    --cyan: #00d8ff;
+    --cyan-soft: rgba(0,216,255,0.13);
+    --cyan-line: rgba(0,216,255,0.38);
+    --glass: rgba(11,19,29,0.55);
+    --glass-2: rgba(9,16,24,0.74);
+    --glass-brd: rgba(0,216,255,0.22);
+    --grid-line: rgba(0,216,255,0.055);
+    --glow-cyan: 0 0 14px rgba(0,216,255,0.45);
+    --glow-amber: 0 0 14px rgba(255,176,0,0.45);
+    --glow-alert: 0 0 16px rgba(255,59,59,0.55);
+    --mono: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --display: 'Orbitron', 'Oswald', system-ui, sans-serif;
+    --ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* Coherent z-index scale (was ad-hoc per module) */
+    --z-canvas: 1; --z-rail: 30; --z-popup: 40; --z-mapctl: 50; --z-modal: 200;
+    --z-toast: 600; --z-hud: 1200; --z-overlay: 1300; --z-bar: 1600; --z-intro: 4000; --z-boot: 5000;
+
+    /* Canonical affiliation palette — single source of truth (audit #16) */
+    --aff-friend: #38bdf8;
+    --aff-hostile: #ff4d5e;
+    --aff-neutral: #51cf66;
+    --aff-unknown: #ffd43b;
+
+    /* Team Colors (aliased to the canonical affiliation palette) */
+    --team-blue: var(--aff-friend);
+    --team-red: var(--aff-hostile);
+    --team-green: var(--aff-neutral);
+    --team-yellow: var(--aff-unknown);
     --team-3rd_party: #bfc9d4;
     }
 
@@ -240,7 +282,7 @@
 
     /* Node popup */
     #node-popup {
-    position: absolute;
+    position: fixed;   /* coords are computed viewport-relative; fixed avoids #app's offset */
     min-width: 220px;
     max-width: 320px;
     background: rgba(15,23,32,0.95);
@@ -248,7 +290,7 @@
     border-radius: 10px;
     padding: 10px 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    z-index: 6;
+    z-index: var(--z-popup);
     display: none;
     pointer-events: auto;
     }
@@ -272,9 +314,32 @@
     #app {
     position: relative;
     width: 100vw;
-    height: 100vh;
+    height: calc(100vh - var(--bar-h));
+    margin-top: var(--bar-h);   /* clear the fixed command bar */
     overflow: hidden;
     }
+
+    /* ---- Top command bar (operations console chrome) ---- */
+    #cmd-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--bar-h); z-index: var(--z-bar);
+      display: flex; align-items: center; gap: 14px; padding: 0 14px;
+      background: linear-gradient(180deg, #102234, #0a1826);
+      border-bottom: 1px solid rgba(75,184,255,.45);
+      box-shadow: 0 2px 14px rgba(0,0,0,.5);
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    #cmd-bar .cb-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    #cmd-bar .cb-mark { width: 16px; height: 22px; background: var(--accent); opacity: .85; clip-path: polygon(0 0, 100% 0, 70% 100%, 0 100%); }
+    #cmd-bar .cb-name { font-family: 'Oswald','Inter',system-ui,sans-serif; font-weight: 700; letter-spacing: 3px; font-size: 17px; color: #eaf6ff; line-height: 1; }
+    #cmd-bar .cb-sub { font-size: 9px; letter-spacing: 1.4px; color: #7f9fb8; margin-top: 3px; }
+    #cmd-bar .cb-spacer { flex: 1; }
+    #cmd-bar .cb-switch { display: flex; background: #0b1825; border: 1px solid #1d3447; border-radius: 8px; padding: 2px; }
+    #cmd-bar .cb-switch button { background: transparent; border: none; color: var(--muted); font: 600 12px 'Inter',system-ui; letter-spacing: .5px; padding: 7px 16px; border-radius: 6px; cursor: pointer; }
+    #cmd-bar .cb-switch button.active { background: #18466a; color: #eaf6ff; }
+    #cmd-bar .cb-switch button:hover:not(.active) { color: #cfe6ff; }
+    #cmd-bar #cmd-actions { display: flex; align-items: center; gap: 8px; }
+    /* Normalize relocated module buttons (War Game / Campaign / Fullscreen / Retry 3D) into the bar */
+    #cmd-actions > button { position: static !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; transform: none !important; margin: 0 !important; box-shadow: none !important; height: 32px; }
 
     /* 3D Surface */
     #graph {
@@ -320,15 +385,21 @@
     }
     #org-chart .org-chart-wrap { min-height: 100%; }
     #org-chart-svg { width: 100%; height: calc(100% - 28px); min-height: 420px; display: block; }
-    .org-link { fill: none; stroke-width: 2; opacity: 0.95; stroke: #dfe6ee; }
-    .org-node rect { fill: #0b131b; stroke: #dfe6ee; stroke-width: 2px; rx: 6px; ry: 6px; }
-    .org-node text { fill: #dfe6ee; font-size: 12px; font-weight: 600; }
-    .org-node .sub { fill: #9db2c9; font-size: 11px; font-weight: 500; }
-    .org-node .ticks line { stroke: #dfe6ee; stroke-width: 2px; }
-    .org-node .circles circle { stroke: #dfe6ee; stroke-width: 2px; fill: none; }
+    .org-link { fill: none; stroke-width: 1.5; opacity: 0.45; }
+    .org-node .org-card { fill: #0d1825; stroke-width: 1.4px; }
+    .org-node .org-header { stroke-width: 1.6px; }
+    .org-node text { fill: #eef4fb; font-size: 12px; font-weight: 600; font-family: 'Inter', system-ui, sans-serif; }
+    .org-node .org-name { font-size: 12.5px; font-weight: 700; }
+    .org-node .org-title { font-size: 14px; font-weight: 700; letter-spacing: .06em; font-family: 'Oswald', 'Inter', system-ui, sans-serif; }
+    .org-node .org-chevron { font-size: 16px; }
+    .org-node .org-imp { fill: #ffd86b; font-size: 10.5px; font-weight: 700; }
+    .org-node .sub { fill: #8fa8c0; font-size: 10.5px; font-weight: 500; }
     .org-node .symbol { stroke: #dfe6ee; stroke-width: 2px; fill: none; }
     .org-node .symbol-fill { fill: #dfe6ee; stroke: #dfe6ee; stroke-width: 1.6px; }
-    .org-node .selected rect { stroke: var(--accent); }
+    .mil-box.selected .org-card { stroke: var(--accent); filter: drop-shadow(0 0 5px rgba(0,229,255,.45)); }
+    .org-node image { pointer-events: none; }
+    .org-node .org-group { opacity: 0.92; }
+    .org-node .org-band { font-family: 'Oswald', 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .1em; opacity: .9; }
     #org-chart .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 
@@ -644,6 +715,9 @@
     }
     .left-actions button { width: 100%; }
     .left-actions .full { grid-column: 1 / -1; }
+    .qa-group { margin-bottom: 12px; }
+    .qa-group:last-child { margin-bottom: 0; }
+    .qa-label { font-family: 'Oswald','Inter',system-ui,sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin: 0 0 6px 1px; }
 
     .leaflet-control.compass-control {
     background: rgba(10,15,20,0.9);
@@ -880,10 +954,10 @@
     #strike-options .strike-details { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
     body.high-contrast {
-    --bg: #0000;
+    --bg: #04080c;
     --panel: #0b0f14;
     --border: #335577;
-    --text: #ffff;
+    --text: #ffffff;
     --muted: #d0e0ff;
     --accent: #16f1ff;
     --accent2: #9e7bff;
@@ -921,6 +995,228 @@
     .hint { color: var(--muted); font-size: 11px; }
     .inline { display: inline-flex; align-items: center; gap: 6px; }
     .pct-input { width: 80px; }
+    .muted-note { color: var(--muted); font-size: 10.5px; }
+
+    /* First-run orientation card */
+    #first-run-card { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; }
+    #first-run-card .fr-backdrop { position: absolute; inset: 0; background: rgba(3,8,14,.72); backdrop-filter: blur(2px); }
+    #first-run-card .fr-panel { position: relative; width: min(540px, 92vw); background: linear-gradient(180deg,#0e2236,#0a1622); border: 1px solid #244d6e; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); color: #cfe0ee; font-family: 'Inter', system-ui, sans-serif; }
+    #first-run-card .fr-title { font-family: 'Oswald','Inter',system-ui,sans-serif; font-weight: 700; letter-spacing: .14em; font-size: 22px; color: #eaf4ff; }
+    #first-run-card .fr-sub { color: #8fb4d4; font-size: 13px; margin-top: 2px; }
+    #first-run-card .fr-body { font-size: 13.5px; line-height: 1.5; margin: 14px 0; color: #cfe0ee; }
+    #first-run-card .fr-steps { display: grid; gap: 7px; margin: 12px 0; }
+    #first-run-card .fr-step { display: flex; align-items: center; gap: 10px; background: rgba(20,44,66,.5); border: 1px solid #1d3e59; border-radius: 8px; padding: 9px 12px; font-size: 13px; }
+    #first-run-card .fr-n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1d6f3f; color: #eafff0; font-weight: 700; font-size: 12px; flex: 0 0 auto; }
+    #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 16px; line-height: 1.45; }
+    #first-run-card .fr-ok { width: 100%; background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; font: 600 14px 'Inter',system-ui,sans-serif; padding: 11px; border-radius: 8px; cursor: pointer; }
+    #first-run-card .fr-ok:hover { border-color: #46d585; }
+    #fr-help-btn { position: fixed; bottom: 16px; left: 16px; z-index: 1450; width: 30px; height: 30px; border-radius: 50%; background: #13314a; color: #bfe4ff; border: 1px solid #2c5f86; font: 700 15px system-ui; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
+    #fr-help-btn:hover { border-color: #4bb8ff; color: #fff; }
+    /* Active-view "you are here" highlight on the Quick-Action view buttons */
+    .left-actions button.view-active { border-color: #4bb8ff; background: #18466a; color: #eaf6ff; box-shadow: inset 0 0 0 1px rgba(75,184,255,.4); }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       STARK-HUD OVERHAUL LAYER — cinematic C2 chrome (appended; overrides above)
+       Display: Orbitron · UI: Inter · Data stream: Share Tech Mono
+       ══════════════════════════════════════════════════════════════════════ */
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+
+    body { font-family: var(--ui); background: radial-gradient(1400px 920px at 26% -8%, #0e2030 0%, #07121c 47%, #03070b 100%); }
+
+    /* Moving command grid behind the active surface */
+    #app::before {
+      content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 46px 46px, 46px 46px;
+      -webkit-mask-image: radial-gradient(125% 120% at 50% 38%, #000 52%, transparent 100%);
+      mask-image: radial-gradient(125% 120% at 50% 38%, #000 52%, transparent 100%);
+      animation: gridDrift 26s linear infinite; opacity:.7;
+    }
+    @keyframes gridDrift { from{background-position:0 0,0 0} to{background-position:46px 46px,46px 46px} }
+
+    /* ── Global HUD frame overlay (corner brackets + scan sweep) ───────── */
+    #hud-overlay { position:fixed; inset:0; z-index:var(--z-overlay); pointer-events:none; }
+    #hud-overlay .corner { position:absolute; width:22px; height:22px; border:2px solid var(--cyan-line); filter:drop-shadow(0 0 4px rgba(0,216,255,.4)); }
+    #hud-overlay .corner.tl { top:calc(var(--bar-h) + 6px); left:6px; border-right:0; border-bottom:0; }
+    #hud-overlay .corner.tr { top:calc(var(--bar-h) + 6px); right:6px; border-left:0; border-bottom:0; }
+    #hud-overlay .corner.bl { bottom:6px; left:6px; border-right:0; border-top:0; }
+    #hud-overlay .corner.br { bottom:6px; right:6px; border-left:0; border-top:0; }
+    #hud-overlay .scan { position:absolute; left:0; right:0; top:0; height:160px; transform:translateY(-160px);
+      background:linear-gradient(180deg, transparent, rgba(0,216,255,.05) 55%, rgba(0,216,255,.13)); animation:scanSweep 8s linear infinite; }
+    @keyframes scanSweep { 0%{transform:translateY(-160px)} 100%{transform:translateY(100vh)} }
+
+    /* ── Command bar → operations console ─────────────────────────────── */
+    #cmd-bar {
+      background: linear-gradient(180deg, rgba(13,28,42,.92), rgba(7,16,25,.92));
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--glass-brd);
+      box-shadow: 0 2px 0 rgba(0,216,255,.10), 0 8px 30px rgba(0,0,0,.55);
+    }
+    #cmd-bar::after { content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+      background:linear-gradient(90deg, transparent, var(--cyan) 18%, var(--amber) 50%, var(--cyan) 82%, transparent);
+      opacity:.6; animation:barPulse 5s ease-in-out infinite; }
+    @keyframes barPulse { 0%,100%{opacity:.3} 50%{opacity:.85} }
+    #cmd-bar .cb-mark { width:20px; height:24px; background:transparent; clip-path:none; position:relative; }
+    #cmd-bar .cb-mark::before { content:''; position:absolute; inset:0; border-radius:50%;
+      background:radial-gradient(circle at 50% 50%, #bff6ff 0%, var(--cyan) 38%, rgba(0,216,255,.15) 70%, transparent 72%);
+      box-shadow:var(--glow-cyan); animation:reactor 3.2s ease-in-out infinite; }
+    @keyframes reactor { 0%,100%{transform:scale(.92);opacity:.85} 50%{transform:scale(1.06);opacity:1} }
+    #cmd-bar .cb-name { font-family:var(--display); font-weight:800; letter-spacing:4px; font-size:16px;
+      color:#eaf9ff; text-shadow:0 0 10px rgba(0,216,255,.45); }
+    #cmd-bar .cb-sub { font-family:var(--mono); font-size:9px; letter-spacing:1.6px; color:#6f93ad; }
+    #cmd-bar .cb-switch { background:rgba(6,14,22,.8); border:1px solid var(--glass-brd); border-radius:9px; box-shadow:inset 0 0 14px rgba(0,216,255,.05); }
+    #cmd-bar .cb-switch button { font-family:var(--mono); letter-spacing:1.5px; text-transform:uppercase; color:#7fa0ba; }
+    #cmd-bar .cb-switch button.active { background:linear-gradient(180deg, rgba(0,216,255,.28), rgba(0,216,255,.12)); color:#eafbff; box-shadow:inset 0 0 0 1px var(--cyan-line), 0 0 12px rgba(0,216,255,.3); text-shadow:0 0 8px rgba(0,216,255,.6); }
+    /* Live telemetry cluster (injected by script) */
+    .cb-telemetry { display:flex; align-items:center; gap:14px; font-family:var(--mono); font-size:11px; color:#7fa6c2; letter-spacing:1px; white-space:nowrap; }
+    .cb-telemetry .tlm { display:flex; align-items:center; gap:6px; }
+    .cb-telemetry .tlm b { color:#d7eefc; font-weight:400; }
+    .cb-telemetry .dot { width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 8px var(--success); animation:liveBlink 2s steps(1) infinite; }
+    @keyframes liveBlink { 0%,60%{opacity:1} 61%,100%{opacity:.25} }
+    #cb-clock { color:var(--amber); text-shadow:var(--glow-amber); }
+
+    /* ── Glass panels (rails) with corner accents ─────────────────────── */
+    #side, #left-panel {
+      background: linear-gradient(180deg, rgba(8,15,23,.78), rgba(6,12,19,.86));
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    }
+    #side { border-left:1px solid var(--glass-brd); box-shadow:-12px 0 40px rgba(0,0,0,.4); }
+    #left-panel { border-right:1px solid var(--glass-brd); box-shadow:12px 0 40px rgba(0,0,0,.4); }
+    #side header, #left-panel header { background:linear-gradient(180deg, rgba(12,26,40,.95), rgba(8,17,27,.92)); border-bottom:1px solid var(--glass-brd); }
+    #side header h1 { font-family:var(--display); font-weight:700; letter-spacing:.18em; text-shadow:0 0 12px rgba(0,216,255,.4); }
+    #left-panel header h2, #side header h1 { text-shadow:0 0 10px rgba(0,216,255,.35); }
+
+    /* Section / panel headers → mono labels with tick + rule line */
+    .panel h2, .section h3, #event-log header h4, #legend h4 {
+      font-family:var(--mono) !important; text-transform:uppercase; letter-spacing:.16em; color:var(--cyan);
+      display:flex; align-items:center; gap:8px;
+    }
+    .panel h2::before, .section h3::before {
+      content:'▍'; color:var(--amber); font-size:11px; text-shadow:var(--glow-amber);
+    }
+    .panel h2::after, .section h3:not(.collapsible h3)::after {
+      content:''; flex:1; height:1px; background:linear-gradient(90deg, var(--cyan-line), transparent); opacity:.6;
+    }
+    .qa-label { font-family:var(--mono) !important; color:#6f93ad; }
+
+    /* ── HUD buttons ──────────────────────────────────────────────────── */
+    button {
+      font-family:var(--mono); letter-spacing:.06em; text-transform:uppercase;
+      background:linear-gradient(180deg, rgba(10,32,42,.9), rgba(7,22,30,.9));
+      border:1px solid var(--glass-brd); color:#bdf1ff;
+      clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+    }
+    button:hover { background:linear-gradient(180deg, rgba(0,216,255,.18), rgba(0,216,255,.06)); border-color:var(--cyan); box-shadow:var(--glow-cyan); color:#eafbff; }
+    button.warn { background:linear-gradient(180deg, rgba(60,12,22,.92), rgba(40,8,15,.92)); border-color:rgba(255,77,109,.5); color:#ffc6d1; }
+    button.warn:hover { border-color:var(--alert); box-shadow:var(--glow-alert); color:#fff; }
+    button.view-active, .left-actions button.view-active, #cmd-bar .cb-switch button.active { animation:none; }
+    .left-actions button.view-active { background:linear-gradient(180deg, rgba(0,216,255,.26), rgba(0,216,255,.1)); border-color:var(--cyan); box-shadow:inset 0 0 0 1px var(--cyan-line), 0 0 12px rgba(0,216,255,.28); color:#eafbff; }
+
+    /* Inputs/selects → terminal fields */
+    input[type="text"], input[type="number"], select, input[type="file"] {
+      font-family:var(--mono); background:rgba(5,12,19,.85); border:1px solid var(--border); color:#d7eefc;
+    }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { outline:none; border-color:var(--cyan); box-shadow:0 0 0 1px var(--cyan-line), 0 0 12px rgba(0,216,255,.2); }
+
+    /* ── Data values → glowing mono readouts ──────────────────────────── */
+    .result-value, .coa-stat-value, #strength-text, #counts, #sim-time, .kv-row strong, #d-title {
+      font-family:var(--mono) !important;
+    }
+    .result-value { color:var(--cyan); text-shadow:var(--glow-cyan); font-size:22px; }
+    .coa-stat-value { color:var(--cyan); text-shadow:0 0 10px rgba(0,216,255,.4); }
+    .result-label, .coa-stat-label, .result-metric .result-label { font-family:var(--mono); letter-spacing:.1em; }
+
+    .result-metric {
+      background:linear-gradient(160deg, rgba(7,16,24,.9), rgba(10,22,32,.7));
+      border:1px solid var(--glass-brd); position:relative; overflow:hidden;
+    }
+    .result-metric::before { content:''; position:absolute; top:0; left:0; width:10px; height:10px; border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); opacity:.7; }
+    .result-metric::after { content:''; position:absolute; bottom:0; right:0; width:10px; height:10px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); opacity:.7; }
+    .result-metric:hover { box-shadow:var(--glow-cyan); border-color:var(--cyan); }
+
+    .monte-carlo-panel { border:1px solid var(--glass-brd); box-shadow:inset 0 0 30px rgba(0,216,255,.05); }
+    .monte-carlo-panel #mc-title { color:var(--amber); }
+    .monte-carlo-panel #mc-title::before { content:'◈'; color:var(--amber); }
+
+    /* COA cards → holographic dossiers */
+    .coa-card { background:linear-gradient(135deg, rgba(9,18,28,.95), rgba(14,26,40,.92)); border:1px solid var(--glass-brd); }
+    .coa-card::after { content:''; position:absolute; top:6px; right:6px; width:12px; height:12px; border-top:2px solid var(--cyan-line); border-right:2px solid var(--cyan-line); }
+    .coa-title { font-family:var(--display); letter-spacing:.04em; }
+
+    /* Progress + strength bars → animated energy bars */
+    .progress-bar, #strength-bar {
+      background-image: linear-gradient(90deg, var(--accent2), var(--cyan)), repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 8px, transparent 8px 16px);
+      background-blend-mode: overlay; box-shadow:0 0 14px rgba(0,216,255,.45) inset, var(--glow-cyan);
+      animation: barFlow 1.1s linear infinite;
+    }
+    @keyframes barFlow { from{background-position:0 0,0 0} to{background-position:0 0,32px 0} }
+    .progress-container, #strength-bar-container { border-color:var(--glass-brd); }
+
+    /* ── Tables → terminal grid ───────────────────────────────────────── */
+    table.mdsc-table { font-family:var(--mono); }
+    table.mdsc-table thead th { background:linear-gradient(180deg, rgba(10,26,40,.98), rgba(7,18,28,.98)); color:var(--cyan); text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--cyan-line); cursor:pointer; user-select:none; }
+    table.mdsc-table thead th:hover { color:#eafbff; text-shadow:var(--glow-cyan); }
+    table.mdsc-table thead th[aria-sort] .sort-caret { color:var(--amber); }
+    table.mdsc-table tbody tr { transition:background .12s ease, box-shadow .12s ease; }
+    table.mdsc-table tbody tr:hover { background:rgba(0,216,255,.07); box-shadow:inset 3px 0 0 var(--cyan); }
+
+    /* Task-org cards glow */
+    .org-node .org-title { font-family:var(--display) !important; }
+    .mil-box.selected .org-card { filter:drop-shadow(0 0 7px rgba(0,216,255,.6)); }
+
+    /* ── Modals → glass ops dialogs ───────────────────────────────────── */
+    .modal { background:linear-gradient(180deg, rgba(10,19,28,.96), rgba(7,14,21,.97)); border:1px solid var(--glass-brd); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); box-shadow:0 0 0 1px rgba(0,216,255,.08), 0 24px 80px rgba(0,0,0,.65); position:relative; overflow:hidden; }
+    .modal::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, transparent, var(--cyan), var(--amber), var(--cyan), transparent); opacity:.8; }
+    .modal header h2 { font-family:var(--display); letter-spacing:.1em; color:#eafbff; text-shadow:0 0 10px rgba(0,216,255,.4); }
+    .modal-backdrop { background:rgba(2,6,11,.78); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); }
+    .tab { font-family:var(--mono); text-transform:uppercase; letter-spacing:.08em; }
+    .tab.active { text-shadow:var(--glow-cyan); }
+
+    /* Toasts + popups */
+    .toast { font-family:var(--mono); background:var(--glass-2); border:1px solid var(--glass-brd); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:var(--glow-cyan); }
+    #node-popup { background:var(--glass-2); border:1px solid var(--glass-brd); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:0 0 0 1px rgba(0,216,255,.1), 0 18px 50px rgba(0,0,0,.6); }
+    #node-popup h4 { font-family:var(--display); letter-spacing:.05em; color:#eafbff; }
+
+    /* Event log → live data stream */
+    #event-log { border:1px solid var(--glass-brd); }
+    #event-log header h4::before { content:'●'; color:var(--success); font-size:9px; margin-right:6px; text-shadow:0 0 6px var(--success); animation:liveBlink 2s steps(1) infinite; }
+    #event-log .item { font-family:var(--mono); font-size:11px; }
+    #event-log .type { font-family:var(--mono); text-transform:uppercase; }
+
+    /* Slimmer glowing scrollbars */
+    #side-content::-webkit-scrollbar, #left-panel-content::-webkit-scrollbar, .modal .body::-webkit-scrollbar { width:8px; height:8px; }
+    #side-content::-webkit-scrollbar-thumb, #left-panel-content::-webkit-scrollbar-thumb, .modal .body::-webkit-scrollbar-thumb { background:linear-gradient(180deg, var(--cyan-line), rgba(0,216,255,.15)); border-radius:4px; }
+    #side-content::-webkit-scrollbar-track, #left-panel-content::-webkit-scrollbar-track { background:rgba(0,0,0,.3); }
+
+    /* Leaflet controls → HUD chips */
+    .leaflet-control.compass-control, .leaflet-control.basemap-status, .leaflet-control-scale { -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-color:var(--glass-brd) !important; box-shadow:var(--glow-cyan) !important; }
+    .leaflet-bar a { background:var(--glass-2) !important; color:#bdf1ff !important; border-color:var(--glass-brd) !important; }
+    .leaflet-bar a:hover { background:rgba(0,216,255,.18) !important; }
+
+    #view-status { font-family:var(--mono); }
+    #mission-brief { font-family:var(--ui); }
+    .loading { font-family:var(--mono); letter-spacing:.12em; text-shadow:var(--glow-cyan); }
+
+    /* ── Cinematic boot sequence ──────────────────────────────────────── */
+    #boot { position:fixed; inset:0; z-index:var(--z-boot); display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background:radial-gradient(900px 600px at 50% 42%, #0a1c2b 0%, #05101a 55%, #02060a 100%);
+      font-family:var(--mono); color:#bfe6f5; transition:opacity .6s ease, visibility .6s ease; }
+    #boot.gone { opacity:0; visibility:hidden; pointer-events:none; }
+    #boot .boot-ring { width:120px; height:120px; border-radius:50%; position:relative; margin-bottom:26px;
+      background:radial-gradient(circle at 50% 50%, rgba(0,216,255,.18), transparent 62%); }
+    #boot .boot-ring::before, #boot .boot-ring::after { content:''; position:absolute; inset:0; border-radius:50%; border:2px solid transparent; }
+    #boot .boot-ring::before { border-top-color:var(--cyan); border-right-color:var(--cyan); animation:spin 1.1s linear infinite; box-shadow:var(--glow-cyan); }
+    #boot .boot-ring::after { inset:16px; border-bottom-color:var(--amber); border-left-color:var(--amber); animation:spin 1.6s linear infinite reverse; }
+    #boot .boot-core { position:absolute; inset:34px; border-radius:50%; background:radial-gradient(circle, #d6f7ff, var(--cyan) 55%, transparent 75%); box-shadow:var(--glow-cyan); animation:reactor 2s ease-in-out infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #boot .boot-title { font-family:var(--display); font-weight:800; letter-spacing:8px; font-size:26px; color:#eafbff; text-shadow:0 0 18px rgba(0,216,255,.6); }
+    #boot .boot-sub { font-size:11px; letter-spacing:3px; color:#6f93ad; margin-top:8px; }
+    #boot .boot-log { margin-top:22px; width:min(440px,80vw); font-size:11px; line-height:1.7; color:#5f86a0; min-height:96px; }
+    #boot .boot-log .ok { color:var(--success); }
+    #boot .boot-bar { margin-top:12px; width:min(440px,80vw); height:3px; background:rgba(0,216,255,.12); border-radius:2px; overflow:hidden; }
+    #boot .boot-bar i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--amber)); box-shadow:var(--glow-cyan); animation:bootFill 2.1s ease forwards; }
+    @keyframes bootFill { to { width:100%; } }
+
   </style>
   <style id="modal-resize-fix">
     /* Keep modals within the viewport and make content scrollable */
@@ -947,6 +1243,37 @@
 
 </head>
 <body>
+  <!-- ── Stark-HUD overhaul: cinematic boot sequence + global frame overlay ── -->
+  <div id="boot" role="status" aria-label="System boot">
+    <div class="boot-ring"><div class="boot-core"></div></div>
+    <div class="boot-title">STRIKESIM&nbsp;2040</div>
+    <div class="boot-sub">MULTI-DOMAIN COMMAND &amp; CONTROL · NOTIONAL // UNCLASS</div>
+    <div class="boot-log" id="boot-log"></div>
+    <div class="boot-bar"><i></i></div>
+  </div>
+  <div id="hud-overlay" aria-hidden="true">
+    <span class="corner tl"></span><span class="corner tr"></span>
+    <span class="corner bl"></span><span class="corner br"></span>
+  </div>
+
+  <!-- Operations-console command bar: brand · view switcher · global actions. The four
+       module buttons (Campaign / War Game / Fullscreen / Retry 3D) relocate into #cmd-actions
+       on load instead of free-floating over the canvas (see relocateBarButtons()). -->
+  <div id="cmd-bar">
+    <div class="cb-brand">
+      <div class="cb-mark"></div>
+      <div><div class="cb-name">STRIKESIM 2040</div><div class="cb-sub">MULTI-DOMAIN STRIKE WARGAME · NOTIONAL // UNCLASS</div></div>
+    </div>
+    <div class="cb-spacer"></div>
+    <div class="cb-switch" id="cb-switch" role="tablist" aria-label="View">
+      <button type="button" data-view="3d" onclick="setView('3d')">3D</button>
+      <button type="button" data-view="map" onclick="setView('map')">MAP</button>
+      <button type="button" data-view="table" onclick="setView('table')">TABLE</button>
+      <button type="button" data-view="org" onclick="setView('org')">TASK ORG</button>
+    </div>
+    <div class="cb-spacer"></div>
+    <div id="cmd-actions"></div>
+  </div>
   <div id="failurePopup" class="failure-popup">
     <span class="close-btn" onclick="closeFailurePopup()">×</span>
     <h3>Strike Failed</h3>
@@ -1144,20 +1471,30 @@
     </header>
     <div id="left-panel-content">
       <div class="panel" aria-labelledby="left-actions-title">
-        <h2 id="left-actions-title">Quick Actions</h2>
-        <div class="left-actions">
-          <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
-          <button id="reset-view-btn" type="button" class="secondary" title="Re-center the current view">Reset View</button>
-          <button id="map-btn" type="button" class="secondary" title="Toggle map overlay">Map</button>
-          <button id="table-btn" type="button" class="secondary" title="Switch to tabular view">Table</button>
-          <button id="org-btn" type="button" class="secondary" title="Task org / wiring view">Task Org</button>
-          <button id="legend-btn" type="button" class="secondary" title="Show or hide legend">Hide Legend</button>
-          <button id="geo-mode-btn" type="button" class="secondary" title="Pin nodes to globe / restore forces">Geo Mode</button>
-          <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
-          <button id="toggle-payoff-btn" type="button" class="secondary" title="Highlight high-payoff targets">High Payoff</button>
-          <button id="toggle-risk-btn" type="button" class="secondary" title="Highlight high-risk targets">High Risk</button>
-          <button id="toggle-contrast-btn" type="button" class="secondary" title="Toggle high-contrast palette">Contrast</button>
-          <button id="summary-btn" type="button" class="full" title="Quick status summary">Summary</button>
+        <h2 id="left-actions-title">Controls</h2>
+        <div class="qa-group"><div class="qa-label">View</div>
+          <div class="left-actions">
+            <button id="reset-view-btn" type="button" class="secondary" title="Re-center the current view">Recenter</button>
+            <button id="geo-mode-btn" type="button" class="secondary" title="Pin nodes to globe / restore forces">Geo Mode</button>
+            <button id="map-btn" type="button" class="secondary" title="Toggle map overlay">Map</button>
+            <button id="table-btn" type="button" class="secondary" title="Switch to tabular view">Table</button>
+            <button id="org-btn" type="button" class="secondary" title="Task org / wiring view">Task Org</button>
+          </div>
+        </div>
+        <div class="qa-group"><div class="qa-label">Highlight</div>
+          <div class="left-actions">
+            <button id="toggle-payoff-btn" type="button" class="secondary" title="Highlight high-value, easy-to-hit targets (top 20%)">High Payoff</button>
+            <button id="toggle-risk-btn" type="button" class="secondary" title="Highlight well-defended / high-counter targets (top 20%)">High Risk</button>
+            <button id="toggle-contrast-btn" type="button" class="secondary" title="Toggle high-contrast palette">Contrast</button>
+            <button id="legend-btn" type="button" class="secondary" title="Show or hide legend">Hide Legend</button>
+          </div>
+        </div>
+        <div class="qa-group"><div class="qa-label">Session</div>
+          <div class="left-actions">
+            <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
+            <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
+            <button id="summary-btn" type="button" class="secondary" title="Quick status summary">Summary</button>
+          </div>
         </div>
       </div>
       <div class="panel" aria-labelledby="left-io-title">
@@ -1661,7 +1998,7 @@
     // Org chart state
     let orgModeEnabled = false;
     // orgZoomBehavior now lives in ViewsModule (views.js).
-    const orgExpandedTeams = new Set(); // teams that are expanded in org view
+    const orgExpandedTeams = new Set(['blue', 'red']); // both task orgs expanded by default
     // Shared with ViewsModule's renderOrgChart (never reassigned, so the same Set
     // object is visible on both sides); the main toggles mutate it.
     window.orgExpandedTeams = orgExpandedTeams;
@@ -1782,8 +2119,14 @@
       let top = rect.top + coords.y - pop.offsetHeight / 2;
       const margin = 8;
       const maxTop = window.innerHeight - pop.offsetHeight - margin;
-      pop.style.left = `${Math.max(margin, Math.min(left, window.innerWidth - pop.offsetWidth - margin))}px`;
-      pop.style.top = `${Math.max(margin, Math.min(top, maxTop))}px`;
+      // Never let the popup slide under the left rail or the command bar.
+      const lp = document.getElementById('left-panel');
+      let minLeft = margin;
+      if (lp && !lp.classList.contains('locked-collapsed')) { const r = lp.getBoundingClientRect(); if (r.width > 40) minLeft = r.right + 8; }
+      const barH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 54;
+      const minTop = barH + margin;
+      pop.style.left = `${Math.max(minLeft, Math.min(left, window.innerWidth - pop.offsetWidth - margin))}px`;
+      pop.style.top = `${Math.max(minTop, Math.min(top, maxTop))}px`;
     }
 
     function showNodePopup(node) {
@@ -1881,6 +2224,42 @@
       el.textContent = `View: ${view}`;
       el.removeAttribute('data-geo');
     }
+    // Light up the active view's button (single "you are here" cue, in addition to the
+    // label-swap toggle affordance). Exactly one of these is active at a time.
+    const activeBtn = mapModeEnabled ? 'map-btn' : tableModeEnabled ? 'table-btn' : orgModeEnabled ? 'org-btn' : null;
+    ['map-btn', 'table-btn', 'org-btn'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.classList.toggle('view-active', id === activeBtn); b.setAttribute('aria-pressed', String(id === activeBtn)); }
+    });
+    const gb = document.getElementById('geo-mode-btn');
+    if (gb) { gb.classList.toggle('view-active', !!geoOn); gb.setAttribute('aria-pressed', String(!!geoOn)); }
+    // Light the command-bar view switcher (single source of truth for "you are here").
+    const curView = mapModeEnabled ? 'map' : tableModeEnabled ? 'table' : orgModeEnabled ? 'org' : '3d';
+    document.querySelectorAll('#cb-switch button').forEach(b => {
+      const on = b.getAttribute('data-view') === curView;
+      b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on));
+    });
+    }
+
+    // Command-bar view switcher: set the app to exactly one view. Reuses the existing
+    // toggle functions (which already turn the other views off).
+    function setView(v) {
+      if (v === '3d') { if (mapModeEnabled) toggleMapMode(); if (tableModeEnabled) toggleTableMode(); if (orgModeEnabled) toggleOrgMode(); }
+      else if (v === 'map' && !mapModeEnabled) toggleMapMode();
+      else if (v === 'table' && !tableModeEnabled) toggleTableMode();
+      else if (v === 'org' && !orgModeEnabled) toggleOrgMode();
+      updateViewStatus();
+    }
+
+    // Re-home the modules' floating top buttons (Campaign / War Game / Fullscreen / Retry 3D)
+    // into the command bar so they stop overlapping the canvas and each other.
+    function relocateBarButtons() {
+      const bar = document.getElementById('cmd-actions');
+      if (!bar) return;
+      const order = ['cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
+      const move = () => order.forEach(id => { const el = document.getElementById(id); if (el && el.parentElement !== bar) bar.appendChild(el); });
+      move();
+      try { new MutationObserver(move).observe(document.body, { childList: true }); } catch (e) {}
     }
 
     function enableGeoMode() {
@@ -2044,8 +2423,12 @@
 
     function currentVisible() {
     const visibleNodes = data.nodes.filter(n => {
-    const passesDomain = !filteredDomains.size || (n.domain || []).some(d => filteredDomains.has(d));
-    const passesTeam = !filteredTeams.size || filteredTeams.has(n.team || '3rd_party');
+    // Checkboxes are "show these": a node passes a filter group only if one of its values
+    // is selected. Unchecking everything in a group therefore hides everything (it no
+    // longer means "no filter"). Domainless nodes can't be domain-filtered, so they pass.
+    const doms = n.domain || [];
+    const passesDomain = doms.length ? doms.some(d => filteredDomains.has(d)) : true;
+    const passesTeam = filteredTeams.has(n.team || '3rd_party');
     return passesDomain && passesTeam;
     });
     const nodeIds = new Set(visibleNodes.map(n => n.id));
@@ -2129,6 +2512,8 @@
     } else {
     closeMapPopup();
     }
+    // Reflect selection in the Task Org view (so the selected card highlights).
+    if (orgModeEnabled && typeof renderOrgChart === 'function') renderOrgChart();
     }
 
     function cycleVisibleSelection(step) {
@@ -2157,13 +2542,22 @@
     resultsEl.textContent = 'No results found';
     return;
     }
-    resultsEl.innerHTML = matches.slice(0, 5).map(n =>
+    // Only fly to / select matches that are actually visible — otherwise the camera flies to
+    // an empty region for a filtered-out node. If every match is hidden, say so instead.
+    const visibleIds = new Set(currentVisible().visibleNodes.map(n => n.id));
+    const visible = matches.filter(n => visibleIds.has(n.id));
+    const hidden = matches.length - visible.length;
+    if (!visible.length) {
+    resultsEl.innerHTML = `${matches.length} match(es) hidden by active filters — clear filters to view.`;
+    return;
+    }
+    resultsEl.innerHTML = visible.slice(0, 5).map(n =>
     `<span class="badge" data-node-id="${n.id}">${n.name} (${n.id})</span>`
-    ).join(' ');
+    ).join(' ') + (hidden ? ` <span class="muted-note">+${hidden} hidden by filters</span>` : '');
     resultsEl.querySelectorAll('.badge').forEach(badge => {
     badge.addEventListener('click', () => selectNodeById(badge.dataset.nodeId));
     });
-    if (matches[0]) selectNode(matches[0]);
+    selectNode(visible[0]);
     }
 
     function selectNodeById(id) {
@@ -2399,6 +2793,19 @@
     function openImportModal() { document.getElementById('import-modal').style.display = 'flex'; }
     function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
 
+    // Validate a normalized payload BEFORE anything destructive happens. Drops unusable
+    // records and returns an error if nothing valid remains, so a malformed-but-parseable
+    // file can never wipe the working scenario with a false "success".
+    function validateImportedGraph(g) {
+      if (!g || !Array.isArray(g.nodes) || g.nodes.length === 0) return { ok: false, error: 'No nodes found in the file.' };
+      const valid = g.nodes.filter(n => n && typeof n === 'object' && !Array.isArray(n) && n.id != null && (typeof n.id === 'string' || typeof n.id === 'number'));
+      if (!valid.length) return { ok: false, error: 'File has no valid nodes (each node needs an id).' };
+      const dropped = g.nodes.length - valid.length;
+      g.nodes = valid;
+      if (!Array.isArray(g.links)) g.links = [];
+      return { ok: true, dropped };
+    }
+
     function normalizeImportedPayload(importedRaw) {
     if (!importedRaw) return null;
     if (importedRaw.data) {
@@ -2486,6 +2893,10 @@
     const importedRaw = JSON.parse(e.target.result);
     const importedData = normalizeImportedPayload(importedRaw);
     if (!importedData) throw new Error('Unrecognized file format');
+    // Validate BEFORE any destructive action (esp. replace, which resets state).
+    const check = validateImportedGraph(importedData);
+    if (!check.ok) throw new Error(check.error);
+    if (check.dropped) showToast(`Note: skipped ${check.dropped} invalid record(s) in the file.`, 'warn');
 
     if (mode === 'add') {
     const stats = addImportedNodes(importedData, assignedTeam);
@@ -2894,6 +3305,7 @@
         document.getElementById('map').style.display = 'none';
         document.getElementById('table').style.display = 'none';
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = '3D';
+        if (typeof resetOrgFraming === 'function') resetOrgFraming();   // re-frame each time the view opens
         renderOrgChart();
       } else {
         document.getElementById('org-chart').style.display = 'none';
@@ -2992,6 +3404,9 @@
     document.getElementById('filter-all-btn').addEventListener('click', () => { document.querySelectorAll('#filters input').forEach(cb => cb.checked = true); applyFilters(); });
     document.getElementById('filter-none-btn').addEventListener('click', () => { document.querySelectorAll('#filters input').forEach(cb => cb.checked = false); applyFilters(); });
     document.getElementById('filter-apply-btn').addEventListener('click', applyFilters);
+    // Live filtering: toggling any checkbox applies immediately (no need to hit Apply).
+    document.getElementById('filters').addEventListener('change', applyFilters);
+    document.getElementById('team-filters').addEventListener('change', applyTeamFilters);
     document.getElementById('team-filter-all-btn').addEventListener('click', () => { document.querySelectorAll('#team-filters input').forEach(cb => cb.checked = true); applyTeamFilters(); });
     document.getElementById('team-filter-none-btn').addEventListener('click', () => { document.querySelectorAll('#team-filters input').forEach(cb => cb.checked = false); applyTeamFilters(); });
     document.getElementById('team-filter-apply-btn').addEventListener('click', applyTeamFilters);
@@ -3286,19 +3701,29 @@
 
     function handleGraph3DFailure(err) {
       const realMsg = (err && (err.message || String(err))) || 'unknown error';
-      if (webglAvailable()) {
-        // WebGL works — the engine failed for some OTHER reason; surface it honestly.
-        addEvent({ type: 'View', text: '3D engine failed to start: ' + realMsg });
-        showToast('3D failed to start: ' + realMsg + '. Using Map view — click "Retry 3D" to try again.', 'error', 13000);
+      // Notify once, calmly — repeated red errors over an environmental limitation are noise.
+      if (!window.__webglNoticeShown) {
+        window.__webglNoticeShown = true;
+        if (webglAvailable()) {
+          addEvent({ type: 'View', text: '3D engine failed to start: ' + realMsg });
+          showToast('3D didn\'t start (' + realMsg + '). Showing the Map view, which has the full operational picture. "Retry 3D" is up top.', 'warn', 9000);
+        } else {
+          addEvent({ type: 'View', text: '3D unavailable: no WebGL context on this machine.' });
+          showToast('This machine can\'t open a 3D (WebGL) view — common on virtual/remote displays or a blocked GPU, even with acceleration on. No problem: the Map and Table views are the full tool.', 'warn', 11000);
+        }
       } else {
-        addEvent({ type: 'View', text: '3D unavailable: browser provided no WebGL context.' });
-        showToast('Your browser is blocking WebGL. Turn on hardware acceleration (browser Settings → System → "Use hardware acceleration when available"), then click "Retry 3D". Map and Table views work without it.', 'error', 16000);
+        addEvent({ type: 'View', text: '3D still unavailable (no WebGL context).' });
       }
-      // Show the recovery affordance FIRST so a hiccup anywhere in the Map fallback can
-      // never strand the operator without a way back to 3D.
+      degradeToMap();
+    }
+
+    // Switch the app into the Map view (the full operational picture) — used both as the
+    // WebGL-failure fallback and as the default landing when WebGL is unavailable up front.
+    // Every step is guarded so one failure can't abort the rest (a degraded Map beats a
+    // blank screen), and the "Retry 3D" affordance is shown first so the operator is never
+    // stranded without a way back to 3D.
+    function degradeToMap() {
       showRetry3dButton();
-      // Graceful fallback to the Map view — every step guarded so one failure can't abort
-      // the rest (a degraded Map still beats a blank screen).
       mapModeEnabled = true;
       try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
       try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
@@ -3340,6 +3765,12 @@
     // Re-attempt 3D without a page reload — recovers after the operator enables hardware
     // acceleration or frees GPU contexts. On success, switch from the Map fallback to 3D.
     function retry3D() {
+      // If there's still no WebGL, don't re-attempt — that just spams the console with
+      // Three.js context errors. Tell the operator calmly and stay on the 2D views.
+      if (!webglAvailable()) {
+        showToast('Still no WebGL on this machine (likely a virtual/remote display or a blocked GPU). The Map and Table views have everything — no 3D needed.', 'warn', 8000);
+        return;
+      }
       try { EngineModule.dispose(); } catch (e) {}
       document.getElementById('graph').innerHTML = '';
       if (!tryInitGraph3D()) return;   // still failing — fallback path already re-messaged
@@ -3361,14 +3792,63 @@
     bindEventListeners();
     initUI();
 
-    // Build the 3D engine with progressive WebGL fallback + graceful Map degradation and a
-    // no-reload "Retry 3D" path (see tryInitGraph3D / handleGraph3DFailure above).
-    tryInitGraph3D();
+    // Pick the landing view by capability. If WebGL is available, build the 3D engine
+    // (with its own progressive fallback). If not, don't even attempt it — that only
+    // throws a scary error — go straight to the Map view, which carries the full
+    // operational picture (symbols, threat rings, strikes) and needs no GPU.
+    if (webglAvailable()) {
+      tryInitGraph3D();
+    } else {
+      addEvent({ type: 'View', text: 'WebGL unavailable — opened the Map view (full operational picture).' });
+      showToast('Opened the Map view — your full operational picture (symbols, threat rings, the works). The 3D globe needs browser hardware acceleration; enable it and click "Retry 3D" anytime.', 'warn', 11000);
+      degradeToMap();
+    }
 
     refreshGraph();
     // Ensure legend button reflects initial state
     setLegendVisible(true);
     updateViewStatus();
+    try { relocateBarButtons(); } catch (e) {}
+    try { maybeShowFirstRun(); } catch (e) {}
+    }
+
+    // One-time, dismissible orientation card — a cold user should grasp "what is this /
+    // what do I do first" without the manual. Gated on localStorage; reopenable via the
+    // persistent "?" button. Fully self-contained (no images, offline-safe).
+    function buildFirstRunCard() {
+      if (document.getElementById('first-run-card')) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'first-run-card';
+      wrap.innerHTML =
+        '<div class="fr-backdrop"></div>' +
+        '<div class="fr-panel" role="dialog" aria-label="Welcome to StrikeSim 2040">' +
+          '<div class="fr-title">STRIKESIM 2040</div>' +
+          '<div class="fr-sub">A Blue-vs-Red multi-domain strike-planning wargame.</div>' +
+          '<p class="fr-body">You command <b style="color:#6cc0ff">Blue</b>. Explore the force network, build an attack plan (a <b>COA</b> — Course of Action), then run thousands of simulations to see whether it\'s worth committing — before you commit.</p>' +
+          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Pick a <b>Red</b> target in the COA Builder</div>' +
+          '<div class="fr-step"><span class="fr-n">2</span> <b>Generate COA</b> or add steps to a plan</div>' +
+          '<div class="fr-step"><span class="fr-n">3</span> <b>Run 10,000 Trials</b> to pressure-test it</div></div>' +
+          '<p class="fr-tip">Tip: the <b>Map</b> view shows the operational picture; <b>⚔ War Game</b> (top) is a turn-based match vs the computer. No 3D? That just needs browser hardware acceleration — every other view works without it.</p>' +
+          '<button class="fr-ok" type="button">Got it</button>' +
+        '</div>';
+      document.body.appendChild(wrap);
+      const close = () => { wrap.style.display = 'none'; try { localStorage.setItem('strikesim-intro-seen', '1'); } catch (e) {} };
+      wrap.querySelector('.fr-ok').addEventListener('click', close);
+      wrap.querySelector('.fr-backdrop').addEventListener('click', close);
+      if (!document.getElementById('fr-help-btn')) {
+        const help = document.createElement('button');
+        help.id = 'fr-help-btn'; help.type = 'button'; help.textContent = '?';
+        help.title = 'What is this? (show the intro again)';
+        help.addEventListener('click', () => { wrap.style.display = 'flex'; });
+        document.body.appendChild(help);
+      }
+    }
+    function maybeShowFirstRun() {
+      buildFirstRunCard();
+      let seen = false;
+      try { seen = localStorage.getItem('strikesim-intro-seen') === '1'; } catch (e) {}
+      const wrap = document.getElementById('first-run-card');
+      if (wrap) wrap.style.display = seen ? 'none' : 'flex';
     }
 
     // --- Monte Carlo Simulation (COA-based) ---
@@ -3672,9 +4152,13 @@
       };
     }
 
-    function redResponseForMethod(methodKey, red) {
-      // basic policy: counter the domain of the method, sometimes reinforce
-      const roll = Math.random();
+    function redResponseForMethod(methodKey, stepIdx) {
+      // Deterministic pseudo-roll from (methodKey, stepIdx) so plan construction is
+      // reproducible — Math.random() here made two runs of the same seed differ.
+      const str = String(methodKey) + ':' + (stepIdx || 0);
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+      const roll = ((h >>> 0) % 1000) / 1000;
       if (methodKey === 'cyber') return roll < 0.8 ? 'Cyber Defense' : 'Deception';
       if (methodKey === 'ew')    return roll < 0.8 ? 'EW Countermeasure' : 'Reinforcement';
       if (methodKey === 'sof')   return roll < 0.8 ? 'SOF Interception' : 'Reinforcement';
@@ -3684,7 +4168,7 @@
     function toActionPlanFromBuilt() {
       return builtCOA.map((s, i) => {
         const methodName = strikeMethods[s.methodKey]?.name || 'Kinetic Strike';
-        const redAct = redResponseForMethod(s.methodKey);
+        const redAct = redResponseForMethod(s.methodKey, i);
         return { step: i+1, blue: methodName, blueKey: s.methodKey, targetId: s.targetId, red: redAct };
       });
     }
@@ -4426,6 +4910,15 @@
       else if (action === 'rerun') runMonteCarlo(getMcTrialCount());
     }
 
+    // Avalanche-mix (base, trialIndex) -> a well-spread 32-bit seed, so adjacent trials are
+    // independent rather than near-linear in t. Same routine is used in sim-worker.js.
+    function mcMixSeed(base, t) {
+      let x = ((base >>> 0) ^ Math.imul(t, 0x9E3779B1)) >>> 0;
+      x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+      x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+      return (x ^ (x >>> 16)) >>> 0;
+    }
+
     async function runMonteCarlo(trials = null) {
       if (mcRunInProgress) {
         requestCancelMonteCarlo();
@@ -4549,7 +5042,10 @@
               cancelled = true;
               break;
             }
-            const rng = createRng(baseSeed + t);
+            // Decorrelate per-trial seeds: consecutive integers (baseSeed+t) leave the LCG's
+            // first draw a near-linear function of t, so trials weren't independent and the
+            // success rate was biased. Avalanche-mix the seed instead.
+            const rng = createRng(mcMixSeed(baseSeed, t));
             const result = simulateTrial(actionPlan, {
               context,
               rng,
@@ -4601,7 +5097,13 @@
         const p50Steps = percentile(stepsToSuccessArr, 0.5);
         const p90Steps = percentile(stepsToSuccessArr, 0.9);
 
+        // 95% confidence interval (Wald) on the success proportion — so an analyst can tell
+        // whether two COAs at e.g. 62% vs 65% actually differ or are within noise.
+        const ciHalf = 1.96 * Math.sqrt(Math.max(0, successRate * (1 - successRate)) / effectiveTrials);
+        const ciPct = (ciHalf * 100).toFixed(1);
         if (outSuccess) outSuccess.textContent = `${Math.round(successRate * 100)}%`;
+        const ciEl = document.getElementById('mc-success-ci');
+        if (ciEl) ciEl.textContent = `±${ciPct}% (95% CI)`;
         if (outDmg) outDmg.textContent = Math.round(expImpact);
         if (outTime) outTime.textContent = avgSteps.toFixed(1);
         const mcHealth = Math.max(0, Math.min(100, Math.round(successRate * 100)));
@@ -4634,7 +5136,7 @@
           const margin = blueBudget - planCost;
           details.innerHTML = [
             `Plan length: ${actionPlan.length} steps.`,
-            `${Math.round(successRate * 100)}% success across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `${Math.round(successRate * 100)}% ±${ciPct}% success (95% CI) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
             `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
             `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
             `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
@@ -5034,7 +5536,7 @@
       const stepsArr = [];
       const blueLostArr = [];
       for (let t = 1; t <= trials; t++) {
-        const rng = createRng(baseSeed + t);
+        const rng = createRng(mcMixSeed(baseSeed, t));
         const result = simulateTrial(plan, {
           context,
           rng,
@@ -5382,6 +5884,259 @@
     };
 
     init();
+  </script>
+
+  <!-- ── Stark-HUD overhaul: boot fade, live telemetry clock, readout FX ── -->
+  <script>
+  (function(){
+    try {
+      var lines = [
+        '▸ initializing C2 core ............. <span class="ok">OK</span>',
+        '▸ loading force networks (RED/BLUE) . <span class="ok">OK</span>',
+        '▸ calibrating MIL-STD-2525 symbology  <span class="ok">OK</span>',
+        '▸ spinning up Monte Carlo engine .... <span class="ok">OK</span>',
+        '▸ establishing geospatial link ..... <span class="ok">OK</span>',
+        '▸ rendering command picture ........ <span class="ok">OK</span>'
+      ];
+      var logEl = document.getElementById('boot-log'), i = 0;
+      (function nextLine(){
+        if (!logEl || i >= lines.length) return;
+        var d = document.createElement('div'); d.innerHTML = lines[i++];
+        logEl.appendChild(d); setTimeout(nextLine, 300);
+      })();
+      function killBoot(){ var b = document.getElementById('boot'); if (b) b.classList.add('gone'); }
+      var bootStart = Date.now();
+      function scheduleKill(){ setTimeout(killBoot, Math.max(0, 2300 - (Date.now()-bootStart))); }
+      if (document.readyState === 'complete') scheduleKill(); else window.addEventListener('load', scheduleKill);
+      setTimeout(killBoot, 6000); // hard cap — boot never hangs
+
+      function buildTelemetry(){
+        var bar = document.getElementById('cmd-bar');
+        var brand = bar && bar.querySelector('.cb-brand');
+        if (!bar || !brand || document.querySelector('.cb-telemetry')) return;
+        var t = document.createElement('div'); t.className = 'cb-telemetry';
+        t.innerHTML = '<span class="tlm"><span class="dot"></span><b>C2 LINK</b></span>'
+                    + '<span class="tlm">SECTOR <b>INDO-PAC</b></span>'
+                    + '<span class="tlm"><b id="cb-clock">--:--:--</b> UTC</span>';
+        brand.insertAdjacentElement('afterend', t);
+        (function tick(){ var el=document.getElementById('cb-clock'); if(el) el.textContent=new Date().toISOString().slice(11,19); setTimeout(tick,1000); })();
+      }
+      if (document.getElementById('cmd-bar')) buildTelemetry(); else document.addEventListener('DOMContentLoaded', buildTelemetry);
+
+      var st = document.createElement('style');
+      st.textContent = '@keyframes valFlash{0%{color:#fff;text-shadow:0 0 18px rgba(0,216,255,.95)}100%{}} .val-flash{animation:valFlash .6s ease}';
+      document.head.appendChild(st);
+      var obs = new MutationObserver(function(muts){
+        muts.forEach(function(m){
+          var n = (m.target.nodeType===3 ? m.target.parentElement : m.target);
+          if (n && n.classList && n.classList.contains('result-value')) { n.classList.remove('val-flash'); void n.offsetWidth; n.classList.add('val-flash'); }
+        });
+      });
+      document.querySelectorAll('.result-value').forEach(function(el){ obs.observe(el,{childList:true,characterData:true,subtree:true}); });
+    } catch(e){ var b=document.getElementById('boot'); if(b) b.classList.add('gone'); }
+  })();
+  </script>
+
+  <!-- ── Stark-HUD overhaul II: synth audio engine · DEFCON threat · screen FX ── -->
+  <script>
+  (function(){
+    "use strict";
+    try {
+      var css = document.createElement('style');
+      css.textContent = [
+        '@keyframes fxShake{10%{transform:translate(-3px,2px)}20%{transform:translate(4px,-3px)}30%{transform:translate(-5px,1px)}40%{transform:translate(4px,3px)}50%{transform:translate(-3px,-2px)}60%{transform:translate(3px,2px)}70%{transform:translate(-2px,-1px)}80%{transform:translate(2px,1px)}100%{transform:translate(0,0)}}',
+        'body.fx-shake #app{animation:fxShake .32s ease}',
+        '#fx-vignette{position:fixed;inset:0;z-index:1250;pointer-events:none;opacity:0;box-shadow:inset 0 0 200px 46px rgba(255,40,40,.55);transition:opacity .25s ease}',
+        'body.fx-alert #fx-vignette{opacity:1;animation:fxAlertPulse 1.1s ease-in-out infinite}',
+        '@keyframes fxAlertPulse{0%,100%{opacity:.22}50%{opacity:.85}}',
+        '.cb-telemetry .defcon b{font-weight:700;letter-spacing:1px}',
+        '.defcon[data-lvl="5"] b{color:#51cf66;text-shadow:0 0 8px rgba(81,207,102,.6)}',
+        '.defcon[data-lvl="4"] b{color:#9ad84d;text-shadow:0 0 8px rgba(154,216,77,.6)}',
+        '.defcon[data-lvl="3"] b{color:#ffb000;text-shadow:0 0 10px rgba(255,176,0,.7)}',
+        '.defcon[data-lvl="2"] b{color:#ff7a3c;text-shadow:0 0 12px rgba(255,122,60,.85)}',
+        '.defcon[data-lvl="1"] b{color:#ff3b3b;text-shadow:0 0 14px rgba(255,59,59,.95);animation:liveBlink 1s steps(1) infinite}',
+        '.cb-audio{cursor:pointer;background:transparent;border:0;color:#7fa6c2;font-family:var(--mono);font-size:14px;padding:0 4px;clip-path:none}',
+        '.cb-audio:hover{color:var(--cyan);box-shadow:none;background:transparent;transform:none}'
+      ].join('\n');
+      document.head.appendChild(css);
+      var vig = document.createElement('div'); vig.id='fx-vignette'; document.body.appendChild(vig);
+
+      // ---- Synthesized audio engine (offline, zero asset files) ----
+      var AC=null, master=null, armed=false;
+      var muted=(function(){ try{ return localStorage.getItem('strikesim_muted')==='1'; }catch(e){ return false; } })();
+      function arm(){
+        if(armed) return;
+        try {
+          AC=new (window.AudioContext||window.webkitAudioContext)();
+          master=AC.createGain(); master.gain.value=muted?0:0.5; master.connect(AC.destination);
+          armed=true; if(AC.state==='suspended') AC.resume();
+          Audio.boot();
+        } catch(e){ armed=false; }
+      }
+      function tone(freq,t0,dur,type,peak,glideTo){
+        if(!armed||!AC) return;
+        var o=AC.createOscillator(), g=AC.createGain();
+        o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0);
+        if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,glideTo),t0+dur);
+        g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(peak||0.25,t0+0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+        o.connect(g); g.connect(master); o.start(t0); o.stop(t0+dur+0.02);
+      }
+      function noise(t0,dur,peak,lp){
+        if(!armed||!AC) return;
+        var n=Math.floor(AC.sampleRate*dur), buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+        for(var i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+        var src=AC.createBufferSource(); src.buffer=buf;
+        var f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=lp||1200;
+        var g=AC.createGain(); g.gain.setValueAtTime(peak||0.3,t0); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+        src.connect(f); f.connect(g); g.connect(master); src.start(t0); src.stop(t0+dur);
+      }
+      var Audio = window.StrikeSimAudio = {
+        isMuted:function(){ return muted; },
+        setMuted:function(m){ muted=!!m; try{localStorage.setItem('strikesim_muted',muted?'1':'0');}catch(e){} if(master) master.gain.value=muted?0:0.5; updateAudioBtn(); },
+        toggleMute:function(){ this.setMuted(!muted); },
+        click:function(){ if(!armed) return; tone(880,AC.currentTime,0.06,'square',0.05); },
+        boot:function(){ if(!armed) return; var t=AC.currentTime; tone(150,t,0.7,'sawtooth',0.16,760); tone(300,t+0.05,0.6,'sine',0.10,980); noise(t,0.5,0.09,2400); },
+        strike:function(kind){ if(!armed) return; var t=AC.currentTime;
+          if(kind==='kill'||kind==='cascade'){ tone(220,t,0.5,'sine',0.38,40); tone(90,t,0.55,'sine',0.28,30); noise(t,0.45,0.45,900); }
+          else { tone(1200,t,0.14,'square',0.16,300); noise(t,0.12,0.16,3000); } },
+        alert:function(level){ if(!armed) return; var t=AC.currentTime, f=(level<=1?660:520);
+          tone(f,t,0.28,'sawtooth',0.2,f); tone(f*0.75,t+0.3,0.28,'sawtooth',0.2,f*0.75); }
+      };
+
+      // ---- Global FX bus + DEFCON threat model ----
+      var threat=5, threatVal=0, lastDefcon=5;
+      function defconFromVal(v){ return Math.max(1, 5-Math.round(v*4)); }
+      function renderDefcon(){ var el=document.getElementById('cb-defcon'); if(!el) return; el.setAttribute('data-lvl',String(threat)); var b=el.querySelector('b'); if(b) b.textContent=String(threat); document.body.classList.toggle('fx-alert', threat<=2); }
+      function setThreatVal(v){ threatVal=Math.max(0,Math.min(1,v)); var nd=defconFromVal(threatVal); if(nd!==threat){ threat=nd; renderDefcon(); if(threat<lastDefcon && threat<=2) Audio.alert(threat); lastDefcon=threat; } }
+      function screenShake(){ document.body.classList.remove('fx-shake'); void document.body.offsetWidth; document.body.classList.add('fx-shake'); setTimeout(function(){document.body.classList.remove('fx-shake');},340); }
+      window.StrikeSimFX = {
+        onStrike:function(kind){ try{ Audio.strike(kind); if(kind==='kill'||kind==='cascade') screenShake(); setThreatVal(threatVal+((kind==='kill'||kind==='cascade')?0.22:0.09)); }catch(e){} },
+        setDefcon:function(n){ n=Math.max(1,Math.min(5,n|0)); setThreatVal((5-n)/4); },
+        alert:function(){ setThreatVal(1); },
+        screenShake:screenShake
+      };
+      setInterval(function(){ if(threatVal>0) setThreatVal(threatVal-0.05); }, 1300); // calm decays
+
+      // ---- DEFCON chip + sound toggle into the telemetry cluster ----
+      function updateAudioBtn(){ var b=document.getElementById('cb-audio-btn'); if(b) b.textContent=muted?'🔇':'🔊'; }
+      function buildExtras(){
+        var tel=document.querySelector('.cb-telemetry'); if(!tel||document.getElementById('cb-defcon')) return false;
+        var d=document.createElement('span'); d.className='tlm defcon'; d.id='cb-defcon'; d.setAttribute('data-lvl','5'); d.innerHTML='DEFCON <b>5</b>'; tel.insertBefore(d, tel.firstChild);
+        var btn=document.createElement('button'); btn.type='button'; btn.className='cb-audio'; btn.id='cb-audio-btn'; btn.title='Toggle sound'; tel.appendChild(btn);
+        btn.addEventListener('click', function(ev){ ev.stopPropagation(); arm(); Audio.toggleMute(); });
+        updateAudioBtn(); renderDefcon(); return true;
+      }
+      if(!buildExtras()){ var tries=0, iv=setInterval(function(){ if(buildExtras()||++tries>50) clearInterval(iv); },120); }
+
+      // ---- arm audio on first gesture; subtle UI click blips ----
+      window.addEventListener('pointerdown', arm);
+      window.addEventListener('keydown', arm);
+      var lastClick=0;
+      document.addEventListener('click', function(e){ var t=e.target; if(t && t.closest && t.closest('button, .cb-switch button, .left-actions button, .tab')){ var now=Date.now(); if(now-lastClick>60){ lastClick=now; Audio.click(); } } }, true);
+    } catch(e){ /* FX layer must never break the app */ }
+  })();
+  </script>
+
+  <!-- ── Stark-HUD overhaul III: tactical radar scope + live C2 intel ticker ── -->
+  <script>
+  (function(){
+    "use strict";
+    try {
+      var css=document.createElement('style');
+      css.textContent=[
+        '#hud-radar{position:fixed;top:calc(var(--bar-h) + 14px);left:352px;width:150px;height:170px;z-index:1180;pointer-events:none;font-family:var(--mono)}',
+        '#hud-radar canvas{display:block;filter:drop-shadow(0 0 9px rgba(0,216,255,.28))}',
+        '#hud-radar .hr-label{margin-top:3px;text-align:center;font-size:9px;letter-spacing:2.5px;color:#6f93ad}',
+        '#hud-ticker{position:fixed;left:352px;right:var(--side-width);bottom:0;height:26px;z-index:1180;pointer-events:none;display:flex;align-items:center;overflow:hidden;background:linear-gradient(180deg,rgba(6,13,20,0),rgba(5,11,18,.86));border-top:1px solid var(--glass-brd);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--mono);font-size:11px}',
+        '#hud-ticker .ht-tag{flex:0 0 auto;padding:0 12px 0 10px;height:100%;display:flex;align-items:center;color:#04121b;background:linear-gradient(90deg,var(--amber),#ffd36b);font-weight:700;letter-spacing:1.5px;clip-path:polygon(0 0,100% 0,calc(100% - 11px) 100%,0 100%)}',
+        '#hud-ticker .ht-view{flex:1 1 auto;overflow:hidden;position:relative;height:100%}',
+        '#hud-ticker .ht-track{position:absolute;top:0;left:0;white-space:nowrap;display:inline-flex;align-items:center;height:100%;will-change:transform;animation:tickerScroll 42s linear infinite}',
+        '#hud-ticker .ht-item{padding:0 4px;color:#bfe0f2}',
+        '#hud-ticker .ht-sep{padding:0 12px;color:var(--cyan);opacity:.55}',
+        '@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}',
+        '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}'
+      ].join('\n');
+      document.head.appendChild(css);
+
+      // ---- Tactical radar scope -------------------------------------------------
+      var radarWrap=document.createElement('div'); radarWrap.id='hud-radar';
+      radarWrap.innerHTML='<canvas width="150" height="150"></canvas><div class="hr-label">TACTICAL SCAN</div>';
+      document.body.appendChild(radarWrap);
+      var rAng=0, rLast=0;
+      function radarNodes(){ try{ var g=window.AppState&&AppState.activeGraph&&AppState.activeGraph(); return (g&&g.nodes)||[]; }catch(e){ return []; } }
+      function drawRadar(ts){
+        var wrap=document.getElementById('hud-radar'); if(!wrap) return; requestAnimationFrame(drawRadar);
+        if(wrap.style.display==='none') return; if(ts-rLast<33) return; rLast=ts;
+        var cv=wrap.querySelector('canvas'); if(!cv) return; var ctx=cv.getContext('2d'); if(!ctx) return;
+        var cx=75,cy=75,R=66; rAng+=0.045; if(rAng>Math.PI*2) rAng-=Math.PI*2;
+        ctx.clearRect(0,0,150,150);
+        ctx.fillStyle='rgba(4,12,19,0.5)'; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='rgba(0,216,255,0.2)'; ctx.lineWidth=1;
+        [0.33,0.66,1].forEach(function(f){ ctx.beginPath(); ctx.arc(cx,cy,R*f,0,Math.PI*2); ctx.stroke(); });
+        ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy); ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R); ctx.stroke();
+        var ns=radarNodes();
+        if(ns.length){
+          var lats=[],lons=[]; ns.forEach(function(n){ if(n.lat!=null&&n.lon!=null){ lats.push(+n.lat); lons.push(+n.lon);} });
+          if(lats.length){
+            var miA=Math.min.apply(null,lats),maA=Math.max.apply(null,lats),miO=Math.min.apply(null,lons),maO=Math.max.apply(null,lons);
+            var spA=(maA-miA)||1, spO=(maO-miO)||1;
+            ns.forEach(function(n){ if(n.lat==null||n.lon==null) return;
+              var nx=((+n.lon-miO)/spO)*2-1, ny=((+n.lat-miA)/spA)*2-1;
+              var x=cx+nx*R*0.86, y=cy-ny*R*0.86;
+              var na=Math.atan2(y-cy,x-cx); if(na<0) na+=Math.PI*2;
+              var diff=Math.abs(((rAng-na+Math.PI*3)%(Math.PI*2))-Math.PI); var ping=Math.max(0,1-diff*1.5);
+              var tm=(n.team||'').toLowerCase();
+              var col=tm==='blue'?'56,189,248':tm==='red'?'255,77,94':tm==='green'?'81,207,102':'255,212,59';
+              ctx.fillStyle='rgba('+col+','+(0.32+ping*0.68).toFixed(2)+')';
+              ctx.beginPath(); ctx.arc(x,y,1.5+ping*2.6,0,Math.PI*2); ctx.fill();
+            });
+          }
+        }
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(rAng);
+        var grad=ctx.createLinearGradient(0,0,R,0); grad.addColorStop(0,'rgba(0,216,255,0)'); grad.addColorStop(1,'rgba(0,216,255,0.3)');
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.4,0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+        ctx.strokeStyle='rgba(0,216,255,0.8)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0); ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle='rgba(0,216,255,0.5)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+      }
+      requestAnimationFrame(drawRadar);
+
+      // ---- Live C2 intel ticker -------------------------------------------------
+      var ticker=document.createElement('div'); ticker.id='hud-ticker';
+      ticker.innerHTML='<div class="ht-tag">LIVE INTEL</div><div class="ht-view"><div class="ht-track" id="ht-track"></div></div>';
+      document.body.appendChild(ticker);
+      var feed=[];
+      function esc(s){ return String(s).replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
+      function ambient(){
+        var counts=((document.getElementById('counts')||{}).textContent||'').trim();
+        var dcEl=document.getElementById('cb-defcon'); var dc=dcEl&&dcEl.getAttribute?dcEl.getAttribute('data-lvl'):'5';
+        return ['SECTOR INDO-PAC // WATCH STANDING', counts?('FORCE LAYDOWN '+counts):'FORCE LAYDOWN NOMINAL', 'THREAT POSTURE DEFCON '+dc, 'C2 DATALINK STABLE', 'ISR FEED LIVE'];
+      }
+      function renderTrack(){
+        var tr=document.getElementById('ht-track'); if(!tr) return;
+        var items=ambient().concat(feed);
+        var html=items.map(function(s){ return '<span class="ht-item">&#9656; '+esc(s)+'</span>'; }).join('<span class="ht-sep">//</span>');
+        tr.innerHTML=html+'<span class="ht-sep">//</span>'+html;
+      }
+      function pushFeed(t){ t=(t||'').replace(/\s+/g,' ').trim(); if(!t) return; feed.unshift(t.slice(0,90)); if(feed.length>10) feed.pop(); renderTrack(); }
+      renderTrack(); setInterval(renderTrack, 6000);
+      var elist=document.getElementById('event-list');
+      if(elist && window.MutationObserver){
+        new MutationObserver(function(muts){ muts.forEach(function(m){ Array.prototype.forEach.call(m.addedNodes||[],function(nd){ if(nd && nd.nodeType===1) pushFeed(nd.textContent); }); }); }).observe(elist,{childList:true});
+      }
+
+      // ---- view-aware visibility (radar on 3D+map, ticker on 3D) ----------------
+      function applyViewChrome(view){
+        var r=document.getElementById('hud-radar'), t=document.getElementById('hud-ticker');
+        if(r) r.style.display=(view==='map'||view==='3d')?'block':'none';
+        if(t) t.style.display=(view==='3d')?'flex':'none';
+      }
+      (function hook(){ var tries=0; (function go(){ var orig=window.setView;
+        if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
+        if(++tries<50) setTimeout(go,120); })(); })();
+    } catch(e){ /* HUD III layer must never break the app */ }
+  })();
   </script>
 </body>
 </html>

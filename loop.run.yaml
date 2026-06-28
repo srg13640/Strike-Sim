@@ -1,0 +1,8 @@
+mode: code
+editable_files:
+  - game.js
+gate_cmd: node tools/wargame-loop-gate.js
+metric_cmd: node tools/wargame-loop-eval.js --matches 100 --seed-base 42
+sandbox_root: ./loop-runs/20260626-1834
+budget: 8
+patience: 3

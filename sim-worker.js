@@ -10,6 +10,15 @@
 
 let activeRun = null;
 
+// Avalanche-mix (base, trialIndex) so adjacent trials get independent seeds (consecutive
+// integers leave the LCG's first draw near-linear in t). Mirror of mcMixSeed in the shell.
+function mcMixSeed(base, t) {
+  let x = ((base >>> 0) ^ Math.imul(t, 0x9E3779B1)) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
 function createRng(seed) {
   let s = seed % 2147483647;
   if (s <= 0) s += 2147483646;
@@ -399,7 +408,7 @@ function startRun(runId, payload) {
       if (activeRun.cancelled) break;
       const result = simulateTrial(payload.actionPlan || [], {
         context,
-        rng: createRng(payload.baseSeed + t),
+        rng: createRng(mcMixSeed(payload.baseSeed, t)),
         successMode: payload.successMode || 'impact',
         successN: Math.max(1, Number(payload.successN || 3)),
         victoryThreshold: Math.max(1, Number(payload.victoryThreshold || 100)),
