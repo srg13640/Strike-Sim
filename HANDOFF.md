@@ -24,7 +24,7 @@ not caution. Show us what this could be.
 A 3D multi-domain force-network visualizer with a Monte Carlo course-of-action sim. Red
 (PLA) vs Blue (US/allied), West Pacific 2040. Read `README.md` for the architecture.
 
-Run it: `python3 -m http.server 8000`, open `http://localhost:8000/DST2040.HTML`, wait
+Run it: `python3 -m http.server 8000`, open `http://localhost:8000/StrikeSim2040.html`, wait
 ~5s for the graph to settle. **Actually run it and click around** — you'll spot more in 60
 seconds of play than in an hour of reading. The views: 3D network, Geo Mode (globe), Map,
 Table, Task Org. The sim lives in the COA Builder / Generator panels.

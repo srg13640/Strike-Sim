@@ -35,7 +35,103 @@ window.EngineModule = (function () {
   // Optional real-Earth texture (equirectangular). If this file is bundled it upgrades
   // the procedural globe to a photo globe; if absent, the procedural globe is used and
   // NO request is made (a fetch-HEAD probe guards the load), so there's no 404.
-  const EARTH_TEX_URL = 'assets/earth.jpg';
+  const EARTH_TEX_URL = 'assets/earth-blue-marble-2048.png';
+  const EARTH_AUTO_ROTATE = 0.15;
+  let earthLightingDone = false;
+  let starField = null;   // procedural deep-space backdrop, lives inside the EarthSphere group
+
+  // Fresnel rim-glow shader for the atmosphere shell. Rendered on the BACK faces of a
+  // slightly larger sphere with additive blending, so the limb of the planet picks up a
+  // soft blue halo that fades toward the center — the look real orbital imagery has, and
+  // far more convincing than a flat translucent shell. Falls back to a plain additive
+  // material if ShaderMaterial fails (e.g. cross-instance THREE edge cases).
+  function makeAtmosphereMaterial() {
+    try {
+      return new THREE.ShaderMaterial({
+        uniforms: {
+          glowColor: { value: new THREE.Color(0x5cc8ff) },
+          coefficient: { value: 0.62 },
+          power: { value: 3.4 }
+        },
+        vertexShader: [
+          'varying vec3 vNormal;',
+          'varying vec3 vView;',
+          'void main() {',
+          '  vNormal = normalize(normalMatrix * normal);',
+          '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+          '  vView = normalize(-mv.xyz);',
+          '  gl_Position = projectionMatrix * mv;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform vec3 glowColor;',
+          'uniform float coefficient;',
+          'uniform float power;',
+          'varying vec3 vNormal;',
+          'varying vec3 vView;',
+          'void main() {',
+          '  float rim = pow(clamp(coefficient - dot(vNormal, vView), 0.0, 1.0), power);',
+          '  gl_FragColor = vec4(glowColor, rim);',
+          '}'
+        ].join('\n'),
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false
+      });
+    } catch (e) {
+      return new THREE.MeshBasicMaterial({
+        color: 0x4bb8ff, transparent: true, opacity: 0.11,
+        side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false
+      });
+    }
+  }
+
+  // A static starfield far outside the globe so Geo mode reads as a view from orbit
+  // rather than a sphere floating in a black box. Points are scattered on a large shell;
+  // a handful are brightened to suggest nearer stars. Pure procedural — no asset, no
+  // network. Returns a THREE.Points or null on failure.
+  function makeStarField() {
+    try {
+      const COUNT = 1400;
+      const R = EARTH_RADIUS * 9;
+      const positions = new Float32Array(COUNT * 3);
+      const colors = new Float32Array(COUNT * 3);
+      let seed = 0x9e3779b9;
+      const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      for (let i = 0; i < COUNT; i++) {
+        // even-ish distribution on a sphere
+        const u = rnd() * 2 - 1;
+        const t = rnd() * Math.PI * 2;
+        const s = Math.sqrt(1 - u * u);
+        const r = R * (0.85 + rnd() * 0.3);
+        positions[i * 3]     = r * s * Math.cos(t);
+        positions[i * 3 + 1] = r * u;
+        positions[i * 3 + 2] = r * s * Math.sin(t);
+        // mostly cool white, a few warm/bright
+        const b = 0.55 + rnd() * 0.45;
+        const warm = rnd() > 0.92;
+        colors[i * 3]     = warm ? b : b * 0.82;
+        colors[i * 3 + 1] = b * 0.9;
+        colors[i * 3 + 2] = warm ? b * 0.8 : b;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      // Constant screen-space size (no attenuation): the star shell is thousands of units
+      // out, so attenuated points collapse to sub-pixel and vanish. Fixed pixel size keeps
+      // them as crisp specks regardless of zoom.
+      const mat = new THREE.PointsMaterial({
+        size: 1.7, sizeAttenuation: false, vertexColors: true,
+        transparent: true, opacity: 0.95, depthWrite: false
+      });
+      const pts = new THREE.Points(geo, mat);
+      pts.name = 'StarField';
+      return pts;
+    } catch (e) {
+      return null;
+    }
+  }
 
   function latLonToXYZ(lat, lon, radius) {
     if (radius === undefined) radius = 400;
@@ -62,8 +158,8 @@ window.EngineModule = (function () {
       const body = new THREE.Mesh(
         new THREE.SphereGeometry(EARTH_RADIUS, 48, 48),
         new THREE.MeshPhongMaterial({
-          color: 0x0c2336, emissive: 0x040d16, shininess: 4,
-          transparent: true, opacity: 0.5, depthWrite: false
+          color: 0x09253b, emissive: 0x050f1a, shininess: 6,
+          transparent: true, opacity: 0.62, depthWrite: true
         })
       );
       group.add(body);
@@ -77,12 +173,44 @@ window.EngineModule = (function () {
       );
       group.add(grid);
 
+      const scene = graphInstance.scene && graphInstance.scene();
+      if (!scene) return;
+
+      if (!earthLightingDone) {
+        // Lower ambient + a brighter near-white key gives the planet a real terminator
+        // and self-shadowed limb (depth), while the warm-cool fill keeps the night side
+        // readable enough that pinned nodes there are never lost in pure black.
+        const ambient = new THREE.AmbientLight(0x2a4866, 0.42);
+        const key = new THREE.DirectionalLight(0xfff4e6, 1.05);
+        const fill = new THREE.DirectionalLight(0x24557d, 0.5);
+        const rim = new THREE.DirectionalLight(0x4bb8ff, 0.35);
+        key.position.set(1.35, 0.75, 1.15);
+        fill.position.set(-1, -0.55, -1.05);
+        rim.position.set(-0.6, 0.2, -1.4);
+        scene.add(ambient);
+        scene.add(key);
+        scene.add(fill);
+        scene.add(rim);
+        earthLightingDone = true;
+      }
+
+      // Fresnel rim-glow atmosphere on the planet limb.
+      const atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_RADIUS + 9, 64, 64),
+        makeAtmosphereMaterial()
+      );
+      atmosphere.name = 'Atmosphere';
+      group.add(atmosphere);
+
+      // Deep-space starfield so the globe sits in orbit, not a void.
+      starField = makeStarField();
+      if (starField) group.add(starField);
+
       earthMesh = group;
       earthMesh.visible = false;
-      const scene = graphInstance.scene && graphInstance.scene();
-      if (scene) scene.add(earthMesh);
+      scene.add(earthMesh);
 
-      // Upgrade to a real-Earth photo globe if assets/earth.jpg is bundled. Probe with a
+      // Upgrade to a real-Earth photo globe if the bundled Blue Marble texture is present. Probe with a
       // fetch HEAD first so a missing file makes no request (no 404). When textured, the
       // globe becomes opaque (far-side nodes are correctly occluded by the planet) and the
       // graticule is hidden since the photo already shows coastlines.
@@ -91,7 +219,23 @@ window.EngineModule = (function () {
           .then(r => {
             if (!(r && r.ok) || !window.THREE) return;
             const tex = new THREE.TextureLoader().load(EARTH_TEX_URL);
-            body.material = new THREE.MeshPhongMaterial({ map: tex, color: 0xffffff, emissive: 0x0a1622, shininess: 6 });
+            // Sharpen the texture at grazing angles (anisotropy) so coastlines stay crisp
+            // when the camera sits low over a theater.
+            try {
+              const renderer = graphInstance.renderer && graphInstance.renderer();
+              if (renderer && renderer.capabilities) tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            } catch (e) { /* anisotropy is a nicety, not required */ }
+            // Specular oceans: a tight, dim highlight gives the seas a wet sheen under the
+            // key light without washing out the land. Low emissive keeps the night side
+            // from going fully black so pinned nodes there remain legible.
+            body.material = new THREE.MeshPhongMaterial({
+              map: tex,
+              color: 0xffffff,
+              emissive: 0x0b1a2b,
+              emissiveIntensity: 0.6,
+              specular: 0x2b4a63,
+              shininess: 22
+            });
             body.material.needsUpdate = true;
             grid.visible = false;
           })
@@ -99,6 +243,17 @@ window.EngineModule = (function () {
       } catch (e) { /* keep procedural globe */ }
     } catch (e) {
       addEvent({ type: 'View', text: 'Globe backdrop unavailable.' });
+    }
+  }
+
+  function setGeoAutoRotate(enabled) {
+    if (!graphInstance || !graphInstance.controls) return;
+    const controls = graphInstance.controls();
+    if (!controls || typeof controls.autoRotate === 'undefined') return;
+    controls.autoRotate = !!enabled;
+    if (enabled) {
+      controls.autoRotateSpeed = EARTH_AUTO_ROTATE;
+      if (typeof controls.update === 'function') controls.update();
     }
   }
 
@@ -123,7 +278,9 @@ window.EngineModule = (function () {
     }
     cx /= k; cy /= k; cz /= k;
     const len = Math.hypot(cx, cy, cz) || 1;
-    const dist = EARTH_RADIUS * 1.9;   // out along the theater direction, with context
+    // Far enough back that the planet's curvature and the glowing atmospheric limb are in
+    // frame (the "from orbit" command-center read), while the theater still fills the view.
+    const dist = EARTH_RADIUS * 2.5;
     graphInstance.cameraPosition(
       { x: (cx / len) * dist, y: (cy / len) * dist, z: (cz / len) * dist },
       { x: cx, y: cy, z: cz },
@@ -142,7 +299,7 @@ window.EngineModule = (function () {
         const pos = latLonToXYZ(node.lat, node.lon, 400 + (node.alt || 0));
         node.fx = pos.x; node.fy = pos.y; node.fz = pos.z;
         node.x  = pos.x; node.y  = pos.y; node.z  = pos.z;
-      } else {
+      } else if (node.fx == null || node.fy == null || node.fz == null) {
         const angle = Math.random() * 2 * Math.PI;
         const r = 50 + Math.random() * 20;
         const px = r * Math.cos(angle);
@@ -156,6 +313,7 @@ window.EngineModule = (function () {
       .d3Force('charge', null)
       .d3Force('center', null)
       .d3ReheatSimulation();
+    setGeoAutoRotate(true);
     frameGeo();   // pull back so the globe + pinned nodes are actually visible
   }
 
@@ -168,6 +326,7 @@ window.EngineModule = (function () {
       .d3Force('link', d3.forceLink().distance(60))
       .d3Force('charge', d3.forceManyBody().strength(-150))
       .d3Force('center', d3.forceCenter());
+    setGeoAutoRotate(false);
     graphInstance.d3ReheatSimulation();
   }
 
@@ -183,7 +342,21 @@ window.EngineModule = (function () {
    */
   function create(containerId, opts) {
     opts = opts || {};
-    graphInstance = ForceGraph3D()(document.getElementById(containerId))
+    // WebGL context acquisition, tuned for COMPATIBILITY first. The big lever is
+    // powerPreference: 'high-performance' can make getContext() FAIL outright on machines
+    // with hardware acceleration disabled or a laptop whose discrete GPU is parked — the
+    // exact "WebGL context failed" case operators hit. 'default' lets the browser pick any
+    // working adapter (integrated or software). failIfMajorPerformanceCaveat:false keeps a
+    // software/SwiftShader fallback eligible. The caller may pass opts.rendererConfig to
+    // retry with an even more conservative profile.
+    const rendererConfig = opts.rendererConfig || {
+      antialias: true,
+      alpha: false,
+      powerPreference: 'default',
+      failIfMajorPerformanceCaveat: false,
+      preserveDrawingBuffer: false
+    };
+    graphInstance = ForceGraph3D({ rendererConfig })(document.getElementById(containerId))
       .graphData({ nodes: [], links: [] }) // Start empty
       .nodeLabel(opts.nodeLabel || (n => `${n.name} (${n.id})`))
       .nodeColor(opts.nodeColor || (n => n.color || '#ffffff'))
@@ -263,5 +436,25 @@ window.EngineModule = (function () {
   function getGraph() { return graphInstance; }
   function isInitialViewDone() { return initialViewDone; }
 
-  return { create, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
+  // Tear down a (possibly half-built) graph instance so a retry can re-create cleanly:
+  // run the lib destructor, force the WebGL context loss to free the GPU slot, and reset
+  // all module state including the lazily-built globe so it rebuilds on the new instance.
+  function dispose() {
+    try {
+      if (graphInstance) {
+        const r = graphInstance.renderer && graphInstance.renderer();
+        if (graphInstance._destructor) graphInstance._destructor();
+        if (r && r.forceContextLoss) r.forceContextLoss();
+        if (r && r.dispose) r.dispose();
+      }
+    } catch (e) { /* best-effort cleanup */ }
+    graphInstance = null;
+    window.graphInstance = null;
+    initialViewDone = false;
+    earthMesh = null;
+    starField = null;
+    earthLightingDone = false;
+  }
+
+  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
 })();

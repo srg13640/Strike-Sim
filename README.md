@@ -18,7 +18,7 @@ No build step, no package manager, no backend. You need a static file server (to
 ```bash
 # from the project root
 python3 -m http.server 8000
-# then open:  http://localhost:8000/DST2040.HTML
+# then open:  http://localhost:8000/StrikeSim2040.html
 ```
 
 The app boots, auto-loads the two bundled scenarios (Red + Blue), and frames the 3D
@@ -51,7 +51,7 @@ static server.
 
 | File | Responsibility |
 |------|----------------|
-| `DST2040.HTML` | App shell: markup, styles, orchestration glue, filters, modals, the COA UI, and the core simulation engine. Loads the modules below. |
+| `StrikeSim2040.html` | App shell: markup, styles, orchestration glue, filters, modals, the COA UI, and the core simulation engine. Loads the modules below. |
 | `ui.js` (`UiModule`) | UI notification primitives: toasts + the event log. |
 | `state.js` (`AppState`) | Scenario-centric application state. A *scenario* owns the graph; foundation for future multi-scenario support. |
 | `sim.js` (`SimModule`) | Simulation foundation: seeded RNG, action/counter profiles, statistics, and the graph→context snapshot builder. |
@@ -111,7 +111,7 @@ A link is `{ "source": "<id>", "target": "<id>" }`. Bundled scenarios:
 
 ```
 .
-├── DST2040.HTML          # app shell + orchestration + sim engine
+├── StrikeSim2040.html          # app shell + orchestration + sim engine
 ├── ui.js  state.js  sim.js  map.js  engine.js  views.js
 ├── inline-datasets.js    # startup scenario auto-loader
 ├── grok150red.json  grokblue90.json   # bundled scenarios

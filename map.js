@@ -26,7 +26,21 @@ window.MapModule = (function () {
   let leafletMap = null;
   let markersLayer = null;
   let mapLinksLayer = null;
+  let coastlineLayer = null;
   const mapMarkers = new Map(); // id -> marker
+  // Leaflet renders EPSG:3857. Keep a generated full-world Web Mercator Blue Marble
+  // underneath the operational theater so panning never falls back to a dead grid, then
+  // drape the PO-provided Indo-Pacific satellite image over a tight regional envelope.
+  const WEB_MERCATOR_MAX_LAT = 85.05112878;
+  const GLOBAL_SATELLITE_BOUNDS = [[-WEB_MERCATOR_MAX_LAT, -180], [WEB_MERCATOR_MAX_LAT, 180]];
+  const GLOBAL_SATELLITE_BASEMAP = 'assets/earth-blue-marble-webmercator-2048.jpg';
+  // The square source image covers mainland China through Japan, the Philippines,
+  // Indonesia, and Papua New Guinea. These bounds intentionally hug visible coastlines
+  // so force-network nodes sit on recognizable terrain instead of an abstract grid.
+  const THEATER_SATELLITE_BOUNDS = [[-13.5, 57.5], [62.5, 173.5]];
+  const THEATER_SATELLITE_BASEMAP = 'assets/earth-blue-marble-indopac-3072.jpg';
+  let globalSatelliteLoaded = false;
+  let theaterSatelliteLoaded = false;
 
   // --- Injected context (overridden by init); safe defaults so nothing throws ---
   let ctx = {
@@ -34,6 +48,7 @@ window.MapModule = (function () {
     getHighlightMode: () => null,
     getHighlightSet: () => new Set(),
     isMapMode: () => false,
+    enableLocalTiles: false,
     tileBasePath: './tiles',
     blankTileDataUrl: ''
   };
@@ -49,7 +64,7 @@ window.MapModule = (function () {
 
   function ensureMap() {
     if (leafletMap) return;
-    let coastlinesLoaded = false;   // offline vector basemap (assets/land.geojson)
+    let coastlinesLoaded = false;   // offline vector fallback (assets/land.geojson)
     let realTilesLoaded = false;    // raster tiles found under ./tiles/
     leafletMap = L.map('map', {
       zoomControl: true,
@@ -67,9 +82,9 @@ window.MapModule = (function () {
         const size = this.getTileSize();
         tile.width = size.x; tile.height = size.y;
         const c = tile.getContext('2d');
-        c.fillStyle = '#0b131b';
+        c.fillStyle = '#020814';
         c.fillRect(0, 0, size.x, size.y);
-        c.strokeStyle = '#1e2a38';
+        c.strokeStyle = '#10202b';
         c.lineWidth = 1;
         c.strokeRect(0.5, 0.5, size.x - 1, size.y - 1);
         return tile;
@@ -84,21 +99,85 @@ window.MapModule = (function () {
     leafletMap.getPane('basemapPane').style.zIndex = 250;
     leafletMap.getPane('basemapPane').style.pointerEvents = 'none';
 
-    // Offline vector basemap: regional land/coastlines from a bundled GeoJSON, drawn on
-    // top of the blank grid so the operator sees actual geography (China coast, Japan,
-    // Taiwan, Philippines, …) with NO map tiles. Relative path -> within OFFLINE_MODE.
+    // Basemap status helper: keep one status signal even as layers come online asynchronously.
+    const setBasemapStatus = (text, state) => {
+      const el = document.querySelector('.basemap-status');
+      if (!el) return;
+      el.textContent = text;
+      if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
+    };
+    const refreshBasemapStatus = () => {
+      if (realTilesLoaded) {
+        setBasemapStatus(theaterSatelliteLoaded ? 'Basemap: local tiles + theater satellite' : 'Basemap: local tiles', 'ok');
+      } else if (theaterSatelliteLoaded) {
+        setBasemapStatus('Basemap: theater satellite', 'ok');
+      } else if (globalSatelliteLoaded) {
+        setBasemapStatus('Basemap: global satellite', 'ok');
+      } else if (coastlinesLoaded) {
+        setBasemapStatus('Basemap: coastlines (offline)', 'ok');
+      } else {
+        setBasemapStatus('Basemap: offline grid', 'offline');
+      }
+    };
+    const shouldShowCoastlineFallback = () => coastlinesLoaded && !realTilesLoaded && !globalSatelliteLoaded && !theaterSatelliteLoaded;
+    const refreshCoastlineFallback = () => {
+      if (!coastlineLayer || !leafletMap) return;
+      const visible = shouldShowCoastlineFallback();
+      const hasLayer = leafletMap.hasLayer(coastlineLayer);
+      if (visible && !hasLayer) coastlineLayer.addTo(leafletMap);
+      if (!visible && hasLayer) leafletMap.removeLayer(coastlineLayer);
+    };
+
+    // Offline satellite basemaps behind coastlines so markers and links remain visible.
+    const addImageBasemap = (url, bounds, opts = {}) => {
+      try {
+        fetch(url, { method: 'HEAD', cache: 'force-cache' })
+          .then(r => {
+            if (!(r && r.ok) || !leafletMap) return;
+            L.imageOverlay(url, bounds, {
+              pane: 'basemapPane',
+              interactive: false,
+              opacity: opts.opacity ?? 1,
+              className: opts.className || ''
+            }).addTo(leafletMap);
+            if (opts.kind === 'theater') theaterSatelliteLoaded = true;
+            if (opts.kind === 'global') globalSatelliteLoaded = true;
+            refreshCoastlineFallback();
+            refreshBasemapStatus();
+          })
+          .catch(() => {});
+      } catch (err) {
+        // No-op: offline fallback stack remains in place.
+      }
+    };
+    // ONE geospatially-honest basemap: the full-world Web Mercator Blue Marble, at full
+    // opacity. The regional Indo-Pacific crop (earth-blue-marble-indopac-3072.jpg) was
+    // deliberately removed here: it is a square image draped over a lat/lon rectangle, so
+    // in EPSG:3857 it stretches by latitude and floats out of register with the basemap and
+    // the unit markers (the misaligned rectangle the operator reported). A single correctly
+    // projected basemap keeps imagery, coastlines, and markers in one coordinate system.
+    addImageBasemap(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, {
+      kind: 'global',
+      opacity: 1,
+      className: 'global-satellite-overlay'
+    });
+
+    // Offline vector fallback: land/coastlines from bundled GeoJSON. It is intentionally
+    // hidden when any raster basemap loads, because drawing this vector outline over the
+    // regional satellite crop creates a visible projection mismatch.
     try {
       fetch('assets/land.geojson', { cache: 'force-cache' })
         .then(r => (r && r.ok) ? r.json() : null)
         .then(geo => {
           if (!geo || !leafletMap) return;
-          L.geoJSON(geo, {
+          coastlineLayer = L.geoJSON(geo, {
             pane: 'basemapPane',
             interactive: false,
-            style: { color: '#33617f', weight: 0.7, opacity: 0.85, fillColor: '#15293a', fillOpacity: 1 }
-          }).addTo(leafletMap);
+            style: { color: '#5fbde8', weight: 0.55, opacity: 0.48, fillColor: '#15293a', fillOpacity: 0.035 }
+          });
           coastlinesLoaded = true;
-          if (!realTilesLoaded) setBasemapStatus('Basemap: coastlines (offline)', 'ok');
+          refreshCoastlineFallback();
+          refreshBasemapStatus();
         })
         .catch(() => {});
     } catch (e) { /* non-fatal */ }
@@ -127,12 +206,6 @@ window.MapModule = (function () {
       }
     });
     new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
-    const setBasemapStatus = (text, state) => {
-      const el = document.querySelector('.basemap-status');
-      if (!el) return;
-      el.textContent = text;
-      if (state) el.setAttribute('data-state', state); else el.removeAttribute('data-state');
-    };
 
     // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
     // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
@@ -141,19 +214,24 @@ window.MapModule = (function () {
     // so it stays within OFFLINE_MODE; any failure (e.g. file://) degrades to offline.
     const enableRealTiles = () => {
       realTilesLoaded = true;
+      refreshCoastlineFallback();
       L.tileLayer(`${ctx.tileBasePath}/{z}/{x}/{y}.png`, {
         minZoom: 0, maxZoom: 5, tileSize: 256, attribution: 'Local tiles'
       }).addTo(leafletMap);
-      setBasemapStatus('Basemap: local tiles', 'ok');
+      refreshBasemapStatus();
     };
     // If no raster tiles, the offline coastline basemap is still shown, so only fall back
     // to the bare-grid message when even that hasn't loaded.
-    const noTiles = () => { if (!coastlinesLoaded) setBasemapStatus('Basemap: offline grid', 'offline'); };
-    try {
-      fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
-        .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
-        .catch(noTiles);
-    } catch (err) {
+    const noTiles = () => { refreshBasemapStatus(); };
+    if (ctx.enableLocalTiles && ctx.tileBasePath) {
+      try {
+        fetch(`${ctx.tileBasePath}/0/0/0.png`, { method: 'HEAD', cache: 'no-cache' })
+          .then(r => { if (r && r.ok) enableRealTiles(); else noTiles(); })
+          .catch(noTiles);
+      } catch (err) {
+        noTiles();
+      }
+    } else {
       noTiles();
     }
 
@@ -263,9 +341,15 @@ window.MapModule = (function () {
     });
   }
 
+  // Indo-Pacific operational frame — used whenever there are no markers to fit to yet,
+  // so the map NEVER falls back to a whole-world view (the "zoomed out, centered on Africa"
+  // state). This is a theater tool; an empty map should still show the theater.
+  const THEATER_VIEW_BOUNDS = [[-12, 95], [50, 150]];
+
   function fitMapToMarkers() {
-    if (!leafletMap || mapMarkers.size === 0) {
-      if (leafletMap) leafletMap.setView([20, 0], 2);
+    if (!leafletMap) return;
+    if (mapMarkers.size === 0) {
+      try { leafletMap.fitBounds(THEATER_VIEW_BOUNDS); } catch (e) { leafletMap.setView([18, 125], 3); }
       return;
     }
     const group = L.featureGroup(Array.from(mapMarkers.values()));
