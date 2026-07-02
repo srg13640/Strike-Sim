@@ -11,6 +11,14 @@
  * Geo), then the HUD offers context actions — strike methods against an enemy node,
  * or harden/repair on a friendly one. Orders queue against an action-point budget;
  * "Commit Turn" gathers any AI side's orders and resolves everything simultaneously.
+ *
+ * Increment A (GAME_DESIGN.md §10): the HUD additionally consumes — strictly
+ * read-only, all optional — the engine's calendar (D-day turn labels), denialHistory
+ * (per-turn staff-estimate trend), lodgment (Red's win track) and result (denial
+ * verdict + horizon projection). Every field degrades gracefully when absent so an
+ * older GameModule renders exactly as before. A skippable Taiwan-2027 scenario brief
+ * (NOTIONAL//UNCLASSIFIED) gates the START MATCH path; skip state is remembered in
+ * localStorage.
  */
 (function () {
   'use strict';
@@ -27,6 +35,11 @@
 
   // Strike FX: tracks active overlay/flash elements and timers so they are always cleaned up.
   var _fxTimers = [];
+
+  // Increment A: scenario-brief plumbing. The brief interposes between the setup screen
+  // and match start; the skip preference persists (same key style as strikesim-intro-seen).
+  var BRIEF_SKIP_KEY = 'strikesim-wg-brief-skip';
+  var pendingCfg = null;        // setup config stashed while the brief screen is up
 
   function humanSides(cfg) { return ['blue', 'red'].filter(function (s) { return cfg.control[s] === 'human'; }); }
   function otherSide(s) { return s === 'blue' ? 'red' : 'blue'; }
@@ -495,6 +508,59 @@
     '.wg-curtain b.blue{color:#38bdf8;}.wg-curtain b.red{color:#ff4d5e;}',
     '.wg-curtain .wg-btn{min-width:220px;}',
 
+    // ---- Scenario brief (Increment A) ----
+    '.wg-brief-class{',
+      "font:700 10px/1.3 'Share Tech Mono',ui-monospace,monospace;letter-spacing:.12em;",
+      'color:#ffd43b;border:1px solid rgba(255,212,59,0.35);background:rgba(255,212,59,0.07);',
+      'border-radius:4px;padding:5px 8px;text-align:center;margin-bottom:12px;',
+    '}',
+    '.wg-brief p{',
+      "font:400 12px/1.55 'Inter',system-ui,sans-serif;color:#bcd6ec;margin:0;",
+    '}',
+    '.wg-brief-skiprow{',
+      'display:flex;gap:7px;align-items:flex-start;cursor:pointer;margin-top:4px;',
+      "font:400 11px/1.4 'Inter',system-ui,sans-serif;color:#7fa3c0;",
+    '}',
+
+    // ---- Denial assessment: sparkline + lodgment track (Increment A) ----
+    '.wg-denial-wrap{display:flex;align-items:flex-end;gap:8px;}',
+    '.wg-denial-spark{',
+      'flex:1;display:flex;align-items:flex-end;gap:2px;height:36px;padding:2px;',
+      'border:1px solid rgba(0,216,255,0.12);border-radius:4px;background:rgba(9,16,24,0.6);',
+    '}',
+    '.wg-denial-spark i{',
+      'flex:1;min-width:4px;border-radius:1px 1px 0 0;',
+      'background:linear-gradient(180deg,#00d8ff,rgba(0,216,255,0.35));opacity:.55;',
+    '}',
+    '.wg-denial-spark i:last-child{opacity:1;box-shadow:0 0 6px rgba(0,216,255,0.5);}',
+    '.wg-denial-val{',
+      "font:700 16px/1 'Share Tech Mono',ui-monospace,monospace;color:#00d8ff;",
+    '}',
+    '.wg-est-note{',
+      "font:400 10.5px/1.45 'Inter',system-ui,sans-serif;color:#7e9cb5;font-style:italic;margin:4px 0 0;",
+    '}',
+    '.wg-lodg{',
+      'position:relative;height:9px;border-radius:5px;margin-top:9px;',
+      'background:rgba(255,77,94,0.10);border:1px solid rgba(255,77,94,0.18);',
+    '}',
+    '.wg-lodg>i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,94,0.45),#ff4d5e);}',
+    '.wg-lodg .thr{',
+      'position:absolute;top:-4px;bottom:-4px;width:2px;background:#ffd43b;',
+      'box-shadow:0 0 6px rgba(255,212,59,0.7);',
+      'animation:wg-thr-pulse 2.2s ease-in-out infinite;',
+    '}',
+    '.wg-lodg-meta{margin-top:5px;color:#e8a0a8;}',
+    '.wg-lodg-meta b{color:#ff8a8a;}',
+    '@keyframes wg-thr-pulse{0%,100%{opacity:1}50%{opacity:0.55}}',
+
+    // ---- Horizon projection block (Increment A end screen) ----
+    '.wg-proj{',
+      'border:1px solid rgba(0,216,255,0.18);border-radius:6px;background:rgba(9,16,24,0.7);',
+      'padding:8px 10px;margin-top:8px;',
+      "font:400 12px/1.5 'Share Tech Mono',ui-monospace,monospace;color:#cfe0ee;",
+    '}',
+    '.wg-proj b{color:#eaf4ff;}',
+
     // ---- Strike FX keyframes ----
     '@keyframes wg-fx-flash{',
       '0%{opacity:0}10%{opacity:1}80%{opacity:0.6}100%{opacity:0}',
@@ -514,6 +580,7 @@
       '#wg-hud{transition:none;}',
       '.wg-btn,.wg-toggle button,.wg-chip{transition:none;}',
       '#wg-strike-fx,#wg-strike-tracer,#wg-strike-badge{display:none!important;}',
+      '.wg-lodg .thr{animation:none;}',
     '}',
 
     // ---- Fonts ----
@@ -598,20 +665,30 @@
       sideSetup('blue', 'Blue (US / Allied)') +
       sideSetup('red', 'Red (PLA)') +
       '<div class="wg-sec"><h4>Match length</h4><div class="wg-toggle" id="wg-turns">' +
-        turnsBtn(6) + turnsBtn(10) + turnsBtn(16) + '</div></div>' +
+        turnsBtn(6) + turnsBtn(10) + turnsBtn(16) + '</div>' +
+        '<p class="wg-hint" style="margin-top:6px;">Six 3.5-day turns cover the decisive first three weeks &mdash; D+1 through D+18.5. Longer matches run the same clock further.</p></div>' +
       '<div class="wg-sec"><h4>AI difficulty</h4><div class="wg-toggle" id="wg-diff">' +
         '<button data-diff="easy">Easy</button><button data-diff="hard" class="on">Hard</button></div></div>' +
       '<div class="wg-sec"><h4>Fog of war</h4><div class="wg-toggle" id="wg-fog">' +
         '<button data-fog="on">On</button><button data-fog="off">Off</button></div>' +
         '<p class="wg-hint" style="margin-top:6px;">On: enemy strength is masked while you plan, and a two-human match hands off blind so neither side sees the other\'s orders.</p></div>' +
-      '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. A side is defeated if its surviving force value falls below 35% of its start, otherwise the higher score at the final turn wins.</p>' +
+      '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. Blue wins by halting Red\'s invasion &mdash; throughput below what a lodgment needs &mdash; before the window closes; Red wins by building the lodgment first. Still ambiguous at the horizon? The engine projects the continuation from the final state &mdash; the clock never extends.</p>' +
       '<p class="wg-strat">&#9889; <b>Command tempo:</b> your action points each turn come from your surviving <b>Command</b> &amp; <b>Logistics</b> nodes. Strike the enemy\'s C2/sustainment to throttle how many orders they can issue &mdash; or protect your own to keep your tempo up.</p>' +
-      '<p class="wg-strat">&#127919; <b>Key objectives:</b> each side has 8 high-value nodes. Lose most of yours and you\'re defeated outright &mdash; so it\'s hold-your-key-terrain and deny-theirs, not just attrition.</p>';
+      '<p class="wg-strat">&#127919; <b>Key objectives:</b> each side has 8 high-value nodes. Lose most of yours and you\'re defeated outright &mdash; so it\'s hold-your-key-terrain and deny-theirs, not just attrition.</p>' +
+      '<button class="wg-btn full" data-act="brief-view" style="margin-top:4px;">&#128220; VIEW SCENARIO BRIEF</button>';
     document.getElementById('wg-foot').innerHTML = '<button class="wg-btn primary" data-act="start">START MATCH</button>';
-    // defaults
+    // defaults — six 3.5-day turns is the designed match (GAME_DESIGN.md §3)
     setToggle('wg-ctl-blue', 'human'); setToggle('wg-ctl-red', 'ai');
-    setToggle('wg-turns', '10');
+    setToggle('wg-turns', '6');
     setToggle('wg-fog', 'on');
+  }
+  // Re-apply a stashed setup config to the toggle groups (used returning from the brief).
+  function applySetup(cfg) {
+    if (!cfg) return;
+    setToggle('wg-ctl-blue', cfg.control.blue); setToggle('wg-ctl-red', cfg.control.red);
+    setToggle('wg-turns', String(cfg.turnLimit));
+    setToggle('wg-diff', cfg.difficulty.blue);
+    setToggle('wg-fog', cfg.fog ? 'on' : 'off');
   }
   function sideSetup(side, label) {
     return '<div class="wg-sec"><h4>' + esc(label) + '</h4><div class="wg-toggle ' + side + '" id="wg-ctl-' + side + '">' +
@@ -634,10 +711,41 @@
     var fogOn = document.querySelector('#wg-fog button.on');
     return {
       control: { blue: ctl('blue'), red: ctl('red') },
-      turnLimit: turnsOn ? Number(turnsOn.getAttribute('data-turns')) : 10,
+      turnLimit: turnsOn ? Number(turnsOn.getAttribute('data-turns')) : 6,
       difficulty: { blue: diffOn ? diffOn.getAttribute('data-diff') : 'hard', red: diffOn ? diffOn.getAttribute('data-diff') : 'hard' },
       fog: fogOn ? fogOn.getAttribute('data-fog') === 'on' : true
     };
+  }
+
+  // ---- scenario brief (Increment A, GAME_DESIGN.md §3.1/§8) -----------------------
+  // Hardcoded Taiwan 2027 NOTIONAL content is fine pre-Increment-F; the pre-adjudicated
+  // opening-salvo *playback* is Increment D and deliberately not built here. Readable in
+  // under 90 seconds; skippable for repeat plays via localStorage.
+  function briefWanted() {
+    try { return localStorage.getItem(BRIEF_SKIP_KEY) !== '1'; } catch (e) { return true; }
+  }
+  function renderBrief() {
+    var skip = false;
+    try { skip = localStorage.getItem(BRIEF_SKIP_KEY) === '1'; } catch (e) {}
+    document.getElementById('wg-sub').textContent = 'Scenario brief — Taiwan 2027';
+    document.getElementById('wg-body').innerHTML =
+      '<div class="wg-brief">' +
+      '<div class="wg-brief-class">NOTIONAL//UNCLASSIFIED &mdash; open-source derived scenario</div>' +
+      '<div class="wg-sec"><h4>Sitrep &mdash; Taiwan, 2027</h4>' +
+        '<p>D+1. PLA joint fires opened the war the way systems-destruction doctrine prescribes: Blue C2, ISR, and basing across the first island chain are under attack, and the amphibious fleet is massing across the strait [ENGSTROM; WUTHNOW]. The first echelon crosses within days; weather holds Red\'s invasion window open for roughly three weeks. You fight six 3.5-day turns &mdash; D+1 through D+18.5, the decisive first three weeks [CSIS-FB].</p></div>' +
+      '<div class="wg-sec"><h4>Commander\'s intent</h4>' +
+        '<p><b>Deny.</b> Red must be unable to build and sustain a lodgment against Taiwan\'s defense inside the fait-accompli window. Taiwan\'s continued autonomy is the end state. Blue losses are reported alongside &mdash; they never change the verdict [CSIS-FB].</p></div>' +
+      '<div class="wg-sec"><h4>ROE</h4>' +
+        '<p>Strikes on the Chinese mainland are <b>withheld</b>. Operate under restrictive escalation guidance. Expect no wartime resupply &mdash; the theater fights this war with what it has on D+1 [CSIS-FB].</p></div>' +
+      '<div class="wg-sec"><h4>What winning means</h4>' +
+        '<p><b style="color:#38bdf8">Blue wins by halt:</b> Red\'s lift and sustainment throughput falls below what a lodgment needs before the window closes.<br>' +
+        '<b style="color:#ff4d5e">Red wins by lodgment:</b> enough combat power ashore, sustained, before D+18.5.<br>' +
+        'The clock is hard. Still ambiguous at the horizon, the engine projects the continuation from the final state and scores the distribution &mdash; no extra turns.</p></div>' +
+      '<label class="wg-brief-skiprow"><input type="checkbox" data-act="brief-skip"' + (skip ? ' checked' : '') + '> Skip this brief on future matches (reopen any time from setup)</label>' +
+      '</div>';
+    document.getElementById('wg-foot').innerHTML =
+      '<button class="wg-btn primary" data-act="brief-start">ACKNOWLEDGE &rarr; START MATCH</button>' +
+      '<button class="wg-btn full" data-act="brief-back" style="margin-top:6px;">&larr; BACK TO SETUP</button>';
   }
 
   // ---- game view -----------------------------------------------------------------
@@ -654,6 +762,7 @@
     var humans = humanSides(cfg);
     var fog = fogActive(cfg);
     var fogHandoff = fog && humans.length > 1;   // sequential blind planning between two humans
+    var dday = ddayText(state);                  // 'D+4.5' style label, null on an older engine
 
     // Initialise each plan phase once: pick who plans first and drop any stale curtain.
     if (state.phase === 'plan' && planTurnInit !== state.turn) {
@@ -669,7 +778,7 @@
 
     // Blind-handoff curtain takes over the whole panel between two human turns.
     if (curtain && pendingSide) {
-      document.getElementById('wg-sub').textContent = 'Turn ' + state.turn + ' · handoff';
+      document.getElementById('wg-sub').textContent = 'Turn ' + state.turn + (dday ? ' — ' + dday : '') + ' · handoff';
       body.innerHTML = '<div class="wg-curtain"><div class="lock">🔒</div><div class="ttl">ORDERS LOCKED</div>' +
         '<p>Pass the device to <b class="' + pendingSide + '">' + pendingSide.toUpperCase() + '</b>.<br>The previous orders are hidden — no peeking.</p>' +
         '<button class="wg-btn primary" data-act="ready">' + pendingSide.toUpperCase() + ' IS READY &rarr;</button></div>';
@@ -677,13 +786,17 @@
       return;
     }
 
+    // Calendar-labeled turn indicator ("TURN 2 / 6 — D+4.5") when the engine publishes
+    // s.calendar; otherwise the pre-Increment-A label, unchanged.
     document.getElementById('wg-sub').textContent =
-      state.phase === 'over' ? 'Match complete'
-        : ('Turn ' + state.turn + ' of ' + cfg.turnLimit + ' · ' + (state.phase === 'plan' ? (fogHandoff ? activeSide.toUpperCase() + ' planning' : 'planning') : 'resolved'));
+      state.phase === 'over' ? ('Match complete' + (dday ? ' — ' + dday : ''))
+        : ((dday ? 'TURN ' + state.turn + ' / ' + cfg.turnLimit + ' — ' + dday
+                 : 'Turn ' + state.turn + ' of ' + cfg.turnLimit) +
+           ' · ' + (state.phase === 'plan' ? (fogHandoff ? activeSide.toUpperCase() + ' planning' : 'planning') : 'resolved'));
 
     // During planning under fog, mask the side that is NOT currently planning.
     var maskEnemy = (fog && state.phase === 'plan' && cfg.control[activeSide] === 'human') ? otherSide(activeSide) : null;
-    var html = scoreboard(state, maskEnemy);
+    var html = scoreboard(state, maskEnemy) + denialSection(state);
 
     if (state.phase === 'over') {
       // banner only; orders hidden
@@ -705,7 +818,7 @@
     }
 
     if (state.phase === 'resolved' || state.phase === 'over') {
-      if (state.phase === 'over') html += aarSection(state);
+      if (state.phase === 'over') html += resultSection(state) + aarSection(state);
       html += logSection(state);
     }
     body.innerHTML = html;
@@ -775,6 +888,145 @@
       '<div class="wg-meta">' + alive + '/' + total + ' active &middot; force <span style="color:' + forceColor + '">' + forcePct + '%</span></div>' +
       '<div class="wg-bar"><i style="width:' + forcePct + '%;background:' + forceColor + ';opacity:0.85;"></i></div>' +
       tempoRow + objRow + '</div>';
+  }
+
+  // ---- Increment A read-only consumers of the GameModule contract fields ----------
+  // (s.calendar / s.denialHistory / s.lodgment / s.result — all optional; every reader
+  // below returns '' / null when its field is absent so an older engine is untouched.)
+
+  // 'D+4.5' label from s.calendar.dday (D+1 at turn 1, advancing 3.5 per turn).
+  function ddayText(state) {
+    var cal = state && state.calendar;
+    if (!cal || typeof cal.dday !== 'number' || !isFinite(cal.dday)) return null;
+    var r = Math.round(cal.dday * 10) / 10;
+    return 'D+' + (r % 1 === 0 ? String(Math.round(r)) : r.toFixed(1));
+  }
+  function fmt2(v) { return (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 100) / 100).toFixed(2) : '—'; }
+
+  // Denial trend (stepped-bar sparkline over s.denialHistory) + lodgment track
+  // (s.lodgment.value 0..1 toward Red's win, threshold marked). Static DOM bars, no
+  // canvas, no new deps; the only animation (threshold pulse) is disabled under
+  // prefers-reduced-motion. Captions are fog-honest: staff estimate, not ground truth.
+  function denialSection(state) {
+    var hist = Array.isArray(state.denialHistory) ? state.denialHistory : [];
+    var lodg = (state.lodgment && typeof state.lodgment.value === 'number') ? state.lodgment : null;
+    if (!hist.length && !lodg) return '';
+    var html = '<div class="wg-sec"><h4>Denial assessment <span class="wg-fogtag">staff estimate</span></h4>';
+    if (hist.length) {
+      var last = hist[hist.length - 1];
+      var bars = hist.map(function (h) {
+        var v = Math.max(0, Math.min(1, Number(h.index) || 0));
+        var px = Math.max(2, Math.round(v * 32));
+        return '<i style="height:' + px + 'px" title="T' + esc(h.turn) + ' denial index ' + fmt2(v) + '"></i>';
+      }).join('');
+      html += '<div class="wg-denial-wrap">' +
+        '<div class="wg-denial-spark" role="img" aria-label="Denial index by turn, latest ' + fmt2(last.index) + '">' + bars + '</div>' +
+        '<div class="wg-denial-val">' + fmt2(last.index) + '</div></div>' +
+        '<div class="wg-meta" style="margin-top:4px;">T' + esc(last.turn) + ' &middot; Red throughput ' + fmt2(last.throughput) + ' &middot; OSVI ' + fmt2(last.osvi) + '</div>' +
+        '<p class="wg-est-note">Staff estimate of Red\'s invasion system, updated each turn &mdash; not ground truth.</p>';
+    }
+    if (lodg) {
+      var thr = (typeof lodg.threshold === 'number' && lodg.threshold > 0) ? lodg.threshold : 1;
+      var v = Math.max(0, Number(lodg.value) || 0);
+      var span = Math.max(thr, v) * 1.12;                  // headroom so the win line sits inside the bar
+      var fill = Math.min(100, Math.round((v / span) * 100));
+      var mark = Math.min(97, Math.round((thr / span) * 100));
+      var pctOfWin = Math.round((v / thr) * 100);
+      html += '<div class="wg-lodg" role="img" aria-label="Red lodgment at ' + pctOfWin + '% of its win threshold">' +
+        '<i style="width:' + fill + '%"></i><span class="thr" style="left:' + mark + '%" title="Red win threshold"></span></div>' +
+        '<div class="wg-meta wg-lodg-meta">Red lodgment <b>' + pctOfWin + '%</b> of win threshold</div>' +
+        '<p class="wg-est-note">Red wins if accumulated buildup crosses the line before the clock runs out.</p>';
+    }
+    return html + '</div>';
+  }
+
+  // End-of-match verdict from s.result — winner + reason in doctrine language, and for
+  // reason 'horizon' the MC projection summary with the honest-uncertainty caption (§3).
+  function resultSection(state) {
+    var res = state.result;
+    if (!res || (!res.winner && !res.reason)) return '';
+    var side = (res.winner === 'blue' || res.winner === 'red') ? res.winner : '';
+    var who = side ? side.toUpperCase() + ' — ' : '';
+    var at = ddayText(state);
+    var head, body;
+    if (res.reason === 'halt') {
+      head = who + 'INVASION HALTED';
+      body = (res.detail === 'early-collapse')
+        ? 'Red force cohesion collapsed outright' + (at ? ' by ' + at : '') + ' — the invasion cannot continue.'
+        : 'Red throughput fell below the sustainment threshold' + (at ? ' by ' + at : '') +
+          ' — the lodgment can be neither built nor sustained inside the window.';
+    } else if (res.reason === 'lodgment') {
+      head = who + 'LODGMENT SUSTAINED';
+      body = (res.detail === 'early-collapse')
+        ? 'Blue force cohesion collapsed' + (at ? ' by ' + at : '') + ' — the fait accompli stands uncontested.'
+        : 'Red put sufficient combat power ashore and sustained it' + (at ? ' by ' + at : '') +
+          ' — the fait accompli stands.';
+    } else if (res.reason === 'horizon') {
+      head = who + (res.projection ? 'DECIDED AT THE HORIZON' : (res.winner === 'draw' ? 'UNRESOLVED AT THE HORIZON' : 'DECIDED AT THE HORIZON'));
+      body = 'The window closed' + (at ? ' at ' + at : '') + ' with the outcome still in the balance.' +
+        (res.projection ? ' The verdict is a seeded projection of the continuation from the final state — the clock never extends.' : '');
+    } else {
+      head = who + String(res.reason || 'MATCH DECIDED').toUpperCase();
+      body = '';
+    }
+    var html = '<div class="wg-sec"><h4>Verdict</h4>' +
+      '<div class="wg-aar-callout ' + side + '"><b>' + esc(head) + '</b>' + (body ? '<br>' + esc(body) : '') + '</div>';
+    if (res.reason === 'horizon') html += projectionBlock(res.projection);
+    return html + '</div>';
+  }
+
+  // Renders s.result.projection — game.js's mc-continuation summary ({trials,
+  // horizonTurns, lodgmentSustainedPct, haltPct, undecidedAtHorizonPct,
+  // medianFinalLodgment, ...}) gets the §3-style sentences; a summary string or an
+  // unknown shape gets defensive fallbacks. Always carries the uncertainty caption.
+  function projectionBlock(p) {
+    if (!p) return '';
+    var lines = [];
+    if (typeof p === 'string') {
+      lines.push(esc(p));
+    } else if (typeof p === 'object') {
+      var s = p.summary || p.text || p.label;
+      if (typeof s === 'string') {
+        lines.push(esc(s));
+      } else {
+        var lodgPct = pctOf(p, ['lodgmentSustainedPct'], ['lodgmentRate', 'redWinRate', 'redWinShare', 'pRed']);
+        var haltPct = pctOf(p, ['haltPct'], ['haltRate', 'blueWinRate', 'blueWinShare', 'pBlue']);
+        var undecPct = pctOf(p, ['undecidedAtHorizonPct'], []);
+        var runs = firstNum(p, ['trials', 'runs', 'n', 'samples', 'count']);
+        var horizon = firstNum(p, ['horizonTurns']);
+        var tail = runs ? ' (' + Math.round(runs) + ' seeded continuations' +
+          (horizon ? ', ' + Math.round(horizon) + ' turns past the horizon' : '') + ')' : '';
+        if (lodgPct != null) { lines.push('Lodgment sustained in <b>' + lodgPct + '%</b> of projected continuations' + tail + '.'); tail = ''; }
+        if (haltPct != null) { lines.push('Invasion halted in <b>' + haltPct + '%</b>' + (lodgPct != null ? '' : ' of projected continuations' + tail) + '.'); tail = ''; }
+        if (undecPct != null && undecPct > 0) lines.push('Still undecided at the projection horizon in ' + undecPct + '%.');
+        if (typeof p.medianFinalLodgment === 'number' && isFinite(p.medianFinalLodgment)) {
+          lines.push('Median final lodgment: ' + Math.round(p.medianFinalLodgment * 100) + '% of the win threshold.');
+        }
+        if (!lines.length) {
+          Object.keys(p).forEach(function (k) {
+            var v = p[k];
+            if (typeof v !== 'number' || !isFinite(v)) return;
+            var nm = k.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase();
+            lines.push(esc(nm) + ': ' + (v >= 0 && v <= 1 ? Math.round(v * 100) + '%' : Math.round(v * 100) / 100));
+          });
+        }
+      }
+    }
+    if (!lines.length) return '';
+    return '<div class="wg-proj">' + lines.map(function (l) { return '<div>' + l + '</div>'; }).join('') + '</div>' +
+      '<p class="wg-est-note">Projection under model assumptions from the final board &mdash; an ordering with uncertainty, not a prediction. Seeded and reproducible.</p>';
+  }
+  function firstNum(o, keys) {
+    for (var i = 0; i < keys.length; i++) { var v = o[keys[i]]; if (typeof v === 'number' && isFinite(v)) return v; }
+    return null;
+  }
+  // Integer percent from either a 0–100 "…Pct" field or a 0..1 rate field.
+  function pctOf(o, pctKeys, rateKeys) {
+    var v = firstNum(o, pctKeys);
+    if (v != null) return Math.max(0, Math.min(100, Math.round(v)));
+    v = firstNum(o, rateKeys);
+    if (v != null) return Math.max(0, Math.min(100, Math.round(v * 100)));
+    return null;
   }
 
   function ordersSection(state) {
@@ -992,6 +1244,10 @@
     else if (act === 'newmatch') { W.endMatch(); refreshVisuals(); renderSetup(); }
     else if (act === 'pass') doPass();
     else if (act === 'ready') doReady();
+    else if (act === 'brief-view') { pendingCfg = readSetup(); renderBrief(); }
+    else if (act === 'brief-back') { var back = pendingCfg; pendingCfg = null; renderSetup(); applySetup(back); }
+    else if (act === 'brief-start') { var go = pendingCfg || readSetup(); pendingCfg = null; beginMatch(go); }
+    else if (act === 'brief-skip') { try { localStorage.setItem(BRIEF_SKIP_KEY, t.checked ? '1' : '0'); } catch (e) {} }
   }
 
   // Lock the current side's orders and raise the handoff curtain for the next human side.
@@ -1024,6 +1280,12 @@
 
   function doStart() {
     var cfg = readSetup();
+    // The scenario brief interposes before match start (Increment A) unless the player
+    // has opted out; the setup selections are stashed so ACKNOWLEDGE starts this config.
+    if (briefWanted()) { pendingCfg = cfg; renderBrief(); return; }
+    beginMatch(cfg);
+  }
+  function beginMatch(cfg) {
     activeSide = firstHuman(cfg);
     planTurnInit = -1; curtain = false; pendingSide = null;   // re-arm plan-phase init for the new match
     W.newMatch(cfg);

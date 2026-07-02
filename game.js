@@ -55,6 +55,23 @@ window.GameModule = (function () {
   const REPAIR_AMOUNT = 30;     // health restored by a Repair order at end of turn
   const TEMPO_FLOOR_AP = 2;     // dynamic AP a side bottoms out at when its C2/logistics tempo fully collapses
 
+  // ---- Denial-victory / calendar constants (GAME_DESIGN.md §3, §6 — Increment A) ----
+  const TURN_LENGTH_DAYS = 3.5; // command timestep: half-week standing orders [CSIS-FB Ch.3]
+  const DDAY_START = 1;         // turn 1 opens on D+1 — the opening salvo is pre-adjudicated [CSIS-FB App. C]
+  // Lodgment accumulation (§6): each turn Red's throughput (liftCapacity × OSVI^k, from
+  // MoeModule.assessGraph) integrates into a 0..1 lodgment track. LODGMENT_REQ_TURNS is
+  // the NOTIONAL number of FULL-throughput 3.5-day turns Red needs to land and sustain a
+  // decisive force — an unopposed crossing completes in ~2 weeks, inside the 6-turn
+  // fait-accompli window, so the Red win condition is live from day one [METHODOLOGY;
+  // ENGSTROM; CSIS-FB Ch.3]. Blue denies by keeping the accumulated track below 1.0 for
+  // the whole window (a halt — throughput under MoeModule's tMin — ends it outright).
+  const LODGMENT_REQ_TURNS = 4;
+  // Horizon projection (§3.5): seeded MC continuation trials run when the hard clock
+  // expires undecided. Sized to stay interactive (~trials × horizon resolveTurn calls).
+  const PROJECTION_TRIALS = 200;
+  const PROJECTION_HORIZON_TURNS = 6;
+  function ddayForTurn(turn) { return DDAY_START + (turn - 1) * TURN_LENGTH_DAYS; }
+
   const DEFAULT_CFG = {
     apBlue: 4,            // action points / orders per turn
     apRed: 5,            // Red fields more mass; Blue is more precise (asymmetry by design)
@@ -251,6 +268,19 @@ window.GameModule = (function () {
   }
   // How much the AI should prize hitting / protecting a tempo node.
   function tempoWeightOf(n) { const r = nodeTempoRole(n); return r ? TEMPO_W[r] : 0; }
+
+  // Lodgment-critical weight of an own node for Red's protective scoring (GAME_DESIGN
+  // §10 Increment A): amphibious lift (Assault) is the throughput multiplicand and
+  // sustainment keeps the lodgment supplied. Mirrors moe.js classify()'s mapping
+  // (Assault -> lift, Logistics -> sustain) without a cross-module dependency, so the
+  // AI stays deterministic and self-contained even when MoeModule is absent.
+  function lodgmentWeightOf(n) {
+    const ty = String(n.type || '').toLowerCase();
+    const sub = String(n.subsystem || '').toLowerCase();
+    if (ty.includes('assault') || sub.includes('assault')) return 1.0;
+    if (ty.includes('logist') || sub.includes('logist') || sub.includes('sustain')) return 0.7;
+    return 0;
+  }
 
   // ---- Key objectives (hold / deny) -----------------------------------------------
   // Each side has a set of designated key nodes — its highest-value systems. Holding
@@ -590,7 +620,11 @@ window.GameModule = (function () {
     if (remaining > 0) {
       const own = board.rosters[side].map(id => board.nodes[id]).filter(n => n && n.alive);
       // Protecting C2 / logistics preserves tempo, so weight them up when shoring up.
-      const protVal = (n) => nodeValue(n) * (1 + (easy ? 0 : tempoWeightOf(n)));
+      // Red lodgment bias (GAME_DESIGN §10 Increment A, same pattern as tempoTargetBonus):
+      // Red prizes hardening/repairing its Amphibious Lift and Sustainment nodes, so the
+      // lodgment win condition is contested under Blue counter-lift pressure from day one.
+      const lodgmentBonus = (n) => (side === 'red' && !easy) ? 1 + lodgmentWeightOf(n) : 1;
+      const protVal = (n) => nodeValue(n) * (1 + (easy ? 0 : tempoWeightOf(n))) * lodgmentBonus(n);
       const damaged = own.filter(n => n.health < n.healthMax * 0.8)
         .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)));
       const healthy = own.slice().sort((a, b) => protVal(b) - protVal(a));
@@ -623,13 +657,19 @@ window.GameModule = (function () {
   // A fixed AP override (explicit sandbox mode / tests) disables the economy for that side.
   function apFor(side) {
     if (!match) return 0;
+    return apForBoard(match.board, side);
+  }
+  // Same tempo-economy rule over an arbitrary board snapshot, so the horizon projection
+  // (§3.5) can run the AP economy on cloned continuation boards without touching the
+  // live match board.
+  function apForBoard(board, side) {
     const fixed = side === 'blue' ? match.cfg.apBlue : match.cfg.apRed;
     if (!match.dynamicAp || !match.dynamicAp[side]) return fixed;
     const base = (match.baseAp && match.baseAp[side]) || fixed;
     const floor = Math.min(TEMPO_FLOOR_AP, base);   // never let the floor exceed a tiny base
     const start = (match.startTempo && match.startTempo[side]) || 0;
     if (start <= 0) return base;
-    const frac = clamp(commandTempo(match.board, side) / start, 0, 1);
+    const frac = clamp(commandTempo(board, side) / start, 0, 1);
     return clamp(Math.round(floor + (base - floor) * frac), floor, base);
   }
 
@@ -701,6 +741,11 @@ window.GameModule = (function () {
       score: { blue: 0, red: 0 },
       startObj: { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: [],
+      // Denial-victory state (GAME_DESIGN §6, Increment A — consumed read-only by wargame.js):
+      calendar: { turnLengthDays: TURN_LENGTH_DAYS, dday: ddayForTurn(1) },   // D+1 at turn 1, +3.5/turn
+      denialHistory: [],                    // per-resolved-turn { turn, index, throughput, osvi }
+      lodgment: { value: 0, history: [] },  // accumulated Red lodgment 0..1, history [{turn, value}]
+      result: null,                         // { winner, reason:'halt'|'lodgment'|'horizon', projection } on match end
       winner: null,
       lastReport: null,
       savedGraphState
@@ -725,6 +770,15 @@ window.GameModule = (function () {
       apLeft: { blue: apFor('blue') - match.orders.blue.length, red: apFor('red') - match.orders.red.length },
       winner: match.winner,
       lastReport: match.lastReport,
+      // Denial-victory surface (GAME_DESIGN §6, Increment A; wargame.js consumes read-only):
+      calendar: match.calendar
+        ? { turnLengthDays: match.calendar.turnLengthDays, dday: match.calendar.dday }
+        : { turnLengthDays: TURN_LENGTH_DAYS, dday: ddayForTurn(match.turn) },
+      denialHistory: (match.denialHistory || []).slice(),
+      lodgment: match.lodgment
+        ? { value: match.lodgment.value, history: (match.lodgment.history || []).slice() }
+        : { value: 0, history: [] },
+      result: match.result || null,
       rosters: { blue: match.board.rosters.blue.length, red: match.board.rosters.red.length },
       alive: {
         blue: match.board.rosters.blue.filter(id => match.board.nodes[id].alive).length,
@@ -849,7 +903,20 @@ window.GameModule = (function () {
     match.history.push({ turn: match.turn, orders: { blue: match.orders.blue.slice(), red: match.orders.red.slice() }, report });
     match.lastReport = { turn: match.turn, events: report.events, scoreDelta: report.scoreDelta };
     syncBoardToGraph();
-    evaluateVictory();
+    // Denial assessment over the LIVE Red roster after every turn resolution (§6):
+    // append the denial-trend row and integrate Red's lodgment before judging victory.
+    const assessment = assessDenialOn(match.board);
+    if (assessment) {
+      match.denialHistory.push({
+        turn: match.turn,
+        index: assessment.denialIndex,
+        throughput: assessment.throughput,
+        osvi: assessment.osviRed
+      });
+      match.lodgment.value = clamp(match.lodgment.value + assessment.throughput / LODGMENT_REQ_TURNS, 0, 1);
+      match.lodgment.history.push({ turn: match.turn, value: match.lodgment.value });
+    }
+    evaluateVictory(false, assessment);
     match.phase = match.winner ? 'over' : 'resolved';
     ctx.onResolved(match.lastReport, getState());
     ctx.onState(getState());
@@ -860,8 +927,14 @@ window.GameModule = (function () {
   function nextTurn() {
     if (!match || match.phase !== 'resolved') return getState();
     match.turn += 1;
+    // D-day clock: +3.5 days per turn, clamped to the advertised window so a
+    // horizon ending reads D+18.5, not D+22 (result.at.dday is clamped the same way).
+    if (match.calendar) match.calendar.dday = ddayForTurn(Math.min(match.turn, match.cfg.turnLimit));
     match.orders = { blue: [], red: [] };
     match.phase = 'plan';
+    // HARD clock (GAME_DESIGN §3/P3): no auto-extend, ever. Past the final turn the match
+    // ends NOW — an ambiguous ending is resolved inside evaluateVictory by a seeded MC
+    // projection of the continuation, never by playing extra turns.
     if (match.turn > match.cfg.turnLimit) { evaluateVictory(true); match.phase = 'over'; }
     ctx.onState(getState());
     return getState();
@@ -884,7 +957,122 @@ window.GameModule = (function () {
     return 'draw';
   }
 
-  function evaluateVictory(force) {
+  // ---- Denial arbiter plumbing (GAME_DESIGN §6 — Increment A) -----------------------
+  // MoeModule (moe.js) is the victory arbiter for invasion play. game.js only ADAPTS
+  // board state into assessGraph's node shape and CONSUMES its outputs; assessment math
+  // stays in moe.js (pure engine), accumulation/victory math lives here (consumer side).
+  let warnedNoMoe = false;
+  function moeAvailable() {
+    if (window.MoeModule && typeof window.MoeModule.assessGraph === 'function') return true;
+    if (!warnedNoMoe) {
+      warnedNoMoe = true;
+      try { console.warn('[game] MoeModule unavailable — denial victory arbiter disabled; falling back to legacy attrition scoring.'); } catch (e) {}
+    }
+    return false;
+  }
+  // Adapt a board's LIVE Red roster (including this-match damage/kills) into the node
+  // shape assessGraph expects (cascScore / status naming). Dead nodes stay in the list
+  // at zero health so subsystem base weights are preserved — losses count against Red.
+  function moeRedNodes(board) {
+    return (board.rosters.red || []).map(id => {
+      const n = board.nodes[id];
+      return {
+        team: 'red', type: n.type, subsystem: n.subsystem,
+        importance: n.importance, cascScore: n.casc,
+        healthMax: n.healthMax, health: n.alive ? n.health : 0,
+        status: n.alive ? 'Active' : 'Neutralized'
+      };
+    });
+  }
+  function assessDenialOn(board) {
+    if (!moeAvailable()) return null;
+    return window.MoeModule.assessGraph(moeRedNodes(board));
+  }
+
+  // ---- Horizon projection (GAME_DESIGN §3.5 / §6) -----------------------------------
+  // The clock is HARD (P3): if the fait-accompli window expires with neither a halt nor
+  // a completed lodgment, we never extend play. Instead the engine MC-projects the
+  // continuation from the FINAL state — both sides handed to their AI commanders — and
+  // scores the distribution ("lodgment sustained in N% of projected continuations").
+  // Fully seeded and deterministic: trial t draws only from
+  // makeRng(hashSeed(matchSeed, 'projection', t)) — the same seeding machinery as turn
+  // resolution. No Math.random() / Date.now() anywhere in this path.
+  function cloneBoardForProjection(board) {
+    // resolveTurn mutates only health/alive; adj + rosters are read-only and per-node
+    // arrays (vulns/domain) are never written — a per-node shallow copy is a complete
+    // snapshot for continuation trials.
+    const nodes = {};
+    for (const id in board.nodes) nodes[id] = Object.assign({}, board.nodes[id]);
+    return { nodes, adj: board.adj, rosters: board.rosters };
+  }
+  function projectContinuation() {
+    if (!moeAvailable()) return null;
+    const round2 = (v) => Math.round(v * 100) / 100;
+    let lodgmentSustained = 0, halted = 0, undecided = 0, thruSum = 0;
+    const finalLodg = [];
+    for (let t = 0; t < PROJECTION_TRIALS; t++) {
+      const rng = makeRng(hashSeed(match.seed, 'projection', t));
+      const board = cloneBoardForProjection(match.board);
+      let lodg = match.lodgment ? match.lodgment.value : 0;
+      let a = null, outcome = null;
+      for (let step = 1; step <= PROJECTION_HORIZON_TURNS; step++) {
+        const orders = planOrders(board, 'blue', apForBoard(board, 'blue'), match.cfg.difficulty.blue || 'hard', rng)
+          .concat(planOrders(board, 'red', apForBoard(board, 'red'), match.cfg.difficulty.red || 'hard', rng));
+        resolveTurn(board, orders, match.cfg, rng);
+        a = assessDenialOn(board);
+        lodg = clamp(lodg + a.throughput / LODGMENT_REQ_TURNS, 0, 1);
+        if (lodg >= 1) { outcome = 'red'; break; }
+        if (a.halt) { outcome = 'blue'; break; }
+      }
+      // Trials still open at the projection horizon score by the halt criterion: not
+      // halted means the crossing remains viable — lodgment sustained [CSIS-FB Ch.5].
+      if (!outcome) { undecided++; outcome = 'red'; }
+      if (outcome === 'red') lodgmentSustained++; else halted++;
+      finalLodg.push(lodg);
+      thruSum += a ? a.throughput : 0;
+    }
+    finalLodg.sort((x, y) => x - y);
+    const winner = lodgmentSustained > halted ? 'red' : halted > lodgmentSustained ? 'blue' : 'draw';
+    return {
+      method: 'mc-continuation',
+      trials: PROJECTION_TRIALS,
+      horizonTurns: PROJECTION_HORIZON_TURNS,
+      from: {
+        turn: Math.min(match.turn, match.cfg.turnLimit),
+        dday: ddayForTurn(Math.min(match.turn, match.cfg.turnLimit)),
+        lodgment: round2(match.lodgment ? match.lodgment.value : 0)
+      },
+      // Complementary by construction (sustained + halted === trials) so the two
+      // headline percentages always sum to 100 in the UI; raw counts ride along for
+      // the explain-panel (P2: every estimate inspectable to its inputs).
+      lodgmentSustainedPct: Math.round(lodgmentSustained / PROJECTION_TRIALS * 100),
+      haltPct: 100 - Math.round(lodgmentSustained / PROJECTION_TRIALS * 100),
+      counts: { lodgmentSustained, halted, undecidedAtHorizon: undecided },
+      undecidedAtHorizonPct: Math.round(undecided / PROJECTION_TRIALS * 100),
+      medianFinalLodgment: round2(finalLodg[Math.floor(PROJECTION_TRIALS / 2)]),
+      meanFinalThroughput: round2(thruSum / PROJECTION_TRIALS),
+      winner
+    };
+  }
+
+  // ---- Victory arbiter (GAME_DESIGN §6 / §10 Increment A) ---------------------------
+  // INVASION play is decided by the denial model, not attrition: MoeModule.assessGraph
+  // over the live Red roster is the arbiter. Blue wins by HALT before the window closes
+  // (Red throughput under tMin — the crossing culminates); Red wins by ACCUMULATED
+  // LODGMENT before the HARD turn limit; a window that expires undecided is resolved by
+  // a seeded MC projection of the continuation — never by extending the clock. The
+  // legacy collapse / key-objective checks are retained only as a rare early-collapse
+  // out (a side annihilated outright), and the legacy score decision survives solely as
+  // the fallback when MoeModule is absent.
+  //
+  // KNOWN-DEGENERATE WINDOW (until Increment C — documented per §10 Increment A): with
+  // node-level strike verbs, no typed magazines (Increment B) and no chip apportionment
+  // (Increment C), Blue can spam counter-lift strikes on the Amphibious Lift subsystem
+  // every turn at no opportunity cost, which reliably suppresses Red throughput. The Red
+  // lodgment-protection bias in planOrders (harden/repair weighting via lodgmentWeightOf)
+  // is the Increment A counterweight; magazine scarcity and command-altitude chips close
+  // the exploit properly.
+  function evaluateVictory(force, assessment) {
     const objBlue = objectiveValue(match.board, 'blue');
     const objRed = objectiveValue(match.board, 'red');
     // Guard degenerate boards: a side with no starting objective value can't "collapse" from
@@ -899,16 +1087,58 @@ window.GameModule = (function () {
     const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
     const blueDown = blueCollapsed || blueKeyLost;
     const redDown = redCollapsed || redKeyLost;
-    // Mutual collapse in the same turn is settled by the side-neutral tie-break (-> can draw),
-    // never a silent Blue default.
-    if (blueDown && redDown) { match.winner = neutralTieBreak(); return; }
-    if (redDown) { match.winner = 'blue'; return; }
-    if (blueDown) { match.winner = 'red'; return; }
+    // Decide + record: winner and the s.result contract shape ({winner, reason, projection},
+    // plus additive detail/at fields) are always set together so they can never disagree.
+    const finish = (winner, reason, projection, detail) => {
+      match.winner = winner;
+      match.result = {
+        winner, reason,
+        projection: projection || null,
+        detail: detail || null,
+        at: { turn: Math.min(match.turn, match.cfg.turnLimit), dday: ddayForTurn(Math.min(match.turn, match.cfg.turnLimit)) }
+      };
+    };
+
+    // 1) Rare early-collapse out (legacy): a side annihilated outright ends the match
+    //    immediately, mapped onto the denial vocabulary — Red's invasion system gone is
+    //    a halt; Blue's kill chain gone leaves the crossing unopposed (lodgment). Mutual
+    //    collapse settles by the side-neutral tie-break (-> can draw), never a Blue default.
+    if (blueDown && redDown) {
+      const w = neutralTieBreak();
+      finish(w, w === 'blue' ? 'halt' : w === 'red' ? 'lodgment' : 'horizon', null, 'mutual-collapse');
+      return;
+    }
+    if (redDown) { finish('blue', 'halt', null, 'early-collapse'); return; }
+    if (blueDown) { finish('red', 'lodgment', null, 'early-collapse'); return; }
+
+    // 2) Denial arbiter for invasion play. Blockade scenarios get their own MOE track
+    //    (Increment F, §6) and bypass the lodgment arbiter via cfg.moeTrack.
+    const invasion = (match.cfg.moeTrack || 'invasion') === 'invasion';
+    const moe = invasion ? (assessment !== undefined ? assessment : assessDenialOn(match.board)) : null;
+    if (moe) {
+      // Red wins by accumulated lodgment before the hard limit: the landed force is
+      // ashore — a later halt cannot un-land it, so this is checked first.
+      if (match.lodgment && match.lodgment.value >= 1) { finish('red', 'lodgment', null, 'lodgment-complete'); return; }
+      // Blue wins by halt-before-window: throughput below tMin — the crossing has
+      // culminated (capitulation when Red C2 has also collapsed, per moe.js).
+      if (moe.halt) { finish('blue', 'halt', null, moe.capitulation ? 'capitulation' : 'throughput-below-tmin'); return; }
+      // 3) Hard clock (§3.5): window expired undecided -> seeded MC projection from the
+      //    final state. Never extend the clock; never fall back to the attrition score.
+      if (force || match.turn > match.cfg.turnLimit) {
+        const projection = projectContinuation();
+        finish(projection.winner, 'horizon', projection, 'window-expired');
+      }
+      return;
+    }
+
+    // 4) Fallback (MoeModule absent — warned once in moeAvailable — or a non-invasion
+    //    track pre-Increment-F): legacy score decision, with s.result still populated so
+    //    consumers always see the contract shape.
     if (force || match.turn > match.cfg.turnLimit) {
-      // Time limit: decide by accumulated score, then by the side-neutral tie-break
-      // (combat power -> key objectives -> tempo), and finally an explicit draw.
-      if (match.score.blue !== match.score.red) match.winner = match.score.blue > match.score.red ? 'blue' : 'red';
-      else match.winner = neutralTieBreak();
+      let w;
+      if (match.score.blue !== match.score.red) w = match.score.blue > match.score.red ? 'blue' : 'red';
+      else w = neutralTieBreak();
+      finish(w, 'horizon', null, 'legacy-score');
     }
   }
 
@@ -1067,18 +1297,35 @@ window.GameModule = (function () {
     const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
     const mutual = (blueCollapsed || blueKeyLost) && (redCollapsed || redKeyLost);
     const isDraw = match.winner === 'draw';
-    const reason = isDraw ? (mutual ? 'Mutual collapse — contested draw (forces dead even)' : 'Turn limit — contested draw (forces dead even)')
+    // Denial-arbiter verdict text (Increment A). Early-collapse / mutual-collapse /
+    // legacy-score endings fall through to the legacy attrition wording below.
+    const r = match.result;
+    const denialReason = !r ? null
+      : r.detail === 'capitulation' ? 'Denial achieved — Red throughput halted and Red C2 collapsed (capitulation)'
+        : r.detail === 'throughput-below-tmin' ? 'Denial achieved — Red amphibious throughput halted before the window closed'
+          : r.detail === 'lodgment-complete' ? 'Red accumulated a decisive lodgment before the window closed'
+            : (r.reason === 'horizon' && r.projection)
+              ? ('Window expired undecided — projected continuations: lodgment sustained in '
+                + r.projection.lodgmentSustainedPct + '%, halted in ' + r.projection.haltPct + '%')
+              : null;
+    const reason = denialReason || (isDraw ? (mutual ? 'Mutual collapse — contested draw (forces dead even)' : 'Turn limit — contested draw (forces dead even)')
       : mutual ? 'Mutual collapse — settled by combat power'
         : redKeyLost ? `Red lost its key objectives (${oR.lost}/${oR.total})`
           : blueKeyLost ? `Blue lost its key objectives (${oB.lost}/${oB.total})`
             : redCollapsed ? 'Red force collapsed'
               : blueCollapsed ? 'Blue force collapsed'
-                : 'Turn-limit score decision';
+                : 'Turn-limit score decision');
 
     const targetList = Object.values(targets);
     return {
       winner: match.winner,
       reason,
+      // Denial-victory record (Increment A) so the AAR surface can render the verdict,
+      // trend, and lodgment track without re-reading live match internals.
+      result: match.result || null,
+      denialHistory: (match.denialHistory || []).slice(),
+      lodgment: match.lodgment ? { value: match.lodgment.value, history: (match.lodgment.history || []).slice() } : null,
+      calendar: match.calendar ? { turnLengthDays: match.calendar.turnLengthDays, dday: match.calendar.dday } : null,
       turns: match.history.length,
       scoreMargin: round1(match.score.blue - match.score.red),
       scoreByTurn,
@@ -1106,16 +1353,24 @@ window.GameModule = (function () {
   // against the same graph, plus savedGraphState and lastReport so a loaded match is self-
   // contained (can restore the scenario on exit and keep its resolved-turn log). v1 saves
   // (no fingerprint) still load, but cannot be integrity-checked — deserialize flags that.
+  // v3 saves additionally carry the denial-victory state (calendar / denialHistory /
+  // lodgment / result — Increment A); older saves default those fields on load.
   function serialize() {
     if (!match) return null;
     const health = {};
     for (const id in match.board.nodes) { const n = match.board.nodes[id]; health[id] = { h: n.health, a: n.alive }; }
     return {
-      v: 2, seed: match.seed, turn: match.turn, phase: match.phase,
+      v: 3, seed: match.seed, turn: match.turn, phase: match.phase,
       fingerprint: match.fingerprint || null,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
       objectives: match.objectives,
+      // v3 additions (Increment A): denial-victory state — additive and versioned, like
+      // the fingerprint scheme; v1/v2 loaders below default them safely.
+      calendar: match.calendar || null,
+      denialHistory: match.denialHistory || [],
+      lodgment: match.lodgment || { value: 0, history: [] },
+      result: match.result || null,
       history: match.history,
       orders: match.orders, winner: match.winner, health,
       lastReport: match.lastReport || null,
@@ -1178,6 +1433,17 @@ window.GameModule = (function () {
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null,
       lastReport,
+      // v3 denial-victory state (Increment A). v1/v2 saves resume with a calendar derived
+      // from the turn counter and empty denial/lodgment tracks (per-turn assessments are
+      // not replayed here); new turns extend the tracks normally from the loaded board.
+      calendar: (s.calendar && typeof s.calendar.dday === 'number')
+        ? { turnLengthDays: Number(s.calendar.turnLengthDays) || TURN_LENGTH_DAYS, dday: s.calendar.dday }
+        : { turnLengthDays: TURN_LENGTH_DAYS, dday: ddayForTurn(s.turn || 1) },
+      denialHistory: Array.isArray(s.denialHistory) ? s.denialHistory.slice() : [],
+      lodgment: (s.lodgment && typeof s.lodgment.value === 'number')
+        ? { value: clamp(s.lodgment.value, 0, 1), history: Array.isArray(s.lodgment.history) ? s.lodgment.history.slice() : [] }
+        : { value: 0, history: [] },
+      result: s.result || null,
       // Capture the CURRENT graph state before overwriting it with loaded battle damage, so
       // exiting a loaded match still restores the scenario (even though older saves omitted it).
       savedGraphState: s.savedGraphState || (graph.nodes || []).map(n => ({ id: n.id, health: n.health, status: n.status }))
@@ -1231,6 +1497,8 @@ window.GameModule = (function () {
     fingerprint, fingerprintMatches, scenarioStatus,
     // exposed for headless testing / future reuse
     _internal: { buildBoard, resolveTurn, planOrders, makeRng, hashSeed, objectiveValue,
-      canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch }
+      canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch,
+      // Increment A additions (denial arbiter plumbing):
+      ddayForTurn, moeRedNodes, lodgmentWeightOf }
   };
 })();

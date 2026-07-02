@@ -1,6 +1,6 @@
 # StrikeSim 2040: Denial-MOE Model — Methodology White Paper
 
-**Version:** 1.1 (synchronized to the implemented model in `moe.js`)  
+**Version:** 1.2 (1.1 synchronized this paper to the implemented model in `moe.js`; 1.2 adds Section 9, in-game victory adjudication — build Increment A. Sections 1–8 are unchanged from 1.1.)  
 **Date:** July 2026  
 **Classification:** UNCLASSIFIED // NOTIONAL RESEARCH TOOL
 
@@ -223,7 +223,41 @@ The generator terminates when the projected denialIndex reaches 0.97 (near-total
 
 ---
 
-## 9. References
+## 9. In-Game Victory Adjudication (Wargame Layer)
+
+The turn-based wargame surface uses the denial MOE as its **victory arbiter** for invasion scenarios, replacing the legacy attrition scoring that Section 2 identified as a MOP. This section documents the adjudication contract. The assessment model of Sections 5–7 is unchanged; this section specifies only how its per-turn outputs are consumed by the game layer. All numeric parameters introduced here are NOTIONAL analytic assumptions of the same standing as those in Section 8.
+
+### 9.1 Division of Labor: One MOE Function, Three Consumers
+
+The MOE engine (`moe.js`) remains a pure, stateless, single-period assessment function. Each game turn, after resolution, the game layer calls `assessGraph()` over the **live Red order of battle only** (Blue nodes shape the game's tempo economy but are not MOE inputs, consistent with Section 8's "No Blue cost" boundary) and records the snapshot outputs defined in Section 5: throughput T, OSVI\_Red, the halt boolean, and denialIndex. Everything that persists across turns — the denial trend history, the lodgment track, the campaign calendar, and the end-of-match verdict — is accumulated and adjudicated in the game layer from those outputs.
+
+This division preserves the methodological property established in Section 7: the COA generator, the Monte Carlo evaluator, and now the victory arbiter share **exactly one MOE function**. The arbiter is a third consumer of the same equations, not a second model that could drift from them. No change to the assessment engine was required to add adjudication: the Section 5 outputs and exported defaults (including T\_min) are sufficient.
+
+### 9.2 The Fait-Accompli Window (the Hard Clock)
+
+An invasion match runs six turns of 3.5 game-days each (D+1, D+4.5, D+8, D+11.5, D+15, D+18.5) — the decisive first three weeks, following the scoping validated across the CSIS First Battle iterations [10]. The horizon is **hard**: play never extends past the final turn, even when the outcome is ambiguous. Extending only ambiguous runs is optional stopping — run length would correlate with outcome, biasing every cross-run aggregate — so all scored runs share a fixed horizon and remain statistically comparable. (The occasional extra turns in the CSIS games were a human facilitation judgment inside individually analyzed iterations, not a scoring rule to inherit [10].)
+
+### 9.3 Blue Win: Halt Before the Window Closes
+
+Blue wins when the halt criterion of Section 5.5 — throughput T < T\_min — is met by a turn assessment before the window closes. This is the deny-capability mechanism of Section 6 rendered as a win condition, per the Colby denial framework of Section 3 [7]: the crossing culminates; Red cannot generate the throughput required to seize and hold the objective within the fait-accompli window. Blue losses are reported alongside the verdict but are **excluded from the win judgment**, mirroring the CSIS study's Taiwanese-autonomy scoring [10] — a costly halt is still a halt, and the cost ledger is where its price is told.
+
+### 9.4 Red Win: Accumulated Lodgment
+
+Red wins by sustained buildup. Each turn, the throughput fraction T from Section 5.4 accrues into a **lodgment track**, normalized to [0, 1], representing forces landed, sustained, and consolidated ashore — the lodgment-strangulation logic of the CSIS study [10] and the throughput/culmination analyses [12][15][16] run in the adversary's favor. If the track saturates (reaches 1.0, the level assessed as sufficient to seize and hold the objective) before the window closes, Red wins. The implemented accrual is lodgment\_t = clamp\[0,1\](lodgment\_{t-1} + T\_t / N\_req) with **N\_req = 4** — four NOTIONAL full-throughput turns (14 days at 3.5 days/turn) to complete the buildup. The accumulation rate and the saturation threshold are analytic assumptions, exactly like T\_min (Section 5.5): NOTIONAL, documented here, and appropriate targets for sensitivity sweeps — not estimates of actual PLA buildup requirements.
+
+### 9.5 Ambiguous Endings: Monte Carlo Projection, Never Extension
+
+If the window closes with neither halt achieved nor lodgment saturated, the ending is resolved by a **seeded Monte Carlo projection from the final game state**, never by extra turns (Section 9.2). The engine resamples continuations of the final state — fixed: the final board and force posture; resampled: both sides' AI-planned orders and engagement draws each continuation turn, seeded per trial — and scores the distribution, reported as, e.g., "lodgment sustained in 78% of projected continuations." The projection is deterministic and reproducible from the match seed. Its output is presented in the same epistemic register as every other output of this model (Section 2.3): a distribution over continuations **under the model's assumptions**, with the fixed/resampled ensemble definition stated wherever it is shown — never a point prediction of how the war ends.
+
+### 9.6 Scope and Caveats
+
+- **Invasion scenarios only.** A lodgment-throughput arbiter structurally cannot assess a blockade: it would score a blockade campaign as an immediate Blue win, inverting the CSIS finding that a blockade is in several respects the *harder* problem for the defender [24]. Blockade scenarios require their own MOE track (a Taiwan stockpile-depletion clock and a capitulation-pressure index) and are not adjudicated by this section's rules.
+- **Section 8 carries over in full.** The single-period-snapshot limitation is narrowed, not removed: the lodgment track integrates throughput over time, but Red reconstitution and adaptation between turns are game-layer dynamics outside the MOE, and the coefficient, cascade, and human-will caveats apply to every per-turn assessment the verdict is built from.
+- **A played run is one seeded draw.** Its verdict is a plausibility illustration, not a finding [23]; findings come from iterated runs and Monte Carlo sweeps. Consistent with Sections 2.3 and 8, all adjudication outputs — including the horizon projection — are orderings and distributions with stated assumptions, not predictions.
+
+---
+
+## 10. References
 
 [1] Joint Chiefs of Staff. *CJCSI 3162.02: Methodology for Combat Assessment.* Available: https://www.jcs.mil/Portals/36/Documents/Doctrine/training/jts/cjcsi_3162_02.pdf
 
@@ -268,6 +302,10 @@ The generator terminates when the projected denialIndex reaches 0.97 (near-total
 [21] CNAS. *Hellscape for Taiwan.* Center for a New American Security, 2026. Available: https://s3.us-east-1.amazonaws.com/files.cnas.org/documents/Hellscape_DEFENSE_2026-Final.pdf
 
 [22] Brose, C. *The Kill Chain* (NDU Press review). Available: https://ndupress.ndu.edu/Media/News/News-Article-View/Article/2884464/the-kill-chain/
+
+[23] UK Ministry of Defence, Development, Concepts and Doctrine Centre. *Wargaming Handbook*, 2017. Available: https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/641040/doctrine_uk_wargaming_handbook.pdf
+
+[24] Cancian, M., Cancian, M., & Heginbotham, E. *Lights Out? Wargaming a Chinese Blockade of Taiwan.* CSIS, July 2025. Available: https://csis-website-prod.s3.amazonaws.com/s3fs-public/2025-07/250730_Cancian_Taiwan_Blockade.pdf
 
 ---
 
