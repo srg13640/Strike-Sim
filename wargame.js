@@ -107,7 +107,7 @@
                             : (hits + (hits === 1 ? ' HIT' : ' HITS'));
       badge.textContent = badgeText;
       badge.style.cssText = [
-        'position:fixed;top:14px;right:356px;z-index:9992;pointer-events:none;',
+        'position:fixed;top:14px;right:calc(var(--wg-hud-w, 340px) + 16px);z-index:9992;pointer-events:none;',
         'font:700 11px/1 "Share Tech Mono",ui-monospace,monospace;letter-spacing:.12em;',
         'color:' + tracerColor + ';',
         kills ? 'text-shadow:0 0 10px rgba(255,59,59,0.8);' : 'text-shadow:0 0 10px rgba(0,216,255,0.8);',
@@ -130,6 +130,10 @@
 
   // ---- styles --------------------------------------------------------------------
   var CSS = [
+    // ---- Layout contract (C-025): HUD width lives in a var so the strike badge,
+    // ---- the panel, and the shell can all agree on the right-edge geometry. ----
+    ':root{--wg-hud-w:340px;}',
+
     // ---- Launch button — premium HUD action ----
     '#wg-launch{',
       'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1400;',
@@ -150,9 +154,9 @@
 
     // ---- HUD panel ----
     '#wg-hud{',
-      'position:fixed;top:0;right:0;width:340px;',
+      'position:fixed;top:var(--bar-h, 48px);right:0;width:var(--wg-hud-w, 340px);',
       'max-height:100vh;',          /* never taller than the viewport */
-      'height:100%;',
+      'height:calc(100vh - var(--bar-h, 48px));',   /* sit below the command bar */
       'z-index:1390;display:flex;flex-direction:column;',
       'background:rgba(9,16,24,0.92);',
       'border-left:1px solid rgba(0,216,255,0.22);',
@@ -548,9 +552,19 @@
     hud.addEventListener('click', onHudClick);
   }
 
+  // Layout contract (C-025): tell the shell the WG HUD owns the right edge so it can
+  // collapse the main right rail. Falls back to the body class when AppShell is absent.
+  function setShellOpen(on) {
+    try {
+      if (window.AppShell && window.AppShell.set) window.AppShell.set({ wargameOpen: !!on });
+      else document.body.classList.toggle('wargame-open', !!on);
+    } catch (e) {}
+  }
+
   function open() {
     hud.classList.add('wg-open');
     launchBtn.classList.add('wg-hidden');
+    setShellOpen(true);
     if (!W.isActive()) renderSetup(); else render(W.getState());
     if (!pollTimer) pollTimer = setInterval(pollSelection, 280);
   }
@@ -561,6 +575,7 @@
     if (W.isActive()) { W.endMatch(); refreshVisuals(); }
     hud.classList.remove('wg-open');
     launchBtn.classList.remove('wg-hidden');
+    setShellOpen(false);
     lastSelId = null;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     // Clean up any lingering FX timers.

@@ -14,7 +14,7 @@
  *   3. OSVI_Red (Operational System Viability Index) = weighted sum of the ENABLER
  *      subsystem scores (C2-first weighting per PLA targeting priority).
  *   4. Amphibious throughput  T = liftCapacity * OSVI_Red^k   (coordination penalty k).
- *   5. capabilityDenial = 1 - min(1, T / T_min)         (deny-capability mechanism)
+ *   5. capabilityDenial = clamp01((1 - T) / (1 - T_min))  (deny-capability, partial credit)
  *      costDenial       = min(1, redCost / costTolerance) (impose-cost / break-will)
  *   6. denialIndex = (1-balance)*capabilityDenial + balance*costDenial   (intent-weighted)
  *      success (denial achieved) = denialIndex >= threshold

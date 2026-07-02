@@ -1,7 +1,7 @@
 # StrikeSim 2040: Denial-MOE Model — Methodology White Paper
 
-**Version:** 1.0  
-**Date:** June 2026  
+**Version:** 1.1 (synchronized to the implemented model in `moe.js`)  
+**Date:** July 2026  
 **Classification:** UNCLASSIFIED // NOTIONAL RESEARCH TOOL
 
 ---
@@ -89,13 +89,19 @@ Each Red node is mapped to a functional subsystem via its `node.type` field, fol
 | Blockade | Sea Control | `seacontrol` |
 | Protection | Air Defense | `protect` |
 
+The `node.type` mapping is the primary classifier; the implementation degrades gracefully on incomplete order-of-battle data. When `node.type` is missing or unrecognized, the classifier falls back to the node's `subsystem` field (Information Attack → `info`, Firepower Strike → `fires`, Assault → `lift`, Blockade → `seacontrol`). If neither field resolves, the node is assigned to `fires`; a null node reference resolves to `protect`. Nodes lacking an `importance` value receive the mid-scale default of 5. These defaults keep the assessment total — every Red node is scored — at the cost of classification noise on poorly attributed data.
+
 ### 5.2 Subsystem Score
 
-For subsystem S with node set N(S):
+For subsystem S with node set N(S), each node carries a **cascade-aware weight**:
 
-$$\text{subsystemScore}(S) = \frac{\sum_{i \in N(S)} \text{importance}_i \cdot \text{healthFrac}_i}{\sum_{i \in N(S)} \text{importance}_i} \in [0, 1]$$
+$$w_i = \text{importance}_i \cdot (1 + 0.5 \cdot \text{cascScore}_i)$$
+
+$$\text{subsystemScore}(S) = \frac{\sum_{i \in N(S)} w_i \cdot \text{healthFrac}_i}{\sum_{i \in N(S)} w_i} \in [0, 1]$$
 
 where `healthFrac` is current health divided by baseline health, clamped to [0, 1]. Neutralized nodes contribute healthFrac = 0.
+
+The cascade term operationalizes the systems-destruction premise [17][18]: a node whose failure propagates through the network (high `cascScore`) contributes more enabling value to its subsystem than an equally important node whose failure is contained, so its loss depresses the subsystem score disproportionately. A node with no cascade data defaults to cascScore = 1 (weight 1.5 × importance); where no node in a subsystem carries differentiated cascade data, the uniform factor cancels in the ratio and the score reduces to the plain importance-weighted mean.
 
 ### 5.3 Operational System Viability Index (OSVI\_Red)
 
@@ -123,27 +129,33 @@ $$T = \text{liftCapacity} \times \text{OSVI\_Red}^k, \quad k = 2$$
 
 where liftCapacity is the subsystem score for the `lift` subsystem (assault shipping health), T is a fraction of maximum theoretical throughput in [0, 1], and k is a **coordination/cascade penalty exponent**.
 
+liftCapacity follows a fallback chain for partial orders of battle: if the scenario contains no Amphibious-Lift nodes, the sea-control subsystem score is substituted as the nearest maritime-transport proxy; if that subsystem is also absent, a neutral constant of 0.6 is used. The fallbacks keep the throughput equation defined on any Red node set, but a scenario without lift nodes is exercising a proxy — throughput results there should be read as indicative, not assessed.
+
 The exponent k = 2 encodes the judgment that amphibious lift capacity without a functioning operating system cannot be realized: vessels without functioning C2 cannot coordinate loading, routing, or fire support; without ISR they cannot navigate contested waters; without sustainment they cannot be resupplied. The quadratic relationship reflects a multiplicative (not additive) dependency structure consistent with the cascade literature on network interdiction [19] and with Engstrom's account of system-destruction warfare [17].
 
 k = 2 is an **analytic assumption**. The true functional form of this dependency is not empirically known for the Taiwan scenario. Sensitivity analysis varying k in [1.5, 3.0] is recommended for robustness checks.
 
 ### 5.5 Capability Denial
 
-$$\text{capabilityDenial} = \text{clamp}_{[0,1]}\!\left(1 - \frac{T}{T_{\min}}\right)$$
+$$\text{capabilityDenial} = \text{clamp}_{[0,1]}\!\left(\frac{1 - T}{1 - T_{\min}}\right)$$
 
 $$\text{halt} = \begin{cases} \text{True} & T < T_{\min} \\ \text{False} & \text{otherwise} \end{cases}$$
+
+The implemented formulation is a **partial-credit rescaling**:† capabilityDenial rises linearly from 0 at full Red throughput (T = 1) to 1.0 when throughput reaches the halt threshold (T = T\_min), and saturates at 1.0 below it, so any reduction in Red throughput earns proportional capability-denial credit. This choice has two motivations. Operationally, partial throughput denial is meaningful short of a halt — it slows lodgment build-up and reinforcement even while the crossing continues. Computationally, it gives the greedy COA generator (Section 7) a smooth gradient to climb: because the generator and the evaluator share one MOE function, a formulation that awards no credit until throughput crosses T\_min would leave early strikes with zero capability-denial gain and bias the generator toward cost-imposition targets. The binary halt determination is unaffected: `halt` remains the hard threshold test T < T\_min.
 
 Default T\_min = 0.30. This threshold represents the **minimum amphibious throughput** below which the crossing force cannot establish and sustain a lodgment against a competent defending force — operationally analogous to the culmination-point concept in JP 3-0 [20] and Clausewitzian theory. At T < T\_min, the operation's internal logic fails: the force cannot reinforce, cannot be resupplied, and cannot achieve the operational objectives that justify the cost.
 
 T\_min = 0.30 is an **analytic assumption** derived from the CSIS finding [10] that scenarios in which Blue forces halted Red generally involved reducing effective amphibious capacity to a fraction that could not sustain a lodgment. It is not a classified estimate of actual PLA operational requirements.
 
+† A stricter variant, capabilityDenial = clamp₍₀,₁₎(1 − T/T\_min), which awards capability-denial credit only as throughput falls below the halt threshold, is a defensible alternative for pure halt/no-halt scoring. It is not implemented because it is flat (zero gradient) over most of the throughput range, which would starve the goal-driven generator of a usable optimization signal.
+
 ### 5.6 Cost Denial
 
-$$\text{redCost} = \text{clamp}_{[0,1]}\!\left(1 - \frac{\sum_i \text{importance}_i \cdot \text{healthFrac}_i}{\sum_i \text{importance}_i}\right)$$
+$$\text{redCost} = \text{clamp}_{[0,1]}\!\left(1 - \frac{\sum_i w_i \cdot \text{healthFrac}_i}{\sum_i w_i}\right)$$
 
 $$\text{costDenial} = \text{clamp}_{[0,1]}\!\left(\frac{\text{redCost}}{\text{costTolerance}}\right)$$
 
-Default costTolerance = 0.55. redCost is the importance-weighted fractional loss across all Red nodes. costDenial reaches 1.0 when losses exceed costTolerance — the point at which the operation is assessed to have become politically unsustainable. costTolerance is an analytic assumption about PRC risk tolerance; it is not derived from classified intelligence.
+Default costTolerance = 0.55. redCost is the weighted fractional loss across **all** Red nodes — every subsystem, including lift — using the same cascade-aware weights w\_i defined in Section 5.2, so the loss of a cascade-capable node registers as a proportionally larger cost imposed, mirroring its larger contribution to the operating system. costDenial reaches 1.0 when losses exceed costTolerance — the point at which the operation is assessed to have become politically unsustainable. costTolerance is an analytic assumption about PRC risk tolerance; it is not derived from classified intelligence.
 
 ### 5.7 Denial Index and Success Criterion
 
@@ -167,7 +179,7 @@ The model implements two operationally distinct pathways to denial, each with a 
 
 **Mechanism 1 — Operational Paralysis (capability denial):** Blue targeting degrades the Red operating system (C2, ISR, sustainment, fires) to the point where amphibious throughput falls below T\_min. Indicators: OSVI\_Red trending below 0.55; throughput T trending below 0.30; lift operations unable to maintain crossing rate. Threshold: halt = True.
 
-**Mechanism 2 — Cost Imposition (cost denial):** Blue targeting imposes losses severe enough to cross the adversary's political tolerance threshold. Indicators: redCost trending above 0.40; importance-weighted surviving fraction declining; operational tempo unsustainable given losses. Threshold: costDenial ≥ 1.0.
+**Mechanism 2 — Cost Imposition (cost denial):** Blue targeting imposes losses severe enough to cross the adversary's political tolerance threshold. Indicators: redCost trending above 0.40; the cascade-weighted surviving fraction (Section 5.6) declining; operational tempo unsustainable given losses. Threshold: costDenial ≥ 1.0.
 
 These mechanisms correspond to deterrence-by-denial and deterrence-by-punishment respectively [7][9]. The model treats them as complementary: a COA that achieves only Mechanism 2 without Mechanism 1 may impose heavy losses on both sides while the operation continues to succeed — the failure mode that the CSIS study documented as "Blue wins the attrition exchange, loses the war" [10].
 
@@ -179,11 +191,17 @@ The COA generator uses a **greedy hill-climb** that iteratively selects the stri
 
 $$\text{score}(u, m) = \frac{\Delta\text{denialIndex}(u,m)}{\text{cost}(m)} \times (0.6 + 0.4 \cdot p_{u,m})$$
 
-where p\_{u,m} is the estimated strike probability for node u and method m. The 0.4·p factor tilts selection toward reliable (high-probability) strikes, operationalizing a risk-calibrated approach governed by the operator's `riskTolerance` parameter.
+where p\_{u,m} is the estimated strike probability for node u and method m. The 0.4·p factor tilts selection toward reliable (high-probability) strikes. Risk calibration is enforced by a hard probability floor governed by the operator's `riskTolerance` parameter: a candidate strike is considered only if
+
+$$p_{u,m} \geq 0.15 + (1 - \text{riskTolerance}) \times 0.45$$
+
+so an operator at riskTolerance = 1 admits any strike with at least a 15% hit probability, while an operator at riskTolerance = 0 plans only strikes with at least a 60% hit probability.
+
+When projecting the effect of a candidate strike, the generator assumes an expected hit removes approximately **60% of the target's remaining health** (healthFrac ← healthFrac × (1 − 0.6·p)). This is a **planning heuristic internal to the generator** — it approximates average strike damage so that resilient, high-value nodes realistically require multiple planned strikes and the projection tracks the Monte Carlo rather than over-killing. It is not part of the Monte Carlo evaluation, which samples actual damage outcomes per trial.
 
 The decisive methodological feature is that **the generator and the evaluator share one MOE function**. This eliminates the common pathology in which a COA generator optimizes a different metric (e.g., expected kills) than the campaign evaluator uses to score success. Here, a COA generated by the tool is internally consistent with the MOE it will subsequently be scored against.
 
-The generator terminates when denialIndex exceeds 0.92 (diminishing returns) or the maximum step count is reached. It does not branch or backtrack; it is greedy. This means it may miss globally optimal sequences — a known limitation of greedy algorithms on interdependent networks [19]. For research purposes, exhaustive or branch-and-bound approaches would provide tighter bounds.
+The generator terminates when the projected denialIndex reaches 0.97 (near-total denial; further strikes add negligible gain), when no remaining strike yields a positive marginal gain (diminishing returns), or when the maximum step count is reached. It does not branch or backtrack; it is greedy. This means it may miss globally optimal sequences — a known limitation of greedy algorithms on interdependent networks [19]. For research purposes, exhaustive or branch-and-bound approaches would provide tighter bounds.
 
 ---
 

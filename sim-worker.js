@@ -31,14 +31,17 @@ function createRng(seed) {
 }
 
 // ===========================================================================
-// C-009 PARITY BLOCK — VERBATIM COPY of the canonical core from sim.js.
+// C-009 PARITY BLOCK — canonical per-trial simulation core.
 //
-// The functions between this banner and END PARITY BLOCK are byte-for-byte copies
-// of SimModule's simulateTrialCore() and its simCore* helpers. The worker cannot
-// importScripts sim.js in every offline context, so the single source of truth is
-// duplicated here on purpose. DO NOT edit one copy without editing the other — run a
-// parityHash() comparison (see the {type:'parity'} handler) after any change.
+// Everything between the BEGIN/END SHARED CORE markers below is kept BYTE-IDENTICAL
+// with the copy in sim.js (SimModule). The worker cannot importScripts sim.js in
+// every offline context, so the single source of truth is duplicated here on purpose.
+// DO NOT edit one copy without editing the other: extract the marked regions from
+// both files and diff them (must be empty), then compare parityHash(seed, n) via the
+// {type:'parity'} handler after any change.
 // ===========================================================================
+
+// === BEGIN SHARED CORE (keep byte-identical with sim.js) ===
 
 function simCoreMethodKeyFromStep(step) {
   if (step.methodKey) return step.methodKey;
@@ -99,6 +102,9 @@ function simCoreChooseRedCounter(methodKey, redBudget, redTypeBudget, detectionL
 
 function simulateTrialCore(actionPlan, opts) {
   const o = opts || {};
+  // context and rng are REQUIRED — no defaults here, so the core stays byte-identical
+  // across its copies. sim.js layers its public fallbacks (buildSimContext/createRng)
+  // in a wrapper OUTSIDE the shared region; the worker always passes both explicitly.
   const context = o.context;
   const rng = o.rng;
   const successMode = o.successMode || 'impact';
@@ -320,10 +326,13 @@ function simulateTrialCore(actionPlan, opts) {
   };
 }
 
-// C-009: deterministic parity helper — VERBATIM copy of SimModule.parityHash and its
-// fixture from sim.js. Same (seed, n) must hash identically here and in the shell; the
-// {type:'parity'} handler below lets the app/tests assert inline === worker agreement.
+// C-009: deterministic parity helper. Runs n trials of the canonical core on a tiny
+// fixed context with mcMixSeed(seed, t) per-trial seeding, and folds the per-trial
+// results into a stable 32-bit hash. Pure function of (seed, n): same inputs → same
+// hash, every time — so the copies of this core (SimModule in sim.js, the worker's
+// {type:'parity'} handler, the inline mirror in the shell) can be asserted equal.
 function parityFixture() {
+  // Small, deterministic battlespace. No DOM, no globals.
   const nodeInfo = new Map();
   const mk = (id, team, extra) => Object.assign({
     id, name: id, team,
@@ -358,6 +367,8 @@ function parityFixture() {
       ew: { name: 'EW', baseProb: 0.65, cost: 1, baseDamage: [5, 15], vulnerability: 'rf' },
       sof: { name: 'SOF', baseProb: 0.40, cost: 2, baseDamage: [30, 60], vulnerability: 'access' }
     },
+    // Inlined (not a reference to a module-level const) so every copy of this fixture
+    // is self-contained and the copies stay byte-identical for parity.
     redProfiles: {
       'Counter-Strike':     { pMult: 0.90 },
       'Cyber Defense':      { tag: 'cyber', pMult: 0.80 },
@@ -378,7 +389,9 @@ function parityFixture() {
   return { opts, plan };
 }
 
+// FNV-1a-style fold of a number into a running 32-bit hash (order-sensitive).
 function parityFold(h, num) {
+  // Quantize to avoid float drift; impact/steps/sizes are small integers or coarse.
   const q = Math.round((Number(num) || 0) * 1000) | 0;
   let x = (h ^ (q & 0xffff)) >>> 0;
   x = Math.imul(x, 16777619) >>> 0;
@@ -406,7 +419,7 @@ function parityHash(seed, n) {
   return h >>> 0;
 }
 
-// END PARITY BLOCK — keep identical to SimModule.simulateTrialCore in sim.js.
+// === END SHARED CORE (keep byte-identical with sim.js) ===
 
 function normalizeContext(context) {
   const nodeInfo = new Map();

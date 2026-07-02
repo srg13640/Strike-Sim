@@ -38,25 +38,25 @@
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
   <script src="map.js?v=p13"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p5"></script>
+  <script src="engine.js?v=p6"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
   <script src="stage.js?v=p5"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p5"></script>
+  <script src="sim.js?v=p6"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
        the COA generator and the Monte Carlo 'denial' success mode. See docs/METHODOLOGY.md. -->
-  <script src="moe.js?v=p1"></script>
+  <script src="moe.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
   <script src="game.js?v=p10"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p10"></script>
+  <script src="wargame.js?v=p11"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p7"></script>
+  <script src="views.js?v=p8"></script>
   <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
@@ -72,6 +72,7 @@
     --warning: #ffa94d;
     --side-width: 380px;
     --bar-h: 56px;
+    --left-w: 340px;   /* left rail width — HUD chrome (radar/ticker) offsets derive from this */
 
     /* ── Stark-HUD overhaul tokens ───────────────────────────── */
     --amber: #ffb000;
@@ -418,6 +419,11 @@
     background: rgba(5,10,15,0.6);
     }
     body.right-collapsed { --side-width: 22px; }
+    body.left-collapsed { --left-w: 22px; }
+    /* Layout contract (C-025): while the War Game HUD is open the right rail yields
+       to it — surfaces make room for the HUD width instead of the rail. */
+    body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
+    body.wargame-open #side { visibility: hidden; }
     .table-wrap { padding: 10px 12px 16px; }
     table.mdsc-table { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--text); }
     table.mdsc-table thead th {
@@ -1218,6 +1224,24 @@
     #boot .boot-bar { margin-top:12px; width:min(440px,80vw); height:3px; background:rgba(0,216,255,.12); border-radius:2px; overflow:hidden; }
     #boot .boot-bar i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--amber)); box-shadow:var(--glow-cyan); animation:bootFill 2.1s ease forwards; }
     @keyframes bootFill { to { width:100%; } }
+    #boot .boot-skip { margin-top:18px; font-size:10px; letter-spacing:2.5px; color:#4f7590; }
+
+    /* ── Responsive layout contract (C-006/C-052): the rails and command bar adapt
+       to viewport width; JS auto-collapse below the tactical minimum lives in the
+       shell resize handler. ─────────────────────────────────────────────────── */
+    @media (max-width: 1280px) {
+      body { --side-width: 330px; }
+      body.right-collapsed { --side-width: 22px; }
+      body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
+      #side { width: 330px; }
+    }
+    @media (max-width: 1000px) {
+      /* Command bar wraps instead of clipping; --bar-h is re-measured by the shell
+         resize handler so dependent offsets (app top, radar, banner) follow. */
+      #cmd-bar { flex-wrap: wrap; height: auto; min-height: 56px; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+      #cmd-bar .cb-sub { display: none; }
+      .cb-telemetry .tlm:not(.defcon) { display: none; }
+    }
 
   </style>
   <style id="modal-resize-fix">
@@ -1245,6 +1269,68 @@
 
 </head>
 <body>
+  <!-- ── AppShell: single owner for layout/mode/lifecycle state (C-025). Modules read
+       AppShell.state, call AppShell.set(), and subscribe for changes; AppShell owns the
+       body classes and reacts to visibilitychange + prefers-reduced-motion so every
+       ambient loop can pause from one place (C-032/C-050). ── -->
+  <script>
+  window.AppShell = (function () {
+    "use strict";
+    var mqMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    var state = {
+      view: '3d',                                  // '3d' | 'map' | 'table' | 'org'
+      wargameOpen: false,
+      hidden: !!document.hidden,
+      reducedMotion: !!(mqMotion && mqMotion.matches)
+    };
+    var subs = [];
+    function notify(changed) {
+      for (var i = 0; i < subs.length; i++) { try { subs[i](state, changed); } catch (e) {} }
+    }
+    function applyBodyState(changed) {
+      if (changed.indexOf('wargameOpen') !== -1 && document.body) {
+        document.body.classList.toggle('wargame-open', state.wargameOpen);
+      }
+    }
+    function set(patch) {
+      var changed = [];
+      for (var k in patch) {
+        if (Object.prototype.hasOwnProperty.call(patch, k) && state[k] !== patch[k]) { state[k] = patch[k]; changed.push(k); }
+      }
+      if (changed.length) { applyBodyState(changed); notify(changed); }
+    }
+    function subscribe(fn) {
+      subs.push(fn);
+      return function () { var i = subs.indexOf(fn); if (i !== -1) subs.splice(i, 1); };
+    }
+    // Managed ambient interval: pauses while the tab is hidden, runs once immediately
+    // on resume so displays catch up (C-050).
+    function every(ms, fn) {
+      var id = null;
+      function start() { if (id == null) id = setInterval(fn, ms); }
+      function stop() { if (id != null) { clearInterval(id); id = null; } }
+      subscribe(function (s, changed) {
+        if (changed.indexOf('hidden') !== -1) { if (s.hidden) stop(); else { try { fn(); } catch (e) {} start(); } }
+      });
+      if (!state.hidden) start();
+      return { start: start, stop: stop };
+    }
+    document.addEventListener('visibilitychange', function () { set({ hidden: !!document.hidden }); });
+    if (mqMotion) {
+      var onMq = function () { set({ reducedMotion: !!mqMotion.matches }); };
+      if (mqMotion.addEventListener) mqMotion.addEventListener('change', onMq);
+      else if (mqMotion.addListener) mqMotion.addListener(onMq);
+    }
+    return {
+      state: state,
+      set: set,
+      subscribe: subscribe,
+      every: every,
+      prefersReducedMotion: function () { return state.reducedMotion; }
+    };
+  })();
+  </script>
+
   <!-- ── Stark-HUD overhaul: cinematic boot sequence + global frame overlay ── -->
   <div id="boot" role="status" aria-label="System boot">
     <div class="boot-ring"><div class="boot-core"></div></div>
@@ -2252,6 +2338,11 @@
     // Persistent header indicator of the active view (and Geo on/off + pinned count),
     // so mode changes are never signalled by a button label alone.
     function updateViewStatus() {
+    // Publish the canonical view to the shell first — every toggle path funnels
+    // through here, so this is the one place layout/chrome state stays honest.
+    if (window.AppShell) {
+      AppShell.set({ view: mapModeEnabled ? 'map' : tableModeEnabled ? 'table' : orgModeEnabled ? 'org' : '3d' });
+    }
     const el = document.getElementById('view-status');
     if (!el) return;
     let view = '3D Network';
@@ -2303,7 +2394,10 @@
       const order = ['cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
       const move = () => order.forEach(id => { const el = document.getElementById(id); if (el && el.parentElement !== bar) bar.appendChild(el); });
       move();
-      try { new MutationObserver(move).observe(document.body, { childList: true }); } catch (e) {}
+      // subtree:true — some modules append their launcher inside #app rather than
+      // directly under <body> (e.g. #wg-launch), which a childList-only observer
+      // on body never sees; the button then hides beneath the command bar.
+      try { new MutationObserver(move).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
     }
 
     function enableGeoMode() {
@@ -3396,38 +3490,95 @@
     const handleKey = (e, fn) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); }
     };
-    if (leftPanel && leftCollapseBtn) {
-      const setLeftCollapsed = (collapsed) => {
-        leftPanel.classList.toggle('locked-collapsed', collapsed);
-        if (leftHandle) {
-          leftHandle.setAttribute('aria-expanded', String(!collapsed));
-          const arrow = leftHandle.querySelector('.arrow');
-          if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
-        }
-        leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
-      };
-      setLeftCollapsed(false);
-      leftCollapseBtn.addEventListener('click', () => setLeftCollapsed(true));
+    // Rail collapse setters are shared by the user toggles AND the responsive
+    // auto-collapse below (C-006): a manual toggle records user intent so a later
+    // viewport crossing doesn't fight the operator.
+    let userLeftCollapsed = null;   // null = no explicit preference
+    let userRightCollapsed = null;
+    const setLeftCollapsed = (collapsed) => {
+      if (!leftPanel) return;
+      leftPanel.classList.toggle('locked-collapsed', collapsed);
+      document.body.classList.toggle('left-collapsed', collapsed); // drives --left-w for HUD chrome
       if (leftHandle) {
-        const toggleLeft = () => setLeftCollapsed(!leftPanel.classList.contains('locked-collapsed'));
+        leftHandle.setAttribute('aria-expanded', String(!collapsed));
+        const arrow = leftHandle.querySelector('.arrow');
+        if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
+      }
+      if (leftCollapseBtn) leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+    };
+    const setRightCollapsed = (collapsed) => {
+      if (!rightPanel) return;
+      rightPanel.classList.toggle('collapsed', collapsed);
+      document.body.classList.toggle('right-collapsed', collapsed);
+    };
+    if (leftPanel && leftCollapseBtn) {
+      setLeftCollapsed(false);
+      leftCollapseBtn.addEventListener('click', () => { userLeftCollapsed = true; setLeftCollapsed(true); });
+      if (leftHandle) {
+        const toggleLeft = () => {
+          const next = !leftPanel.classList.contains('locked-collapsed');
+          userLeftCollapsed = next;
+          setLeftCollapsed(next);
+        };
         leftHandle.addEventListener('click', toggleLeft);
         leftHandle.addEventListener('keydown', (e) => handleKey(e, toggleLeft));
       }
     }
     if (rightPanel && rightCollapseBtn) {
       rightCollapseBtn.addEventListener('click', () => {
-        rightPanel.classList.toggle('collapsed');
-        document.body.classList.toggle('right-collapsed');
+        const next = !rightPanel.classList.contains('collapsed');
+        userRightCollapsed = next;
+        setRightCollapsed(next);
       });
     }
     if (rightPanel && rightHandle) {
       const toggleRight = () => {
-        rightPanel.classList.toggle('collapsed');
-        document.body.classList.toggle('right-collapsed');
+        const next = !rightPanel.classList.contains('collapsed');
+        userRightCollapsed = next;
+        setRightCollapsed(next);
       };
       rightHandle.addEventListener('click', toggleRight);
       rightHandle.addEventListener('keydown', (e) => handleKey(e, toggleRight));
     }
+
+    // Responsive auto-collapse (C-006) + command-bar height re-measure (C-052).
+    // Crossing below a breakpoint collapses a rail; crossing back restores the
+    // user's last explicit choice (or expands when they never chose).
+    let wasNarrowRight = null, wasNarrowLeft = null;
+    const applyResponsiveShell = () => {
+      const w = window.innerWidth;
+      const narrowRight = w < 1080, narrowLeft = w < 860;
+      if (narrowRight !== wasNarrowRight) {
+        setRightCollapsed(narrowRight ? true : (userRightCollapsed ?? false));
+        wasNarrowRight = narrowRight;
+      }
+      if (narrowLeft !== wasNarrowLeft) {
+        setLeftCollapsed(narrowLeft ? true : (userLeftCollapsed ?? false));
+        wasNarrowLeft = narrowLeft;
+      }
+      // The bar wraps below 1000px (CSS, height:auto there); republish its real
+      // height so every var(--bar-h) consumer (app top, radar, banner, WG HUD)
+      // follows. At full width the bar's height IS var(--bar-h), so measuring
+      // would be circular — reset to the stylesheet default instead.
+      const bar = document.getElementById('cmd-bar');
+      if (bar) {
+        if (w < 1000) {
+          const h = Math.max(56, Math.round(bar.getBoundingClientRect().height));
+          document.documentElement.style.setProperty('--bar-h', h + 'px');
+        } else {
+          document.documentElement.style.removeProperty('--bar-h');
+        }
+      }
+    };
+    applyResponsiveShell();
+    // The bar's content changes after load (module launch buttons relocate into it),
+    // which can change its wrapped height — re-measure whenever the bar resizes.
+    // No feedback loop: below 1000px the bar's height is content-driven (height:auto,
+    // literal min-height), so writing --bar-h never changes the bar itself.
+    try {
+      const barEl = document.getElementById('cmd-bar');
+      if (barEl && window.ResizeObserver) new ResizeObserver(() => applyResponsiveShell()).observe(barEl);
+    } catch (e) {}
 
     // Event Log
     document.getElementById('toggle-log-btn').addEventListener('click', toggleEventLog);
@@ -3535,8 +3686,12 @@
       if (leftPanelEl) leftPanelEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
     });
 
-    // Resize handling for map
+    // Resize handling for map + the responsive shell contract (rAF-throttled)
+    let resizeRaf = 0;
     window.addEventListener('resize', () => {
+    if (!resizeRaf) {
+      resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; applyResponsiveShell(); });
+    }
     if (mapModeEnabled && MapModule.getMap()) setTimeout(() => MapModule.invalidateSize(), 50);
     if (selectedNode && !mapModeEnabled) setTimeout(() => updateNodePopupPosition(selectedNode), 30);
     if (orgModeEnabled) setTimeout(renderOrgChart, 80);
@@ -4863,7 +5018,7 @@
       const runId = ++mcWorkerRunId;
       mcWorkerActiveRunId = runId;
       try {
-        mcWorker = new Worker('sim-worker.js');
+        mcWorker = new Worker('sim-worker.js?v=p6');
       } catch (err) {
         clearMonteCarloWorker();
         return Promise.resolve(null);
@@ -5946,8 +6101,9 @@
         const avgRS = Math.round(mean(r.redSpendArr || []));
         const interp = mcInterpretationFor(r);
         const runStatus = r.cancelled ? `Partial (${r.trials.toLocaleString()} / ${r.requestedTrials.toLocaleString()})` : 'Complete';
-        const oddsTable = (r.nodeOdds && r.nodeOdds.length) ? (`<h3 class=\"muted\" style=\"margin-top:10px;\">Neutralization Odds by Node (Top 10)</h3>` +
-          `<div>${r.nodeOdds.slice(0,10).map(o=>`<div class=\\\"kv-row\\\"><span>${o.name} (${o.id})</span><strong>${o.p}%</strong></div>`).join('')}</div>`) : '';
+        const escOdds = (s) => (window.UiModule && UiModule.escapeHtml) ? UiModule.escapeHtml(String(s ?? '')) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const oddsTable = (r.nodeOdds && r.nodeOdds.length) ? (`<h3 class="muted" style="margin-top:10px;">Neutralization Odds by Node (Top 10)</h3>` +
+          `<div>${r.nodeOdds.slice(0,10).map(o=>`<div class="kv-row"><span>${escOdds(o.name)} (${escOdds(o.id)})</span><strong>${o.p}%</strong></div>`).join('')}</div>`) : '';
         body.innerHTML = `
           <div class="interpretation-strip" data-tone="${interp.tone}">
             <strong>What this means:</strong> ${interp.text}
@@ -6046,6 +6202,34 @@
     };
 
     init();
+
+    // C-009: boot-time engine parity assertion. Ask the worker for its parityHash
+    // and compare against the inline core's — the two copies must agree or Monte
+    // Carlo results could differ by execution path. Deferred so it never competes
+    // with first render; silent unless something is actually wrong (the pass/fail
+    // lands in the event log either way).
+    setTimeout(function assertSimParity() {
+      if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
+      try {
+        const pw = new Worker('sim-worker.js?v=p6');
+        const bail = setTimeout(() => { try { pw.terminate(); } catch (e) {} }, 5000);
+        pw.onmessage = (ev) => {
+          const m = ev.data || {};
+          if (m.type !== 'parity') return;
+          clearTimeout(bail);
+          try { pw.terminate(); } catch (e) {}
+          const local = SimModule.parityHash(m.seed, m.n);
+          if (local === m.hash) {
+            addEvent({ type: 'Sim', text: `Engine parity check passed (inline ≡ worker, hash ${m.hash}).` });
+          } else {
+            addEvent({ type: 'Sim', text: `ENGINE PARITY MISMATCH — inline ${local} vs worker ${m.hash}. Monte Carlo paths may disagree; do not trust cross-run comparisons until sim.js and sim-worker.js are re-synced.` });
+            UiModule.toast('Engine parity mismatch — see event log', 'error');
+          }
+        };
+        pw.onerror = () => { clearTimeout(bail); try { pw.terminate(); } catch (e) {} };
+        pw.postMessage({ type: 'parity', runId: 'parity-boot', seed: 42, n: 64 });
+      } catch (e) { /* parity probe must never break boot */ }
+    }, 2500);
   </script>
 
   <!-- ── Stark-HUD overhaul: boot fade, live telemetry clock, readout FX ── -->
@@ -6060,15 +6244,37 @@
         '▸ establishing geospatial link ..... <span class="ok">OK</span>',
         '▸ rendering command picture ........ <span class="ok">OK</span>'
       ];
+      // C-050: cinematic boot is first-run-only and always skippable. Returning
+      // operators get a fast branded fade; reduced-motion gets near-instant.
+      var bootEl = document.getElementById('boot');
+      var bootReduced = window.AppShell ? AppShell.prefersReducedMotion()
+        : !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var bootSeen = false; try { bootSeen = localStorage.getItem('strikesim_boot_seen') === '1'; } catch(e) {}
+      var bootDwell = bootReduced ? 150 : (bootSeen ? 650 : 2300);
       var logEl = document.getElementById('boot-log'), i = 0;
-      (function nextLine(){
-        if (!logEl || i >= lines.length) return;
-        var d = document.createElement('div'); d.innerHTML = lines[i++];
-        logEl.appendChild(d); setTimeout(nextLine, 300);
-      })();
-      function killBoot(){ var b = document.getElementById('boot'); if (b) b.classList.add('gone'); }
+      if (bootReduced || bootSeen) {
+        // no typing theater on repeat visits — render the log at once
+        if (logEl) logEl.innerHTML = lines.map(function(l){ return '<div>' + l + '</div>'; }).join('');
+      } else {
+        (function nextLine(){
+          if (!logEl || i >= lines.length) return;
+          var d = document.createElement('div'); d.innerHTML = lines[i++];
+          logEl.appendChild(d); setTimeout(nextLine, 300);
+        })();
+      }
+      function killBoot(){
+        var b = document.getElementById('boot'); if (b) b.classList.add('gone');
+        try { localStorage.setItem('strikesim_boot_seen', '1'); } catch(e) {}
+      }
+      if (bootEl) {
+        var hint = document.createElement('div'); hint.className = 'boot-skip';
+        hint.textContent = 'CLICK OR PRESS ANY KEY TO SKIP';
+        bootEl.appendChild(hint);
+        bootEl.addEventListener('pointerdown', killBoot);
+      }
+      window.addEventListener('keydown', killBoot, { once: true });
       var bootStart = Date.now();
-      function scheduleKill(){ setTimeout(killBoot, Math.max(0, 2300 - (Date.now()-bootStart))); }
+      function scheduleKill(){ setTimeout(killBoot, Math.max(0, bootDwell - (Date.now()-bootStart))); }
       if (document.readyState === 'complete') scheduleKill(); else window.addEventListener('load', scheduleKill);
       setTimeout(killBoot, 6000); // hard cap — boot never hangs
 
@@ -6081,7 +6287,9 @@
                     + '<span class="tlm">SECTOR <b>INDO-PAC</b></span>'
                     + '<span class="tlm"><b id="cb-clock">--:--:--</b> UTC</span>';
         brand.insertAdjacentElement('afterend', t);
-        (function tick(){ var el=document.getElementById('cb-clock'); if(el) el.textContent=new Date().toISOString().slice(11,19); setTimeout(tick,1000); })();
+        var tickClock = function(){ var el=document.getElementById('cb-clock'); if(el) el.textContent=new Date().toISOString().slice(11,19); };
+        tickClock();
+        if (window.AppShell) AppShell.every(1000, tickClock); else setInterval(tickClock, 1000); // pauses on hidden tab (C-050)
       }
       if (document.getElementById('cmd-bar')) buildTelemetry(); else document.addEventListener('DOMContentLoaded', buildTelemetry);
 
@@ -6178,7 +6386,8 @@
         alert:function(){ setThreatVal(1); },
         screenShake:screenShake
       };
-      setInterval(function(){ if(threatVal>0) setThreatVal(threatVal-0.05); }, 1300); // calm decays
+      var threatDecay = function(){ if(threatVal>0) setThreatVal(threatVal-0.05); };
+      if (window.AppShell) AppShell.every(1300, threatDecay); else setInterval(threatDecay, 1300); // calm decays; pauses on hidden tab (C-050)
 
       // ---- DEFCON chip + sound toggle into the telemetry cluster ----
       function updateAudioBtn(){ var b=document.getElementById('cb-audio-btn'); if(b) b.textContent=muted?'🔇':'🔊'; }
@@ -6207,10 +6416,10 @@
     try {
       var css=document.createElement('style');
       css.textContent=[
-        '#hud-radar{position:fixed;top:calc(var(--bar-h) + 14px);left:352px;width:150px;height:170px;z-index:1180;pointer-events:none;font-family:var(--mono)}',
+        '#hud-radar{position:fixed;top:calc(var(--bar-h) + 14px);left:calc(var(--left-w, 340px) + 12px);width:150px;height:170px;z-index:1180;pointer-events:none;font-family:var(--mono);transition:left .2s ease}',
         '#hud-radar canvas{display:block;filter:drop-shadow(0 0 9px rgba(0,216,255,.28))}',
         '#hud-radar .hr-label{margin-top:3px;text-align:center;font-size:9px;letter-spacing:2.5px;color:#6f93ad}',
-        '#hud-ticker{position:fixed;left:352px;right:var(--side-width);bottom:0;height:26px;z-index:1180;pointer-events:none;display:flex;align-items:center;overflow:hidden;background:linear-gradient(180deg,rgba(6,13,20,0),rgba(5,11,18,.86));border-top:1px solid var(--glass-brd);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--mono);font-size:11px}',
+        '#hud-ticker{position:fixed;left:calc(var(--left-w, 340px) + 12px);right:var(--side-width);bottom:0;height:26px;z-index:1180;pointer-events:none;display:flex;align-items:center;overflow:hidden;background:linear-gradient(180deg,rgba(6,13,20,0),rgba(5,11,18,.86));border-top:1px solid var(--glass-brd);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--mono);font-size:11px;transition:left .2s ease}',
         '#hud-ticker .ht-tag{flex:0 0 auto;padding:0 12px 0 10px;height:100%;display:flex;align-items:center;color:#04121b;background:linear-gradient(90deg,var(--amber),#ffd36b);font-weight:700;letter-spacing:1.5px;clip-path:polygon(0 0,100% 0,calc(100% - 11px) 100%,0 100%)}',
         '#hud-ticker .ht-view{flex:1 1 auto;overflow:hidden;position:relative;height:100%}',
         '#hud-ticker .ht-track{position:absolute;top:0;left:0;white-space:nowrap;display:inline-flex;align-items:center;height:100%;will-change:transform;animation:tickerScroll 42s linear infinite}',
@@ -6225,13 +6434,20 @@
       var radarWrap=document.createElement('div'); radarWrap.id='hud-radar';
       radarWrap.innerHTML='<canvas width="150" height="150"></canvas><div class="hr-label">TACTICAL SCAN</div>';
       document.body.appendChild(radarWrap);
-      var rAng=0, rLast=0;
+      // C-032: the scope's loop is owned by the shell lifecycle — it runs only while
+      // a view that shows the radar is active AND the tab is visible. Reduced motion
+      // drops to a static 1 Hz picture with no sweep.
+      var rAng=0, radarOn=false, radarTimer=0, radarRaf=0;
       function radarNodes(){ try{ var g=window.AppState&&AppState.activeGraph&&AppState.activeGraph(); return (g&&g.nodes)||[]; }catch(e){ return []; } }
-      function drawRadar(ts){
-        var wrap=document.getElementById('hud-radar'); if(!wrap) return; requestAnimationFrame(drawRadar);
-        if(wrap.style.display==='none') return; if(ts-rLast<33) return; rLast=ts;
-        var cv=wrap.querySelector('canvas'); if(!cv) return; var ctx=cv.getContext('2d'); if(!ctx) return;
-        var cx=75,cy=75,R=66; rAng+=0.045; if(rAng>Math.PI*2) rAng-=Math.PI*2;
+      function radarReduced(){ return window.AppShell ? AppShell.prefersReducedMotion() : false; }
+      function paintRadar(){
+        if(!radarOn) return;
+        var reduced=radarReduced();
+        var wrap=document.getElementById('hud-radar');
+        var cv=wrap&&wrap.querySelector('canvas'); var ctx=cv&&cv.getContext('2d');
+        if(!ctx){ scheduleRadar(); return; }
+        var cx=75,cy=75,R=66;
+        if(!reduced){ rAng+=0.045; if(rAng>Math.PI*2) rAng-=Math.PI*2; }
         ctx.clearRect(0,0,150,150);
         ctx.fillStyle='rgba(4,12,19,0.5)'; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
         ctx.strokeStyle='rgba(0,216,255,0.2)'; ctx.lineWidth=1;
@@ -6246,23 +6462,43 @@
             ns.forEach(function(n){ if(n.lat==null||n.lon==null) return;
               var nx=((+n.lon-miO)/spO)*2-1, ny=((+n.lat-miA)/spA)*2-1;
               var x=cx+nx*R*0.86, y=cy-ny*R*0.86;
-              var na=Math.atan2(y-cy,x-cx); if(na<0) na+=Math.PI*2;
-              var diff=Math.abs(((rAng-na+Math.PI*3)%(Math.PI*2))-Math.PI); var ping=Math.max(0,1-diff*1.5);
+              var ping=0;
+              if(!reduced){
+                var na=Math.atan2(y-cy,x-cx); if(na<0) na+=Math.PI*2;
+                var diff=Math.abs(((rAng-na+Math.PI*3)%(Math.PI*2))-Math.PI); ping=Math.max(0,1-diff*1.5);
+              }
               var tm=(n.team||'').toLowerCase();
               var col=tm==='blue'?'56,189,248':tm==='red'?'255,77,94':tm==='green'?'81,207,102':'255,212,59';
-              ctx.fillStyle='rgba('+col+','+(0.32+ping*0.68).toFixed(2)+')';
-              ctx.beginPath(); ctx.arc(x,y,1.5+ping*2.6,0,Math.PI*2); ctx.fill();
+              ctx.fillStyle='rgba('+col+','+(reduced?'0.75':(0.32+ping*0.68).toFixed(2))+')';
+              ctx.beginPath(); ctx.arc(x,y,reduced?2.2:(1.5+ping*2.6),0,Math.PI*2); ctx.fill();
             });
           }
         }
-        ctx.save(); ctx.translate(cx,cy); ctx.rotate(rAng);
-        var grad=ctx.createLinearGradient(0,0,R,0); grad.addColorStop(0,'rgba(0,216,255,0)'); grad.addColorStop(1,'rgba(0,216,255,0.3)');
-        ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.4,0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
-        ctx.strokeStyle='rgba(0,216,255,0.8)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0); ctx.stroke();
-        ctx.restore();
+        if(!reduced){
+          ctx.save(); ctx.translate(cx,cy); ctx.rotate(rAng);
+          var grad=ctx.createLinearGradient(0,0,R,0); grad.addColorStop(0,'rgba(0,216,255,0)'); grad.addColorStop(1,'rgba(0,216,255,0.3)');
+          ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.4,0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+          ctx.strokeStyle='rgba(0,216,255,0.8)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0); ctx.stroke();
+          ctx.restore();
+        }
         ctx.strokeStyle='rgba(0,216,255,0.5)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+        scheduleRadar();
       }
-      requestAnimationFrame(drawRadar);
+      function scheduleRadar(){
+        if(!radarOn) return;
+        radarTimer=setTimeout(function(){ radarTimer=0; radarRaf=requestAnimationFrame(paintRadar); }, radarReduced()?1000:33);
+      }
+      function startRadar(){ if(radarOn) return; radarOn=true; paintRadar(); }
+      function stopRadar(){
+        radarOn=false;
+        if(radarTimer){ clearTimeout(radarTimer); radarTimer=0; }
+        if(radarRaf){ cancelAnimationFrame(radarRaf); radarRaf=0; }
+      }
+      function syncRadar(){
+        var s=window.AppShell?AppShell.state:{view:'3d',hidden:document.hidden};
+        var wants=(s.view==='3d'||s.view==='map')&&!s.hidden;
+        if(wants) startRadar(); else stopRadar();
+      }
 
       // ---- Live C2 intel ticker -------------------------------------------------
       var ticker=document.createElement('div'); ticker.id='hud-ticker';
@@ -6282,21 +6518,36 @@
         tr.innerHTML=html+'<span class="ht-sep">//</span>'+html;
       }
       function pushFeed(t){ t=(t||'').replace(/\s+/g,' ').trim(); if(!t) return; feed.unshift(t.slice(0,90)); if(feed.length>10) feed.pop(); renderTrack(); }
-      renderTrack(); setInterval(renderTrack, 6000);
+      renderTrack();
+      if (window.AppShell) AppShell.every(6000, renderTrack); else setInterval(renderTrack, 6000); // pauses on hidden tab (C-050)
       var elist=document.getElementById('event-list');
       if(elist && window.MutationObserver){
         new MutationObserver(function(muts){ muts.forEach(function(m){ Array.prototype.forEach.call(m.addedNodes||[],function(nd){ if(nd && nd.nodeType===1) pushFeed(nd.textContent); }); }); }).observe(elist,{childList:true});
       }
 
       // ---- view-aware visibility (radar on 3D+map, ticker on 3D) ----------------
+      // C-025: chrome follows AppShell state — no more setView monkey-patching.
+      // updateViewStatus() publishes the canonical view; hidden/reduced-motion
+      // changes re-sync the radar loop through the same subscription.
       function applyViewChrome(view){
         var r=document.getElementById('hud-radar'), t=document.getElementById('hud-ticker');
         if(r) r.style.display=(view==='map'||view==='3d')?'block':'none';
         if(t) t.style.display=(view==='3d')?'flex':'none';
+        syncRadar();
       }
-      (function hook(){ var tries=0; (function go(){ var orig=window.setView;
-        if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
-        if(++tries<50) setTimeout(go,120); })(); })();
+      if (window.AppShell) {
+        AppShell.subscribe(function(s, changed){
+          if (changed.indexOf('view') !== -1) applyViewChrome(s.view);
+          else if (changed.indexOf('hidden') !== -1 || changed.indexOf('reducedMotion') !== -1) syncRadar();
+        });
+        applyViewChrome(AppShell.state.view);
+      } else {
+        // resilience fallback (AppShell lives in this same document, so this
+        // branch only runs if that script somehow failed): hook setView.
+        (function hook(){ var tries=0; (function go(){ var orig=window.setView;
+          if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
+          if(++tries<50) setTimeout(go,120); })(); })();
+      }
     } catch(e){ /* HUD III layer must never break the app */ }
   })();
   </script>

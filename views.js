@@ -40,6 +40,20 @@ window.ViewsModule = (function () {
   };
   function init(context) { ctx = Object.assign({}, ctx, context || {}); }
 
+  // --- C-030 adjacency: HTML-escape helper for innerHTML template literals ---
+  // Scenario JSON is user-importable, so every node-derived string interpolated
+  // into markup (names, types, statuses, ids, vulns, ...) must be escaped.
+  // Delegates to the shared UiModule.escapeHtml, resolved LAZILY per call
+  // (views.js may load before ui.js); identical local fallback otherwise.
+  function esc(s) {
+    if (window.UiModule && typeof window.UiModule.escapeHtml === 'function') {
+      return window.UiModule.escapeHtml(s);
+    }
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   // --- Table sort state ---
   // Column index (0-based) and direction for the active sort.
   let sortCol = -1;   // -1 = no active sort
@@ -421,12 +435,12 @@ window.ViewsModule = (function () {
     const resCell = `<td style="font-family:var(--mono);color:var(--accent)">${resGen}</td>`;
 
     const sub = n.subsystem || '—';
-    const subCell = `<td style="color:var(--muted)">${sub}</td>`;
+    const subCell = `<td style="color:var(--muted)">${esc(sub)}</td>`;
 
     const vulns = Array.isArray(n.vulnerabilities) ? n.vulnerabilities : [];
     const vulnColor = vulns.length >= 2 ? 'var(--alert)' : vulns.length === 1 ? 'var(--amber)' : 'var(--muted)';
     const vulnTitle = vulns.length ? vulns.join(', ') : 'None';
-    const vulnCell = `<td><span title="${vulnTitle}" style="cursor:default;color:${vulnColor};font-family:var(--mono)">${vulns.length ? vulns.slice(0,2).join(', ') + (vulns.length > 2 ? ' +' + (vulns.length - 2) : '') : '—'}</span></td>`;
+    const vulnCell = `<td><span title="${esc(vulnTitle)}" style="cursor:default;color:${vulnColor};font-family:var(--mono)">${vulns.length ? esc(vulns.slice(0,2).join(', ')) + (vulns.length > 2 ? ' +' + (vulns.length - 2) : '') : '—'}</span></td>`;
 
     const precCoords = (n.lat != null && n.lon != null)
       ? `${Number(n.lat).toFixed(5)}, ${Number(n.lon).toFixed(5)}`
@@ -509,14 +523,14 @@ window.ViewsModule = (function () {
 
       // --- Status badge with affiliation-derived color ---
       const sColor = statusColor(statusText);
-      const statusCell = `<span class="status-badge" style="border-color:${sColor};color:${sColor}">${statusText}</span>`;
+      const statusCell = `<span class="status-badge" style="border-color:${sColor};color:${sColor}">${esc(statusText)}</span>`;
 
       // --- Team cell with canonical affiliation color ---
       const affColor = teamAffColor(n.team);
       const teamLabel2 = (n.team || '3rd_party').replace('_', ' ');
       const teamCell = `<span style="display:inline-flex;align-items:center;gap:5px">` +
         `<span class="swatch" style="background:${affColor};display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>` +
-        `<span style="color:${affColor};font-family:var(--mono)">${teamLabel2}</span>` +
+        `<span style="color:${affColor};font-family:var(--mono)">${esc(teamLabel2)}</span>` +
         `</span>`;
 
       // C-034: analysis cells only when mode is on
@@ -524,16 +538,16 @@ window.ViewsModule = (function () {
 
       // C-026: row is keyboard-reachable via roving tabindex (applied in _wireRowKeyboard)
       return `
-        <tr class="${trClass}" data-id="${n.id}" role="row" aria-selected="${isSelected ? 'true' : 'false'}">
-          <td style="font-family:var(--mono);color:var(--muted)">${n.id}</td>
-          <td>${n.name || ''}</td>
+        <tr class="${trClass}" data-id="${esc(n.id)}" role="row" aria-selected="${isSelected ? 'true' : 'false'}">
+          <td style="font-family:var(--mono);color:var(--muted)">${esc(n.id)}</td>
+          <td>${esc(n.name || '')}</td>
           <td>${teamCell}</td>
-          <td>${dom}</td>
-          <td>${n.type || ''}</td>
+          <td>${esc(dom)}</td>
+          <td>${esc(n.type || '')}</td>
           <td>${healthCell}</td>
           <td>${statusCell}</td>
-          <td style="font-family:var(--mono)">${n.importance ?? ''}</td>
-          <td>${n.difficulty || ''}</td>
+          <td style="font-family:var(--mono)">${esc(n.importance ?? '')}</td>
+          <td>${esc(n.difficulty || '')}</td>
           <td style="font-family:var(--mono);color:var(--muted)">${coords}</td>
           ${analysisCols}
         </tr>`;
@@ -685,7 +699,7 @@ window.ViewsModule = (function () {
       const span = document.createElement('span');
       span.style.cssText = 'display:inline-flex;align-items:center;gap:5px';
       span.title = desc;
-      span.innerHTML = `<span style="${style}" aria-hidden="true"></span><span>${label}</span>`;
+      span.innerHTML = `<span style="${style}" aria-hidden="true"></span><span>${esc(label)}</span>`;
       legend.appendChild(span);
     });
 

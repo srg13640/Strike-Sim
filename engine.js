@@ -499,6 +499,18 @@ window.EngineModule = (function () {
     } catch (e) { return false; }
   }
 
+  // Live reduced-motion check, evaluated at call time (never cached at load) so an
+  // OS/app toggle takes effect on the very next strike. Prefers the AppShell when it
+  // is present; falls back to the OS-level media query when running without the shell.
+  function fxReducedMotion() {
+    try {
+      if (window.AppShell && typeof AppShell.prefersReducedMotion === 'function') {
+        return !!AppShell.prefersReducedMotion();
+      }
+      return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+
   // Render a single strike event in the THREE scene.
   // opts: { team:'blue'|'red', kill:bool }
   function flashStrike3D(srcId, dstId, opts) {
@@ -537,6 +549,26 @@ window.EngineModule = (function () {
       }
 
       const T = new THREE.Vector3(dst.x, dst.y, dst.z);
+
+      // ---- Reduced motion: static impact indication only (finding C-031) --------------
+      // No tracer, no projectile, no RAF loops — a single non-animated flash at the
+      // target, cleaned up by the existing scheduleRemove path (one disposal timer).
+      if (fxReducedMotion()) {
+        const flashGeo = new THREE.SphereGeometry(kill ? 6 : 3.5, 8, 8);
+        const flashMat = new THREE.MeshBasicMaterial({
+          color: kill ? 0xffffff : glowColor,
+          transparent: true,
+          opacity: kill ? 0.95 : 0.8,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const flash = new THREE.Mesh(flashGeo, flashMat);
+        flash.position.copy(T);
+        flash.name = 'StrikeFlashStatic';
+        scene.add(flash);
+        scheduleRemove(flash, flashGeo, flashMat, 450);
+        return;
+      }
 
       // ---- 1. Static glowing beam (source→target), only when source has a position ----
       if (src && src.x != null && src.y != null && src.z != null) {
