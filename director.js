@@ -134,6 +134,17 @@ window.DirectorModule = (function () {
       '#dir-dock .oq.h{border-color:#2f6e46;} #dir-dock .oq.r{border-color:#6e5a2f;}',
       '#dir-dock .oq u{cursor:pointer;text-decoration:none;color:#7f9db5;} #dir-dock .oq u:hover{color:#ff9d94;}',
       '#dir-dock .spacer{flex:1;}',
+      // objective overlay (map rings on both sides' key terrain)
+      '.dir-objring{display:block;width:34px;height:34px;border-radius:50%;box-sizing:border-box;',
+      'border:2px solid;animation:dirObjPulse 2.4s ease-in-out infinite;}',
+      '.dir-objring.b{border-color:rgba(77,171,247,.9);box-shadow:0 0 12px rgba(77,171,247,.45),inset 0 0 10px rgba(77,171,247,.25);}',
+      '.dir-objring.r{border-color:rgba(255,107,107,.9);box-shadow:0 0 12px rgba(255,107,107,.45),inset 0 0 10px rgba(255,107,107,.25);border-style:dashed;}',
+      '.dir-objring.down{border-color:rgba(120,130,140,.55);box-shadow:none;animation:none;opacity:.55;}',
+      '@keyframes dirObjPulse{0%,100%{transform:scale(1);opacity:.9;}50%{transform:scale(1.16);opacity:.55;}}',
+      // recon readout
+      '.dir-recon{font-size:11.5px;color:#8fd0e8;background:rgba(10,26,38,.65);border:1px solid #14344a;border-radius:7px;',
+      'padding:5px 9px;letter-spacing:.02em;}',
+      '.dir-recon b{color:#dff2ff;}',
       // watch feed
       '#dir-feed{position:fixed;left:16px;bottom:16px;z-index:1500;display:none;width:min(430px,44vw);max-height:52vh;overflow:auto;',
       'background:rgba(8,14,20,.94);border:1px solid #1f4058;border-radius:12px;padding:10px 12px;font:12.5px Inter;color:#cfe3f2;backdrop-filter:blur(6px);}',
@@ -280,12 +291,49 @@ window.DirectorModule = (function () {
 
   function GMseed() { var s = GM.serialize(); return s ? s.seed : '—'; }
 
+  // ---- objective overlay (key terrain rings on the map) -------------------------------
+  var objLayer = null;
+  function dirPacLon(lon) { return (lon != null && lon < -25) ? lon + 360 : lon; }   // mirror of map.js pacLon/PAC_CUT
+
+  function hideObjectiveOverlay() {
+    if (objLayer) { try { objLayer.remove(); } catch (e) {} objLayer = null; }
+  }
+
+  // Rings on both sides' key objectives: solid blue = defend, dashed red = attack,
+  // dimmed = already down. Re-drawn after every resolution so state stays honest.
+  function showObjectiveOverlay(retry) {
+    hideObjectiveOverlay();
+    if (op.phase === 'idle' || !window.L || !window.MapModule || !GM.isActive()) return;
+    var m = MapModule.getMap();
+    if (!m) {   // map may still be initializing right after the view switch
+      if (!retry) setTimeout(function () { showObjectiveOverlay(true); }, 600);
+      return;
+    }
+    var st = GM.getState();
+    if (!st) return;
+    var byId = {};
+    (AppState.activeGraph().nodes || []).forEach(function (n) { byId[n.id] = n; });
+    objLayer = L.layerGroup();
+    ['blue', 'red'].forEach(function (side) {
+      (st.objectiveIds[side] || []).forEach(function (id) {
+        var n = byId[id];
+        if (!n || n.lat == null || n.lon == null) return;
+        var b = GM.boardNode(id);
+        var cls = 'dir-objring ' + (side === 'blue' ? 'b' : 'r') + (b && !b.alive ? ' down' : '');
+        var icon = L.divIcon({ className: '', html: '<span class="' + cls + '"></span>', iconSize: [34, 34], iconAnchor: [17, 17] });
+        objLayer.addLayer(L.marker([n.lat, dirPacLon(n.lon)], { icon: icon, pane: 'ringsPane', interactive: false, keyboard: false }));
+      });
+    });
+    objLayer.addTo(m);
+  }
+
   // ---- PLAN (command dock) -----------------------------------------------------------
   function beginPlanning() {
     setPhase('plan');
     forceMapView();
     renderDock();
     startSelPoll();
+    showObjectiveOverlay();
     evt('Planning phase — turn ' + GM.getState().turn + '.');
   }
 
@@ -320,11 +368,40 @@ window.DirectorModule = (function () {
     }
     var objSet = {};
     (st.objectiveIds.blue || []).concat(st.objectiveIds.red || []).forEach(function (i) { objSet[i] = true; });
+    // default the working target to the top of the pool so the select and the recon
+    // readout agree from the very first render
+    if ((!op.targetId || !pool.some(function (b) { return b.id === op.targetId; })) && pool.length) op.targetId = pool[0].id;
     return pool.slice(0, 40).map(function (b) {
       var tag = objSet[b.id] ? '★ ' : '';
       var extra = op.kind === 'repair' ? (' · ' + Math.round(b.health) + 'hp') : (' · ' + esc(b.difficulty || ''));
       return '<option value="' + esc(b.id) + '"' + (b.id === op.targetId ? ' selected' : '') + '>' + tag + esc(b.name) + ' (val ' + nodeVal(b) + extra + ')</option>';
     }).join('');
+  }
+
+  // "What dies if this dies" — engine-honest recon for the selected strike target.
+  // Cascade math mirrors game.js: dmg = cascScore × importance × 0.25 × affinity(0.8–1.8),
+  // applied to each linked neighbor on a kill — so it is shown as a range, per node.
+  function reconHtml(tgt) {
+    if (!tgt || op.kind !== 'strike') return '';
+    var st = GM.getState();
+    var nbrs = {};
+    (AppState.activeGraph().links || []).forEach(function (l) {
+      var s = (l.source && l.source.id) || l.source, t = (l.target && l.target.id) || l.target;
+      if (s === tgt.id) nbrs[t] = 1; else if (t === tgt.id) nbrs[s] = 1;
+    });
+    var aliveN = Object.keys(nbrs).map(function (id) { return GM.boardNode(id); })
+      .filter(function (b) { return b && b.alive; }).length;
+    var base = (tgt.casc || tgt.cascScore || 1) * (tgt.importance || 1) * 0.25;
+    var lo = Math.round(base * 0.8), hi = Math.round(base * 1.8);
+    var isTempo = /command|c2|logistic|relay|comm/i.test((tgt.type || '') + ' ' + (tgt.subsystem || ''));
+    var isObj = (st.objectiveIds.red || []).concat(st.objectiveIds.blue || []).indexOf(tgt.id) >= 0;
+    var bits = ['DIF <b>' + esc(tgt.difficulty || '—') + '</b>',
+      'VULN <b>' + esc((tgt.vulns || []).join('/') || 'none') + '</b>'];
+    if (isObj) bits.push('<b>★ KEY OBJECTIVE</b>');
+    if (isTempo) bits.push('<b>TEMPO ASSET</b> — killing it drains ' + (tgt.team === 'red' ? 'Red' : 'Blue') + ' orders');
+    bits.push('ON KILL: cascade hits <b>' + aliveN + '</b> linked node' + (aliveN === 1 ? '' : 's') +
+      (aliveN ? ' for <b>~' + lo + '–' + hi + '</b> dmg each' : ''));
+    return '<div class="row dir-recon">RECON · ' + esc(tgt.name.slice(0, 40)) + ' — ' + bits.join(' · ') + '</div>';
   }
 
   function renderDock() {
@@ -334,6 +411,7 @@ window.DirectorModule = (function () {
     var pips = '';
     for (var i = 0; i < apMax; i++) pips += '<i class="' + (i < apLeft ? 'full' : '') + '"></i>';
     var methods = GM.methods();
+    var optsHtml = targetOptions();   // resolves op.targetId to the pool default first
     var tgt = op.targetId ? GM.boardNode(op.targetId) : null;
     var methodChips = GM.methodKeys().map(function (k) {
       var m = methods[k];
@@ -362,10 +440,11 @@ window.DirectorModule = (function () {
       '<span class="dir-chips">' +
       ['strike', 'harden', 'repair'].map(function (k) { return '<span class="dir-chip' + (op.kind === k ? ' on' : '') + '" data-kind="' + k + '">' + k.toUpperCase() + '</span>'; }).join('') +
       '</span>' +
-      '<select id="dir-target">' + (targetOptions() || '<option value="">— no valid targets —</option>') + '</select>' +
+      '<select id="dir-target">' + (optsHtml || '<option value="">— no valid targets —</option>') + '</select>' +
       (op.kind === 'strike' ? '<span class="dir-chips">' + methodChips + '</span>' : '') +
       '<button class="dir-btn" data-act="queue" ' + (apLeft <= 0 ? 'disabled style="opacity:.45"' : '') + '>+ QUEUE</button>' +
       '</div>' +
+      reconHtml(tgt) +
       '<div class="row q">' + queue + '</div>' +
       '<div class="row"><span class="dir-note">Orders lock blind — Red is planning the same turn right now.</span><span class="spacer"></span>' +
       '<button class="dir-btn primary" data-act="forecast">⚡ FORECAST &amp; COMMIT</button></div>';
@@ -479,6 +558,7 @@ window.DirectorModule = (function () {
     setPhase('watch');
     forceMapView();
     refreshVisuals();
+    showObjectiveOverlay();   // re-draw so downed key terrain dims during playback
     var report = st.lastReport || { events: [] };
     op.actuals[turn] = actualSummary(report);
     playWatch(report, st);
@@ -788,6 +868,7 @@ window.DirectorModule = (function () {
   function endOperation() {
     clearWatchTimers();
     stopSelPoll();
+    hideObjectiveOverlay();
     if (GM.isActive()) GM.endMatch();
     op.forecasts = {}; op.actuals = {}; op.record = null; op.lastForecast = null;
     setPhase('idle');
