@@ -330,6 +330,36 @@ window.EngineModule = (function () {
     graphInstance.d3ReheatSimulation();
   }
 
+  // --- Canonical affiliation palette (Stark/Avengers C2 HUD) ---
+  // Maps node team/affiliation to a canonical hex color. Used as the engine-level
+  // fallback when the caller does not supply an opts.nodeColor. The main orchestration
+  // script usually provides its own nodeColor (which also handles highlight/dim states),
+  // so this palette primarily governs the initial empty-state render and any future
+  // caller that omits the option.
+  var AFFIL_COLORS = {
+    blue:      '#38bdf8',   // friend  — sky-blue
+    red:       '#ff4d5e',   // hostile — danger red
+    green:     '#51cf66',   // neutral — green
+    yellow:    '#ffd43b',   // unknown — amber
+    '3rd_party': '#ffd43b' // treat third-party as unknown/amber
+  };
+  var AFFIL_DEFAULT = '#94a3b8'; // unrecognized team → cool slate
+
+  // Map a node's `importance` field (typically 1–10, with 5 as the neutral default)
+  // to a sphere *volume value* for nodeVal(). ForceGraph3D sizes the sphere radius as
+  // Math.cbrt(val) * nodeRelSize, so passing val directly in a ~0.5–8 range gives
+  // a comfortable radius spread (~0.8–2× the base size) without overwhelming the scene.
+  // Clamped so outlier importance values don't produce absurdly large or invisible nodes.
+  function importanceToNodeVal(n) {
+    var imp = Number((n && n.importance) || 5);
+    imp = Math.max(1, Math.min(10, imp));
+    // Map 1→0.5, 5→2.0, 10→8.0 (roughly cubic so the visual spread feels proportional)
+    // Simple linear interpolation on the cube: val = (imp/10)^3 * MAX + MIN
+    var MIN_VAL = 0.5, MAX_VAL = 8.0;
+    var t = (imp - 1) / 9; // 0..1
+    return MIN_VAL + t * t * (MAX_VAL - MIN_VAL);
+  }
+
   /**
    * Build the ForceGraph3D instance in the given container. Throws if WebGL context
    * creation fails (the caller handles the Map/Table fallback). Publishes the instance
@@ -356,10 +386,28 @@ window.EngineModule = (function () {
       failIfMajorPerformanceCaveat: false,
       preserveDrawingBuffer: false
     };
+
+    // Engine-level nodeColor fallback: use canonical affiliation palette when the caller
+    // does not supply its own. The main orchestration script (StrikeSim2040.html) passes
+    // opts.nodeColor so this fallback is for any bare create() call.
+    var defaultNodeColor = function(n) {
+      var team = (n && (n.team || (n.originalTeam))) || null;
+      if (team && AFFIL_COLORS[team]) return AFFIL_COLORS[team];
+      return (n && n.color) || AFFIL_DEFAULT;
+    };
+
     graphInstance = ForceGraph3D({ rendererConfig })(document.getElementById(containerId))
       .graphData({ nodes: [], links: [] }) // Start empty
+      .backgroundColor('#03070b')          // near-black C2 scene background
       .nodeLabel(opts.nodeLabel || (n => `${n.name} (${n.id})`))
-      .nodeColor(opts.nodeColor || (n => n.color || '#ffffff'))
+      .nodeColor(opts.nodeColor || defaultNodeColor)
+      // Size nodes by importance (field range ~1-10). nodeVal drives the sphere volume;
+      // radius = Math.cbrt(val) * nodeRelSize. nodeRelSize=4 (lib default) gives a
+      // comfortable physical size range — no need to change it.
+      .nodeVal(importanceToNodeVal)
+      // Low-opacity cyan links — understated C2 comms aesthetic. The main script's
+      // applyHighlight() overrides linkColor dynamically when highlights are active.
+      .linkColor(() => 'rgba(0,216,255,0.18)')
       .onNodeClick(opts.onNodeClick || (() => {}))
       .onBackgroundClick(opts.onBackgroundClick || (() => {}))
       .onEngineStop(() => {
@@ -436,6 +484,221 @@ window.EngineModule = (function () {
   function getGraph() { return graphInstance; }
   function isInitialViewDone() { return initialViewDone; }
 
+  // ---- Strike FX: cinematic 3D glowing beams + projectiles + impact flashes ----------
+  // Mirrors MapModule.playStrikes in timing and event shape, but rendered into the THREE
+  // scene instead of on the Leaflet canvas.
+
+  // Check whether the 3D graph panel is the currently visible view. Guards against
+  // rendering into a hidden canvas (wasted GPU) and avoids the scene-not-ready case.
+  function engineVisible() {
+    try {
+      if (!graphInstance) return false;
+      const renderer = graphInstance.renderer && graphInstance.renderer();
+      if (!renderer || !renderer.domElement) return false;
+      return renderer.domElement.offsetParent !== null;
+    } catch (e) { return false; }
+  }
+
+  // Render a single strike event in the THREE scene.
+  // opts: { team:'blue'|'red', kill:bool }
+  function flashStrike3D(srcId, dstId, opts) {
+    try {
+      opts = opts || {};
+      if (!graphInstance || !window.THREE) return;
+      const scene = graphInstance.scene && graphInstance.scene();
+      if (!scene) return;
+
+      const gd = graphInstance.graphData();
+      const nodes = (gd && gd.nodes) || [];
+      const src = nodes.find(n => n.id === srcId);
+      const dst = nodes.find(n => n.id === dstId);
+      if (!dst) return;
+      // Target must have a resolved position from the layout engine.
+      if (dst.x == null || dst.y == null || dst.z == null) return;
+
+      const kill = !!(opts.kill);
+      const team = opts.team === 'blue' ? 'blue' : 'red';
+      // Beam / projectile color: cyan for blue side, amber for red; white-hot on kill.
+      const strikeColor = kill ? 0xffffff : (team === 'blue' ? 0x00d8ff : 0xff8a4a);
+      // Dim glow ring color (non-kill tint).
+      const glowColor   = team === 'blue' ? 0x00d8ff : 0xff8a4a;
+
+      // Track disposables so cleanup is guaranteed.
+      const toDispose = []; // { obj, geo?, mat? } — removed from scene on timeout
+
+      function scheduleRemove(obj, geo, mat, delayMs) {
+        setTimeout(() => {
+          try {
+            scene.remove(obj);
+            if (geo && typeof geo.dispose === 'function') geo.dispose();
+            if (mat && typeof mat.dispose === 'function') mat.dispose();
+          } catch (e) { /* silent cleanup */ }
+        }, delayMs);
+      }
+
+      const T = new THREE.Vector3(dst.x, dst.y, dst.z);
+
+      // ---- 1. Static glowing beam (source→target), only when source has a position ----
+      if (src && src.x != null && src.y != null && src.z != null) {
+        const S = new THREE.Vector3(src.x, src.y, src.z);
+
+        const beamGeo = new THREE.BufferGeometry().setFromPoints([S, T]);
+        const beamMat = new THREE.LineBasicMaterial({
+          color: strikeColor,
+          transparent: true,
+          opacity: kill ? 0.92 : 0.72,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          linewidth: 1  // linewidth >1 only works in WebGL1 on some drivers; 1 is safe
+        });
+        const beam = new THREE.Line(beamGeo, beamMat);
+        beam.name = 'StrikeBeam';
+        scene.add(beam);
+        scheduleRemove(beam, beamGeo, beamMat, 1300);
+
+        // ---- 2. Animated projectile (tiny sphere travels source→target over 600ms) ----
+        const projGeo = new THREE.SphereGeometry(kill ? 3.2 : 2.0, 6, 6);
+        const projMat = new THREE.MeshBasicMaterial({
+          color: strikeColor,
+          transparent: true,
+          opacity: 1.0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const proj = new THREE.Mesh(projGeo, projMat);
+        proj.position.copy(S);
+        proj.name = 'StrikeProjectile';
+        scene.add(proj);
+
+        const PROJ_MS = kill ? 500 : 650;
+        const projStart = performance.now();
+        let projRafId = null;
+        const animProj = (now) => {
+          try {
+            const t = Math.min(1, (now - projStart) / PROJ_MS);
+            proj.position.lerpVectors(S, T, t);
+            if (t < 1) {
+              projRafId = requestAnimationFrame(animProj);
+            } else {
+              scene.remove(proj);
+              projGeo.dispose();
+              projMat.dispose();
+            }
+          } catch (e) {
+            // Guard: if something went wrong (scene torn down etc.) stop the loop.
+            if (projRafId != null) cancelAnimationFrame(projRafId);
+            try { scene.remove(proj); projGeo.dispose(); projMat.dispose(); } catch (e2) {}
+          }
+        };
+        projRafId = requestAnimationFrame(animProj);
+        // Safety net: if animation loop somehow outlives 2s, terminate.
+        setTimeout(() => {
+          if (projRafId != null) { cancelAnimationFrame(projRafId); projRafId = null; }
+          try { scene.remove(proj); projGeo.dispose(); projMat.dispose(); } catch (e) {}
+        }, 2000);
+      }
+
+      // ---- 3. Impact flash at target: expanding ring + fading sphere ----
+      const flashRadius = kill ? 14 : 8;
+      const FLASH_MS    = kill ? 600 : 450;
+
+      // Outer expanding ring (torus that scales up while fading out).
+      const ringGeo = new THREE.TorusGeometry(flashRadius * 0.5, kill ? 1.8 : 1.1, 8, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: kill ? 0xffffff : glowColor,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.copy(T);
+      ring.name = 'StrikeRing';
+      scene.add(ring);
+
+      // Small hot-white core sphere that fades quickly.
+      const coreGeo = new THREE.SphereGeometry(kill ? 6 : 3.5, 8, 8);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.copy(T);
+      core.name = 'StrikeCore';
+      scene.add(core);
+
+      const flashStart = performance.now();
+      const RING_MAX_SCALE = kill ? 3.8 : 2.6;
+      let flashRafId = null;
+      const animFlash = (now) => {
+        try {
+          const t = Math.min(1, (now - flashStart) / FLASH_MS);
+          const ease = 1 - Math.pow(1 - t, 2); // ease-out quad
+          const sc = 1 + ease * (RING_MAX_SCALE - 1);
+          ring.scale.setScalar(sc);
+          ringMat.opacity = (1 - t) * (kill ? 1.0 : 0.8);
+          coreMat.opacity = Math.max(0, 1 - t * 2.2);  // core fades faster
+          if (t < 1) {
+            flashRafId = requestAnimationFrame(animFlash);
+          } else {
+            scene.remove(ring);  ringGeo.dispose();  ringMat.dispose();
+            scene.remove(core);  coreGeo.dispose();  coreMat.dispose();
+          }
+        } catch (e) {
+          if (flashRafId != null) cancelAnimationFrame(flashRafId);
+          try {
+            scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+            scene.remove(core); coreGeo.dispose(); coreMat.dispose();
+          } catch (e2) {}
+        }
+      };
+      flashRafId = requestAnimationFrame(animFlash);
+      // Safety net.
+      setTimeout(() => {
+        if (flashRafId != null) { cancelAnimationFrame(flashRafId); flashRafId = null; }
+        try {
+          scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+          scene.remove(core); coreGeo.dispose(); coreMat.dispose();
+        } catch (e) {}
+      }, FLASH_MS + 500);
+
+    } catch (e) {
+      // Top-level guard: nothing in flashStrike3D may crash the running game.
+    }
+  }
+
+  /**
+   * Play a turn's resolution events as staggered cinematic 3D strike FX.
+   * Mirrors MapModule.playStrikes in event shape and 130ms stagger timing.
+   *
+   * events = Array of { kind:'hit'|'kill'|'cascade', sourceId, targetId, side:'blue'|'red' }
+   * 'cascade' is treated identically to 'kill' (white-hot, larger flash).
+   * No-ops silently when the 3D view is not active, the scene is missing, or
+   * source/target positions are not yet resolved.
+   */
+  function playStrikes(events) {
+    try {
+      if (!Array.isArray(events)) return;
+      if (!engineVisible()) return;
+      const shots = events.filter(e =>
+        e && (e.kind === 'hit' || e.kind === 'kill' || e.kind === 'cascade') && e.targetId
+      );
+      shots.forEach(function(e, i) {
+        setTimeout(function() {
+          flashStrike3D(e.sourceId, e.targetId, {
+            team: e.side === 'blue' ? 'blue' : 'red',
+            kill: e.kind === 'kill' || e.kind === 'cascade'
+          });
+        }, i * 130);
+      });
+    } catch (e) {
+      // Never propagate — caller must not be affected by FX failures.
+    }
+  }
+
   // Tear down a (possibly half-built) graph instance so a retry can re-create cleanly:
   // run the lib destructor, force the WebGL context loss to free the GPU slot, and reset
   // all module state including the lazily-built globe so it rebuilds on the new instance.
@@ -456,5 +719,5 @@ window.EngineModule = (function () {
     earthLightingDone = false;
   }
 
-  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout };
+  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout, playStrikes };
 })();

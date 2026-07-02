@@ -30,7 +30,17 @@ function createRng(seed) {
   };
 }
 
-function methodKeyFromStep(step) {
+// ===========================================================================
+// C-009 PARITY BLOCK — VERBATIM COPY of the canonical core from sim.js.
+//
+// The functions between this banner and END PARITY BLOCK are byte-for-byte copies
+// of SimModule's simulateTrialCore() and its simCore* helpers. The worker cannot
+// importScripts sim.js in every offline context, so the single source of truth is
+// duplicated here on purpose. DO NOT edit one copy without editing the other — run a
+// parityHash() comparison (see the {type:'parity'} handler) after any change.
+// ===========================================================================
+
+function simCoreMethodKeyFromStep(step) {
   if (step.methodKey) return step.methodKey;
   if (step.blueKey) return step.blueKey;
   if (step.blue === 'Kinetic Strike') return 'kinetic';
@@ -40,32 +50,7 @@ function methodKeyFromStep(step) {
   return 'kinetic';
 }
 
-function normalizeContext(context) {
-  const nodeInfo = new Map();
-  const adj = new Map();
-  (context.nodes || []).forEach(info => {
-    nodeInfo.set(info.id, {
-      id: info.id,
-      name: info.name,
-      team: info.team,
-      difficulty: info.difficulty,
-      vulnerabilities: Array.isArray(info.vulnerabilities) ? info.vulnerabilities : [],
-      cascScore: info.cascScore || 1,
-      importance: info.importance || 5,
-      healthMax: info.healthMax || 100,
-      health: info.health ?? (info.healthMax || 100),
-      status: info.status || 'Active',
-      domain: Array.isArray(info.domain) ? info.domain : (info.domain ? [info.domain] : []),
-      type: info.type || ''
-    });
-  });
-  (context.adjacency || []).forEach(([id, neighbors]) => {
-    adj.set(id, new Set(neighbors || []));
-  });
-  return { nodeInfo, adj };
-}
-
-function domainAffinity(srcInfo, dstInfo, methodKey) {
+function simCoreDomainAffinity(srcInfo, dstInfo, methodKey) {
   if (!srcInfo || !dstInfo) return 1.0;
   const sd = new Set(srcInfo.domain || []);
   const dd = new Set(dstInfo.domain || []);
@@ -82,13 +67,13 @@ function domainAffinity(srcInfo, dstInfo, methodKey) {
   return Math.min(1.8, Math.max(0.8, mult));
 }
 
-function computeVulnMultiplier(info, method, intelQ) {
+function simCoreVulnMultiplier(info, method, intelQ) {
   const hasV = (info.vulnerabilities || []).includes(method.vulnerability);
   if (hasV) return Math.min(1.35, Math.max(1.0, 1.2 + (intelQ - 1) * 0.5));
   return Math.min(1.0, Math.max(0.6, 0.85 - (intelQ - 1) * 0.35));
 }
 
-function chooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel, redProfiles) {
+function simCoreChooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel, redProfiles) {
   const optionsByMethod = {
     kinetic: ['Counter-Strike', 'Reinforcement', 'Sabotage'],
     cyber: ['Cyber Defense', 'Deception', 'Reinforcement'],
@@ -104,7 +89,7 @@ function chooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel, r
     const cat = redCounterType[name] || 'ke';
     const canAfford = redTypeBudget?.[cat] !== undefined ? redTypeBudget[cat] >= cost : redBudget >= cost;
     if (!canAfford) return;
-    const prof = redProfiles[name] || {};
+    const prof = (redProfiles || {})[name] || {};
     const pMult = prof.pMult ?? prof.globalPmult ?? 0.95;
     const strength = (1 - pMult) + detectionLevel * 0.2;
     if (!best || strength > best.strength) best = { name, cost, cat, strength };
@@ -112,27 +97,26 @@ function chooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel, r
   return best;
 }
 
-function simulateTrial(actionPlan, opts) {
-  const {
-    context,
-    rng,
-    successMode,
-    successN,
-    victoryThreshold,
-    prioritySet,
-    maxBlueLoss,
-    regenFrac,
-    detectionGrowthTarget,
-    detectionGrowthDomain,
-    detectionPenalty,
-    intelNoise,
-    fatigueRate,
-    dynamicRed,
-    teamResources,
-    settings,
-    strikeMethods,
-    redProfiles
-  } = opts;
+function simulateTrialCore(actionPlan, opts) {
+  const o = opts || {};
+  const context = o.context;
+  const rng = o.rng;
+  const successMode = o.successMode || 'impact';
+  const successN = o.successN != null ? o.successN : 3;
+  const victoryThreshold = o.victoryThreshold != null ? o.victoryThreshold : 100;
+  const prioritySet = o.prioritySet || null;
+  const maxBlueLoss = o.maxBlueLoss != null ? o.maxBlueLoss : Infinity;
+  const regenFrac = o.regenFrac != null ? o.regenFrac : 0;
+  const detectionGrowthTarget = o.detectionGrowthTarget != null ? o.detectionGrowthTarget : 0.08;
+  const detectionGrowthDomain = o.detectionGrowthDomain != null ? o.detectionGrowthDomain : 0.04;
+  const detectionPenalty = o.detectionPenalty != null ? o.detectionPenalty : 0.18;
+  const intelNoise = o.intelNoise != null ? o.intelNoise : 0.15;
+  const fatigueRate = o.fatigueRate != null ? o.fatigueRate : 0.03;
+  const dynamicRed = o.dynamicRed !== false;
+  const teamResources = o.teamResources || {};
+  const settings = o.settings || { cascadeAlpha: 0.25, difficultyModifiers: {} };
+  const strikeMethods = o.strikeMethods || {};
+  const redProfiles = o.redProfiles || {};
 
   const { nodeInfo, adj } = context;
   const blueBudgetBase = teamResources?.blue ?? 0;
@@ -191,7 +175,7 @@ function simulateTrial(actionPlan, opts) {
       const ninfo = nodeInfo.get(nid);
       const stn = state.get(nid);
       if (!ninfo || !stn?.alive) return;
-      const mult = domainAffinity(srcInfo, ninfo, methodKey);
+      const mult = simCoreDomainAffinity(srcInfo, ninfo, methodKey);
       const cascadeDamage = base * mult;
       stn.health = Math.max(0, stn.health - cascadeDamage);
       recordDamage(nid, cascadeDamage, ninfo);
@@ -207,13 +191,15 @@ function simulateTrial(actionPlan, opts) {
     if (successMode === 'impact') return impact >= victoryThreshold;
     if (successMode === 'nodes_any') return redNeutralized.size >= successN;
     if (successMode === 'nodes') {
+      const pri = prioritySet || new Set();
       let count = 0;
-      redNeutralized.forEach(id => { if (prioritySet.has(id)) count++; });
+      redNeutralized.forEach(id => { if (pri.has(id)) count++; });
       return count >= successN;
     }
     if (successMode === 'goal') {
+      const pri = prioritySet || new Set();
       let count = 0;
-      redNeutralized.forEach(id => { if (prioritySet.has(id)) count++; });
+      redNeutralized.forEach(id => { if (pri.has(id)) count++; });
       return count >= successN && blueNeutralized.size <= maxBlueLoss;
     }
     return false;
@@ -221,7 +207,7 @@ function simulateTrial(actionPlan, opts) {
 
   for (let i = 0; i < actionPlan.length; i++) {
     const step = actionPlan[i];
-    const methodKey = methodKeyFromStep(step);
+    const methodKey = simCoreMethodKeyFromStep(step);
     const method = strikeMethods[methodKey] || strikeMethods.kinetic;
     const targetId = step.targetId || pickRedTargetFromState();
     if (!targetId) break;
@@ -235,7 +221,7 @@ function simulateTrial(actionPlan, opts) {
     }
 
     const diff = settings.difficultyModifiers[info.difficulty] || 1.0;
-    const vuln = computeVulnMultiplier(info, method, intelQ);
+    const vuln = simCoreVulnMultiplier(info, method, intelQ);
     let p = method.baseProb * diff * vuln;
 
     const targetDet = detectionTarget.get(info.id) || 0;
@@ -246,7 +232,7 @@ function simulateTrial(actionPlan, opts) {
 
     let redChoice = null;
     if (dynamicRed) {
-      redChoice = chooseRedCounter(methodKey, redBudget, redTypeBudget, targetDet + domainDet, redProfiles);
+      redChoice = simCoreChooseRedCounter(methodKey, redBudget, redTypeBudget, targetDet + domainDet, redProfiles);
     } else if (step.red) {
       redChoice = { name: step.red, cost: redCounterCosts[step.red] || 0, cat: redCounterType[step.red] || 'ke' };
     }
@@ -334,6 +320,124 @@ function simulateTrial(actionPlan, opts) {
   };
 }
 
+// C-009: deterministic parity helper — VERBATIM copy of SimModule.parityHash and its
+// fixture from sim.js. Same (seed, n) must hash identically here and in the shell; the
+// {type:'parity'} handler below lets the app/tests assert inline === worker agreement.
+function parityFixture() {
+  const nodeInfo = new Map();
+  const mk = (id, team, extra) => Object.assign({
+    id, name: id, team,
+    difficulty: 'Medium', vulnerabilities: [], cascScore: 1, importance: 5,
+    healthMax: 100, health: 100, status: 'Active', domain: [], type: ''
+  }, extra || {});
+  nodeInfo.set('R1', mk('R1', 'red', { importance: 8, cascScore: 2, domain: ['Cyber'], type: 'Command' }));
+  nodeInfo.set('R2', mk('R2', 'red', { importance: 6, cascScore: 1, domain: ['EW'], difficulty: 'Hardened' }));
+  nodeInfo.set('R3', mk('R3', 'red', { importance: 5, cascScore: 1, domain: ['Land'], type: 'Relay' }));
+  nodeInfo.set('B1', mk('B1', 'blue', { importance: 7, cascScore: 2 }));
+  const adj = new Map([
+    ['R1', new Set(['R2', 'R3'])],
+    ['R2', new Set(['R1'])],
+    ['R3', new Set(['R1', 'B1'])],
+    ['B1', new Set(['R3'])]
+  ]);
+  const context = { nodeInfo, adj };
+  const opts = {
+    context,
+    successMode: 'nodes_any',
+    successN: 2,
+    victoryThreshold: 50,
+    prioritySet: new Set(['R1', 'R2']),
+    maxBlueLoss: 2,
+    regenFrac: 0,
+    dynamicRed: true,
+    teamResources: { blue: 12, red: 8, blueTypes: { ke: 4, ew: 4, jam: 2, sof: 2 }, redTypes: { ke: 3, ew: 3, jam: 1, sof: 1 } },
+    settings: { cascadeAlpha: 0.25, difficultyModifiers: { Soft: 1.2, Medium: 1.0, Hardened: 0.8, Buried: 0.6 } },
+    strikeMethods: {
+      kinetic: { name: 'Kinetic', baseProb: 0.55, cost: 2, baseDamage: [25, 50], vulnerability: 'armor' },
+      cyber: { name: 'Cyber', baseProb: 0.50, cost: 1, baseDamage: [15, 35], vulnerability: 'network' },
+      ew: { name: 'EW', baseProb: 0.65, cost: 1, baseDamage: [5, 15], vulnerability: 'rf' },
+      sof: { name: 'SOF', baseProb: 0.40, cost: 2, baseDamage: [30, 60], vulnerability: 'access' }
+    },
+    redProfiles: {
+      'Counter-Strike':     { pMult: 0.90 },
+      'Cyber Defense':      { tag: 'cyber', pMult: 0.80 },
+      'EW Countermeasure':  { tag: 'ew',    pMult: 0.80 },
+      'SOF Interception':   { tag: 'sof',   pMult: 0.75 },
+      'Reinforcement':      { impactMult: 0.85, duration: 2 },
+      'Deception':          { infoNerf: 0.85 },
+      'Sabotage':           { globalPmult: 0.95 }
+    }
+  };
+  const plan = [
+    { methodKey: 'kinetic', targetId: 'R1' },
+    { methodKey: 'cyber', targetId: 'R2' },
+    { methodKey: 'ew' },
+    { methodKey: 'sof', targetId: 'R3' },
+    { methodKey: 'kinetic' }
+  ];
+  return { opts, plan };
+}
+
+function parityFold(h, num) {
+  const q = Math.round((Number(num) || 0) * 1000) | 0;
+  let x = (h ^ (q & 0xffff)) >>> 0;
+  x = Math.imul(x, 16777619) >>> 0;
+  x = (x ^ ((q >>> 16) & 0xffff)) >>> 0;
+  x = Math.imul(x, 16777619) >>> 0;
+  return x >>> 0;
+}
+
+function parityHash(seed, n) {
+  const base = Number.isFinite(Number(seed)) ? (Number(seed) >>> 0) : 0;
+  const count = Math.max(1, Math.floor(Number(n) || 1));
+  const { opts, plan } = parityFixture();
+  let h = 2166136261 >>> 0;
+  for (let t = 1; t <= count; t++) {
+    const trialOpts = Object.assign({}, opts, { rng: createRng(mcMixSeed(base, t)) });
+    const r = simulateTrialCore(plan, trialOpts);
+    h = parityFold(h, r.success ? 1 : 0);
+    h = parityFold(h, r.stepsToGoal);
+    h = parityFold(h, r.impact);
+    h = parityFold(h, r.redNeutralized.size);
+    h = parityFold(h, r.blueNeutralized.size);
+    h = parityFold(h, r.blueSpend);
+    h = parityFold(h, r.redSpend);
+  }
+  return h >>> 0;
+}
+
+// END PARITY BLOCK — keep identical to SimModule.simulateTrialCore in sim.js.
+
+function normalizeContext(context) {
+  const nodeInfo = new Map();
+  const adj = new Map();
+  (context.nodes || []).forEach(info => {
+    nodeInfo.set(info.id, {
+      id: info.id,
+      name: info.name,
+      team: info.team,
+      difficulty: info.difficulty,
+      vulnerabilities: Array.isArray(info.vulnerabilities) ? info.vulnerabilities : [],
+      cascScore: info.cascScore || 1,
+      importance: info.importance || 5,
+      healthMax: info.healthMax || 100,
+      health: info.health ?? (info.healthMax || 100),
+      status: info.status || 'Active',
+      domain: Array.isArray(info.domain) ? info.domain : (info.domain ? [info.domain] : []),
+      type: info.type || ''
+    });
+  });
+  (context.adjacency || []).forEach(([id, neighbors]) => {
+    adj.set(id, new Set(neighbors || []));
+  });
+  return { nodeInfo, adj };
+}
+
+// NOTE: the per-trial math (simulateTrialCore + simCore* helpers) lives in the PARITY
+// BLOCK above as a verbatim copy of sim.js. The old worker-local simulateTrial and its
+// duplicate helpers were removed so there is exactly one trial implementation here. Run
+// processing calls simulateTrialCore directly with the same opts shape it always used.
+
 function makeAggregator() {
   return {
     trialsSuccess: 0,
@@ -406,7 +510,7 @@ function startRun(runId, payload) {
     const end = Math.min(trials, agg.completedTrials + chunkSize);
     for (let t = agg.completedTrials + 1; t <= end; t++) {
       if (activeRun.cancelled) break;
-      const result = simulateTrial(payload.actionPlan || [], {
+      const result = simulateTrialCore(payload.actionPlan || [], {
         context,
         rng: createRng(mcMixSeed(payload.baseSeed, t)),
         successMode: payload.successMode || 'impact',
@@ -454,6 +558,23 @@ self.onmessage = (event) => {
   const msg = event.data || {};
   if (msg.type === 'cancel') {
     if (activeRun && activeRun.runId === msg.runId) activeRun.cancelled = true;
+    return;
+  }
+  // C-009: additive parity probe. The shell posts {type:'parity', seed, n} and compares
+  // the returned hash against SimModule.parityHash(seed, n) to confirm inline === worker.
+  // Synchronous and side-effect free; does not touch activeRun or the run/cancel flow.
+  if (msg.type === 'parity') {
+    try {
+      const seed = Number(msg.seed) || 0;
+      const n = Math.max(1, Number(msg.n) || 1);
+      self.postMessage({ type: 'parity', runId: msg.runId, seed, n, hash: parityHash(seed, n) });
+    } catch (err) {
+      self.postMessage({
+        type: 'error',
+        runId: msg.runId,
+        message: err && err.message ? err.message : String(err)
+      });
+    }
     return;
   }
   if (msg.type !== 'run') return;

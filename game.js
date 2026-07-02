@@ -53,6 +53,7 @@ window.GameModule = (function () {
   const CASCADE_ALPHA = 0.25;
   const HARDEN_MULT = 0.55;     // incoming strike success multiplier on a hardened node (this turn)
   const REPAIR_AMOUNT = 30;     // health restored by a Repair order at end of turn
+  const TEMPO_FLOOR_AP = 2;     // dynamic AP a side bottoms out at when its C2/logistics tempo fully collapses
 
   const DEFAULT_CFG = {
     apBlue: 4,            // action points / orders per turn
@@ -122,6 +123,74 @@ window.GameModule = (function () {
     if (subsystem.includes('logistics') || subsystem.includes('sustainment')) return false;
     return METHOD_KEYS.some(k => resourceForMethod(node, k) > 0);
   }
+
+  // Can this specific node serve as a firing source for the given method? A valid source
+  // must be a living, non-logistics node that actually generates the resource the method
+  // consumes (kinetic -> kinetic stocks, cyber/ew -> jam/ew, sof -> sof). This is the
+  // per-node half of the authoritative "can side S strike with method M?" rule (C-003).
+  // `aliveFn(node)` overrides the liveness test so the resolver can read START-of-turn
+  // liveness (a source killed this same turn still fires — preserves simultaneity).
+  function canSourceStrikeWith(node, methodKey, aliveFn) {
+    if (!node) return false;
+    const live = aliveFn ? aliveFn(node) : node.alive;
+    if (!live) return false;
+    const subsystem = String(node.subsystem || '').toLowerCase();
+    if (subsystem.includes('logistics') || subsystem.includes('sustainment')) return false;
+    return resourceForMethod(node, methodKey) > 0;
+  }
+
+  // Every friendly node that could fire the given method, best first. Returned in a
+  // deterministic order (resource desc, then id) so source selection / availability checks
+  // are reproducible across machines even before per-target affinity weighting is applied.
+  function sourcesForMethod(board, side, methodKey, aliveFn) {
+    return (board.rosters[side] || [])
+      .map(id => board.nodes[id])
+      .filter(n => canSourceStrikeWith(n, methodKey, aliveFn))
+      .sort((a, b) => (resourceForMethod(b, methodKey) - resourceForMethod(a, methodKey)) ||
+        String(a.id).localeCompare(String(b.id)));
+  }
+
+  // AUTHORITATIVE availability rule (C-003): may `side` strike `targetId` with `methodKey`
+  // on `board`? Used identically by order queueing/validation, the AI commander, and the
+  // resolver so the UI, AI, and combat math can never disagree about what is a legal order.
+  //  - method must be a real strike method
+  //  - target must exist, be alive, and belong to the enemy
+  //  - the side must field at least one surviving valid firing source for that method
+  //  - if a specific sourceId is named, that source must itself be valid (alive, right
+  //    resource) and on the firing side — voiding stale/destroyed/spoofed sources.
+  // `opts.aliveFn` overrides the liveness test (resolver passes start-of-turn liveness).
+  // Returns a structured {ok, reason, sourceId} so callers can surface *why* an order is
+  // illegal and learn which source was assigned to a source-less (human) order.
+  function canStrikeBoard(board, side, targetId, methodKey, sourceId, opts) {
+    const aliveFn = opts && opts.aliveFn;
+    const tgtLive = (n) => aliveFn ? aliveFn(n) : n.alive;
+    if (!board) return { ok: false, reason: 'no-board' };
+    if (side !== 'blue' && side !== 'red') return { ok: false, reason: 'bad-side' };
+    if (!METHODS[methodKey]) return { ok: false, reason: 'bad-method' };
+    const tgt = board.nodes[targetId];
+    if (!tgt) return { ok: false, reason: 'no-target' };
+    if (!tgtLive(tgt)) return { ok: false, reason: 'target-dead' };
+    if (tgt.team === side) return { ok: false, reason: 'friendly-target' };
+    if (sourceId != null) {
+      const src = board.nodes[sourceId];
+      if (!src || src.team !== side) return { ok: false, reason: 'source-not-friendly' };
+      if (!canSourceStrikeWith(src, methodKey, aliveFn)) return { ok: false, reason: 'source-cannot-fire' };
+      return { ok: true, reason: 'ok', sourceId: src.id };
+    }
+    const src = sourcesForMethod(board, side, methodKey, aliveFn)[0];
+    if (!src) return { ok: false, reason: 'no-source' };
+    return { ok: true, reason: 'ok', sourceId: src.id };
+  }
+
+  // Human-readable reason for a voided strike, for the resolved-turn event log.
+  const VOID_TEXT = {
+    'bad-method': 'unknown strike method', 'no-target': 'target not found',
+    'target-dead': 'target already down', 'friendly-target': 'cannot strike own forces',
+    'source-not-friendly': 'firing source is not a surviving friendly unit',
+    'source-cannot-fire': 'firing source cannot deliver this method',
+    'no-source': 'no surviving unit can deliver this strike'
+  };
+  function voidText(reason) { return VOID_TEXT[reason] || 'invalid order'; }
 
   function vulnMult(node, method) {
     const aliases = VULN_ALIASES[method.vuln] || [method.vuln];
@@ -201,6 +270,51 @@ window.GameModule = (function () {
       .slice(0, OBJ_COUNT).map(n => n.id);
   }
 
+  // ---- Scenario fingerprint (save/resume integrity) -------------------------------
+  // A stable, order-independent hash of the scenario's COMBAT IDENTITY — node roster and
+  // the per-node fields that determine how a match plays, plus link topology. It deliberately
+  // EXCLUDES transient state (health/status) so the same scenario fingerprints identically
+  // before and after a match. Saves embed this so a resume/launch can detect that the active
+  // graph is not the graph the match was built on (C-011) instead of silently replaying
+  // against different node/link/combat data. Pure + deterministic.
+  function fingerprintParts(graph) {
+    graph = graph || { nodes: [], links: [] };
+    const nodeSigs = (graph.nodes || [])
+      .filter(n => { const t = n.team || n.originalTeam; return t === 'blue' || t === 'red'; })
+      .map(n => {
+        const team = n.team || n.originalTeam;
+        const dom = Array.isArray(n.domain) ? n.domain.slice().sort() : (n.domain ? [n.domain] : []);
+        const vuln = Array.isArray(n.vulnerabilities) ? n.vulnerabilities.slice().sort() : [];
+        const rg = resourceGenByType(n);
+        return [
+          n.id, team, (n.type || ''), (n.subsystem || ''), (n.difficulty || 'Medium'),
+          Number(n.importance || 5), Math.max(1, Number(n.cascScore || 1)), Number(n.healthMax || 100),
+          dom.join('|'), vuln.join('|'),
+          rg.kinetic, rg.ew, rg.jam, rg.sof
+        ].join(',');
+      })
+      .sort();   // order-independent across node array ordering
+    const linkSigs = (graph.links || [])
+      .map(l => {
+        const s = (l.source && l.source.id != null) ? l.source.id : l.source;
+        const t = (l.target && l.target.id != null) ? l.target.id : l.target;
+        return [String(s), String(t)].sort().join('->');   // undirected, endpoint-order-independent
+      })
+      .sort();
+    return { nodeSigs, linkSigs };
+  }
+  function computeFingerprint(graph) {
+    const parts = fingerprintParts(graph);
+    const hash = hashSeed('fp1', parts.nodeSigs.join(';'), '||', parts.linkSigs.join(';'));
+    // Return both a compact hash (for fast equality) and counts (for human-readable mismatch
+    // diagnostics in the UI). Versioned so the scheme can evolve without false matches.
+    return { v: 1, hash, nodes: parts.nodeSigs.length, links: parts.linkSigs.length };
+  }
+  function fingerprintsMatch(a, b) {
+    if (!a || !b) return false;
+    return a.v === b.v && a.hash === b.hash && a.nodes === b.nodes && a.links === b.links;
+  }
+
   // ---- Board construction ---------------------------------------------------------
   // A board is a pure, serializable snapshot: per-node combat fields + health/alive,
   // adjacency, and the team rosters. It is the single source of truth a match mutates.
@@ -241,9 +355,21 @@ window.GameModule = (function () {
     return { nodes, adj, rosters };
   }
 
+  // Effective combat power of a side = sum of each living node's force value WEIGHTED BY its
+  // current health fraction (C-010). This is the single scoring/collapse currency used
+  // everywhere — score deltas, collapse checks, the HUD's objNow, and the AAR — so the game
+  // is internally consistent: suppressing a high-value node to 1 HP credits the attacker and
+  // pushes the enemy toward collapse, exactly as the tempo model (which is health-weighted)
+  // already behaves. A neutralized node contributes 0. (Key-objective hold/deny remains
+  // kill-based — terrain is held until the node is dead — and is computed separately.)
   function objectiveValue(board, team) {
     let v = 0;
-    board.rosters[team].forEach(id => { const n = board.nodes[id]; if (n && n.alive) v += nodeValue(n); });
+    board.rosters[team].forEach(id => {
+      const n = board.nodes[id];
+      if (!n || !n.alive) return;
+      const frac = clamp((n.health || 0) / (n.healthMax || 100), 0, 1);
+      v += nodeValue(n) * frac;
+    });
     return v;
   }
 
@@ -285,10 +411,20 @@ window.GameModule = (function () {
     for (const o of sorted) {
       if (o.kind !== 'strike') continue;
       const tgt = board.nodes[o.targetId];
-      if (!tgt || tgt.team === o.side || !startAlive[o.targetId]) {
-        events.push({ side: o.side, kind: 'void', targetId: o.targetId, sourceId: o.sourceId || null, text: 'Order voided (invalid or already-down target).' });
+      // AUTHORITATIVE availability gate (C-003): the resolver re-validates every strike
+      // against the start-of-turn board with the SAME rule the UI/AI used. It also resolves
+      // a concrete firing source — honoring an explicitly-named one, else picking the best
+      // surviving valid source — and VOIDS the order (no damage) if none exists. The aliveFn
+      // reads START-of-turn liveness so a source killed this same turn still fires (true
+      // simultaneity), matching how target liveness is read below.
+      const avail = canStrikeBoard(board, o.side, o.targetId, o.methodKey, o.sourceId,
+        { aliveFn: (n) => !!startAlive[n.id] });
+      if (!avail.ok) {
+        events.push({ side: o.side, kind: 'void', targetId: o.targetId, sourceId: o.sourceId || null,
+          reason: avail.reason, text: 'Order voided (' + voidText(avail.reason) + ').' });
         continue;
       }
+      const resolvedSource = avail.sourceId || null;
       const m = METHODS[o.methodKey] || METHODS.kinetic;
       let p = m.baseProb * diffMult(tgt.difficulty) * vulnMult(tgt, m);
       if (hardened.has(o.targetId)) p *= HARDEN_MULT;
@@ -298,15 +434,15 @@ window.GameModule = (function () {
         const d = m.dmg[0] + rng.next() * (m.dmg[1] - m.dmg[0]);
         dmg[o.targetId] = (dmg[o.targetId] || 0) + d;
         if (!hitMeta[o.targetId] || d > hitMeta[o.targetId].damage) {
-          hitMeta[o.targetId] = { method: o.methodKey, sourceId: o.sourceId || null, damage: d };
+          hitMeta[o.targetId] = { method: o.methodKey, sourceId: resolvedSource, damage: d };
         }
         const actual = Math.min(startHealth[o.targetId] || tgt.healthMax || 100, d);
         events.push({ side: o.side, kind: 'hit', method: o.methodKey, targetId: o.targetId,
-          sourceId: o.sourceId || null, damage: actual, probability: p,
+          sourceId: resolvedSource, damage: actual, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} hit ${tgt.name} (-${Math.round(d)})${hardened.has(o.targetId) ? ' [hardened]' : ''}.` });
       } else {
         events.push({ side: o.side, kind: 'miss', method: o.methodKey, targetId: o.targetId,
-          sourceId: o.sourceId || null, probability: p,
+          sourceId: resolvedSource, probability: p,
           text: `${o.side.toUpperCase()} ${m.label} missed ${tgt.name}.` });
       }
     }
@@ -368,9 +504,10 @@ window.GameModule = (function () {
   // spend ~70% of AP striking and the rest hardening/repairing the most valuable own
   // nodes that are exposed. 'easy' wastes AP and picks noisier targets.
   function sourceForMethod(board, side, methodKey, target, rng) {
-    return board.rosters[side]
-      .map(id => board.nodes[id])
-      .filter(n => canSourceStrike(n) && resourceForMethod(n, methodKey) > 0)
+    // Pick from the SAME validated source pool the availability rule (canStrikeBoard) and
+    // resolver use, then weight by affinity to the target so the AI fires from its best
+    // platform. Sharing the pool guarantees the AI never queues a source the rules reject.
+    return sourcesForMethod(board, side, methodKey)
       .map(n => ({
         n,
         score: resourceForMethod(n, methodKey) * affinity(n, target, methodKey) * (0.9 + rng.next() * 0.2)
@@ -479,18 +616,21 @@ window.GameModule = (function () {
   function init(context) { ctx = Object.assign({}, ctx, context || {}); }
 
   // Action points for a side this turn. When the economy is dynamic for that side, AP
-  // scales from the side's base down to a floor of 2 as its command-tempo degrades
-  // (full tempo -> base AP; total C2/logistics loss -> 2 AP). An explicitly-set AP
-  // (campaign handoff / tests) is honored verbatim with the economy disabled.
+  // scales LINEARLY from the side's base down to a hard floor of TEMPO_FLOOR_AP as its
+  // command-tempo collapses: full tempo -> base AP; total C2/logistics loss -> floor AP.
+  // This matches the advertised "decapitate the network and throttle their tempo" rule
+  // (C-010) — at zero surviving C2/logistics a side really is cut to the floor, not ~60%.
+  // A fixed AP override (explicit sandbox mode / tests) disables the economy for that side.
   function apFor(side) {
     if (!match) return 0;
     const fixed = side === 'blue' ? match.cfg.apBlue : match.cfg.apRed;
     if (!match.dynamicAp || !match.dynamicAp[side]) return fixed;
     const base = (match.baseAp && match.baseAp[side]) || fixed;
+    const floor = Math.min(TEMPO_FLOOR_AP, base);   // never let the floor exceed a tiny base
     const start = (match.startTempo && match.startTempo[side]) || 0;
     if (start <= 0) return base;
     const frac = clamp(commandTempo(match.board, side) / start, 0, 1);
-    return clamp(Math.round(base * (0.6 + 0.4 * frac)), 2, base);
+    return clamp(Math.round(floor + (base - floor) * frac), floor, base);
   }
 
   function newMatch(cfgOverrides) {
@@ -511,23 +651,49 @@ window.GameModule = (function () {
       });
     }
     const board = buildBoard(graph);
-    // Command-tempo economy setup: derive each side's BASE action points, then let AP
-    // float per-turn with surviving C2/logistics (see apFor). An explicit AP override
-    // fixes that side's AP and disables the economy for it.
-    const apBlueFixed = !!(cfgOverrides && cfgOverrides.apBlue != null);
-    const apRedFixed = !!(cfgOverrides && cfgOverrides.apRed != null);
-    const baseAp = {
-      blue: apBlueFixed ? cfg.apBlue : resourceAp(board, 'blue', DEFAULT_CFG.apBlue),
-      red: apRedFixed ? cfg.apRed : resourceAp(board, 'red', DEFAULT_CFG.apRed)
-    };
+    // Command-tempo economy setup (C-012). By default a side's BASE action points come from
+    // its surviving C2/logistics and AP floats per-turn (see apFor) so decapitation degrades
+    // tempo. Campaign handoff / callers shape the START posture WITHOUT killing that economy:
+    //   - baseApBlue / baseApRed .......... set base AP, dynamic economy stays ON
+    //   - apBlue / apRed .................. (legacy/campaign) also taken as base AP with the
+    //                                       economy ON, UNLESS cfg.sandbox is set (below)
+    //   - postureModifiers { blue:{mult,offset}, red:{...} } . multiply/offset the base AP,
+    //                                       economy stays ON (tempo degradation still applies)
+    //   - cfg.sandbox === true ........... reserve the OLD behavior: an explicit apBlue/apRed
+    //                                       becomes a FIXED AP and disables the economy for
+    //                                       that side (tests / deliberate sandbox runs only).
+    const sandbox = !!cfg.sandbox;
+    const pm = (cfgOverrides && cfgOverrides.postureModifiers) || {};
+    function setupAp(side, cfgKey, baseKey) {
+      const ov = cfgOverrides || {};
+      const explicitFixed = sandbox && ov[cfgKey] != null;   // only sandbox makes apX fixed
+      if (explicitFixed) {
+        return { base: clamp(Math.round(Number(ov[cfgKey])), 1, 12), dynamic: false };
+      }
+      // Base AP: explicit base override, else legacy apX-as-base, else resource-derived.
+      let base;
+      if (ov[baseKey] != null) base = Number(ov[baseKey]);
+      else if (ov[cfgKey] != null) base = Number(ov[cfgKey]);
+      else base = resourceAp(board, side, DEFAULT_CFG[cfgKey]);
+      // Posture multiplier / offset (kept bounded so a bad campaign value can't run away).
+      const mod = pm[side] || {};
+      const mult = mod.mult != null ? clamp(Number(mod.mult), 0.25, 3) : 1;
+      const offset = mod.offset != null ? clamp(Number(mod.offset), -4, 4) : 0;
+      base = clamp(Math.round(base * mult + offset), TEMPO_FLOOR_AP, 8);
+      return { base, dynamic: true };
+    }
+    const apB = setupAp('blue', 'apBlue', 'baseApBlue');
+    const apR = setupAp('red', 'apRed', 'baseApRed');
+    const baseAp = { blue: apB.base, red: apR.base };
     cfg.apBlue = baseAp.blue;
     cfg.apRed = baseAp.red;
-    const dynamicAp = { blue: !apBlueFixed, red: !apRedFixed };
+    const dynamicAp = { blue: apB.dynamic, red: apR.dynamic };
     const startTempo = { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') };
     const objectives = { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') };
     const seed = (cfgOverrides && cfgOverrides.seed) || hashSeed('match', graph.nodes ? graph.nodes.length : 0, Object.keys(board.nodes).join('').length);
+    const fingerprint = computeFingerprint(graph);   // bind this match to the scenario it was built on (C-011)
     match = {
-      cfg, board, seed,
+      cfg, board, seed, fingerprint,
       baseAp, dynamicAp, startTempo, objectives,
       turn: 1,
       phase: 'plan',            // 'plan' | 'resolved' | 'over'
@@ -567,6 +733,11 @@ window.GameModule = (function () {
       tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
       objectives: { blue: objectiveStatus('blue'), red: objectiveStatus('red') },
       objectiveIds: { blue: (match.objectives && match.objectives.blue || []).slice(), red: (match.objectives && match.objectives.red || []).slice() },
+      // Save/resume integrity flags (C-011): the UI can warn when a loaded match is running
+      // against a different / unverifiable scenario graph than the one it was created on.
+      scenarioMismatch: !!match.scenarioMismatch,
+      scenarioUnknown: !!match.scenarioUnknown,
+      fingerprint: match.fingerprint || null,
       aar: match.phase === 'over' ? buildAar() : null
     };
   }
@@ -600,17 +771,56 @@ window.GameModule = (function () {
   function methods() { return METHODS; }
   function methodKeys() { return METHOD_KEYS.slice(); }
 
-  // Add / remove a human order during the plan phase (AP-bounded).
+  // Add / remove a human order during the plan phase (AP-bounded). Strikes are gated by the
+  // authoritative availability rule (C-003): an order is only accepted if the side fields a
+  // surviving valid firing source for the chosen method against a living enemy target. The
+  // resolved source is stamped onto the order so the resolver/AAR attribute it consistently.
   function queueOrder(side, order) {
     if (!match || match.phase !== 'plan' || !isHuman(side)) return false;
+    if (!order || (order.kind !== 'strike' && order.kind !== 'harden' && order.kind !== 'repair')) return false;
     if (match.orders[side].length >= apFor(side)) return false;
     const n = match.board.nodes[order.targetId];
     if (!n || !n.alive) return false;
-    if (order.kind === 'strike' && n.team === side) return false;   // can't strike your own
+    if (order.kind === 'strike') {
+      const avail = canStrikeBoard(match.board, side, order.targetId, order.methodKey, order.sourceId);
+      if (!avail.ok) return false;   // invalid strike (friendly target / no valid source / bad method) — reject, never silently resolve
+      match.orders[side].push(Object.assign({ side }, order, { sourceId: order.sourceId || avail.sourceId }));
+      ctx.onState(getState());
+      return true;
+    }
     if ((order.kind === 'harden' || order.kind === 'repair') && n.team !== side) return false;
     match.orders[side].push(Object.assign({ side }, order));
     ctx.onState(getState());
     return true;
+  }
+
+  // Public availability helper (C-003) so the UI can gate strike buttons with the SAME rule
+  // the engine enforces. Accepts either a method string or an {targetId, methodKey, sourceId}
+  // order-like object. Returns {ok, reason, sourceId}. Read-only over the live match board.
+  function canStrike(side, targetId, method, sourceId) {
+    if (!match) return { ok: false, reason: 'no-match' };
+    if (targetId && typeof targetId === 'object') {
+      const o = targetId;
+      return canStrikeBoard(match.board, side, o.targetId, o.methodKey || o.method, o.sourceId);
+    }
+    return canStrikeBoard(match.board, side, targetId, method, sourceId);
+  }
+
+  // Public order validator (C-003) covering all order kinds, so the UI can gate every button
+  // (strike/harden/repair) and pre-check AP. Returns {ok, reason, sourceId?}.
+  function validOrder(side, order) {
+    if (!match || match.phase !== 'plan') return { ok: false, reason: 'not-planning' };
+    if (!order) return { ok: false, reason: 'no-order' };
+    if (!isHuman(side)) return { ok: false, reason: 'not-human-side' };
+    if (match.orders[side].length >= apFor(side)) return { ok: false, reason: 'no-ap' };
+    const n = match.board.nodes[order.targetId];
+    if (!n || !n.alive) return { ok: false, reason: n ? 'target-dead' : 'no-target' };
+    if (order.kind === 'strike') return canStrikeBoard(match.board, side, order.targetId, order.methodKey, order.sourceId);
+    if (order.kind === 'harden' || order.kind === 'repair') {
+      if (n.team !== side) return { ok: false, reason: 'not-friendly' };
+      return { ok: true, reason: 'ok' };
+    }
+    return { ok: false, reason: 'bad-kind' };
   }
   function removeOrder(side, index) {
     if (!match || match.phase !== 'plan') return;
@@ -657,6 +867,23 @@ window.GameModule = (function () {
     return getState();
   }
 
+  // Side-NEUTRAL tie-breaker (C-010): no implicit Blue advantage. Compare a cascade of
+  // symmetric measures and only return 'draw' when every measure is exactly equal. Order:
+  //   1. effective combat power remaining (objectiveValue, health-weighted)
+  //   2. key objectives still held
+  //   3. surviving command-tempo
+  // Each is strictly compared (>), so equality falls through to the next measure and, if all
+  // tie, to an explicit draw. 'draw' is a first-class outcome the UI/AAR render as contested.
+  function neutralTieBreak() {
+    const oV = { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') };
+    if (oV.blue !== oV.red) return oV.blue > oV.red ? 'blue' : 'red';
+    const oH = { blue: objectiveStatus('blue').held, red: objectiveStatus('red').held };
+    if (oH.blue !== oH.red) return oH.blue > oH.red ? 'blue' : 'red';
+    const t = { blue: commandTempo(match.board, 'blue'), red: commandTempo(match.board, 'red') };
+    if (t.blue !== t.red) return t.blue > t.red ? 'blue' : 'red';
+    return 'draw';
+  }
+
   function evaluateVictory(force) {
     const objBlue = objectiveValue(match.board, 'blue');
     const objRed = objectiveValue(match.board, 'red');
@@ -672,13 +899,16 @@ window.GameModule = (function () {
     const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
     const blueDown = blueCollapsed || blueKeyLost;
     const redDown = redCollapsed || redKeyLost;
-    if (blueDown && redDown) { match.winner = objBlue >= objRed ? 'blue' : 'red'; return; }
+    // Mutual collapse in the same turn is settled by the side-neutral tie-break (-> can draw),
+    // never a silent Blue default.
+    if (blueDown && redDown) { match.winner = neutralTieBreak(); return; }
     if (redDown) { match.winner = 'blue'; return; }
     if (blueDown) { match.winner = 'red'; return; }
     if (force || match.turn > match.cfg.turnLimit) {
-      // Time limit: decide by score, then by remaining objective value.
+      // Time limit: decide by accumulated score, then by the side-neutral tie-break
+      // (combat power -> key objectives -> tempo), and finally an explicit draw.
       if (match.score.blue !== match.score.red) match.winner = match.score.blue > match.score.red ? 'blue' : 'red';
-      else match.winner = objBlue >= objRed ? 'blue' : 'red';
+      else match.winner = neutralTieBreak();
     }
   }
 
@@ -835,12 +1065,15 @@ window.GameModule = (function () {
     const oB = objectiveStatus('blue'), oR = objectiveStatus('red');
     const blueKeyLost = oB.total > 0 && (oB.held / oB.total) <= OBJ_LOSS_FRAC;
     const redKeyLost = oR.total > 0 && (oR.held / oR.total) <= OBJ_LOSS_FRAC;
-    const reason = (blueCollapsed || blueKeyLost) && (redCollapsed || redKeyLost) ? 'Mutual collapse tie-breaker'
-      : redKeyLost ? `Red lost its key objectives (${oR.lost}/${oR.total})`
-        : blueKeyLost ? `Blue lost its key objectives (${oB.lost}/${oB.total})`
-          : redCollapsed ? 'Red force collapsed'
-            : blueCollapsed ? 'Blue force collapsed'
-              : 'Turn-limit score decision';
+    const mutual = (blueCollapsed || blueKeyLost) && (redCollapsed || redKeyLost);
+    const isDraw = match.winner === 'draw';
+    const reason = isDraw ? (mutual ? 'Mutual collapse — contested draw (forces dead even)' : 'Turn limit — contested draw (forces dead even)')
+      : mutual ? 'Mutual collapse — settled by combat power'
+        : redKeyLost ? `Red lost its key objectives (${oR.lost}/${oR.total})`
+          : blueKeyLost ? `Blue lost its key objectives (${oB.lost}/${oB.total})`
+            : redCollapsed ? 'Red force collapsed'
+              : blueCollapsed ? 'Blue force collapsed'
+                : 'Turn-limit score decision';
 
     const targetList = Object.values(targets);
     return {
@@ -869,38 +1102,92 @@ window.GameModule = (function () {
   }
 
   // ---- Serialization (save / load / future network sync) --------------------------
+  // v2 saves embed a scenario FINGERPRINT (C-011) so a resume can verify it is replaying
+  // against the same graph, plus savedGraphState and lastReport so a loaded match is self-
+  // contained (can restore the scenario on exit and keep its resolved-turn log). v1 saves
+  // (no fingerprint) still load, but cannot be integrity-checked — deserialize flags that.
   function serialize() {
     if (!match) return null;
     const health = {};
     for (const id in match.board.nodes) { const n = match.board.nodes[id]; health[id] = { h: n.health, a: n.alive }; }
     return {
-      v: 1, seed: match.seed, turn: match.turn, phase: match.phase,
+      v: 2, seed: match.seed, turn: match.turn, phase: match.phase,
+      fingerprint: match.fingerprint || null,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
       objectives: match.objectives,
       history: match.history,
-      orders: match.orders, winner: match.winner, health
+      orders: match.orders, winner: match.winner, health,
+      lastReport: match.lastReport || null,
+      savedGraphState: match.savedGraphState || null
     };
   }
-  function deserialize(s) {
+  // Load a serialized match. INTEGRITY GATE (C-011): before touching the live graph, compare
+  // the save's scenario fingerprint to the active graph's. On mismatch we REFUSE by default —
+  // returning { ok:false, reason:'fingerprint-mismatch', ... } and leaving any in-progress
+  // match and the live graph untouched — so a resume never silently replays against the wrong
+  // board. Pass opts.force === true to load anyway (deliberate what-if reuse); the returned
+  // state then carries a `scenarioMismatch` flag so the UI can warn. v1 saves (no fingerprint)
+  // load with `scenarioUnknown` set rather than being blocked, preserving old-save resumes.
+  // Returns the live match state on success (back-compat), or a {ok:false,...} report on refusal.
+  function deserialize(s, opts) {
     if (!s) return null;
+    opts = opts || {};
     const graph = (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] };
+    const activeFp = computeFingerprint(graph);
+    const savedFp = s.fingerprint || null;
+    let mismatch = false, unknown = false;
+    if (savedFp) {
+      if (!fingerprintsMatch(savedFp, activeFp)) {
+        mismatch = true;
+        if (!opts.force) {
+          // Refuse: do NOT mutate the live graph or replace any active match.
+          return {
+            ok: false,
+            reason: 'fingerprint-mismatch',
+            message: 'Saved match was built on a different scenario graph (saved ' +
+              savedFp.nodes + ' nodes / ' + savedFp.links + ' links vs active ' +
+              activeFp.nodes + ' / ' + activeFp.links + '). Load the original scenario, or resume with force to replay anyway.',
+            savedFingerprint: savedFp,
+            activeFingerprint: activeFp
+          };
+        }
+      }
+    } else {
+      unknown = true;   // legacy save with no fingerprint — can't verify
+    }
+
     const board = buildBoard(graph);
     if (s.health) for (const id in s.health) { if (board.nodes[id]) { board.nodes[id].health = s.health[id].h; board.nodes[id].alive = s.health[id].a; } }
     const dcfg = Object.assign({}, DEFAULT_CFG, s.cfg);
+    // Rehydrate lastReport (saved in v2; else derive from the last history entry) so resuming
+    // a resolved phase keeps its turn log / AAR context.
+    let lastReport = s.lastReport || null;
+    if (!lastReport && Array.isArray(s.history) && s.history.length) {
+      const last = s.history[s.history.length - 1];
+      if (last && last.report) lastReport = { turn: last.turn, events: last.report.events, scoreDelta: last.report.scoreDelta };
+    }
     match = {
       cfg: dcfg, board, seed: s.seed,
+      fingerprint: savedFp || activeFp,
       baseAp: s.baseAp || { blue: dcfg.apBlue, red: dcfg.apRed },
       dynamicAp: s.dynamicAp || { blue: false, red: false },
       startTempo: s.startTempo || { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') },
       objectives: s.objectives || { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
-      history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null, lastReport: null
+      history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null,
+      lastReport,
+      // Capture the CURRENT graph state before overwriting it with loaded battle damage, so
+      // exiting a loaded match still restores the scenario (even though older saves omitted it).
+      savedGraphState: s.savedGraphState || (graph.nodes || []).map(n => ({ id: n.id, health: n.health, status: n.status }))
     };
+    match.scenarioMismatch = mismatch;
+    match.scenarioUnknown = unknown;
     syncBoardToGraph();
-    ctx.onState(getState());
-    return getState();
+    const state = getState();
+    ctx.onState(state);
+    return state;
   }
 
   // Restore the scenario graph to exactly what it was before the match began, so
@@ -917,11 +1204,33 @@ window.GameModule = (function () {
   }
   function isActive() { return !!match; }
 
+  // Public scenario-fingerprint helpers (C-011) so the UI / campaign can compute and compare
+  // a graph's fingerprint before resuming or launching a match.
+  function fingerprint(graph) {
+    return computeFingerprint(graph || (window.AppState && window.AppState.activeGraph()) || { nodes: [], links: [] });
+  }
+  // Does the active (or given) graph match a previously-saved fingerprint? Convenience for
+  // gating a "Resume" button in the UI without forcing a load attempt.
+  function fingerprintMatches(savedFp, graph) {
+    return fingerprintsMatch(savedFp, fingerprint(graph));
+  }
+  // Read-only availability of the current match's scenario binding, for UI banners.
+  function scenarioStatus() {
+    if (!match) return null;
+    return { mismatch: !!match.scenarioMismatch, unknown: !!match.scenarioUnknown, fingerprint: match.fingerprint || null };
+  }
+
   return {
     init, newMatch, getState, queueOrder, removeOrder, clearOrders,
     commitTurn, nextTurn, endMatch, isActive, isHuman,
     boardNode, methods, methodKeys, serialize, deserialize,
+    // C-003: authoritative strike-availability helpers so the UI can gate buttons with the
+    // exact rule the engine enforces.
+    canStrike, validOrder,
+    // C-011: scenario fingerprint helpers for save/resume integrity.
+    fingerprint, fingerprintMatches, scenarioStatus,
     // exposed for headless testing / future reuse
-    _internal: { buildBoard, resolveTurn, planOrders, makeRng, hashSeed, objectiveValue }
+    _internal: { buildBoard, resolveTurn, planOrders, makeRng, hashSeed, objectiveValue,
+      canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch }
   };
 })();

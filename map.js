@@ -125,11 +125,18 @@ window.MapModule = (function () {
     leafletMap.getPane('ringsPane').style.pointerEvents = 'none';
     rangeRingsLayer = L.layerGroup().addTo(leafletMap);
 
+    // Pane for radar-sweep FX element — above basemap, below engagement rings.
+    leafletMap.createPane('radarPane');
+    leafletMap.getPane('radarPane').style.zIndex = 310;
+    leafletMap.getPane('radarPane').style.pointerEvents = 'none';
+
     // FX pane for strike tracers / impacts — drawn over everything for the brief flash.
     leafletMap.createPane('fxPane');
     leafletMap.getPane('fxPane').style.zIndex = 640;
     leafletMap.getPane('fxPane').style.pointerEvents = 'none';
-    injectFxCss();
+    injectHudCss(); // unified design-system CSS (includes former injectFxCss content)
+    injectFxCss();  // no-op shim; kept for call-site compatibility
+    // ensureRadarSweep(); // disabled per user feedback — full-map radar sweep removed (top-left tactical scope kept). Re-enable by uncommenting.
 
     // Basemap status helper: keep one status signal even as layers come online asynchronously.
     const setBasemapStatus = (text, state) => {
@@ -160,11 +167,20 @@ window.MapModule = (function () {
       if (!visible && hasLayer) leafletMap.removeLayer(coastlineLayer);
     };
 
-    // ---- Basemaps: crisp online tiles with an automatic offline fallback ------------
-    // A dark "command picture" basemap by default so colored symbols and overlays pop —
-    // the convention real C2/COP tools use — with a photographic satellite option and the
-    // bundled Blue Marble image as a no-network safety net. Slippy tiles wrap across the
-    // antimeridian, so the Pacific-centered view stays seamless out to the Americas.
+    // ---- Basemaps ----------------------------------------------------------------
+    // C-002 (P1): OFFLINE-FIRST. The map boots into the blank canvas grid (already
+    // added above) — ZERO network requests at startup. Online basemaps (CARTO dark,
+    // Esri satellite) are available as explicit opt-in layer toggles only; they are
+    // NOT added to the map at init time. The offline bundled imagery (Blue Marble) is
+    // the default "rich" fallback when the user wants a real photo basemap without going
+    // online. The basemap-status badge clearly shows "offline grid" until the user
+    // deliberately enables an online layer.
+    //
+    // C-019 (P1): Every online tile layer (darkLayer, satImagery, satLabels) gets the
+    // same tile-error fallback handler so a failed online selection always recovers to
+    // the offline layer, never leaves a blank map.
+
+    // Online-capable layers (constructed but NOT added to map at startup)
     const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       subdomains: 'abcd', maxZoom: 19, crossOrigin: true, keepBuffer: 4,
       attribution: '© OpenStreetMap contributors, © CARTO'
@@ -177,34 +193,66 @@ window.MapModule = (function () {
       subdomains: 'abcd', maxZoom: 19, crossOrigin: true, opacity: 0.85
     });
     const satLayer = L.layerGroup([satImagery, satLabels]);
-    // Offline bundled imagery (two copies so the dateline stays covered) — used when the
-    // network is unavailable, or selectable directly.
+    // Offline bundled imagery (two copies so the dateline stays covered).
     const offlineLayer = L.layerGroup([
       L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' }),
       L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS_WRAP, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' })
     ]);
 
-    darkLayer.addTo(leafletMap);
-    globalSatelliteLoaded = true; // a real basemap is up; suppress the bare-grid status
-    setBasemapStatus('Basemap: dark (online)', 'ok');
-    L.control.layers(
-      { 'Dark (command picture)': darkLayer, 'Satellite': satLayer, 'Offline imagery': offlineLayer },
-      { 'Engagement zones (notional)': rangeRingsLayer },
-      { position: 'topright', collapsed: true }
-    ).addTo(leafletMap);
-    leafletMap.on('baselayerchange', (e) => setBasemapStatus('Basemap: ' + e.name, 'ok'));
-
-    // Auto-fallback: if online tiles can't load (offline / blocked), switch to the bundled
-    // imagery so the map is never blank. A handful of tile errors is the trigger.
+    // C-019: shared tile-error fallback for ALL online layers.
+    // Counts errors across dark+sat layers; trips after 4 cumulative failures,
+    // removes whichever online layers are active, and activates the offline layer.
     let onlineTileErrors = 0, fellBack = false;
     const fallBackToOffline = () => {
       if (fellBack || !leafletMap) return;
       fellBack = true;
       if (leafletMap.hasLayer(darkLayer)) leafletMap.removeLayer(darkLayer);
+      if (leafletMap.hasLayer(satImagery)) leafletMap.removeLayer(satImagery);
+      if (leafletMap.hasLayer(satLabels)) leafletMap.removeLayer(satLabels);
+      if (leafletMap.hasLayer(satLayer)) leafletMap.removeLayer(satLayer);
       offlineLayer.addTo(leafletMap);
-      setBasemapStatus('Basemap: offline imagery', 'offline');
+      globalSatelliteLoaded = true;
+      refreshCoastlineFallback();
+      setBasemapStatus('Basemap: offline imagery (online failed)', 'offline');
     };
-    darkLayer.on('tileerror', () => { if (++onlineTileErrors >= 4) fallBackToOffline(); });
+    const onTileError = () => { if (++onlineTileErrors >= 4) fallBackToOffline(); };
+    // Attach to every online tile layer (C-019)
+    darkLayer.on('tileerror', onTileError);
+    satImagery.on('tileerror', onTileError);
+    satLabels.on('tileerror', onTileError);
+
+    // C-002: The layers control lists online basemaps as opt-in choices.
+    // The map starts on the blank offline grid (no entry selected in base layers).
+    // We add offlineLayer as the default "rich offline" base so users have a
+    // photographic option without any network request.
+    offlineLayer.addTo(leafletMap);
+    globalSatelliteLoaded = true;
+    setBasemapStatus('Basemap: offline imagery', 'ok');
+
+    L.control.layers(
+      {
+        'Offline imagery (default)': offlineLayer,
+        'Dark — online opt-in': darkLayer,
+        'Satellite — online opt-in': satLayer
+      },
+      { 'Engagement zones (notional)': rangeRingsLayer },
+      { position: 'topright', collapsed: true }
+    ).addTo(leafletMap);
+
+    // Update the badge when the user explicitly switches basemaps.
+    // Flag online layers clearly so the operator knows a network request will fire.
+    leafletMap.on('baselayerchange', (e) => {
+      const isOnline = e.name.indexOf('online') !== -1;
+      if (isOnline) {
+        // Reset fallback counter when the user intentionally opts into an online layer
+        onlineTileErrors = 0;
+        fellBack = false;
+      }
+      setBasemapStatus(
+        'Basemap: ' + e.name.replace(' — online opt-in', ' (ONLINE)').replace(' (default)', ''),
+        isOnline ? 'ok' : 'ok'
+      );
+    });
 
     // Map overlays: scale + compass
     L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
@@ -280,8 +328,8 @@ window.MapModule = (function () {
       }
     });
     new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
-    // Now that the badge exists, reflect the active online basemap (or the fallback).
-    setBasemapStatus(fellBack ? 'Basemap: offline imagery' : 'Basemap: dark (online)', fellBack ? 'offline' : 'ok');
+    // C-002: badge reflects the offline-first default (not any online layer).
+    setBasemapStatus('Basemap: offline imagery', 'ok');
 
     // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
     // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
@@ -313,7 +361,12 @@ window.MapModule = (function () {
 
     markersLayer = L.layerGroup().addTo(leafletMap);
     mapLinksLayer = L.layerGroup().addTo(leafletMap);
-    setTimeout(() => { leafletMap.invalidateSize(); clampMinZoom(); fitMapToMarkers(); }, 50);
+    setTimeout(() => {
+      leafletMap.invalidateSize();
+      clampMinZoom();
+      fitMapToMarkers();
+      _wireMapVisibilityObserver(); // C-020: auto-replay queued strikes on map show
+    }, 50);
   }
 
   // Set the minimum zoom to exactly the level at which the world imagery fills the
@@ -375,6 +428,7 @@ window.MapModule = (function () {
       if (n.lat == null || n.lon == null) return;
       const off = offsetById.get(n.id) || [0, 0];
       const mlat = n.lat + off[0], mlon = pacLon(n.lon) + off[1];
+      const hasOffset = off[0] !== 0 || off[1] !== 0;
 
       let marker;
       if (useSym) {
@@ -394,6 +448,15 @@ window.MapModule = (function () {
             .on('click', () => selectNodeById(n.id));
           // High-importance units sit above the clutter so they're never hidden.
           try { marker.setZIndexOffset(Math.round(imp * 40)); } catch (e) {}
+          // Blip halo: team-coloured sonar ring. CSS var drives border color.
+          if (marker._icon) {
+            const blipColor = _affiliationColor(n);
+            const blipDelay = ((Math.abs(n.id.charCodeAt(0) || 0) % 16) / 16 * 2.4).toFixed(2);
+            marker._icon.classList.add('mil-blip');
+            if (imp >= 8) marker._icon.classList.add('mil-hi');
+            marker._icon.style.setProperty('--blip-color', blipColor);
+            marker._icon.style.setProperty('--blip-delay', blipDelay + 's');
+          }
         }
       }
       if (!marker) {
@@ -404,13 +467,116 @@ window.MapModule = (function () {
         }).addTo(markersLayer).on('click', () => selectNodeById(n.id));
       }
 
+      // C-017 (P1/P2): When a marker has been offset from its true position by the
+      // declutter spiral, draw a thin leader line back to the true coordinate so the
+      // operator can see where the unit actually is. The line is non-interactive and
+      // very faint to avoid cluttering the COP. Only drawn for genuinely offset markers.
+      if (hasOffset) {
+        try {
+          L.polyline([[n.lat, pacLon(n.lon)], [mlat, mlon]], {
+            color: _affiliationColor(n),
+            weight: 0.8,
+            opacity: 0.35,
+            interactive: false,
+            dashArray: '3 4'
+          }).addTo(markersLayer);
+          // Small true-position dot so the anchor point is unambiguous.
+          L.circleMarker([n.lat, pacLon(n.lon)], {
+            radius: 2,
+            color: _affiliationColor(n),
+            fillColor: _affiliationColor(n),
+            fillOpacity: 0.55,
+            weight: 0,
+            interactive: false
+          }).addTo(markersLayer);
+        } catch (e) { /* non-fatal */ }
+      }
+
       marker.__node = n;
-      marker.bindPopup(`<strong>${n.name}</strong><br>${n.id}`);
+      // HUD-styled popup: name in mono accent, ID in muted mono.
+      marker.bindPopup(
+        `<strong>${n.name}</strong>` +
+        `<span style="display:block;font-family:var(--map-font-mono,'Share Tech Mono',monospace);` +
+        `font-size:10px;color:rgba(0,216,255,0.55);margin-top:1px">${n.id}</span>`
+      );
       mapMarkers.set(n.id, marker);
     });
 
-    refreshRangeRings();
+    refreshRangeRings(offsetById);
+    refreshObjectiveMarkers(offsetById);
     highlightSelectedOnMap();
+  }
+
+  // Return the canonical affiliation color for a node (CSS hex string).
+  function _affiliationColor(n) {
+    const t = String(n.team || n.affiliation || '').toLowerCase();
+    if (t === 'blue' || t === 'friend') return '#38bdf8';
+    if (t === 'red'  || t === 'hostile') return '#ff4d5e';
+    if (t === 'green'|| t === 'neutral') return '#51cf66';
+    return '#ffd43b'; // unknown
+  }
+
+  // --- Objective markers (C-044) ---------------------------------------------------
+  // C-044 (P2): Objective markers now respect active visibility filters — only nodes
+  // that are in currentVisible().visibleNodes receive a badge. They also use the same
+  // display coordinate (true lat/lon + declutter offset) as their unit marker, so the
+  // badge sits on top of the symbol rather than floating at a diverging position.
+  // The offsetById map is passed in from refreshMapMarkers so the two calls share one
+  // computed declutter table; when called stand-alone (e.g. on game state change) it
+  // recomputes the table from the current visible set.
+  let objectiveMarkersLayer = null;
+  function refreshObjectiveMarkers(offsetById) {
+    if (!leafletMap) return;
+    // Lazy-create the layer (above rings, below unit markers)
+    if (!objectiveMarkersLayer) {
+      objectiveMarkersLayer = L.layerGroup().addTo(leafletMap);
+    }
+    objectiveMarkersLayer.clearLayers();
+
+    // Resolve objective IDs from the active game state (defensive — may not exist).
+    let objIds = null;
+    try {
+      const gs = window.GameModule && typeof window.GameModule.getState === 'function'
+        ? window.GameModule.getState() : null;
+      if (gs && gs.objectiveIds) {
+        // Merge both sides into a map: id -> side
+        const blueIds = Array.isArray(gs.objectiveIds.blue) ? gs.objectiveIds.blue : [];
+        const redIds  = Array.isArray(gs.objectiveIds.red)  ? gs.objectiveIds.red  : [];
+        objIds = new Map();
+        blueIds.forEach(id => objIds.set(id, 'blue'));
+        redIds.forEach(id  => objIds.set(id, 'red'));
+      }
+    } catch (e) { objIds = null; }
+
+    if (!objIds || objIds.size === 0) return; // no active game / no objectives
+
+    // C-044: use currentVisible() to respect active filters; build ID set for O(1) lookup.
+    const { visibleNodes } = currentVisible();
+    const visibleIdSet = new Set(visibleNodes.map(n => n.id));
+
+    // If no offsetById was passed in (standalone call), recompute from visible nodes.
+    if (!offsetById) offsetById = computeDeclutter(visibleNodes);
+
+    visibleNodes.forEach(n => {
+      if (!objIds.has(n.id)) return;
+      if (!visibleIdSet.has(n.id)) return; // already guaranteed by visibleNodes, but be explicit
+      if (n.lat == null || n.lon == null) return;
+      const side = objIds.get(n.id); // 'blue' or 'red'
+      const isHostile = side === 'red';
+
+      // C-044: place badge at the same display coordinate as the unit marker.
+      const off = offsetById.get(n.id) || [0, 0];
+      const mlat = n.lat + off[0], mlon = pacLon(n.lon) + off[1];
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="map-obj-marker${isHostile ? ' obj-hostile' : ''}" title="KEY OBJ: ${n.name}">★</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      L.marker([mlat, mlon], { icon, interactive: false, keyboard: false, zIndexOffset: -10 })
+        .addTo(objectiveMarkersLayer);
+    });
   }
 
   // --- Weapon-engagement zones (notional) ------------------------------------------
@@ -433,21 +599,36 @@ window.MapModule = (function () {
     return null;
   }
 
-  // Per-kind / per-affiliation styling. Red threats warm, Blue cool; fires solid,
-  // air-defense dashed, sensors dotted and fainter.
+  // Per-kind / per-affiliation styling using canonical design-system palette.
+  // Hostile fires → alert-red; Blue fires → amber; air-def → cyan; sensors → accent cyan.
   function ringStyle(kind, team) {
     const red = team === 'red';
-    const base = red ? [228, 76, 60] : [80, 168, 224];
-    const rgba = (a) => `rgba(${base[0]},${base[1]},${base[2]},${a})`;
-    // Big fires rings are outline-only (their fills would blanket the view in a haze);
-    // the smaller air-defense / sensor envelopes get a faint fill to read as coverage.
-    if (kind === 'fires') return { color: rgba(0.6), weight: 1.5, fillColor: rgba(1), fillOpacity: 0, dashArray: null };
-    if (kind === 'airdef') return { color: rgba(0.7), weight: 1.4, fillColor: rgba(1), fillOpacity: 0.04, dashArray: '6 5' };
-    return { color: rgba(0.5), weight: 1.1, fillColor: rgba(1), fillOpacity: 0.025, dashArray: '2 5' }; // sensor
+    // Fires: hostile=alert, friend=amber; air-def: cyan tinted by side; sensor: pure accent.
+    if (kind === 'fires') {
+      const c = red ? '#ff3b3b' : '#ffb000'; // --alert vs --amber
+      return { color: c, weight: 1.6, fillColor: c, fillOpacity: 0, dashArray: null,
+               opacity: 0.75 };
+    }
+    if (kind === 'airdef') {
+      // Hostile SAM rings slightly warmer cyan; blue AD rings cool cyan.
+      const c = red ? 'rgba(255,77,94,0.72)' : 'rgba(0,216,255,0.65)';
+      const fill = red ? 'rgba(255,77,94,1)' : 'rgba(0,216,255,1)';
+      return { color: c, weight: 1.4, fillColor: fill, fillOpacity: 0.04, dashArray: '6 5',
+               opacity: 0.8 };
+    }
+    // Sensor: faint accent cyan outline + near-invisible fill
+    const c = red ? 'rgba(255,77,94,0.45)' : 'rgba(0,216,255,0.45)';
+    return { color: c, weight: 1.1, fillColor: c, fillOpacity: 0.02, dashArray: '2 6',
+             opacity: 0.7 };
   }
 
   const MAX_RINGS = 22;   // show the biggest threat/defense envelopes only — readable, not noisy
-  function refreshRangeRings() {
+  // C-017 (P1/P2): rings are drawn at the TRUE coordinate (n.lat/n.lon), not the
+  // decluttered display position. This keeps geometry truthful — a ring centered at the
+  // true coordinate is correct even when its symbol is offset. A thin leader line is
+  // drawn separately in refreshMapMarkers for offset symbols so the user can see the
+  // connection between the displayed icon and its true ground position.
+  function refreshRangeRings(offsetById) {
     if (!rangeRingsLayer) return;
     rangeRingsLayer.clearLayers();
     const { visibleNodes } = currentVisible();
@@ -464,9 +645,10 @@ window.MapModule = (function () {
     candidates.sort((a, b) => b.imp - a.imp);
     candidates.slice(0, MAX_RINGS).forEach(({ n, z }) => {
       const st = ringStyle(z.kind, n.team);
+      // Rings always anchor to true coordinate so geometry is tactically truthful.
       L.circle([n.lat, pacLon(n.lon)], {
         pane: 'ringsPane', interactive: false, radius: z.km * 1000,
-        color: st.color, weight: st.weight, opacity: 0.9,
+        color: st.color, weight: st.weight, opacity: st.opacity !== undefined ? st.opacity : 0.9,
         fillColor: st.fillColor, fillOpacity: st.fillOpacity,
         dashArray: st.dashArray
       }).addTo(rangeRingsLayer);
@@ -516,9 +698,19 @@ window.MapModule = (function () {
 
     if (selectedNode && mapMarkers.has(selectedNode.id)) {
       const m = mapMarkers.get(selectedNode.id);
-      m.bindPopup(`<strong>${selectedNode.name}</strong><br/><span style="color:var(--muted)">${selectedNode.id}</span>`, { autoPan: true }).openPopup();
+      m.bindPopup(
+        `<strong>${selectedNode.name}</strong>` +
+        `<span style="display:block;font-family:'Share Tech Mono',monospace;font-size:10px;` +
+        `color:rgba(0,216,255,0.55);margin-top:1px">${selectedNode.id}</span>`,
+        { autoPan: true }
+      ).openPopup();
       if (selectedNode.lat != null && selectedNode.lon != null) {
-        leafletMap.setView([selectedNode.lat, pacLon(selectedNode.lon)], Math.max(leafletMap.getZoom(), 3), { animate: true });
+        // C-017: pan to the marker's display coordinate (which may be offset by declutter)
+        // so the map recenters on where the symbol is actually drawn, not a hidden true pos.
+        let viewPos;
+        try { viewPos = m.getLatLng(); } catch (e) { viewPos = null; }
+        if (!viewPos) viewPos = { lat: selectedNode.lat, lng: pacLon(selectedNode.lon) };
+        leafletMap.setView([viewPos.lat, viewPos.lng], Math.max(leafletMap.getZoom(), 3), { animate: true });
       }
     }
     refreshMapLinks();
@@ -542,11 +734,36 @@ window.MapModule = (function () {
         if (n && n.lat != null && n.lon != null) neighbors.push(n);
       }
     });
+
+    // C-017: use display coordinates (marker.getLatLng()) for link endpoints so lines
+    // connect to where the symbols are actually drawn, not a diverging true position.
+    const selMarker = mapMarkers.get(selectedNode.id);
+    let selDispPos;
+    try { selDispPos = selMarker ? selMarker.getLatLng() : null; } catch (e) { selDispPos = null; }
+    const from = selDispPos
+      ? [selDispPos.lat, selDispPos.lng]
+      : [selectedNode.lat, pacLon(selectedNode.lon)];
+
     neighbors.forEach(n => {
-      L.polyline([[selectedNode.lat, pacLon(selectedNode.lon)], [n.lat, pacLon(n.lon)]], {
-        color: resolveCssVar('var(--accent)'),
-        weight: 3,
-        opacity: 0.85
+      // Inner glow line (thicker, very faint) + crisp accent line on top.
+      const nMarker = mapMarkers.get(n.id);
+      let nDispPos;
+      try { nDispPos = nMarker ? nMarker.getLatLng() : null; } catch (e) { nDispPos = null; }
+      const to = nDispPos ? [nDispPos.lat, nDispPos.lng] : [n.lat, pacLon(n.lon)];
+
+      // Glow layer: wide, low opacity
+      L.polyline([from, to], {
+        color: '#00d8ff',
+        weight: 9,
+        opacity: 0.14,
+        interactive: false
+      }).addTo(mapLinksLayer);
+      // Primary link line
+      L.polyline([from, to], {
+        color: resolveCssVar ? resolveCssVar('var(--accent)') : '#00d8ff',
+        weight: 2.5,
+        opacity: 0.92,
+        interactive: false
       }).addTo(mapLinksLayer);
     });
   }
@@ -587,25 +804,354 @@ window.MapModule = (function () {
     if (leafletMap) { leafletMap.invalidateSize(); clampMinZoom(); }
   }
 
+  // ---- Design-system CSS injection ------------------------------------------------
+  // All map CSS lives here; nothing is injected anywhere else in this file.
+  // CSS variables match those defined on :root in StrikeSim2040.html.
+  let hudCssInjected = false;
+  function injectHudCss() {
+    if (hudCssInjected || typeof document === 'undefined') return;
+    hudCssInjected = true;
+    const st = document.createElement('style');
+    st.id = 'map-hud-css';
+    st.textContent = [
+      // ---- Affiliation palette tokens (canonical — do not change) -----------------
+      ':root{',
+      '  --map-friend:#38bdf8;--map-hostile:#ff4d5e;--map-neutral:#51cf66;--map-unknown:#ffd43b;',
+      '  --map-accent:#00d8ff;--map-amber:#ffb000;--map-alert:#ff3b3b;',
+      '  --map-glass:rgba(9,16,24,0.82);--map-border:rgba(0,216,255,0.22);',
+      '  --map-glow:0 0 14px rgba(0,216,255,0.45);',
+      '  --map-font-mono:"Share Tech Mono",monospace;--map-font-ui:Inter,system-ui,sans-serif;',
+      '}',
+
+      // ---- Leaflet container & controls ------------------------------------------
+      // Remove Leaflet's default white/rounded control style; replace with glass HUD.
+      '.leaflet-control-zoom,.leaflet-control-attribution,.leaflet-control-layers,',
+      '.basemap-status,.compass-control,.mil-legend{',
+      '  background:var(--map-glass)!important;',
+      '  border:1px solid var(--map-border)!important;',
+      '  border-radius:4px!important;',
+      '  color:#c8e6f0!important;',
+      '  font-family:var(--map-font-ui)!important;',
+      '  font-size:11px!important;',
+      '  backdrop-filter:blur(10px)!important;',
+      '  -webkit-backdrop-filter:blur(10px)!important;',
+      '}',
+      '.leaflet-control-zoom a{',
+      '  background:transparent!important;',
+      '  color:var(--map-accent)!important;',
+      '  border-color:var(--map-border)!important;',
+      '  font-family:var(--map-font-mono)!important;',
+      '  font-size:16px!important;',
+      '  line-height:26px!important;',
+      '}',
+      '.leaflet-control-zoom a:hover{background:rgba(0,216,255,0.12)!important;}',
+      '.leaflet-control-attribution{font-size:9px!important;opacity:.55}',
+      // Layers panel
+      '.leaflet-control-layers-expanded{padding:8px!important;min-width:170px}',
+      '.leaflet-control-layers label{color:#c8e6f0!important;font-family:var(--map-font-ui)!important;font-size:11px}',
+      '.leaflet-control-layers-separator{border-color:var(--map-border)!important}',
+
+      // ---- Scale control ---------------------------------------------------------
+      '.leaflet-control-scale-line{',
+      '  background:var(--map-glass)!important;',
+      '  border-color:var(--map-accent)!important;',
+      '  color:var(--map-accent)!important;',
+      '  font-family:var(--map-font-mono)!important;',
+      '  font-size:10px!important;',
+      '  padding:1px 5px!important;',
+      '}',
+
+      // ---- Compass control -------------------------------------------------------
+      '.compass-control{',
+      '  padding:5px 8px!important;',
+      '  text-align:center;',
+      '}',
+      '.compass-arrow{font-size:18px;color:var(--map-accent);line-height:1;',
+      '  text-shadow:var(--map-glow);}',
+      '.compass-label{font-family:var(--map-font-mono);font-size:10px;',
+      '  color:var(--map-accent);letter-spacing:.08em}',
+
+      // ---- Basemap-status badge --------------------------------------------------
+      '.basemap-status{',
+      '  font-family:var(--map-font-mono)!important;',
+      '  font-size:10px!important;',
+      '  color:var(--map-accent)!important;',
+      '  padding:3px 8px!important;',
+      '  letter-spacing:.04em;',
+      '}',
+      '.basemap-status[data-state="offline"]{color:var(--map-amber)!important;}',
+
+      // ---- Legend re-skin --------------------------------------------------------
+      '.mil-legend{padding:7px 9px!important}',
+      '.mil-leg-head{letter-spacing:.07em;color:var(--map-accent)!important;',
+      '  font-family:var(--map-font-mono)!important;font-size:11px}',
+      '.mil-leg-toggle{color:var(--map-accent)!important}',
+      '.mil-leg-sub{color:rgba(0,216,255,0.55)!important;font-family:var(--map-font-ui)!important}',
+      '.mil-leg-item span{font-family:var(--map-font-ui)!important;color:#c8e6f0!important}',
+      '.mil-leg-note{color:rgba(200,230,240,0.45)!important;font-family:var(--map-font-ui)!important}',
+
+      // ---- Popups ----------------------------------------------------------------
+      '.leaflet-popup-content-wrapper{',
+      '  background:var(--map-glass)!important;',
+      '  border:1px solid var(--map-border)!important;',
+      '  border-radius:6px!important;',
+      '  box-shadow:var(--map-glow),0 4px 24px rgba(0,0,0,.6)!important;',
+      '  backdrop-filter:blur(10px)!important;',
+      '  -webkit-backdrop-filter:blur(10px)!important;',
+      '  color:#e2f4fb!important;',
+      '  font-family:var(--map-font-ui)!important;',
+      '  padding:0!important;',
+      '}',
+      '.leaflet-popup-content{',
+      '  margin:10px 14px!important;',
+      '  font-size:12px!important;',
+      '  line-height:1.5!important;',
+      '}',
+      '.leaflet-popup-content strong{',
+      '  display:block;font-family:var(--map-font-mono);font-size:13px;',
+      '  color:var(--map-accent);letter-spacing:.04em;margin-bottom:2px;',
+      '}',
+      '.leaflet-popup-tip-container .leaflet-popup-tip{',
+      '  background:rgba(9,16,24,0.9)!important;',
+      '}',
+      '.leaflet-popup-close-button{color:var(--map-accent)!important;font-size:16px!important;top:3px!important;right:5px!important;}',
+      '.leaflet-popup-close-button:hover{color:#fff!important;}',
+      // Popup node-id line
+      '.leaflet-popup-content [style*="--muted"]{',
+      '  font-family:var(--map-font-mono);font-size:10px;color:rgba(0,216,255,0.55);',
+      '}',
+
+      // ---- Marker states: dim / selected / fallback circles ----------------------
+      // MIL-symbol icon wrapper
+      '.mil-dimmed{opacity:.28;filter:grayscale(.6) brightness(.7);transition:opacity .2s}',
+      '.mil-selected{',
+      '  filter:drop-shadow(0 0 7px var(--map-accent)) drop-shadow(0 0 14px rgba(0,216,255,0.5));',
+      '}',
+
+      // ---- Blip / sonar-halo pulse on div-icon markers --------------------------
+      // The halo is a pseudo-element so it never shifts the icon's click target.
+      // Reduced-motion: no animation, keep the static ring.
+      '@keyframes mapBlip{',
+      '  0%{transform:scale(.55);opacity:.75}',
+      '  55%{opacity:.35}',
+      '  100%{transform:scale(2.2);opacity:0}',
+      '}',
+      '@keyframes mapBlipStrong{',
+      '  0%{transform:scale(.55);opacity:.9}',
+      '  55%{opacity:.55}',
+      '  100%{transform:scale(2.8);opacity:0}',
+      '}',
+      // .mil-blip is added to divIcon wrapper by refreshMapMarkers
+      '.mil-blip::after{',
+      '  content:"";display:block;position:absolute;',
+      '  top:50%;left:50%;width:28px;height:28px;',
+      '  transform:translate(-50%,-50%) scale(.55);',
+      '  border-radius:50%;border:1.5px solid var(--blip-color,var(--map-friend));',
+      '  pointer-events:none;',
+      '  animation:mapBlip 2.6s ease-out infinite;',
+      '  animation-delay:var(--blip-delay,0s);',
+      '}',
+      '.mil-blip.mil-selected::after{',
+      '  width:34px;height:34px;',
+      '  border-width:2.5px;',
+      '  border-color:var(--map-accent);',
+      '  animation:mapBlipStrong 1.8s ease-out infinite;',
+      '  box-shadow:0 0 8px rgba(0,216,255,0.4);',
+      '}',
+      // High-importance nodes get a slightly stronger base ring
+      '.mil-blip.mil-hi::after{',
+      '  width:32px;height:32px;',
+      '  border-width:2px;',
+      '  animation-duration:2.2s;',
+      '}',
+      '@media(prefers-reduced-motion:reduce){',
+      '  .mil-blip::after,.mil-blip.mil-selected::after,.mil-blip.mil-hi::after{animation:none;opacity:.35}',
+      '}',
+
+      // ---- Objective marker ------------------------------------------------------
+      '@keyframes mapObjPulse{',
+      '  0%,100%{box-shadow:0 0 6px 2px var(--obj-glow,var(--map-amber)),inset 0 0 4px rgba(255,176,0,.3)}',
+      '  50%{box-shadow:0 0 16px 6px var(--obj-glow,var(--map-amber)),inset 0 0 8px rgba(255,176,0,.5)}',
+      '}',
+      '@keyframes mapObjSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}',
+      '.map-obj-marker{',
+      '  display:flex;align-items:center;justify-content:center;',
+      '  width:22px;height:22px;',
+      '  border-radius:50%;',
+      '  border:2px solid var(--map-amber);',
+      '  background:rgba(255,176,0,0.12);',
+      '  color:var(--map-amber);',
+      '  font-size:10px;font-family:var(--map-font-mono);font-weight:700;',
+      '  animation:mapObjPulse 2.4s ease-in-out infinite;',
+      '}',
+      '.map-obj-marker.obj-hostile{',
+      '  border-color:var(--map-alert);color:var(--map-alert);',
+      '  background:rgba(255,59,59,0.12);',
+      '  --obj-glow:var(--map-alert);',
+      '}',
+      '@media(prefers-reduced-motion:reduce){.map-obj-marker{animation:none}}',
+
+      // ---- Radar-sweep FX --------------------------------------------------------
+      // A single rotating conic-gradient div in its own pane. Cheap: one element,
+      // CSS-only rotation. Kept very faint so it reads as ambiance, not distraction.
+      '@keyframes mapRadarSweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
+      '#map-radar-sweep{',
+      '  position:absolute;top:50%;left:50%;',
+      '  width:200vmax;height:200vmax;',
+      '  transform:translate(-50%,-50%) rotate(0deg);',
+      '  background:conic-gradient(',
+      '    rgba(0,216,255,0) 0deg,',
+      '    rgba(0,216,255,0) 338deg,',
+      '    rgba(0,216,255,0.07) 348deg,',
+      '    rgba(0,216,255,0.18) 355deg,',
+      '    rgba(0,216,255,0.04) 360deg',
+      '  );',
+      '  pointer-events:none;',
+      '  animation:mapRadarSweep 8s linear infinite;',
+      '  border-radius:50%;',
+      '  mix-blend-mode:screen;',
+      '}',
+      '@media(prefers-reduced-motion:reduce){#map-radar-sweep{animation:none;display:none}}',
+
+      // ---- Strike FX (existing arc + new cinematic tracer/shockwave) ------------
+      '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}',
+      '@keyframes wgFade{0%{opacity:0}14%{opacity:1}72%{opacity:1}100%{opacity:0}}',
+      '.wg-strike-fx{stroke-linecap:round;animation:wgTracer .55s linear,wgFade 1.25s ease forwards}',
+      '.wg-impact-fx span{display:block;width:12px;height:12px;border-radius:50%;border:2.5px solid #fff;',
+      '  box-sizing:border-box;animation:wgImpact .85s ease-out forwards}',
+      '@keyframes wgImpact{0%{transform:scale(.35);opacity:.95}100%{transform:scale(5);opacity:0}}',
+
+      // Traveling tracer pulse dot
+      '@keyframes wgPulseGlow{',
+      '  0%,100%{box-shadow:0 0 4px 2px var(--tracer-color,#6fe0ff),0 0 10px 4px var(--tracer-color,#6fe0ff)}',
+      '  50%{box-shadow:0 0 8px 4px var(--tracer-color,#6fe0ff),0 0 18px 8px var(--tracer-color,#6fe0ff)}',
+      '}',
+      '.wg-tracer-dot{',
+      '  width:8px;height:8px;border-radius:50%;',
+      '  background:var(--tracer-core,#fff);',
+      '  box-shadow:0 0 6px 3px var(--tracer-color,#6fe0ff),0 0 14px 6px var(--tracer-color,#6fe0ff);',
+      '  mix-blend-mode:screen;',
+      '  animation:wgPulseGlow .35s ease-in-out infinite;',
+      '  pointer-events:none;',
+      '}',
+      // Trail segments
+      '.wg-tracer-trail{',
+      '  width:5px;height:5px;border-radius:50%;',
+      '  background:var(--tracer-color,#6fe0ff);',
+      '  mix-blend-mode:screen;',
+      '  pointer-events:none;',
+      '}',
+      // Shockwave ring
+      '@keyframes wgShockwave{',
+      '  0%{transform:translate(-50%,-50%) scale(.15);opacity:1}',
+      '  60%{opacity:.7}',
+      '  100%{transform:translate(-50%,-50%) scale(1);opacity:0}',
+      '}',
+      '@keyframes wgShockwaveBig{',
+      '  0%{transform:translate(-50%,-50%) scale(.1);opacity:1}',
+      '  60%{opacity:.9}',
+      '  100%{transform:translate(-50%,-50%) scale(1);opacity:0}',
+      '}',
+      '.wg-shockwave{',
+      '  position:absolute;top:50%;left:50%;',
+      '  border-radius:50%;',
+      '  border:2px solid var(--shock-color,#6fe0ff);',
+      '  pointer-events:none;',
+      '  mix-blend-mode:screen;',
+      '  animation:wgShockwave .65s ease-out forwards;',
+      '}',
+      '.wg-shockwave.wg-shock-kill{',
+      '  border-color:var(--shock-kill-color,#fff);',
+      '  border-width:3px;',
+      '  animation:wgShockwaveBig .9s ease-out forwards;',
+      '}',
+      '.wg-shockwave.wg-shock-inner{',
+      '  animation-delay:.08s;',
+      '  opacity:.65;',
+      '}',
+      // Reduced-motion overrides: skip tracer travel, use static ring only
+      '@media(prefers-reduced-motion:reduce){',
+      '  .wg-tracer-dot,.wg-tracer-trail{display:none}',
+      '  .wg-shockwave{animation:wgImpact .85s ease-out forwards}',
+      '  .wg-shockwave.wg-shock-kill{animation-duration:.95s}',
+      '}',
+    ].join('');
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  // ---- Radar sweep element -------------------------------------------------------
+  // One rotating div placed in the radar pane (z-index below markers, above basemap).
+  // Created once; re-used across refreshMapMarkers calls.
+  let radarSweepEl = null;
+  function ensureRadarSweep() {
+    if (radarSweepEl || !leafletMap) return;
+    try {
+      const pane = leafletMap.getPane('radarPane');
+      if (!pane) return;
+      radarSweepEl = document.createElement('div');
+      radarSweepEl.id = 'map-radar-sweep';
+      pane.appendChild(radarSweepEl);
+    } catch (e) { /* silent */ }
+  }
+
   // ---- Strike FX: animated tracer arcs + impact flashes ---------------------------
+  // (CSS is now inside injectHudCss; this function is kept as a no-op shim so the
+  //  ensureMap() call site `injectFxCss()` continues to compile and run without error.)
   let fxCssInjected = false;
   function injectFxCss() {
-    if (fxCssInjected || typeof document === 'undefined') return;
-    fxCssInjected = true;
-    const st = document.createElement('style');
-    st.id = 'wg-fx-css';
-    st.textContent =
-      '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}' +
-      '@keyframes wgFade{0%{opacity:0}14%{opacity:1}72%{opacity:1}100%{opacity:0}}' +
-      '.wg-strike-fx{stroke-linecap:round;animation:wgTracer .55s linear,wgFade 1.25s ease forwards}' +
-      '.wg-impact-fx span{display:block;width:12px;height:12px;border-radius:50%;border:2.5px solid #fff;box-sizing:border-box;animation:wgImpact .85s ease-out forwards}' +
-      '@keyframes wgImpact{0%{transform:scale(.35);opacity:.95}100%{transform:scale(5);opacity:0}}';
-    (document.head || document.documentElement).appendChild(st);
+    // Unified CSS is injected by injectHudCss(); nothing to do here.
+    void fxCssInjected;
   }
 
   function nodeById(id) { return graph().nodes.find(n => n.id === id) || null; }
   function mapVisible() {
     try { return leafletMap && leafletMap.getContainer().offsetParent !== null; } catch (e) { return false; }
+  }
+
+  // C-020 (P1): Hidden-strike queue.
+  // When flashStrike / playStrikes are called while the map panel is not visible,
+  // events are queued rather than silently dropped. When the map becomes visible again
+  // (detected via replayHiddenStrikes(), which the main script calls on map-mode
+  // activation, or which fires automatically if an IntersectionObserver is available),
+  // a condensed replay is shown: at most MAX_QUEUED_STRIKES events staggered over ~2 s,
+  // oldest-first. The queue is capped so a long hidden session never floods the COP.
+  const MAX_QUEUED_STRIKES = 30;
+  const _hiddenStrikeQueue = [];
+
+  function _enqueueStrike(srcId, dstId, opts) {
+    if (_hiddenStrikeQueue.length >= MAX_QUEUED_STRIKES) {
+      _hiddenStrikeQueue.shift(); // drop oldest to make room (keep recency)
+    }
+    _hiddenStrikeQueue.push({ srcId, dstId, opts: Object.assign({}, opts) });
+  }
+
+  // Called by the main script when the map panel becomes visible (mode toggle).
+  // Also wired to an IntersectionObserver below when the DOM is available.
+  function replayHiddenStrikes() {
+    if (_hiddenStrikeQueue.length === 0) return;
+    if (!mapVisible()) return; // still hidden; keep the queue for next activation
+    const batch = _hiddenStrikeQueue.splice(0); // drain queue atomically
+    // Condensed replay: stagger over ~2 s (max 30 events → ~67 ms apart).
+    const interval = Math.max(60, Math.min(200, 2000 / batch.length));
+    batch.forEach((ev, i) => {
+      setTimeout(() => {
+        if (mapVisible()) flashStrike(ev.srcId, ev.dstId, ev.opts);
+      }, i * interval);
+    });
+  }
+
+  // Wire IntersectionObserver so replayHiddenStrikes fires automatically when the
+  // map container scrolls into view (works even without a main-script hook).
+  function _wireMapVisibilityObserver() {
+    if (typeof IntersectionObserver === 'undefined' || !leafletMap) return;
+    try {
+      const container = leafletMap.getContainer();
+      if (!container) return;
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => { if (entry.isIntersecting) replayHiddenStrikes(); });
+      }, { threshold: 0.1 });
+      obs.observe(container);
+    } catch (e) { /* non-fatal — main-script can call replayHiddenStrikes() directly */ }
   }
 
   // Quadratic-bezier arc (list of [lat,lon]) bowed off the straight line for a ballistic feel.
@@ -623,31 +1169,193 @@ window.MapModule = (function () {
   }
 
   // Animate a strike from one node to another. opts: { team:'red'|'blue', kill:bool }.
+  // C-020 (P1): If the map is not currently visible, queue the event for replay rather
+  // than silently discarding it.
   function flashStrike(srcId, dstId, opts) {
     opts = opts || {};
-    if (!leafletMap || !mapVisible()) return;
+    if (!leafletMap || !mapVisible()) {
+      _enqueueStrike(srcId, dstId, opts);
+      return;
+    }
     const s = nodeById(srcId), d = nodeById(dstId);
     if (!d || d.lat == null || d.lon == null) return;
     const team = opts.team === 'blue' ? 'blue' : 'red';
     const color = team === 'blue' ? '#6fe0ff' : '#ff8a4a';
+    const isKill = !!opts.kill;
+
+    // Detect reduced-motion preference once per call.
+    const reducedMotion = (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+
+    // Cleanup registry: everything added during this strike, removed on completion.
+    const tempLayers = [];
+    const tempTimers = [];
+    let tracerRaf = null;
+
+    function safeDrop(layer) {
+      try { if (leafletMap) leafletMap.removeLayer(layer); } catch (e) {}
+    }
+    function cleanup() {
+      tempTimers.forEach(t => clearTimeout(t));
+      tempTimers.length = 0;
+      if (tracerRaf !== null) { cancelAnimationFrame(tracerRaf); tracerRaf = null; }
+      tempLayers.forEach(l => safeDrop(l));
+      tempLayers.length = 0;
+    }
+
+    // ---- 1. Arc polyline (existing behavior, preserved) -------------------------
+    let pts = null;
     if (s && s.lat != null && s.lon != null) {
       const from = [s.lat, pacLon(s.lon)], to = [d.lat, pacLon(d.lon)];
-      const line = L.polyline(arcPoints(from, to, 0.18, 30), {
-        pane: 'fxPane', interactive: false, color, weight: opts.kill ? 3.2 : 2.2,
+      pts = arcPoints(from, to, 0.18, 30);
+      const line = L.polyline(pts, {
+        pane: 'fxPane', interactive: false, color, weight: isKill ? 3.2 : 2.2,
         opacity: 0.95, dashArray: '4 9', className: 'wg-strike-fx'
       }).addTo(leafletMap);
-      setTimeout(() => { try { leafletMap.removeLayer(line); } catch (e) {} }, 1300);
+      tempLayers.push(line);
     }
-    // Impact flash at the target (always), brighter on a kill.
-    const icon = L.divIcon({ className: 'wg-impact-fx', html: '<span style="border-color:' + (opts.kill ? '#fff' : color) + '"></span>', iconSize: [12, 12], iconAnchor: [6, 6] });
-    const m = L.marker([d.lat, pacLon(d.lon)], { icon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
-    setTimeout(() => { try { leafletMap.removeLayer(m); } catch (e) {} }, 900);
+
+    // ---- Helper: spawn impact shockwave at target --------------------------------
+    function spawnShockwave() {
+      const dLat = d.lat, dLon = pacLon(d.lon);
+      const shockColor = isKill ? '#fff' : color;
+      const outerSize = isKill ? 72 : 48;
+      const innerSize = isKill ? 46 : 30;
+
+      // Outer ring
+      const outerHtml = '<div class="wg-shockwave' + (isKill ? ' wg-shock-kill' : '') + '" ' +
+        'style="width:' + outerSize + 'px;height:' + outerSize + 'px;' +
+        '--shock-color:' + shockColor + ';--shock-kill-color:#fff;"></div>';
+      const outerIcon = L.divIcon({
+        className: '', html: outerHtml,
+        iconSize: [outerSize, outerSize], iconAnchor: [outerSize / 2, outerSize / 2]
+      });
+      const outerM = L.marker([dLat, dLon], { icon: outerIcon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+      tempLayers.push(outerM);
+
+      // Inner ring (slight delay, same center)
+      const innerHtml = '<div class="wg-shockwave wg-shock-inner' + (isKill ? ' wg-shock-kill' : '') + '" ' +
+        'style="width:' + innerSize + 'px;height:' + innerSize + 'px;' +
+        '--shock-color:' + shockColor + ';--shock-kill-color:#fff;"></div>';
+      const innerIcon = L.divIcon({
+        className: '', html: innerHtml,
+        iconSize: [innerSize, innerSize], iconAnchor: [innerSize / 2, innerSize / 2]
+      });
+      const innerM = L.marker([dLat, dLon], { icon: innerIcon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+      tempLayers.push(innerM);
+
+      // Keep the existing impact flash too (white hot on kill)
+      const impactIcon = L.divIcon({
+        className: 'wg-impact-fx',
+        html: '<span style="border-color:' + (isKill ? '#fff' : color) + '"></span>',
+        iconSize: [12, 12], iconAnchor: [6, 6]
+      });
+      const impactM = L.marker([dLat, dLon], { icon: impactIcon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+      tempLayers.push(impactM);
+
+      // Remove everything after the longest animation completes
+      const totalDur = isKill ? 1300 : 950;
+      const t = setTimeout(cleanup, totalDur);
+      tempTimers.push(t);
+    }
+
+    // ---- 2. Reduced-motion path: skip tracer, just flash + static ring ----------
+    if (reducedMotion || !pts) {
+      spawnShockwave();
+      return;
+    }
+
+    // ---- 3. Cinematic tracer pulse: dot travels the arc over ~600ms -------------
+    const TRAVEL_MS = 600;
+    const TRAIL_LEN = 4;    // number of trailing ghost dots
+    const trailMarkers = []; // ring buffer of the last N positions
+
+    const dotCoreColor = isKill ? '#fff' : '#fff';
+    const dotHtml = '<div class="wg-tracer-dot" style="--tracer-color:' + color + ';--tracer-core:' + dotCoreColor + '"></div>';
+    const dotIcon = L.divIcon({ className: '', html: dotHtml, iconSize: [8, 8], iconAnchor: [4, 4] });
+    const dotM = L.marker(pts[0], { icon: dotIcon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+    tempLayers.push(dotM);
+
+    // Pre-create trail markers (reused each frame)
+    for (let ti = 0; ti < TRAIL_LEN; ti++) {
+      const opacity = 1 - (ti + 1) / (TRAIL_LEN + 1);
+      const sz = Math.max(2, 5 - ti);
+      const trailHtml = '<div class="wg-tracer-trail" style="width:' + sz + 'px;height:' + sz + 'px;' +
+        '--tracer-color:' + color + ';opacity:' + opacity.toFixed(2) + '"></div>';
+      const trailIcon = L.divIcon({ className: '', html: trailHtml, iconSize: [sz, sz], iconAnchor: [sz / 2, sz / 2] });
+      const trailM = L.marker(pts[0], { icon: trailIcon, pane: 'fxPane', interactive: false, keyboard: false }).addTo(leafletMap);
+      tempLayers.push(trailM);
+      trailMarkers.push(trailM);
+    }
+
+    // Position history for trail (stores the lat/lon at each frame for trailing dots)
+    const posHistory = [];
+    const startTime = performance.now();
+
+    function animateTracer(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / TRAVEL_MS);
+
+      // Interpolate along the arc points array
+      const maxIdx = pts.length - 1;
+      const rawIdx = progress * maxIdx;
+      const lo = Math.floor(rawIdx), hi = Math.min(maxIdx, lo + 1);
+      const frac = rawIdx - lo;
+      const lat = pts[lo][0] + (pts[hi][0] - pts[lo][0]) * frac;
+      const lon = pts[lo][1] + (pts[hi][1] - pts[lo][1]) * frac;
+
+      // Move the leading dot
+      try { dotM.setLatLng([lat, lon]); } catch (e) {}
+
+      // Update trail: push current pos, keep last TRAIL_LEN
+      posHistory.push([lat, lon]);
+      const histLen = posHistory.length;
+      for (let ti = 0; ti < TRAIL_LEN; ti++) {
+        const histIdx = histLen - 2 - ti * 2; // step back 2 frames per trail segment
+        if (histIdx >= 0) {
+          try { trailMarkers[ti].setLatLng(posHistory[histIdx]); } catch (e) {}
+        }
+      }
+
+      if (progress < 1) {
+        tracerRaf = requestAnimationFrame(animateTracer);
+      } else {
+        // Tracer arrived — cancel RAF, remove the traveling elements, spawn shockwave
+        tracerRaf = null;
+        try { safeDrop(dotM); } catch (e) {}
+        trailMarkers.forEach(tm => { try { safeDrop(tm); } catch (e) {} });
+        // Remove them from tempLayers so cleanup() doesn't double-remove
+        const toRemove = new Set([dotM, ...trailMarkers]);
+        for (let i = tempLayers.length - 1; i >= 0; i--) {
+          if (toRemove.has(tempLayers[i])) tempLayers.splice(i, 1);
+        }
+        spawnShockwave();
+      }
+    }
+
+    tracerRaf = requestAnimationFrame(animateTracer);
+
+    // Safety net: if anything goes wrong, force cleanup after max expected duration
+    const safetyTimer = setTimeout(() => { cleanup(); }, TRAVEL_MS + 2000);
+    tempTimers.push(safetyTimer);
   }
 
   // Play a turn's resolution events as a staggered volley.
+  // C-020 (P1): If the map is hidden, enqueue each strike rather than dropping the whole
+  // batch. They will be replayed (condensed) when the map becomes visible again.
   function playStrikes(events) {
-    if (!Array.isArray(events) || !mapVisible()) return;
+    if (!Array.isArray(events)) return;
     const shots = events.filter(e => e && (e.kind === 'hit' || e.kind === 'kill') && e.targetId);
+    if (!mapVisible()) {
+      // Queue all shots for later replay (each respects the MAX_QUEUED_STRIKES cap).
+      shots.forEach(e => _enqueueStrike(e.sourceId, e.targetId, {
+        team: e.side === 'blue' ? 'blue' : 'red', kill: e.kind === 'kill'
+      }));
+      return;
+    }
     shots.forEach((e, i) => {
       setTimeout(() => flashStrike(e.sourceId, e.targetId, {
         team: e.side === 'blue' ? 'blue' : 'red', kill: e.kind === 'kill'
@@ -670,6 +1378,7 @@ window.MapModule = (function () {
     invalidateSize,
     flashStrike,
     playStrikes,
+    replayHiddenStrikes,  // C-020: call from main script on map-mode activation
     getMap,
     getMarkers
   };
