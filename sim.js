@@ -305,7 +305,11 @@ window.SimModule = (function () {
       if (!adj.has(t)) adj.set(t, new Set());
       adj.get(s).add(t); adj.get(t).add(s);
     });
-    return { nodeInfo, adj };
+    // B0: contexts built on the window path carry the MOE handle for successMode
+    // 'denial'. The shared core only ever reads context.moe (never a global), so this
+    // wrapper-layer default is what wires moe.js into inline trials. undefined (moe.js
+    // not loaded) makes the core throw a clear 'denial unavailable' error when used.
+    return { nodeInfo, adj, moe: (typeof window !== 'undefined' && window.MoeModule) || undefined };
   }
 
   // ===========================================================================
@@ -402,6 +406,8 @@ function simulateTrialCore(actionPlan, opts) {
   const prioritySet = o.prioritySet || null;
   const maxBlueLoss = o.maxBlueLoss != null ? o.maxBlueLoss : Infinity;
   const regenFrac = o.regenFrac != null ? o.regenFrac : 0;
+  const denialBalance = o.denialBalance != null ? o.denialBalance : 0.35;
+  const denialParams = o.denialParams != null ? o.denialParams : null;
   const detectionGrowthTarget = o.detectionGrowthTarget != null ? o.detectionGrowthTarget : 0.08;
   const detectionGrowthDomain = o.detectionGrowthDomain != null ? o.detectionGrowthDomain : 0.04;
   const detectionPenalty = o.detectionPenalty != null ? o.detectionPenalty : 0.18;
@@ -414,6 +420,12 @@ function simulateTrialCore(actionPlan, opts) {
   const redProfiles = o.redProfiles || {};
 
   const { nodeInfo, adj } = context;
+  // B0: injected MOE handle for successMode 'denial'. The core NEVER reads
+  // window.MoeModule / self.MoeModule itself — each consumer's wrapper layer places
+  // the handle on context.moe (sim.js defaults it from window, sim-worker.js from
+  // the importScripts('moe.js') result, parity fixtures inject a pure-JS stub).
+  // undefined here means denial mode is unavailable and is a hard error when used.
+  const moe = context.moe;
   const blueBudgetBase = teamResources?.blue ?? 0;
   const redBudgetBase = teamResources?.red ?? 0;
   const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke: 0, ew: 0, jam: 0, sof: 0 }));
@@ -431,6 +443,7 @@ function simulateTrialCore(actionPlan, opts) {
 
   let impact = 0;
   let stepsToGoal = null;
+  let lastDenial = null;
   let blueBudget = blueBudgetBase;
   let redBudget = redBudgetBase;
   let blueSpent = 0;
@@ -496,6 +509,18 @@ function simulateTrialCore(actionPlan, opts) {
       let count = 0;
       redNeutralized.forEach(id => { if (pri.has(id)) count++; });
       return count >= successN && blueNeutralized.size <= maxBlueLoss;
+    }
+    if (successMode === 'denial') {
+      // MOE: denial achieved when Red's operation is halted / culminates / capitulates.
+      // Scored through the injected handle so the core stays environment-free. Same call
+      // semantics as the retired inline mirror: denialOutcome(state, nodeInfo, opts) with
+      // the intent balance plus any explicit denial params. A missing handle throws (not
+      // a silent false) — an unscored trial must never masquerade as a scored failure.
+      if (!moe || typeof moe.denialOutcome !== 'function') {
+        throw new Error("successMode 'denial' unavailable: context.moe is undefined — inject the MOE handle (MoeModule) as context.moe before running denial trials");
+      }
+      lastDenial = moe.denialOutcome(state, nodeInfo, Object.assign({ balance: denialBalance }, denialParams || {}));
+      return lastDenial.success;
     }
     return false;
   }
@@ -604,7 +629,12 @@ function simulateTrialCore(actionPlan, opts) {
   }
 
   return {
+    // Property order is load-bearing for `denial`: success re-runs successSatisfied()
+    // on the final state, which (in denial mode) refreshes lastDenial before it is
+    // read on the next line — so `denial` is always the FINAL-state MOE outcome,
+    // exactly like the inline mirror this replaces. null in every non-denial mode.
     success: successSatisfied(),
+    denial: lastDenial,
     stepsToGoal: stepsToGoal ?? actionPlan.length,
     impact,
     redNeutralized,
@@ -708,6 +738,121 @@ function parityHash(seed, n) {
   return h >>> 0;
 }
 
+// B0: denial-mode Monte Carlo summary (environment-free, so it lives in the shared
+// core — ONE implementation feeds both the worker's {type:'done'} payload and the
+// shell's inline chunked fallback via SimModule). Mirrors the inline runMonteCarlo
+// denial accumulators exactly: per-trial arrays of denialIndex / throughput / osviRed
+// plus halt & capitulation counts. "Chance of success" for denial mode is
+// P(denialIndex >= 0.5), matching the shell's documented MC-note semantics.
+// agg: { denialDiArr, denialTputArr, denialOsviArr, denialHalt, denialCap }.
+function summarizeDenialStats(agg) {
+  const a = agg || {};
+  const diArr = a.denialDiArr || [];
+  const tputArr = a.denialTputArr || [];
+  const osviArr = a.denialOsviArr || [];
+  const n = diArr.length;
+  const avg = arr => {
+    if (!arr || arr.length === 0) return 0;
+    let s = 0;
+    for (let i = 0; i < arr.length; i++) s += arr[i];
+    return s / arr.length;
+  };
+  let denialSuccess = 0;
+  for (let i = 0; i < n; i++) { if (diArr[i] >= 0.5) denialSuccess++; }
+  const halt = Math.max(0, Math.floor(Number(a.denialHalt) || 0));
+  const cap = Math.max(0, Math.floor(Number(a.denialCap) || 0));
+  const meanThroughput = avg(tputArr);
+  const meanOsvi = avg(osviArr);
+  return {
+    trials: n,
+    meanDenialIndex: avg(diArr),
+    meanThroughput,                          // mean residual Red throughput (0..1 of capacity)
+    meanOsvi,                                // mean residual Red operational viability (0..1)
+    throughputReduction: 1 - meanThroughput, // how far Red lift was driven down
+    osviReduction: 1 - meanOsvi,
+    haltRate: n > 0 ? halt / n : 0,
+    capitulationRate: n > 0 ? cap / n : 0,
+    successRate: n > 0 ? denialSuccess / n : 0 // P(denialIndex >= 0.5)
+  };
+}
+
+// B0: denial-mode parity fixture. Reuses the parityFixture battlespace/plan but flips
+// successMode to 'denial' with a minimal DETERMINISTIC pure-JS MOE stub injected as
+// context.moe — deliberately NOT moe.js, so denial parity needs no external file in
+// any environment (worker, window, Node harness). The stub is not the real model;
+// it exists only to exercise the denial plumbing (injected handle, per-step scoring,
+// result fields) with reproducible numbers.
+function denialParityFixture() {
+  const { opts, plan } = parityFixture();
+  const stubMoe = {
+    denialOutcome(stateMap, nodeInfo, o) {
+      const bal = o && o.balance != null ? o.balance : 0.35;
+      let base = 0;
+      let cur = 0;
+      nodeInfo.forEach((info, id) => {
+        if (!info || info.team !== 'red') return;
+        const cap = info.healthMax || info.health || 100;
+        const st = stateMap && stateMap.get ? stateMap.get(id) : null;
+        let hf = st ? (st.alive ? Math.min(1, Math.max(0, st.health / cap)) : 0)
+                    : (info.status === 'Neutralized' ? 0 : 1);
+        const w = info.importance == null ? 5 : info.importance;
+        base += w;
+        cur += w * hf;
+      });
+      const osvi = base > 0 ? cur / base : 1;
+      const throughput = osvi * osvi; // exact float ops only (no Math.pow) for parity
+      const capabilityDenial = Math.min(1, Math.max(0, (1 - throughput) / 0.7));
+      const costDenial = Math.min(1, Math.max(0, (1 - osvi) / 0.55));
+      const denialIndex = Math.min(1, Math.max(0, (1 - bal) * capabilityDenial + bal * costDenial));
+      const halt = throughput < 0.30;
+      return {
+        denialIndex,
+        success: denialIndex >= 0.5,
+        halt,
+        capitulation: halt && osvi < 0.30,
+        throughput,
+        osviRed: osvi
+      };
+    }
+  };
+  const denialOpts = Object.assign({}, opts, {
+    context: { nodeInfo: opts.context.nodeInfo, adj: opts.context.adj, moe: stubMoe },
+    successMode: 'denial',
+    denialBalance: 0.35,
+    denialParams: null
+  });
+  return { opts: denialOpts, plan };
+}
+
+// B0: parityHash's denial-mode sibling. Pure function of (seed, n); folds the standard
+// trial fields PLUS the denial outcome fields, so a drift in either the trial math or
+// the denial plumbing changes the hash. Must return identical values from sim.js,
+// sim-worker.js, and any future consumer — the shell will assert this at boot later.
+function denialParityHash(seed, n) {
+  const base = Number.isFinite(Number(seed)) ? (Number(seed) >>> 0) : 0;
+  const count = Math.max(1, Math.floor(Number(n) || 1));
+  const { opts, plan } = denialParityFixture();
+  let h = 2166136261 >>> 0;
+  for (let t = 1; t <= count; t++) {
+    const trialOpts = Object.assign({}, opts, { rng: createRng(mcMixSeed(base, t)) });
+    const r = simulateTrialCore(plan, trialOpts);
+    const d = r.denial || {};
+    h = parityFold(h, r.success ? 1 : 0);
+    h = parityFold(h, r.stepsToGoal);
+    h = parityFold(h, r.impact);
+    h = parityFold(h, r.redNeutralized.size);
+    h = parityFold(h, r.blueNeutralized.size);
+    h = parityFold(h, r.blueSpend);
+    h = parityFold(h, r.redSpend);
+    h = parityFold(h, d.denialIndex);
+    h = parityFold(h, d.throughput);
+    h = parityFold(h, d.osviRed);
+    h = parityFold(h, d.halt ? 1 : 0);
+    h = parityFold(h, d.capitulation ? 1 : 0);
+  }
+  return h >>> 0;
+}
+
 // === END SHARED CORE (keep byte-identical with sim-worker.js) ===
 
   // Public wrapper preserving the historical window/SimModule API: callers may omit
@@ -717,9 +862,19 @@ function parityHash(seed, n) {
   // name, so window-level behavior is unchanged.
   function simulateTrialCoreWithDefaults(actionPlan, opts) {
     const o = opts || {};
-    if (o.context && o.rng) return simulateTrialCore(actionPlan, o);
+    let context = o.context || buildSimContext();
+    // B0: default the injected MOE handle on caller-supplied contexts too (shallow
+    // copy — never mutate the caller's context, which is typically reused across
+    // trials). buildSimContext() already carries moe, so this only fires for hand
+    // -built contexts that omitted it.
+    if (context.moe === undefined) {
+      context = Object.assign({}, context, {
+        moe: (typeof window !== 'undefined' && window.MoeModule) || undefined
+      });
+    }
+    if (context === o.context && o.rng) return simulateTrialCore(actionPlan, o);
     return simulateTrialCore(actionPlan, Object.assign({}, o, {
-      context: o.context || buildSimContext(),
+      context,
       rng: o.rng || createRng()
     }));
   }
@@ -742,6 +897,8 @@ function parityHash(seed, n) {
   window.plannerSeed = plannerSeed;
   window.simulateTrialCore = simulateTrialCoreWithDefaults;
   window.parityHash = parityHash;
+  window.summarizeDenialStats = summarizeDenialStats;
+  window.denialParityHash = denialParityHash;
 
   return {
     blueProfiles, redProfiles, randIn, createRng, mcMixSeed, percentile, buildSimContext,
@@ -750,6 +907,10 @@ function parityHash(seed, n) {
     // C-041
     plannerSeed,
     // C-009
-    simulateTrialCore: simulateTrialCoreWithDefaults, parityHash
+    simulateTrialCore: simulateTrialCoreWithDefaults, parityHash,
+    // B0 (Increment B): denial-mode support — MC summary shared with the worker's
+    // aggregation, and the denial-plumbing parity probe (stub-MOE fixture, no moe.js
+    // dependency).
+    summarizeDenialStats, denialParityHash
   };
 })();

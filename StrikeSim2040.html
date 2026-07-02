@@ -43,7 +43,7 @@
        Owns sizing the active surface and surviving GPU context drops. -->
   <script src="stage.js?v=p5"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p6"></script>
+  <script src="sim.js?v=p7"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
        the COA generator and the Monte Carlo 'denial' success mode. See docs/METHODOLOGY.md. -->
   <script src="moe.js?v=p2"></script>
@@ -4309,301 +4309,20 @@
     // blueProfiles/redProfiles, randIn/createRng/percentile and buildSimContext now
     // live in SimModule (sim.js); aliased to their original global names at load.
 
-    function methodKeyFromStep(step) {
-      if (step.methodKey) return step.methodKey;
-      if (step.blueKey) return step.blueKey;
-      if (step.blue === 'Kinetic Strike') return 'kinetic';
-      if (step.blue === 'Cyber Attack') return 'cyber';
-      if (step.blue === 'EW Jamming') return 'ew';
-      if (step.blue === 'SOF Mission') return 'sof';
-      return 'kinetic';
-    }
-
-    function domainAffinity(srcInfo, dstInfo, methodKey) {
-      if (!srcInfo || !dstInfo) return 1.0;
-      const sd = new Set(srcInfo.domain || []);
-      const dd = new Set(dstInfo.domain || []);
-      const shared = Array.from(sd).some(d => dd.has(d));
-      let mult = shared ? 1.3 : 1.0;
-      const srcType = String(srcInfo.type || '').toLowerCase();
-      const dstType = String(dstInfo.type || '').toLowerCase();
-      if (srcType.includes('command') || dstType.includes('command') || srcType.includes('relay') || dstType.includes('relay')) {
-        mult *= 1.15;
-      }
-      if ((methodKey === 'cyber' || methodKey === 'ew') && (dd.has('Cyber') || dd.has('EW') || dstType.includes('relay'))) {
-        mult *= 1.15;
-      }
-      return Math.min(1.8, Math.max(0.8, mult));
-    }
-
-    function computeVulnMultiplier(info, method, intelQ) {
-      const hasV = (info.vulnerabilities || []).includes(method.vulnerability);
-      if (hasV) return Math.min(1.35, Math.max(1.0, 1.2 + (intelQ - 1) * 0.5));
-      return Math.min(1.0, Math.max(0.6, 0.85 - (intelQ - 1) * 0.35));
-    }
-
-    function chooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel = 0) {
-      const optionsByMethod = {
-        kinetic: ['Counter-Strike', 'Reinforcement', 'Sabotage'],
-        cyber: ['Cyber Defense', 'Deception', 'Reinforcement'],
-        ew: ['EW Countermeasure', 'Deception', 'Reinforcement'],
-        sof: ['SOF Interception', 'Reinforcement']
-      };
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const opts = optionsByMethod[methodKey] || optionsByMethod.kinetic;
-      let best = null;
-      opts.forEach(name => {
-        const cost = redCounterCosts[name] || 0;
-        const cat = redCounterType[name] || 'ke';
-        const canAfford = (redTypeBudget?.[cat] !== undefined ? redTypeBudget[cat] >= cost : redBudget >= cost);
-        if (!canAfford) return;
-        const prof = redProfiles[name] || {};
-        const pMult = prof.pMult ?? prof.globalPmult ?? 0.95;
-        const strength = (1 - pMult) + detectionLevel * 0.2;
-        if (!best || strength > best.strength) best = { name, cost, cat, strength };
-      });
-      return best;
-    }
-
+    // B0 (Increment B): the inline per-trial mirror (simulateTrial + its private
+    // helpers methodKeyFromStep/domainAffinity/computeVulnMultiplier/chooseRedCounter)
+    // is retired. ALL trial execution — including successMode 'denial' — routes through
+    // the canonical shared core in sim.js (SimModule.simulateTrialCore, aliased to
+    // window.simulateTrialCore). This thin shim only injects the shell's live config
+    // globals; context/rng fallbacks and the injected MOE handle (context.moe, wired
+    // from window.MoeModule) are handled by the sim.js wrapper layer.
     function simulateTrial(actionPlan, opts = {}) {
-      const {
-        context = buildSimContext(),
-        rng = createRng(),
-        successMode = 'impact',
-        successN = 3,
-        victoryThreshold = 100,
-        prioritySet = null,
-        maxBlueLoss = Infinity,
-        regenFrac = 0,
-        denialBalance = 0.35,
-        denialParams = null,
-        detectionGrowthTarget = 0.08,
-        detectionGrowthDomain = 0.04,
-        detectionPenalty = 0.18,
-        intelNoise = 0.15,
-        fatigueRate = 0.03,
-        dynamicRed = true,
-        logSteps = false
-      } = opts;
-
-      const { nodeInfo, adj } = context;
-      const blueBudgetBase = teamResources?.blue ?? 0;
-      const redBudgetBase = teamResources?.red ?? 0;
-      const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 }));
-      const redTypeBase  = JSON.parse(JSON.stringify(teamResources?.redTypes  || { ke:0, ew:0, jam:0, sof:0 }));
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const blueMethodType = { kinetic:'ke', cyber:'ew', ew:'jam', sof:'sof' };
-
-      const state = new Map();
-      nodeInfo.forEach((info, id) => state.set(id, { alive: info.status !== 'Neutralized', health: info.health }));
-      const detectionTarget = new Map();
-      const detectionDomain = new Map();
-      const fatigue = { kinetic: 0, cyber: 0, ew: 0, sof: 0 };
-      const intelQ = 1 + (rng.next() * 2 - 1) * intelNoise;
-
-      let impact = 0;
-      let stepsToGoal = null;
-      let lastDenial = null;
-      let blueBudget = blueBudgetBase;
-      let redBudget = redBudgetBase;
-      let blueSpent = 0;
-      let redSpent = 0;
-      let blueTypeBudget = JSON.parse(JSON.stringify(blueTypeBase));
-      let redTypeBudget  = JSON.parse(JSON.stringify(redTypeBase));
-      const redNeutralized = new Set();
-      const blueNeutralized = new Set();
-      const damageThisRun = new Map();
-      const log = [];
-
-      function recordDamage(id, delta, info) {
-        if (!info || info.team !== 'red' || !delta || delta <= 0) return;
-        const prev = damageThisRun.get(id) || 0;
-        damageThisRun.set(id, prev + delta);
-      }
-
-      function pickRedTargetFromState() {
-        let bestId = null, bestScore = -Infinity;
-        nodeInfo.forEach((info, id) => {
-          const st = state.get(id);
-          if (!st || !st.alive) return;
-          if (info.team !== 'red') return;
-          const diffW = { Soft: 1.1, Medium: 1.0, Hardened: 0.8, Buried: 0.6 };
-          const base = (info.importance || 5) * 2 + (info.cascScore || 1) * 4;
-          const sc = base * (diffW[info.difficulty] || 1.0);
-          if (sc > bestScore) { bestScore = sc; bestId = id; }
-        });
-        return bestId;
-      }
-
-      function applyCascade(srcId, srcInfo, methodKey) {
-        const base = 5 * (srcInfo.cascScore || 1) * settings.cascadeAlpha;
-        const neigh = adj.get(srcId) || new Set();
-        neigh.forEach(nid => {
-          const ninfo = nodeInfo.get(nid);
-          const stn = state.get(nid);
-          if (!ninfo || !stn?.alive) return;
-          const mult = domainAffinity(srcInfo, ninfo, methodKey);
-          const cd = base * mult;
-          stn.health = Math.max(0, stn.health - cd);
-          recordDamage(nid, cd, ninfo);
-          if (stn.health <= 0 && stn.alive) {
-            stn.alive = false;
-            if (ninfo.team === 'red') redNeutralized.add(nid);
-            else if (ninfo.team === 'blue') blueNeutralized.add(nid);
-          }
-        });
-      }
-
-      function successSatisfied() {
-        if (successMode === 'impact') return impact >= victoryThreshold;
-        if (successMode === 'nodes_any') return redNeutralized.size >= successN;
-        if (successMode === 'nodes') {
-          const pri = prioritySet || new Set();
-          let count = 0;
-          redNeutralized.forEach(id => { if (pri.has(id)) count++; });
-          return count >= successN;
-        }
-        if (successMode === 'goal') {
-          const pri = prioritySet || new Set();
-          let count = 0;
-          redNeutralized.forEach(id => { if (pri.has(id)) count++; });
-          return count >= successN && blueNeutralized.size <= maxBlueLoss;
-        }
-        if (successMode === 'denial') {
-          // MOE: denial achieved when Red's operation is halted / culminates / capitulates.
-          if (!window.MoeModule) return false;
-          lastDenial = window.MoeModule.denialOutcome(state, nodeInfo, Object.assign({ balance: denialBalance }, denialParams || {}));
-          return lastDenial.success;
-        }
-        return false;
-      }
-
-      for (let i = 0; i < actionPlan.length; i++) {
-        const step = actionPlan[i];
-        const methodKey = methodKeyFromStep(step);
-        const method = strikeMethods[methodKey] || strikeMethods.kinetic;
-        const targetId = step.targetId || pickRedTargetFromState();
-        if (!targetId) break;
-        let info = nodeInfo.get(targetId);
-        let st = state.get(targetId);
-        if (!info || !st?.alive) {
-          const alt = pickRedTargetFromState();
-          if (!alt) break;
-          info = nodeInfo.get(alt);
-          st = state.get(alt);
-        }
-
-        const diff = settings.difficultyModifiers[info.difficulty] || 1.0;
-        const vuln = computeVulnMultiplier(info, method, intelQ);
-        let p = method.baseProb * diff * vuln;
-
-        const targetDet = detectionTarget.get(info.id) || 0;
-        const domainKey = (info.domain || [])[0] || methodKey;
-        const domainDet = detectionDomain.get(domainKey) || 0;
-        const detPenalty = 1 - Math.min(0.6, (targetDet + domainDet) * detectionPenalty);
-        p *= detPenalty;
-
-        const fatiguePenalty = Math.max(0.7, 1 - fatigueRate * (fatigue[methodKey] || 0));
-        p *= fatiguePenalty;
-
-        let redChoice = null;
-        if (dynamicRed) {
-          redChoice = chooseRedCounter(methodKey, redBudget, redTypeBudget, targetDet + domainDet);
-        } else if (step.red) {
-          redChoice = { name: step.red, cost: redCounterCosts[step.red] || 0, cat: redCounterType[step.red] || 'ke' };
-        }
-        const redProfile = redChoice ? redProfiles[redChoice.name] || null : null;
-        const redActive = redChoice && (redTypeBudget?.[redChoice.cat] !== undefined ? (redTypeBudget[redChoice.cat] >= redChoice.cost) : (redBudget >= redChoice.cost));
-        if (redActive && redProfile) {
-          if (redProfile.globalPmult) p *= redProfile.globalPmult;
-          if (redProfile.pMult) p *= redProfile.pMult;
-        }
-
-        p = Math.min(Math.max(p, 0.05), 0.98);
-        const blueCost = method.cost || 0;
-        const blueCat = blueMethodType[methodKey] || 'ke';
-        const canAct = (blueTypeBudget[blueCat] !== undefined ? blueTypeBudget[blueCat] >= blueCost : blueBudget >= blueCost);
-
-        let line = logSteps ? `S${i+1}: ${method.name} -> ${info.name} (${info.id})` : '';
-        if (!canAct) {
-          if (logSteps) log.push(`${line} [Skipped: insufficient Blue resources]`);
-          continue;
-        }
-        if (blueTypeBudget[blueCat] !== undefined) blueTypeBudget[blueCat] -= blueCost;
-        else blueBudget -= blueCost;
-        blueSpent += blueCost;
-
-        if (redActive) {
-          if (redTypeBudget?.[redChoice.cat] !== undefined) redTypeBudget[redChoice.cat] -= redChoice.cost;
-          else redBudget -= redChoice.cost;
-          redSpent += redChoice.cost;
-        }
-
-        const success = rng.next() < p;
-        if (success) {
-          const dmg = method.baseDamage[0] + rng.next() * (method.baseDamage[1] - method.baseDamage[0]);
-          st.health = Math.max(0, st.health - dmg);
-          recordDamage(info.id, dmg, info);
-          if (st.health <= 0 && st.alive) {
-            st.alive = false;
-            if (info.team === 'red') redNeutralized.add(info.id);
-            else if (info.team === 'blue') blueNeutralized.add(info.id);
-          }
-          impact += (info.importance || 5) * (info.cascScore || 1);
-          applyCascade(info.id, info, methodKey);
-          if (logSteps) line += ` — Hit (${Math.round(dmg)} dmg)`;
-        } else if (logSteps) {
-          line += ' — Missed';
-        }
-
-        detectionTarget.set(info.id, Math.min(1.0, (detectionTarget.get(info.id) || 0) + detectionGrowthTarget));
-        detectionDomain.set(domainKey, Math.min(1.0, (detectionDomain.get(domainKey) || 0) + detectionGrowthDomain));
-        fatigue[methodKey] = (fatigue[methodKey] || 0) + 1;
-
-        if (redActive && (redChoice.name === 'Counter-Strike' || redChoice.name === 'SOF Interception')) {
-          let cand = null, best = -1;
-          nodeInfo.forEach((bi, bid) => {
-            const st2 = state.get(bid);
-            if (bi.team === 'blue' && st2?.alive) {
-              const s = (bi.importance || 5) + (bi.cascScore || 1) * 2;
-              if (s > best) { best = s; cand = bid; }
-            }
-          });
-          if (cand) {
-            const st2 = state.get(cand);
-            const bi = nodeInfo.get(cand);
-            const rd = 15 + rng.next() * 35;
-            st2.health = Math.max(0, st2.health - rd);
-            if (st2.health <= 0 && st2.alive) { st2.alive = false; blueNeutralized.add(cand); }
-            if (logSteps) line += `; Red counter damaged ${bi.name} (${Math.round(rd)} dmg)`;
-          }
-        }
-
-        if (logSteps) log.push(line);
-
-        if (regenFrac > 0) {
-          blueBudget += blueBudgetBase * regenFrac;
-          redBudget += redBudgetBase * regenFrac;
-        }
-
-        if (blueNeutralized.size > maxBlueLoss) break;
-        if (successSatisfied() && stepsToGoal === null) stepsToGoal = i + 1;
-      }
-
-      return {
-        success: successSatisfied(),
-        denial: lastDenial,
-        stepsToGoal: stepsToGoal ?? actionPlan.length,
-        impact,
-        redNeutralized,
-        blueNeutralized,
-        blueSpend: blueSpent,
-        redSpend: redSpent,
-        damageThisRun,
-        log
-      };
+      return simulateTrialCore(actionPlan, Object.assign({
+        teamResources,
+        settings,
+        strikeMethods,
+        redProfiles
+      }, opts));
     }
 
     function redResponseForMethod(methodKey, stepIdx) {
@@ -4625,453 +4344,6 @@
         const redAct = redResponseForMethod(s.methodKey, i);
         return { step: i+1, blue: methodName, blueKey: s.methodKey, targetId: s.targetId, red: redAct };
       });
-    }
-
-    async function runMonteCarloLegacy(trials = 10000) {
-      const btn = document.getElementById('run-mc-btn');
-      const bar = document.getElementById('mc-progress');
-      const outSuccess = document.getElementById('mc-success');
-      const outDmg = document.getElementById('mc-exp-dmg');
-      const outTime = document.getElementById('mc-time');
-      const singleBtn = document.getElementById('run-single-btn');
-      const btnLabel = btn ? btn.textContent : '';
-      const singleLabel = singleBtn ? singleBtn.textContent : '';
-
-      // choose source plan: builtCOA (preferred) or last generated
-      let actionPlan = null;
-      if (builtCOA && builtCOA.length) {
-        actionPlan = toActionPlanFromBuilt();
-        const note = document.getElementById('mc-note');
-        if (note) note.textContent = 'Using custom plan built below.';
-      } else if (lastCOA && Array.isArray(lastCOA) && lastCOA.length) {
-        actionPlan = lastCOA;
-        const note = document.getElementById('mc-note');
-        if (note) note.textContent = 'Using last generated plan.';
-      }
-      if (!actionPlan) {
-        addEvent({ type: 'MC', text: 'Build or generate a COA first, then run Monte Carlo.' });
-        showToast('Build or generate a COA first, then run Monte Carlo.', 'warn');
-        return;
-      }
-
-      try {
-        if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
-        if (singleBtn) singleBtn.disabled = true;
-        if (bar) { bar.style.width = '0%'; bar.textContent = '0%'; }
-
-      // Success criteria & controls
-      const successMode = (document.getElementById('mc-success-mode')?.value || 'impact');
-      const successN = Math.max(1, Number(document.getElementById('mc-success-n')?.value || 3));
-      const victoryThreshold = Math.max(1, Number(document.getElementById('mc-impact-threshold')?.value || 100));
-      const highlightThresh = Math.min(0.9, Math.max(0.2, Number(document.getElementById('mc-highlight-threshold')?.value || 0.5)));
-      const regenFrac = Math.min(1, Math.max(0, Number(document.getElementById('mc-regen-frac')?.value || 0)));
-      let trialsSuccess = 0;
-      let totalImpactOnSuccess = 0;
-      let totalStepsToSuccess = 0;
-      const successImpacts = [];
-      const stepsToSuccessArr = [];
-      const stepSuccessCounts = new Array(actionPlan.length).fill(0);
-
-      const chunk = Math.max(100, Math.floor(trials / 100));
-      const blueBudgetBase = teamResources?.blue ?? 0;
-      const redBudgetBase = teamResources?.red ?? 0;
-      const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 }));
-      const redTypeBase  = JSON.parse(JSON.stringify(teamResources?.redTypes  || { ke:0, ew:0, jam:0, sof:0 }));
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const blueMethodType = { kinetic:'ke', cyber:'ew', ew:'jam', sof:'sof' };
-
-      // Build static maps from current data for per-trial state simulation
-      const nodeInfo = new Map();
-      data.nodes.forEach(n => {
-        nodeInfo.set(n.id, {
-          id: n.id,
-          name: n.name,
-          team: n.team,
-          difficulty: n.difficulty,
-          vulnerabilities: n.vulnerabilities || [],
-          cascScore: n.cascScore || 1,
-          importance: n.importance || 5,
-          healthMax: n.healthMax || 100,
-          health: n.health ?? (n.healthMax || 100),
-          status: n.status || 'Active'
-        });
-      });
-      const adj = new Map();
-      data.links.forEach(l => {
-        const s = l.source?.id ?? l.source;
-        const t = l.target?.id ?? l.target;
-        if (!nodeInfo.has(s) || !nodeInfo.has(t)) return;
-        if (!adj.has(s)) adj.set(s, new Set());
-        if (!adj.has(t)) adj.set(t, new Set());
-        adj.get(s).add(t); adj.get(t).add(s);
-      });
-
-      function pickRedTargetFromState(state) {
-        // choose highest payoff red alive
-        let bestId = null, bestScore = -Infinity;
-        nodeInfo.forEach((info, id) => {
-          const st = state.get(id);
-          if (!st || !st.alive) return;
-          if (info.team !== 'red') return;
-          const diffW = { Soft: 1.1, Medium: 1.0, Hardened: 0.8, Buried: 0.6 };
-          const base = (info.importance || 5) * 2 + (info.cascScore || 1) * 4;
-          const sc = base * (diffW[info.difficulty] || 1.0);
-          if (sc > bestScore) { bestScore = sc; bestId = id; }
-        });
-        return bestId;
-      }
-
-      function strikeProbForInfo(info, methodKey) {
-        const method = strikeMethods[methodKey];
-        if (!method || !info) return 0.5;
-        const diff = settings.difficultyModifiers[info.difficulty] || 1.0;
-        const vuln = (info.vulnerabilities || []).includes(method.vulnerability) ? 1.25 : 0.8;
-        return Math.min(1.0, method.baseProb * diff * vuln);
-      }
-
-      function topRedByPayoff(n) {
-        const arr = [];
-        nodeInfo.forEach((info, id) => { if (info.team==='red') { const s=(info.importance||5)*(info.cascScore||1); arr.push({id, s}); } });
-        arr.sort((a,b)=>b.s-a.s);
-        return new Set(arr.slice(0, Math.max(1,n)).map(x=>x.id));
-      }
-
-      // tally arrays for averages
-      const redNeutralizedArr = [];
-      const blueNeutralizedArr = [];
-      const blueSpendArr = [];
-      const redSpendArr = [];
-      const neutralizedCounts = new Map(); // nodeId -> count
-      const damageTotals = new Map(); // nodeId -> total damage dealt across trials
-      const damageHitCounts = new Map(); // nodeId -> trials where any damage was taken
-      const prioritySet = (successMode==='nodes') ? topRedByPayoff(Number(successN)) : null;
-
-      for (let t = 1; t <= trials; t++) {
-        let impact = 0;
-        let stepsToWin = null;
-
-        const ctx = { pMult: 1.0, impactMult: 1.0, nextStepPMult: 1.0, impactMultDecay: 0 };
-        let blueBudget = blueBudgetBase;
-        let redBudget = redBudgetBase;
-        let blueTypeBudget = JSON.parse(JSON.stringify(blueTypeBase));
-        let redTypeBudget  = JSON.parse(JSON.stringify(redTypeBase));
-
-        // Per-trial live state
-        const state = new Map();
-        nodeInfo.forEach((info, id) => state.set(id, { alive: info.status !== 'Neutralized', health: info.health }));
-        let redNeutralized = 0;
-        let blueNeutralized = 0;
-        let blueSpend = 0;
-        let redSpend = 0;
-        const redNeutralizedSet = new Set();
-        const damageThisRun = new Map(); // nodeId -> cumulative damage this trial (red only)
-
-        function recordDamage(id, delta, info) {
-          if (!info || info.team !== 'red' || !delta || delta <= 0) return;
-          const prev = damageThisRun.get(id) || 0;
-          damageThisRun.set(id, prev + delta);
-        }
-
-      for (let i = 0; i < actionPlan.length; i++) {
-        const step = actionPlan[i];
-        const blue = blueProfiles[step.blue] || { baseP: 0.5, impact: [5, 10] };
-        const red = redProfiles[step.red] || null;
-
-          // Select target (prefer explicit target, else top red alive)
-          const targetId = step.targetId || pickRedTargetFromState(state);
-          const info = nodeInfo.get(targetId);
-
-          // Build success probability; if method known and target known, use method-target P and damage
-          let p0 = blue.baseP;
-          let dmgRange = blue.impact;
-          const blueKey = step.blueKey || (step.blue === 'Kinetic Strike' ? 'kinetic' : step.blue === 'Cyber Attack' ? 'cyber' : step.blue === 'EW Jamming' ? 'ew' : step.blue === 'SOF Mission' ? 'sof' : null);
-          if (blueKey && info) {
-            p0 = strikeProbForInfo(info, blueKey);
-            const method = strikeMethods[blueKey];
-            if (method) dmgRange = method.baseDamage;
-          }
-          let p = p0 * ctx.pMult * ctx.nextStepPMult;
-          ctx.nextStepPMult = 1.0; // consume 1-step buff
-
-          // Only apply red modifiers if they can afford the counter (per-type)
-          const redCost = redCounterCosts[step.red] || 0;
-          const redCat  = redCounterType[step.red] || 'ke';
-          const redActive = red && (redTypeBudget[redCat] !== undefined ? (redTypeBudget[redCat] >= redCost) : (redBudget >= redCost));
-          if (redActive) {
-            if (red.globalPmult) p *= red.globalPmult;
-            if (red.pMult) p *= red.pMult;
-            if (red.tag && blue.tag && red.tag === blue.tag && red.pMult) p *= red.pMult;
-          }
-          if (blue.defenseBuff && redActive && red.pMult) {
-            p *= blue.defenseBuff.reduceRed; // defensive maneuver mitigates some red reduction
-          }
-
-          p = Math.min(Math.max(p, 0.05), 0.98);
-          // Blue must afford the step (per-type)
-          const blueCost = (strikeMethods[blueKey]?.cost) || 0;
-          const blueCat = blueMethodType[blueKey] || 'ke';
-          const canAct = (blueTypeBudget[blueCat] !== undefined ? (blueTypeBudget[blueCat] >= blueCost) : (blueBudget >= blueCost));
-          const success = canAct && (Math.random() < p);
-
-          // Impact multiplier from red reinforcement decay
-          let stepImpactMult = ctx.impactMult;
-          if (redActive && red.impactMult) {
-            // reinforcement reduces next N steps impact
-            ctx.impactMult *= red.impactMult;
-            ctx.impactMultDecay = Math.max(ctx.impactMultDecay, red.duration || 1);
-          }
-
-          if (success) {
-            const delta = randIn(dmgRange) * stepImpactMult;
-            impact += delta;
-            // Apply damage to target and cascade
-            if (info && state.get(targetId)?.alive) {
-              const st = state.get(targetId);
-              st.health = Math.max(0, (st.health ?? info.healthMax) - delta);
-              recordDamage(targetId, delta, info);
-              if (st.health <= 0 && st.alive) {
-                st.alive = false;
-                if (info.team === 'red') { redNeutralized++; redNeutralizedSet.add(targetId); }
-                if (info.team === 'blue') blueNeutralized++;
-              }
-              const cascade = 5 * (info.cascScore || 1) * settings.cascadeAlpha;
-              const neighbors = adj.get(targetId) || new Set();
-              neighbors.forEach(nid => {
-                const ni = nodeInfo.get(nid);
-                const stn = state.get(nid);
-                if (!ni || !stn?.alive) return;
-                stn.health = Math.max(0, (stn.health ?? ni.healthMax) - cascade);
-                recordDamage(nid, cascade, ni);
-                if (stn.health <= 0 && stn.alive) {
-                  stn.alive = false;
-                  if (ni.team === 'red') { redNeutralized++; redNeutralizedSet.add(nid); }
-                  if (ni.team === 'blue') blueNeutralized++;
-                }
-              });
-            }
-            // Apply Blue buffs
-            if (blue.buffNext?.pMult) ctx.nextStepPMult *= blue.buffNext.pMult * (red?.infoNerf || 1);
-            if (blue.globalBuff?.pMult) ctx.pMult *= blue.globalBuff.pMult;
-            // spend handled below (per-type)
-          } else if (canAct) {
-            // spend handled below (per-type)
-          }
-
-          // Check success-at-step conditions
-          if (stepsToWin === null) {
-            if (successMode === 'impact' && impact >= victoryThreshold) {
-              stepsToWin = i + 1;
-            } else if (successMode === 'nodes') {
-              const met = Array.from(redNeutralizedSet).filter(id => prioritySet?.has(id)).length >= successN;
-              if (met) stepsToWin = i + 1;
-            } else if (successMode === 'nodes_any') {
-              if (redNeutralized >= successN) stepsToWin = i + 1;
-            }
-          }
-
-          // Decay temporary impact debuff
-          if (ctx.impactMultDecay > 0) {
-            ctx.impactMultDecay--;
-            if (ctx.impactMultDecay === 0) ctx.impactMult = 1.0;
-          }
-
-          // Red countermeasures that can cause Blue losses (align with Preview Outcome logic)
-          if (redActive && (step.red === 'Counter-Strike' || step.red === 'SOF Interception')) {
-            // pick a high-value Blue target that is still alive
-            let candId = null; let bestScore = -Infinity;
-            nodeInfo.forEach((bi, bid) => {
-              const stB = state.get(bid);
-              if (bi.team === 'blue' && stB?.alive) {
-                const s = (bi.importance || 5) + (bi.cascScore || 1) * 2;
-                if (s > bestScore) { bestScore = s; candId = bid; }
-              }
-            });
-            if (candId) {
-              const stB = state.get(candId);
-              const dmg = 20 + Math.random() * 30; // 20–50 damage, no cascade
-              stB.health = Math.max(0, (stB.health ?? (nodeInfo.get(candId)?.healthMax || 100)) - dmg);
-              if (stB.health <= 0 && stB.alive) {
-                stB.alive = false;
-                blueNeutralized++;
-              }
-            }
-          }
-
-          // Spend red if they used a counter
-          if (redActive) {
-            if (redTypeBudget[redCat] !== undefined) redTypeBudget[redCat] = Math.max(0, redTypeBudget[redCat] - redCost);
-            else redBudget -= redCost;
-            redSpend += redCost;
-          }
-          if (canAct) {
-            if (blueTypeBudget[blueCat] !== undefined) blueTypeBudget[blueCat] = Math.max(0, blueTypeBudget[blueCat] - blueCost);
-            else blueBudget -= blueCost;
-            blueSpend += blueCost;
-          }
-          // Per-step regeneration (optional)
-          if (regenFrac > 0) {
-            ['ke','ew','jam','sof'].forEach(k => {
-              if (blueTypeBudget[k] !== undefined) blueTypeBudget[k] += Math.round((blueTypeBase[k]||0) * regenFrac);
-              if (redTypeBudget[k]  !== undefined) redTypeBudget[k]  += Math.round((redTypeBase[k]||0)  * regenFrac);
-            });
-          }
-          // per-step regen handled below
-        }
-
-        const won = (stepsToWin !== null);
-        if (won) {
-          trialsSuccess++;
-          totalImpactOnSuccess += impact;
-          const st = (stepsToWin ?? actionPlan.length);
-          totalStepsToSuccess += st;
-          successImpacts.push(impact);
-          stepsToSuccessArr.push(st);
-          stepSuccessCounts[st - 1]++;
-        }
-        // Accumulate tallies
-        redNeutralizedArr.push(redNeutralized);
-        blueNeutralizedArr.push(blueNeutralized);
-        blueSpendArr.push(blueSpend);
-        redSpendArr.push(redSpend);
-        // Count per-node neutralizations
-        redNeutralizedSet.forEach(id => neutralizedCounts.set(id, (neutralizedCounts.get(id) || 0) + 1));
-        damageThisRun.forEach((dmg, id) => {
-          damageTotals.set(id, (damageTotals.get(id) || 0) + dmg);
-          damageHitCounts.set(id, (damageHitCounts.get(id) || 0) + 1);
-        });
-
-        if (t % chunk === 0 || t === trials) {
-          const pct = Math.round((t / trials) * 100);
-          if (bar) { bar.style.width = pct + '%'; bar.textContent = pct + '%'; }
-          await new Promise(r => setTimeout(r, 0));
-        }
-      }
-
-      const successRate = trialsSuccess / trials;
-      const expImpact = trialsSuccess ? (totalImpactOnSuccess / trialsSuccess) : 0;
-      const avgSteps = trialsSuccess ? (totalStepsToSuccess / trialsSuccess) : actionPlan.length;
-      const p50Impact = Math.round(percentile(successImpacts, 0.5));
-      const p90Impact = Math.round(percentile(successImpacts, 0.9));
-      const p50Steps = Math.round(percentile(stepsToSuccessArr, 0.5));
-      const p90Steps = Math.round(percentile(stepsToSuccessArr, 0.9));
-
-      // cumulative success by step
-      const cumulativeByStep = stepSuccessCounts.reduce((acc, c, i) => {
-        acc.push((acc.length ? acc[acc.length-1] : 0) + c);
-        return acc;
-      }, []).map(v => v / trials);
-
-      if (outSuccess) outSuccess.textContent = Math.round(successRate * 100) + '%';
-      if (outDmg) outDmg.textContent = Math.round(expImpact);
-      if (outTime) outTime.textContent = Math.round(avgSteps * 10) / 10;
-      const elP50I = document.getElementById('mc-impact-p50'); if (elP50I) elP50I.textContent = p50Impact;
-      const elP90I = document.getElementById('mc-impact-p90'); if (elP90I) elP90I.textContent = p90Impact;
-      const elP50S = document.getElementById('mc-steps-p50'); if (elP50S) elP50S.textContent = p50Steps || '—';
-      const elP90S = document.getElementById('mc-steps-p90'); if (elP90S) elP90S.textContent = p90Steps || '—';
-      // Averages for outcomes
-      const redNeuAvg = Math.round((redNeutralizedArr.reduce((a,b)=>a+b,0) / trials) * 10) / 10;
-      const blueLostAvg = Math.round((blueNeutralizedArr.reduce((a,b)=>a+b,0) / trials) * 10) / 10;
-      const blueSpendAvg = Math.round(blueSpendArr.reduce((a,b)=>a+b,0) / trials);
-      const redSpendAvg = Math.round(redSpendArr.reduce((a,b)=>a+b,0) / trials);
-      const elRN = document.getElementById('mc-red-neutral-avg'); if (elRN) elRN.textContent = redNeuAvg;
-      const elBL = document.getElementById('mc-blue-lost-avg'); if (elBL) elBL.textContent = blueLostAvg;
-      const elBS = document.getElementById('mc-blue-spend-avg'); if (elBS) elBS.textContent = blueSpendAvg;
-      const elRS = document.getElementById('mc-red-spend-avg'); if (elRS) elRS.textContent = redSpendAvg;
-
-      // Highlight likely neutralizations on graph/map (>= threshold of trials)
-      const likely = new Set();
-      neutralizedCounts.forEach((cnt, id) => { if ((cnt / trials) >= highlightThresh) likely.add(id); });
-      highlightMode = 'coa';
-      highlightSet = likely;
-      applyHighlight();
-      if (mapModeEnabled) refreshMapMarkers();
-      const note = document.getElementById('mc-note');
-      if (note) note.textContent = `Green highlight shows nodes neutralized in at least ${Math.round(highlightThresh*100)}% of runs.`;
-
-      // Quick list of likely neutralized and often-damaged nodes
-      const likelihoodEl = document.getElementById('mc-likely');
-      if (likelihoodEl) {
-        const topNeutralized = [];
-        neutralizedCounts.forEach((cnt, id) => {
-          const info = nodeInfo.get(id);
-          if (info?.team === 'red') topNeutralized.push({ id, name: info.name, p: (cnt / trials) });
-        });
-        topNeutralized.sort((a,b)=>b.p-a.p);
-        const topDamaged = [];
-        damageHitCounts.forEach((cnt, id) => {
-          const info = nodeInfo.get(id);
-          if (info?.team !== 'red') return;
-          const neutralCnt = neutralizedCounts.get(id) || 0;
-          const damagedButAlivePct = Math.max(0, cnt - neutralCnt) / trials;
-          const avgDmg = Math.round((damageTotals.get(id) || 0) / trials);
-          topDamaged.push({ id, name: info.name, hitPct: cnt / trials, surviveHitPct: damagedButAlivePct, avgDmg });
-        });
-        topDamaged.sort((a,b)=>b.hitPct-a.hitPct);
-        const fmt = (list, label, accessor) => {
-          if (!list.length) return `<div class="muted">${label}: none</div>`;
-          return `<div><strong>${label}:</strong> ${list.slice(0,6).map(n => `${n.name} (${Math.round(accessor(n)*100)}%)`).join(' · ')}</div>`;
-        };
-        const neutralLine = fmt(topNeutralized.filter(n=>n.p>=0.01), 'Likely neutralized', n=>n.p);
-        const damagedLine = fmt(topDamaged.filter(n=>n.surviveHitPct>=0.01), 'Often damaged (survived)', n=>n.surviveHitPct);
-        likelihoodEl.innerHTML = `${neutralLine}${damagedLine ? `<div class="muted" style="margin-top:4px;">${damagedLine}</div>` : ''}`;
-      }
-
-      // brief detailed summary text (plain language)
-      const details = document.getElementById('mc-details');
-      if (details) {
-        const n = actionPlan.length;
-        const succeededRuns = Math.round(trials * successRate);
-        const byHalf = p50Steps || n;
-        const byMost = p90Steps || n;
-        // Budget overview if custom plan
-        let budgetLine = '';
-        if (builtCOA && builtCOA.length) {
-          const planCost = builtCOA.reduce((s, st) => s + (strikeMethods[st.methodKey]?.cost || 0), 0);
-          const blueBudget = teamResources?.blue ?? 0;
-          const margin = blueBudget - planCost;
-          budgetLine = `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`;
-        }
-        const desc = [
-          `Plan length: ${n} steps.`,
-          `${(successRate*100).toFixed(0)}% chance this plan works (${succeededRuns.toLocaleString()} of ${trials.toLocaleString()} tries).`,
-          `When it works, it usually takes about ${avgSteps.toFixed(1)} actions (half finish by step ${byHalf}; most by step ${byMost}).`,
-          `On a winning run, the effect is typically around ${p50Impact}, with stronger wins near ${p90Impact}.`,
-          budgetLine
-        ];
-        // Add plan outline for brief if custom plan
-        if (builtCOA && builtCOA.length) {
-          const outline = builtCOA.map((st, i) => {
-            const node = data.nodes.find(n => n.id === st.targetId);
-            const name = node ? `${node.name} (${node.id})` : st.targetId;
-            const methodName = strikeMethods[st.methodKey]?.name || st.methodKey;
-            const p = node ? Math.round(strikeProbFor(node, st.methodKey) * 100) : 0;
-            return `S${i+1}: ${methodName} -> ${name} (~${p}%)`;
-          }).join('<br>');
-          desc.push(outline);
-        }
-        details.innerHTML = desc.filter(Boolean).join('<br>');
-      }
-
-      // Save minimal results for Detailed Report
-      // Compute per-node odds for report
-      const nodeOdds = [];
-      neutralizedCounts.forEach((cnt, id) => { const info = nodeInfo.get(id); if (info?.team==='red') nodeOdds.push({ id, name: info.name, p: Math.round((cnt/trials)*100) }); });
-      nodeOdds.sort((a,b)=>b.p-a.p);
-      mcLastResults = {
-        actionPlan, trials,
-        successRate,
-        expImpact: Math.round(expImpact), avgSteps: Math.round(avgSteps*10)/10,
-        p50Impact, p90Impact, p50Steps, p90Steps,
-        redNeutralizedArr, blueNeutralizedArr, blueSpendArr, redSpendArr,
-        nodeOdds
-      };
-      addEvent({ type: 'MC', text: `MC(${trials}) on COA(${actionPlan.length} steps): ${Math.round(successRate*100)}% success, ~${Math.round(expImpact)} impact, avg ${Math.round(avgSteps*10)/10} steps.` });
-      showToast(`MC(${trials}) done: ${Math.round(successRate*100)}% success, ~${Math.round(expImpact)} impact.`, 'success', 5000);
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = btnLabel || 'Run 10,000 Trials'; }
-        if (singleBtn) { singleBtn.disabled = false; singleBtn.textContent = singleLabel || singleBtn.textContent; }
-      }
     }
 
     // COA logic
@@ -5213,7 +4485,7 @@
       const runId = ++mcWorkerRunId;
       mcWorkerActiveRunId = runId;
       try {
-        mcWorker = new Worker('sim-worker.js?v=p6');
+        mcWorker = new Worker('sim-worker.js?v=p7');
       } catch (err) {
         clearMonteCarloWorker();
         return Promise.resolve(null);
@@ -5418,13 +4690,10 @@
         const regenFrac = Math.min(1, Math.max(0, Number(document.getElementById('mc-regen-frac')?.value || 0)));
         // Denial MOE: capability<->cost balance from commander's intent (set by the interview).
         const denialBalance = (window.__denialIntent && typeof window.__denialIntent.balance === 'number') ? window.__denialIntent.balance : (window.MoeModule ? window.MoeModule.DEFAULTS.balance : 0.35);
-        // Denial MOE is scored by MoeModule on the main thread (the worker carries only the MOP
-        // cores). Cap trials for responsiveness on large plans — the Wilson CI is already tight.
-        if (successMode === 'denial' && trials > 3000) {
-          trials = 3000;
-          const nD = document.getElementById('mc-note');
-          if (nD) nD.textContent = 'Denial MOE runs on the main thread; trials capped at 3,000 for responsiveness.';
-        }
+        // B0: the old main-thread-only denial path (and its 3,000-trial responsiveness
+        // cap) is retired — the worker importScripts moe.js and the shared core scores
+        // denial through the injected context.moe handle, so denial runs at full trial
+        // counts on the worker like every other mode.
 
         const context = buildSimContext();
         const prioritySet = (successMode === 'nodes') ? getTopPayoffRedIds(Number(successN)) : null;
@@ -5452,9 +4721,10 @@
 
         const note = document.getElementById('mc-note');
         let workerResult = null;
-        // 'denial' mode is evaluated by MoeModule on the main thread (the worker carries only
-        // the MOP cores), so route denial runs to the inline chunked path below.
-        if (successMode !== 'denial' && canUseMonteCarloWorker()) {
+        // B0: every mode — denial included — runs on the worker when one is available
+        // (the worker importScripts moe.js and injects it as context.moe). The inline
+        // chunked path below stays as the no-worker fallback for every mode.
+        if (canUseMonteCarloWorker()) {
           if (note) note.textContent = `Worker thread running ${trials.toLocaleString()} trials...`;
           try {
             workerResult = await runMonteCarloInWorker({
@@ -5469,6 +4739,9 @@
               prioritySet: prioritySet ? Array.from(prioritySet) : [],
               maxBlueLoss: Infinity,
               regenFrac,
+              // B0: denial MOE knobs for the worker's shared core (denialParams has no
+              // shell-side source yet; the worker defaults it to null).
+              denialBalance,
               teamResources: clonePlain(teamResources),
               settings: clonePlain(settings),
               strikeMethods: clonePlain(strikeMethods),
@@ -5501,6 +4774,16 @@
           neutralizedCounts = new Map(workerResult.neutralizedCounts || []);
           damageTotals = new Map(workerResult.damageTotals || []);
           damageHitCounts = new Map(workerResult.damageHitCounts || []);
+          // B0: denial aggregate rides the done payload under a 'denial' key (denial
+          // mode only). Feed the same accumulators the inline fallback fills so the
+          // denial breakdown panel below is path-agnostic.
+          if (workerResult.denial) {
+            denialDiArr = workerResult.denial.denialDiArr || [];
+            denialTputArr = workerResult.denial.denialTputArr || [];
+            denialOsviArr = workerResult.denial.denialOsviArr || [];
+            denialHalt = workerResult.denial.denialHalt || 0;
+            denialCap = workerResult.denial.denialCap || 0;
+          }
           if (note) note.textContent = cancelled ? 'Worker run canceled; partial results shown.' : 'Worker run complete. UI stayed responsive during computation.';
         } else {
           if (note) note.textContent = `Worker unavailable; running ${trials.toLocaleString()} trials in animation-frame chunks.`;
@@ -5521,8 +4804,7 @@
               victoryThreshold,
               prioritySet,
               regenFrac,
-              denialBalance,
-              logSteps: false
+              denialBalance
             });
             completedTrials = t;
 
@@ -5666,10 +4948,13 @@
         // Denial MOE breakdown (continuous effect) — shown only in denial mode, after the
         // shared renderer so it isn't overwritten.
         if (successMode === 'denial' && denialDiArr.length) {
-          const mAvg = a => a.reduce((s, x) => s + x, 0) / a.length;
-          const mDI = mAvg(denialDiArr), mTput = mAvg(denialTputArr), mOsvi = mAvg(denialOsviArr);
-          const haltPct = Math.round(denialHalt / denialDiArr.length * 100);
-          const capPct = Math.round(denialCap / denialDiArr.length * 100);
+          // B0: one shared arithmetic path — the same SimModule.summarizeDenialStats the
+          // worker uses for its done-payload summary, fed here from either source
+          // (worker denial aggregate or inline fallback accumulators).
+          const dstats = SimModule.summarizeDenialStats({ denialDiArr, denialTputArr, denialOsviArr, denialHalt, denialCap });
+          const mDI = dstats.meanDenialIndex, mTput = dstats.meanThroughput, mOsvi = dstats.meanOsvi;
+          const haltPct = Math.round(dstats.haltRate * 100);
+          const capPct = Math.round(dstats.capitulationRate * 100);
           const interp = document.getElementById('mc-interpretation');
           if (interp) {
             interp.setAttribute('data-tone', mDI >= 0.5 ? 'good' : mDI >= 0.25 ? 'warn' : 'bad');
@@ -6056,8 +5341,7 @@
           successN,
           prioritySet,
           maxBlueLoss,
-          regenFrac,
-          logSteps: false
+          regenFrac
         });
         if (result.success) success++;
         stepsArr.push(result.stepsToGoal);
@@ -6332,10 +5616,12 @@
       if (!builtCOA || !builtCOA.length) { addEvent({ type: 'COA', text: 'Build a plan first in the COA Builder.' }); return; }
       const plan = toActionPlanFromBuilt();
       const context = buildSimContext();
+      // B0: routed through the shared core (SimModule), which does not emit the old
+      // narrative logSteps transcript — the step list below is rendered from the plan
+      // plus the trial's actual per-node outcomes (damageThisRun / neutralized sets).
       const result = simulateTrial(plan, {
         context,
-        rng: createRng(),
-        logSteps: true
+        rng: createRng()
       });
 
       highlightMode = 'coa';
@@ -6358,8 +5644,20 @@
         `<div class=\"kv-row\"><span>Blue Spend</span><strong>${planCost}</strong></div>`,
         `<div class=\"kv-row\"><span>Red Spend (counters)</span><strong>${Math.round(result.redSpend)}</strong></div>`,
         `</div>`,
-        `<h3 class=\"muted\">Step-by-step</h3>`,
-        `<div>${result.log.map(l=>`<div class=\"kv-row\"><span>${l}</span></div>`).join('')}</div>`,
+        `<h3 class=\"muted\">Plan sequence</h3>`,
+        `<div>${plan.map((st, i) => {
+          const node = context.nodeInfo.get(st.targetId);
+          const name = node ? `${node.name} (${st.targetId})` : (st.targetId || 'auto-target');
+          return `<div class=\"kv-row\"><span>S${i + 1}: ${st.blue} -> ${name}</span></div>`;
+        }).join('')}</div>`,
+        `<h3 class=\"muted\">Damage dealt this sample (red nodes)</h3>`,
+        `<div>${result.damageThisRun.size
+          ? Array.from(result.damageThisRun.entries()).sort((a, b) => b[1] - a[1]).map(([id, dmg]) => {
+              const node = context.nodeInfo.get(id);
+              const name = node ? `${node.name} (${id})` : id;
+              return `<div class=\"kv-row\"><span>${name} — ${Math.round(dmg)} dmg${result.redNeutralized.has(id) ? ' — NEUTRALIZED' : ''}</span></div>`;
+            }).join('')
+          : '<div class=\"kv-row\"><span>No damage inflicted on red nodes.</span></div>'}</div>`,
         `<p class=\"muted\">Preview Outcome is a single sample run with randomness. Use Monte Carlo for averages and ranges.</p>`
       ].join('');
       body.innerHTML = sum;
@@ -6406,7 +5704,7 @@
     setTimeout(function assertSimParity() {
       if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
       try {
-        const pw = new Worker('sim-worker.js?v=p6');
+        const pw = new Worker('sim-worker.js?v=p7');
         const bail = setTimeout(() => { try { pw.terminate(); } catch (e) {} }, 5000);
         pw.onmessage = (ev) => {
           const m = ev.data || {};
