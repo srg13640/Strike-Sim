@@ -1329,6 +1329,81 @@
       prefersReducedMotion: function () { return state.reducedMotion; }
     };
   })();
+
+  // ── ModalService: shared modal lifecycle (C-028) — one owner for open/close,
+  //    focus trap, Escape-to-close, focus restore, and inert background. Modals
+  //    stay plain .modal-backdrop elements toggled display:flex/none, so existing
+  //    display-based guards (e.g. the shortcut scoping check) keep working. ──
+  window.ModalService = (function () {
+    "use strict";
+    var stack = [];        // { el, onClose, prevFocus }
+    var inertedEls = [];   // background elements inerted while any modal is open
+    var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    var INERT_IDS = ['app', 'cmd-bar', 'hud-radar', 'hud-ticker', 'wg-hud', 'hud-overlay', 'classification-banner'];
+    function focusablesIn(root) {
+      return Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE), function (el) {
+        return el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement;
+      });
+    }
+    function dialogOf(entry) { return entry.el.querySelector('[role="dialog"]') || entry.el; }
+    function applyInert() {
+      INERT_IDS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && !el.hasAttribute('inert')) {
+          el.setAttribute('inert', '');
+          el.setAttribute('aria-hidden', 'true');
+          inertedEls.push(el);
+        }
+      });
+    }
+    function liftInert() {
+      inertedEls.forEach(function (el) { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); });
+      inertedEls = [];
+    }
+    function open(elOrId, opts) {
+      var el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+      if (!el) return null;
+      var entry = { el: el, onClose: opts && opts.onClose, prevFocus: document.activeElement };
+      if (!stack.length) applyInert();
+      el.style.display = 'flex';
+      stack.push(entry);
+      var dlg = dialogOf(entry);
+      var f = focusablesIn(dlg);
+      if (f.length) { try { f[0].focus(); } catch (e) {} }
+      else { if (!dlg.hasAttribute('tabindex')) dlg.setAttribute('tabindex', '-1'); try { dlg.focus(); } catch (e) {} }
+      return el;
+    }
+    function close(elOrId) {
+      var el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+      var idx = -1;
+      for (var i = stack.length - 1; i >= 0; i--) { if (!el || stack[i].el === el) { idx = i; break; } }
+      if (idx === -1) { if (el) el.style.display = 'none'; return; } // not service-opened: degrade to plain hide
+      var entry = stack.splice(idx, 1)[0];
+      entry.el.style.display = 'none';
+      if (!stack.length) liftInert();
+      try { if (entry.prevFocus && document.contains(entry.prevFocus)) entry.prevFocus.focus(); } catch (e) {}
+      if (typeof entry.onClose === 'function') { try { entry.onClose(); } catch (e) {} }
+    }
+    // Capture-phase so Escape/Tab are consumed before app-level shortcut handlers.
+    document.addEventListener('keydown', function (e) {
+      if (!stack.length) return;
+      var top = stack[stack.length - 1];
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        close(top.el);
+        return;
+      }
+      if (e.key === 'Tab') {
+        var dlg = dialogOf(top);
+        var f = focusablesIn(dlg);
+        if (!f.length) { e.preventDefault(); return; }
+        var first = f[0], last = f[f.length - 1], active = document.activeElement;
+        if (e.shiftKey && (active === first || !dlg.contains(active))) { e.preventDefault(); try { last.focus(); } catch (err) {} }
+        else if (!e.shiftKey && (active === last || !dlg.contains(active))) { e.preventDefault(); try { first.focus(); } catch (err) {} }
+      }
+    }, true);
+    return { open: open, close: close, isOpen: function () { return stack.length > 0; } };
+  })();
   </script>
 
   <!-- ── Stark-HUD overhaul: cinematic boot sequence + global frame overlay ── -->
@@ -2709,7 +2784,6 @@
     const node = selectedNode;
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
-    modal.style.display = 'flex';
 
     let optionsHtml = Object.entries(strikeMethods).map(([key, method]) => {
     const difficultyMod = settings.difficultyModifiers[node.difficulty] || 1.0;
@@ -2735,14 +2809,15 @@
     </div>
     `;
     document.body.appendChild(modal);
+    ModalService.open(modal, { onClose: () => modal.remove() });
 
     modal.addEventListener('click', (e) => {
     const target = e.target.closest('button');
     if (e.target === modal || target?.classList.contains('modal-close-btn')) {
-    modal.remove();
+    ModalService.close(modal);
     } else if (target?.dataset.method) {
     executeStrike(node, target.dataset.method);
-    modal.remove();
+    ModalService.close(modal);
     }
     });
     }
@@ -2887,7 +2962,6 @@
     function openSummary() {
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
-    modal.style.display = 'flex';
 
     const activeNodes = data.nodes.filter(n => n.status !== 'Neutralized').length;
     const avgHealth = computeStrength();
@@ -2908,8 +2982,9 @@
     </div>
     `;
     document.body.appendChild(modal);
+    ModalService.open(modal, { onClose: () => modal.remove() });
     modal.addEventListener('click', (e) => {
-    if (e.target === modal || e.target.closest('.modal-close-btn')) modal.remove();
+    if (e.target === modal || e.target.closest('.modal-close-btn')) ModalService.close(modal);
     });
     }
 
@@ -2928,8 +3003,8 @@
     addEvent({ type: 'Export', text: 'Session exported to JSON.' });
     }
 
-    function openImportModal() { document.getElementById('import-modal').style.display = 'flex'; }
-    function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
+    function openImportModal() { ModalService.open('import-modal'); }
+    function closeImportModal() { ModalService.close('import-modal'); }
 
     // Validate a normalized payload BEFORE anything destructive happens. Drops unusable
     // records and returns an error if nothing valid remains, so a malformed-but-parseable
@@ -3710,8 +3785,8 @@
       const refreshLbl = () => { if (slider && balLbl) balLbl.textContent = emphasis(Number(slider.value)) + ' · balance ' + (Number(slider.value) / 100).toFixed(2); };
       if (slider) slider.addEventListener('input', refreshLbl);
       refreshLbl();
-      open.addEventListener('click', () => { modal.style.display = 'flex'; refreshLbl(); });
-      document.getElementById('intent-cancel').addEventListener('click', () => { modal.style.display = 'none'; });
+      open.addEventListener('click', () => { ModalService.open(modal); refreshLbl(); });
+      document.getElementById('intent-cancel').addEventListener('click', () => { ModalService.close(modal); });
       document.getElementById('intent-generate').addEventListener('click', () => {
         try {
           if (!window.MoeModule) { showToast('MOE engine unavailable.', 'error'); return; }
@@ -3731,7 +3806,7 @@
           if (hint) hint.textContent = res.rationale + (mixStr ? ' Resource mix: ' + mixStr + '.' : '');
           addEvent({ type: 'COA', text: 'Intent-based denial COA: ' + res.steps.length + ' steps, projected denial ' + Math.round(res.projectedDenial * 100) + '%.' });
           showToast('Denial COA generated (' + res.steps.length + ' steps). Review, then Simulate Plan.', 'success', 6000);
-          modal.style.display = 'none';
+          ModalService.close(modal);
         } catch (e) { showToast('Generation failed: ' + (e && e.message ? e.message : e), 'error'); }
       });
     })();
@@ -3744,7 +3819,7 @@
     });
     document.getElementById('run-single-btn').addEventListener('click', simulatePlanOnce);
     document.getElementById('mc-report-btn').addEventListener('click', openMcReport);
-    document.getElementById('mc-report-close').addEventListener('click', () => { document.getElementById('mc-report-modal').style.display = 'none'; });
+    document.getElementById('mc-report-close').addEventListener('click', () => { ModalService.close('mc-report-modal'); });
     // MC controls
     const trialsInput = document.getElementById('mc-trials');
     if (trialsInput) trialsInput.addEventListener('input', updateMcRunButtonLabel);
@@ -5161,7 +5236,7 @@
 
     function handleMcAction(action) {
       const reportModal = document.getElementById('mc-report-modal');
-      if (reportModal) reportModal.style.display = 'none';
+      if (reportModal) ModalService.close(reportModal);
       if (action === 'wizard') openCOAWizard();
       else if (action === 'goal') document.getElementById('goal-plan-btn')?.click();
       else if (action === 'recommend') document.getElementById('coa-recommend-btn')?.click();
@@ -5605,12 +5680,12 @@
         <h3 class="muted" style="margin:8px 0 4px;">Recommended Sequence</h3>
         ${stepList}
       `;
-      document.getElementById('coa-modal').style.display = 'flex';
+      ModalService.open('coa-modal');
       addEvent({ type: 'COA', text: `Recommended COA generated for ${rec.targets.length} high-payoff targets.` });
     }
 
     function closeCOAModal() {
-      document.getElementById('coa-modal').style.display = 'none';
+      ModalService.close('coa-modal');
     }
 
     // Placeholder for simulate COA
@@ -5631,14 +5706,14 @@
       coaWizardPlanCache = null;
       // show step 1 only
       wizardSwitch(0);
-      m.style.display = 'flex';
+      ModalService.open(m);
       updateWizardNav();
       addEvent({ type: 'COA', text: 'Opened COA Wizard.' });
     }
 
     function closeCOAWizard() {
       const m = document.getElementById('coa-wizard-modal');
-      if (m) m.style.display = 'none';
+      if (m) ModalService.close(m);
     }
 
     function wizardSwitch(idx) {
@@ -6130,7 +6205,7 @@
           btn.addEventListener('click', () => handleMcAction(btn.dataset.mcAction));
         });
       }
-      modal.style.display = 'flex';
+      ModalService.open(modal);
     }
 
     function simulatePlanOnce() {
@@ -6168,7 +6243,7 @@
         `<p class=\"muted\">Preview Outcome is a single sample run with randomness. Use Monte Carlo for averages and ranges.</p>`
       ].join('');
       body.innerHTML = sum;
-      modal.style.display = 'flex';
+      ModalService.open(modal);
     }
 
     window.runCoaStressTest = function runCoaStressTest(options = {}) {
