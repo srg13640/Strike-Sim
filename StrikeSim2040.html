@@ -1402,7 +1402,39 @@
         else if (!e.shiftKey && (active === last || !dlg.contains(active))) { e.preventDefault(); try { first.focus(); } catch (err) {} }
       }
     }, true);
-    return { open: open, close: close, isOpen: function () { return stack.length > 0; } };
+    // Confirmation dialog (C-029): DOM-built (no innerHTML interpolation), stacks
+    // safely on any open modal, resolves false on Escape/backdrop/Cancel.
+    function confirm(opts) {
+      opts = opts || {};
+      return new Promise(function (resolve) {
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        var dlg = document.createElement('div');
+        dlg.className = 'modal';
+        dlg.setAttribute('role', 'dialog');
+        dlg.setAttribute('aria-modal', 'true');
+        dlg.setAttribute('aria-label', opts.title || 'Confirm');
+        var header = document.createElement('header');
+        var h = document.createElement('h2'); h.textContent = opts.title || 'Confirm'; header.appendChild(h);
+        var body = document.createElement('div'); body.className = 'body';
+        var p = document.createElement('p'); p.textContent = opts.body || 'Are you sure?'; body.appendChild(p);
+        if (opts.detail) { var d = document.createElement('p'); d.className = 'muted'; d.textContent = opts.detail; body.appendChild(d); }
+        var footer = document.createElement('footer');
+        var cancelBtn = document.createElement('button'); cancelBtn.type = 'button'; cancelBtn.className = 'secondary'; cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+        var okBtn = document.createElement('button'); okBtn.type = 'button'; okBtn.className = opts.danger === false ? 'secondary' : 'warn'; okBtn.textContent = opts.confirmLabel || 'Confirm';
+        footer.appendChild(cancelBtn); footer.appendChild(okBtn);
+        dlg.appendChild(header); dlg.appendChild(body); dlg.appendChild(footer);
+        backdrop.appendChild(dlg);
+        document.body.appendChild(backdrop);
+        var settled = false;
+        function settle(v) { if (settled) return; settled = true; close(backdrop); resolve(v); }
+        open(backdrop, { onClose: function () { backdrop.remove(); if (!settled) { settled = true; resolve(false); } } });
+        cancelBtn.addEventListener('click', function () { settle(false); });
+        okBtn.addEventListener('click', function () { settle(true); });
+        backdrop.addEventListener('click', function (e) { if (e.target === backdrop) settle(false); });
+      });
+    }
+    return { open: open, close: close, confirm: confirm, isOpen: function () { return stack.length > 0; } };
   })();
   </script>
 
@@ -1695,6 +1727,7 @@
           <div class="left-actions">
             <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
             <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
+            <button id="undo-btn" type="button" class="secondary" title="Nothing to undo" disabled>Undo</button>
             <button id="summary-btn" type="button" class="secondary" title="Quick status summary">Summary</button>
           </div>
         </div>
@@ -2948,6 +2981,69 @@
     }
     }
 
+    // --- C-029: undo snapshot for destructive actions -----------------------
+    // One-deep snapshot captured right before a confirmed destructive action
+    // (reset, replace-import). Restore goes through the same machinery the
+    // import path uses (AppState.replaceActiveGraph + initUI), so it is exactly
+    // as safe as importing the previous graph back in.
+    let undoSnapshot = null;
+    function cloneNodeForUndo(n) {
+      const o = {};
+      for (const k in n) {
+        if (!Object.prototype.hasOwnProperty.call(n, k)) continue;
+        if (k.startsWith('__') || k === 'vx' || k === 'vy' || k === 'vz' || k === 'index') continue; // force-graph internals
+        const v = n[k];
+        if (typeof v === 'function') continue;
+        try { o[k] = (v == null || typeof v !== 'object') ? v : JSON.parse(JSON.stringify(v)); } catch (e) {}
+      }
+      return o;
+    }
+    function captureUndoSnapshot(label) {
+      try {
+        undoSnapshot = {
+          label,
+          graph: {
+            nodes: data.nodes.map(cloneNodeForUndo),
+            // force-graph rewrites link endpoints to node objects — normalize back to ids
+            links: (data.links || []).map(l => ({
+              ...l,
+              source: (l.source && l.source.id != null) ? l.source.id : l.source,
+              target: (l.target && l.target.id != null) ? l.target.id : l.target
+            }))
+          },
+          simStats: JSON.parse(JSON.stringify(simStats)),
+          at: new Date()
+        };
+      } catch (e) { undoSnapshot = null; }
+      updateUndoButton();
+    }
+    function undoLastChange() {
+      if (!undoSnapshot) { showToast('Nothing to undo.', 'info'); return; }
+      const snap = undoSnapshot;
+      undoSnapshot = null;
+      try {
+        data = AppState.replaceActiveGraph(snap.graph);
+        Object.keys(simStats).forEach(k => { if (k in snap.simStats) simStats[k] = snap.simStats[k]; });
+        initUI();
+        if (graphInstance) {
+          graphInstance.graphData(data);
+          if (!geoModeEnabled) graphInstance.d3ReheatSimulation();
+        }
+        if (mapModeEnabled) refreshMapMarkers();
+        addEvent({ type: 'Sim', text: `Undo: restored state from before ${snap.label}.` });
+        showToast(`Restored state from before ${snap.label}.`, 'success');
+      } catch (e) {
+        showToast('Undo failed: ' + (e && e.message ? e.message : e), 'error');
+      }
+      updateUndoButton();
+    }
+    function updateUndoButton() {
+      const b = document.getElementById('undo-btn');
+      if (!b) return;
+      b.disabled = !undoSnapshot;
+      b.title = undoSnapshot ? `Undo: restore state from before ${undoSnapshot.label}` : 'Nothing to undo';
+    }
+
     function resetSimulation() {
     resetApplicationState();
     initUI();
@@ -3117,6 +3213,7 @@
     showToast(`Added ${stats.nodesAdded} nodes (${stats.linksAdded} links).`, 'success');
 
     } else { // replace
+    captureUndoSnapshot('the graph replacement'); // C-029: snapshot before anything destructive
     resetApplicationState();
     // Preserve each node's own affiliation; only fall back to the selected team when a
     // node has no valid team (C-021: don't flatten a mixed-force file to a single side).
@@ -3549,7 +3646,18 @@
     document.getElementById('org-btn').addEventListener('click', toggleOrgMode);
     document.getElementById('legend-btn').addEventListener('click', toggleLegend);
     document.getElementById('geo-mode-btn').addEventListener('click', () => geoModeEnabled ? disableGeoMode() : enableGeoMode());
-    document.getElementById('reset-sim-btn').addEventListener('click', resetSimulation);
+    document.getElementById('reset-sim-btn').addEventListener('click', async () => {
+      const ok = await ModalService.confirm({
+        title: 'Reset simulation?',
+        body: 'The session clock, strike stats, selection, and event log return to baseline. (Node battle damage is not healed — reload or re-import the scenario for a fresh network.)',
+        detail: 'You can Undo immediately afterwards.',
+        confirmLabel: 'Reset Sim'
+      });
+      if (!ok) return;
+      captureUndoSnapshot('the simulation reset');
+      resetSimulation();
+    });
+    document.getElementById('undo-btn').addEventListener('click', undoLastChange);
     document.getElementById('toggle-payoff-btn').addEventListener('click', toggleHighPayoff);
     document.getElementById('toggle-risk-btn').addEventListener('click', toggleHighRisk);
     document.getElementById('toggle-contrast-btn').addEventListener('click', toggleHighContrast);
@@ -3745,7 +3853,19 @@
     // Import modal
     document.getElementById('import-cancel-btn').addEventListener('click', closeImportModal);
     document.getElementById('import-add-btn').addEventListener('click', () => processImport('add'));
-    document.getElementById('import-replace-btn').addEventListener('click', () => processImport('replace'));
+    document.getElementById('import-replace-btn').addEventListener('click', async () => {
+      const file = document.getElementById('import-file-input').files[0];
+      if (file) { // no-file path falls through to processImport's own guard/toast
+        const ok = await ModalService.confirm({
+          title: 'Replace entire graph?',
+          body: `The current scenario graph will be replaced by "${file.name}".`,
+          detail: 'The file is validated before anything is destroyed, and Undo restores the previous graph.',
+          confirmLabel: 'Replace Graph'
+        });
+        if (!ok) return;
+      }
+      processImport('replace');
+    });
     // Fix last import assignment
     document.getElementById('fix-import-team-btn').addEventListener('click', () => {
       const sel = document.getElementById('fix-import-team-select');
