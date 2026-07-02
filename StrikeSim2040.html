@@ -14,9 +14,8 @@
   <link rel="icon" href="data:,">
   <!-- Display fonts for the command-picture chrome (Inter body, Oswald condensed titles).
        Loaded from Google Fonts; falls back to system-ui if offline. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&family=Orbitron:wght@500;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Self-hosted fonts (offline / air-gap — no external requests at runtime). Vendored under vendor/fonts/. -->
+  <link rel="stylesheet" href="vendor/fonts.css">
 
   <!-- Leaflet (Map) -->
   <link
@@ -39,22 +38,25 @@
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
   <script src="map.js?v=p13"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p5"></script>
+  <script src="engine.js?v=p6"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
   <script src="stage.js?v=p5"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p5"></script>
+  <script src="sim.js?v=p7"></script>
+  <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
+       the COA generator and the Monte Carlo 'denial' success mode. See docs/METHODOLOGY.md. -->
+  <script src="moe.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p10"></script>
+  <script src="game.js?v=p11"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p10"></script>
+  <script src="wargame.js?v=p12"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p7"></script>
+  <script src="views.js?v=p8"></script>
   <script src="inline-datasets.js?v=p5"></script>
   <style>
     :root {
@@ -70,6 +72,7 @@
     --warning: #ffa94d;
     --side-width: 380px;
     --bar-h: 56px;
+    --left-w: 340px;   /* left rail width — HUD chrome (radar/ticker) offsets derive from this */
 
     /* ── Stark-HUD overhaul tokens ───────────────────────────── */
     --amber: #ffb000;
@@ -416,6 +419,11 @@
     background: rgba(5,10,15,0.6);
     }
     body.right-collapsed { --side-width: 22px; }
+    body.left-collapsed { --left-w: 22px; }
+    /* Layout contract (C-025): while the War Game HUD is open the right rail yields
+       to it — surfaces make room for the HUD width instead of the rail. */
+    body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
+    body.wargame-open #side { visibility: hidden; }
     .table-wrap { padding: 10px 12px 16px; }
     table.mdsc-table { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--text); }
     table.mdsc-table thead th {
@@ -1216,6 +1224,24 @@
     #boot .boot-bar { margin-top:12px; width:min(440px,80vw); height:3px; background:rgba(0,216,255,.12); border-radius:2px; overflow:hidden; }
     #boot .boot-bar i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--cyan), var(--amber)); box-shadow:var(--glow-cyan); animation:bootFill 2.1s ease forwards; }
     @keyframes bootFill { to { width:100%; } }
+    #boot .boot-skip { margin-top:18px; font-size:10px; letter-spacing:2.5px; color:#4f7590; }
+
+    /* ── Responsive layout contract (C-006/C-052): the rails and command bar adapt
+       to viewport width; JS auto-collapse below the tactical minimum lives in the
+       shell resize handler. ─────────────────────────────────────────────────── */
+    @media (max-width: 1280px) {
+      body { --side-width: 330px; }
+      body.right-collapsed { --side-width: 22px; }
+      body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
+      #side { width: 330px; }
+    }
+    @media (max-width: 1000px) {
+      /* Command bar wraps instead of clipping; --bar-h is re-measured by the shell
+         resize handler so dependent offsets (app top, radar, banner) follow. */
+      #cmd-bar { flex-wrap: wrap; height: auto; min-height: 56px; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+      #cmd-bar .cb-sub { display: none; }
+      .cb-telemetry .tlm:not(.defcon) { display: none; }
+    }
 
   </style>
   <style id="modal-resize-fix">
@@ -1243,6 +1269,175 @@
 
 </head>
 <body>
+  <!-- ── AppShell: single owner for layout/mode/lifecycle state (C-025). Modules read
+       AppShell.state, call AppShell.set(), and subscribe for changes; AppShell owns the
+       body classes and reacts to visibilitychange + prefers-reduced-motion so every
+       ambient loop can pause from one place (C-032/C-050). ── -->
+  <script>
+  window.AppShell = (function () {
+    "use strict";
+    var mqMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    var state = {
+      view: '3d',                                  // '3d' | 'map' | 'table' | 'org'
+      wargameOpen: false,
+      hidden: !!document.hidden,
+      reducedMotion: !!(mqMotion && mqMotion.matches)
+    };
+    var subs = [];
+    function notify(changed) {
+      for (var i = 0; i < subs.length; i++) { try { subs[i](state, changed); } catch (e) {} }
+    }
+    function applyBodyState(changed) {
+      if (changed.indexOf('wargameOpen') !== -1 && document.body) {
+        document.body.classList.toggle('wargame-open', state.wargameOpen);
+      }
+    }
+    function set(patch) {
+      var changed = [];
+      for (var k in patch) {
+        if (Object.prototype.hasOwnProperty.call(patch, k) && state[k] !== patch[k]) { state[k] = patch[k]; changed.push(k); }
+      }
+      if (changed.length) { applyBodyState(changed); notify(changed); }
+    }
+    function subscribe(fn) {
+      subs.push(fn);
+      return function () { var i = subs.indexOf(fn); if (i !== -1) subs.splice(i, 1); };
+    }
+    // Managed ambient interval: pauses while the tab is hidden, runs once immediately
+    // on resume so displays catch up (C-050).
+    function every(ms, fn) {
+      var id = null;
+      function start() { if (id == null) id = setInterval(fn, ms); }
+      function stop() { if (id != null) { clearInterval(id); id = null; } }
+      subscribe(function (s, changed) {
+        if (changed.indexOf('hidden') !== -1) { if (s.hidden) stop(); else { try { fn(); } catch (e) {} start(); } }
+      });
+      if (!state.hidden) start();
+      return { start: start, stop: stop };
+    }
+    document.addEventListener('visibilitychange', function () { set({ hidden: !!document.hidden }); });
+    if (mqMotion) {
+      var onMq = function () { set({ reducedMotion: !!mqMotion.matches }); };
+      if (mqMotion.addEventListener) mqMotion.addEventListener('change', onMq);
+      else if (mqMotion.addListener) mqMotion.addListener(onMq);
+    }
+    return {
+      state: state,
+      set: set,
+      subscribe: subscribe,
+      every: every,
+      prefersReducedMotion: function () { return state.reducedMotion; }
+    };
+  })();
+
+  // ── ModalService: shared modal lifecycle (C-028) — one owner for open/close,
+  //    focus trap, Escape-to-close, focus restore, and inert background. Modals
+  //    stay plain .modal-backdrop elements toggled display:flex/none, so existing
+  //    display-based guards (e.g. the shortcut scoping check) keep working. ──
+  window.ModalService = (function () {
+    "use strict";
+    var stack = [];        // { el, onClose, prevFocus }
+    var inertedEls = [];   // background elements inerted while any modal is open
+    var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    var INERT_IDS = ['app', 'cmd-bar', 'hud-radar', 'hud-ticker', 'wg-hud', 'hud-overlay', 'classification-banner'];
+    function focusablesIn(root) {
+      return Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE), function (el) {
+        return el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement;
+      });
+    }
+    function dialogOf(entry) { return entry.el.querySelector('[role="dialog"]') || entry.el; }
+    function applyInert() {
+      INERT_IDS.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el && !el.hasAttribute('inert')) {
+          el.setAttribute('inert', '');
+          el.setAttribute('aria-hidden', 'true');
+          inertedEls.push(el);
+        }
+      });
+    }
+    function liftInert() {
+      inertedEls.forEach(function (el) { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); });
+      inertedEls = [];
+    }
+    function open(elOrId, opts) {
+      var el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+      if (!el) return null;
+      var entry = { el: el, onClose: opts && opts.onClose, prevFocus: document.activeElement };
+      if (!stack.length) applyInert();
+      el.style.display = 'flex';
+      stack.push(entry);
+      var dlg = dialogOf(entry);
+      var f = focusablesIn(dlg);
+      if (f.length) { try { f[0].focus(); } catch (e) {} }
+      else { if (!dlg.hasAttribute('tabindex')) dlg.setAttribute('tabindex', '-1'); try { dlg.focus(); } catch (e) {} }
+      return el;
+    }
+    function close(elOrId) {
+      var el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+      var idx = -1;
+      for (var i = stack.length - 1; i >= 0; i--) { if (!el || stack[i].el === el) { idx = i; break; } }
+      if (idx === -1) { if (el) el.style.display = 'none'; return; } // not service-opened: degrade to plain hide
+      var entry = stack.splice(idx, 1)[0];
+      entry.el.style.display = 'none';
+      if (!stack.length) liftInert();
+      try { if (entry.prevFocus && document.contains(entry.prevFocus)) entry.prevFocus.focus(); } catch (e) {}
+      if (typeof entry.onClose === 'function') { try { entry.onClose(); } catch (e) {} }
+    }
+    // Capture-phase so Escape/Tab are consumed before app-level shortcut handlers.
+    document.addEventListener('keydown', function (e) {
+      if (!stack.length) return;
+      var top = stack[stack.length - 1];
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        close(top.el);
+        return;
+      }
+      if (e.key === 'Tab') {
+        var dlg = dialogOf(top);
+        var f = focusablesIn(dlg);
+        if (!f.length) { e.preventDefault(); return; }
+        var first = f[0], last = f[f.length - 1], active = document.activeElement;
+        if (e.shiftKey && (active === first || !dlg.contains(active))) { e.preventDefault(); try { last.focus(); } catch (err) {} }
+        else if (!e.shiftKey && (active === last || !dlg.contains(active))) { e.preventDefault(); try { first.focus(); } catch (err) {} }
+      }
+    }, true);
+    // Confirmation dialog (C-029): DOM-built (no innerHTML interpolation), stacks
+    // safely on any open modal, resolves false on Escape/backdrop/Cancel.
+    function confirm(opts) {
+      opts = opts || {};
+      return new Promise(function (resolve) {
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        var dlg = document.createElement('div');
+        dlg.className = 'modal';
+        dlg.setAttribute('role', 'dialog');
+        dlg.setAttribute('aria-modal', 'true');
+        dlg.setAttribute('aria-label', opts.title || 'Confirm');
+        var header = document.createElement('header');
+        var h = document.createElement('h2'); h.textContent = opts.title || 'Confirm'; header.appendChild(h);
+        var body = document.createElement('div'); body.className = 'body';
+        var p = document.createElement('p'); p.textContent = opts.body || 'Are you sure?'; body.appendChild(p);
+        if (opts.detail) { var d = document.createElement('p'); d.className = 'muted'; d.textContent = opts.detail; body.appendChild(d); }
+        var footer = document.createElement('footer');
+        var cancelBtn = document.createElement('button'); cancelBtn.type = 'button'; cancelBtn.className = 'secondary'; cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+        var okBtn = document.createElement('button'); okBtn.type = 'button'; okBtn.className = opts.danger === false ? 'secondary' : 'warn'; okBtn.textContent = opts.confirmLabel || 'Confirm';
+        footer.appendChild(cancelBtn); footer.appendChild(okBtn);
+        dlg.appendChild(header); dlg.appendChild(body); dlg.appendChild(footer);
+        backdrop.appendChild(dlg);
+        document.body.appendChild(backdrop);
+        var settled = false;
+        function settle(v) { if (settled) return; settled = true; close(backdrop); resolve(v); }
+        open(backdrop, { onClose: function () { backdrop.remove(); if (!settled) { settled = true; resolve(false); } } });
+        cancelBtn.addEventListener('click', function () { settle(false); });
+        okBtn.addEventListener('click', function () { settle(true); });
+        backdrop.addEventListener('click', function (e) { if (e.target === backdrop) settle(false); });
+      });
+    }
+    return { open: open, close: close, confirm: confirm, isOpen: function () { return stack.length > 0; } };
+  })();
+  </script>
+
   <!-- ── Stark-HUD overhaul: cinematic boot sequence + global frame overlay ── -->
   <div id="boot" role="status" aria-label="System boot">
     <div class="boot-ring"><div class="boot-core"></div></div>
@@ -1255,6 +1450,7 @@
     <span class="corner tl"></span><span class="corner tr"></span>
     <span class="corner bl"></span><span class="corner br"></span>
   </div>
+  <div id="classification-banner" aria-label="Classification marking" style="position:fixed;top:calc(var(--bar-h) + 6px);left:50%;transform:translateX(-50%);z-index:1310;pointer-events:none;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:#d6f5da;background:rgba(16,46,24,.72);border:1px solid rgba(81,207,102,.5);border-radius:4px;padding:2px 12px;box-shadow:0 0 10px rgba(81,207,102,.25)">UNCLASSIFIED // NOTIONAL DATA — NOT FOR OPERATIONAL USE</div>
 
   <!-- Operations-console command bar: brand · view switcher · global actions. The four
        module buttons (Campaign / War Game / Fullscreen / Retry 3D) relocate into #cmd-actions
@@ -1425,6 +1621,44 @@
     </div>
   </div>
 
+  <div id="intent-modal" class="modal-backdrop">
+    <div class="modal modal-xl" role="dialog" aria-modal="true" aria-labelledby="intent-title">
+      <header><h2 id="intent-title">Generate COA from Commander's Intent</h2></header>
+      <div class="body">
+        <div class="hint">Plans are optimized to a <strong>Measure of Effectiveness</strong> — halting Red's operation (Strategy of Denial) — not a body count. Answer a few questions and the system builds the steps, methods, and resource mix for you.</div>
+        <div class="mt8">
+          <label for="intent-balance">Primary effect</label>
+          <div class="row" style="align-items:center;gap:10px">
+            <span class="muted" style="font-size:11px;white-space:nowrap">Deny capability</span>
+            <input id="intent-balance" type="range" min="0" max="100" step="5" value="35" style="flex:1">
+            <span class="muted" style="font-size:11px;white-space:nowrap">Impose cost</span>
+          </div>
+          <div class="mt4" id="intent-balance-label" style="font-family:var(--mono);color:var(--accent)"></div>
+          <div class="hint mt4">Deny capability = paralyze the invasion system (C2, ISR, amphibious lift, sustainment) so the operation culminates. Impose cost = attrit the force to break the will to continue.</div>
+        </div>
+        <div class="grid mt8">
+          <div>
+            <label for="intent-risk">Acceptable friendly risk</label>
+            <select id="intent-risk" class="mt4">
+              <option value="low">Low — only high-confidence strikes</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High — accept low-probability strikes</option>
+            </select>
+          </div>
+          <div>
+            <label for="intent-steps">Plan size (max steps)</label>
+            <input id="intent-steps" type="number" min="1" max="120" step="1" value="12" class="mt4">
+          </div>
+        </div>
+        <div id="intent-preview" class="interpretation-strip mt8" data-tone="warn" style="display:none"></div>
+      </div>
+      <footer>
+        <button id="intent-cancel" type="button" class="secondary">Cancel</button>
+        <button id="intent-generate" type="button">Generate Denial COA</button>
+      </footer>
+    </div>
+  </div>
+
     <div id="app">
       <!-- 3D + Map surfaces -->
       <div id="graph"></div>
@@ -1493,6 +1727,7 @@
           <div class="left-actions">
             <button id="neutralize-btn-left" type="button" class="warn full" disabled>Strike Selected</button>
             <button id="reset-sim-btn" type="button" class="secondary" title="Reset simulation state">Reset Sim</button>
+            <button id="undo-btn" type="button" class="secondary" title="Nothing to undo" disabled>Undo</button>
             <button id="summary-btn" type="button" class="secondary" title="Quick status summary">Summary</button>
           </div>
         </div>
@@ -1595,6 +1830,7 @@
     <div class="section" aria-labelledby="coa-generator-title">
     <h3 id="coa-generator-title">COA Generator</h3>
     <button id="generate-coa-btn" type="button">Generate COA</button>
+    <button id="gen-intent-btn" type="button" class="mt6" style="width:100%" title="Interview-driven, denial-MOE optimized plan">◎ Generate from Intent (Denial-MOE)</button>
     </div>
 
     <div class="panel" aria-labelledby="coa-builder-title">
@@ -1655,6 +1891,7 @@
             <option value="impact" selected>Impact ≥ Threshold</option>
             <option value="nodes">Neutralize Top N Red</option>
             <option value="nodes_any">Neutralize N Red (any)</option>
+            <option value="denial">Denial — halt / capitulate (MOE)</option>
           </select>
         </div>
         <div>
@@ -1678,7 +1915,7 @@
         <div id="mc-progress" class="progress-bar">0%</div>
       </div>
       <div class="mt8" aria-labelledby="system-health-title">
-        <h3 id="system-health-title" class="muted mt0">System Health (Monte Carlo)</h3>
+        <h3 id="system-health-title" class="muted mt0">Plan Confidence (Monte Carlo)</h3>
         <div id="strength-bar-container">
           <div id="strength-bar"></div>
         </div>
@@ -1688,6 +1925,7 @@
         <div class="result-metric">
           <span class="result-value" id="mc-success">—</span>
           <span class="result-label">Chance of Success</span>
+          <span class="result-ci" id="mc-success-ci" style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--muted);margin-top:3px"></span>
         </div>
         <div class="result-metric">
           <span class="result-value" id="mc-exp-dmg">—</span>
@@ -2208,6 +2446,11 @@
     // Persistent header indicator of the active view (and Geo on/off + pinned count),
     // so mode changes are never signalled by a button label alone.
     function updateViewStatus() {
+    // Publish the canonical view to the shell first — every toggle path funnels
+    // through here, so this is the one place layout/chrome state stays honest.
+    if (window.AppShell) {
+      AppShell.set({ view: mapModeEnabled ? 'map' : tableModeEnabled ? 'table' : orgModeEnabled ? 'org' : '3d' });
+    }
     const el = document.getElementById('view-status');
     if (!el) return;
     let view = '3D Network';
@@ -2259,7 +2502,10 @@
       const order = ['cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
       const move = () => order.forEach(id => { const el = document.getElementById(id); if (el && el.parentElement !== bar) bar.appendChild(el); });
       move();
-      try { new MutationObserver(move).observe(document.body, { childList: true }); } catch (e) {}
+      // subtree:true — some modules append their launcher inside #app rather than
+      // directly under <body> (e.g. #wg-launch), which a childList-only observer
+      // on body never sees; the button then hides beneath the command bar.
+      try { new MutationObserver(move).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
     }
 
     function enableGeoMode() {
@@ -2571,7 +2817,6 @@
     const node = selectedNode;
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
-    modal.style.display = 'flex';
 
     let optionsHtml = Object.entries(strikeMethods).map(([key, method]) => {
     const difficultyMod = settings.difficultyModifiers[node.difficulty] || 1.0;
@@ -2597,14 +2842,15 @@
     </div>
     `;
     document.body.appendChild(modal);
+    ModalService.open(modal, { onClose: () => modal.remove() });
 
     modal.addEventListener('click', (e) => {
     const target = e.target.closest('button');
     if (e.target === modal || target?.classList.contains('modal-close-btn')) {
-    modal.remove();
+    ModalService.close(modal);
     } else if (target?.dataset.method) {
     executeStrike(node, target.dataset.method);
-    modal.remove();
+    ModalService.close(modal);
     }
     });
     }
@@ -2735,6 +2981,69 @@
     }
     }
 
+    // --- C-029: undo snapshot for destructive actions -----------------------
+    // One-deep snapshot captured right before a confirmed destructive action
+    // (reset, replace-import). Restore goes through the same machinery the
+    // import path uses (AppState.replaceActiveGraph + initUI), so it is exactly
+    // as safe as importing the previous graph back in.
+    let undoSnapshot = null;
+    function cloneNodeForUndo(n) {
+      const o = {};
+      for (const k in n) {
+        if (!Object.prototype.hasOwnProperty.call(n, k)) continue;
+        if (k.startsWith('__') || k === 'vx' || k === 'vy' || k === 'vz' || k === 'index') continue; // force-graph internals
+        const v = n[k];
+        if (typeof v === 'function') continue;
+        try { o[k] = (v == null || typeof v !== 'object') ? v : JSON.parse(JSON.stringify(v)); } catch (e) {}
+      }
+      return o;
+    }
+    function captureUndoSnapshot(label) {
+      try {
+        undoSnapshot = {
+          label,
+          graph: {
+            nodes: data.nodes.map(cloneNodeForUndo),
+            // force-graph rewrites link endpoints to node objects — normalize back to ids
+            links: (data.links || []).map(l => ({
+              ...l,
+              source: (l.source && l.source.id != null) ? l.source.id : l.source,
+              target: (l.target && l.target.id != null) ? l.target.id : l.target
+            }))
+          },
+          simStats: JSON.parse(JSON.stringify(simStats)),
+          at: new Date()
+        };
+      } catch (e) { undoSnapshot = null; }
+      updateUndoButton();
+    }
+    function undoLastChange() {
+      if (!undoSnapshot) { showToast('Nothing to undo.', 'info'); return; }
+      const snap = undoSnapshot;
+      undoSnapshot = null;
+      try {
+        data = AppState.replaceActiveGraph(snap.graph);
+        Object.keys(simStats).forEach(k => { if (k in snap.simStats) simStats[k] = snap.simStats[k]; });
+        initUI();
+        if (graphInstance) {
+          graphInstance.graphData(data);
+          if (!geoModeEnabled) graphInstance.d3ReheatSimulation();
+        }
+        if (mapModeEnabled) refreshMapMarkers();
+        addEvent({ type: 'Sim', text: `Undo: restored state from before ${snap.label}.` });
+        showToast(`Restored state from before ${snap.label}.`, 'success');
+      } catch (e) {
+        showToast('Undo failed: ' + (e && e.message ? e.message : e), 'error');
+      }
+      updateUndoButton();
+    }
+    function updateUndoButton() {
+      const b = document.getElementById('undo-btn');
+      if (!b) return;
+      b.disabled = !undoSnapshot;
+      b.title = undoSnapshot ? `Undo: restore state from before ${undoSnapshot.label}` : 'Nothing to undo';
+    }
+
     function resetSimulation() {
     resetApplicationState();
     initUI();
@@ -2749,7 +3058,6 @@
     function openSummary() {
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
-    modal.style.display = 'flex';
 
     const activeNodes = data.nodes.filter(n => n.status !== 'Neutralized').length;
     const avgHealth = computeStrength();
@@ -2770,8 +3078,9 @@
     </div>
     `;
     document.body.appendChild(modal);
+    ModalService.open(modal, { onClose: () => modal.remove() });
     modal.addEventListener('click', (e) => {
-    if (e.target === modal || e.target.closest('.modal-close-btn')) modal.remove();
+    if (e.target === modal || e.target.closest('.modal-close-btn')) ModalService.close(modal);
     });
     }
 
@@ -2790,8 +3099,8 @@
     addEvent({ type: 'Export', text: 'Session exported to JSON.' });
     }
 
-    function openImportModal() { document.getElementById('import-modal').style.display = 'flex'; }
-    function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
+    function openImportModal() { ModalService.open('import-modal'); }
+    function closeImportModal() { ModalService.close('import-modal'); }
 
     // Validate a normalized payload BEFORE anything destructive happens. Drops unusable
     // records and returns an error if nothing valid remains, so a malformed-but-parseable
@@ -2904,8 +3213,12 @@
     showToast(`Added ${stats.nodesAdded} nodes (${stats.linksAdded} links).`, 'success');
 
     } else { // replace
+    captureUndoSnapshot('the graph replacement'); // C-029: snapshot before anything destructive
     resetApplicationState();
-    importedData.nodes.forEach(node => node.team = assignedTeam);
+    // Preserve each node's own affiliation; only fall back to the selected team when a
+    // node has no valid team (C-021: don't flatten a mixed-force file to a single side).
+    const _validTeams = ['blue', 'red', 'green', 'yellow', '3rd_party'];
+    importedData.nodes.forEach(node => { if (!node.team || !_validTeams.includes(String(node.team).toLowerCase())) node.team = assignedTeam; });
     // Swap the active scenario's graph via the store, keeping `data` in sync with it.
     data = AppState.replaceActiveGraph(importedData);
     addEvent({ type: 'Import', text: `Replaced graph with ${data.nodes.length} nodes.` });
@@ -3333,7 +3646,18 @@
     document.getElementById('org-btn').addEventListener('click', toggleOrgMode);
     document.getElementById('legend-btn').addEventListener('click', toggleLegend);
     document.getElementById('geo-mode-btn').addEventListener('click', () => geoModeEnabled ? disableGeoMode() : enableGeoMode());
-    document.getElementById('reset-sim-btn').addEventListener('click', resetSimulation);
+    document.getElementById('reset-sim-btn').addEventListener('click', async () => {
+      const ok = await ModalService.confirm({
+        title: 'Reset simulation?',
+        body: 'The session clock, strike stats, selection, and event log return to baseline. (Node battle damage is not healed — reload or re-import the scenario for a fresh network.)',
+        detail: 'You can Undo immediately afterwards.',
+        confirmLabel: 'Reset Sim'
+      });
+      if (!ok) return;
+      captureUndoSnapshot('the simulation reset');
+      resetSimulation();
+    });
+    document.getElementById('undo-btn').addEventListener('click', undoLastChange);
     document.getElementById('toggle-payoff-btn').addEventListener('click', toggleHighPayoff);
     document.getElementById('toggle-risk-btn').addEventListener('click', toggleHighRisk);
     document.getElementById('toggle-contrast-btn').addEventListener('click', toggleHighContrast);
@@ -3349,38 +3673,95 @@
     const handleKey = (e, fn) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); }
     };
-    if (leftPanel && leftCollapseBtn) {
-      const setLeftCollapsed = (collapsed) => {
-        leftPanel.classList.toggle('locked-collapsed', collapsed);
-        if (leftHandle) {
-          leftHandle.setAttribute('aria-expanded', String(!collapsed));
-          const arrow = leftHandle.querySelector('.arrow');
-          if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
-        }
-        leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
-      };
-      setLeftCollapsed(false);
-      leftCollapseBtn.addEventListener('click', () => setLeftCollapsed(true));
+    // Rail collapse setters are shared by the user toggles AND the responsive
+    // auto-collapse below (C-006): a manual toggle records user intent so a later
+    // viewport crossing doesn't fight the operator.
+    let userLeftCollapsed = null;   // null = no explicit preference
+    let userRightCollapsed = null;
+    const setLeftCollapsed = (collapsed) => {
+      if (!leftPanel) return;
+      leftPanel.classList.toggle('locked-collapsed', collapsed);
+      document.body.classList.toggle('left-collapsed', collapsed); // drives --left-w for HUD chrome
       if (leftHandle) {
-        const toggleLeft = () => setLeftCollapsed(!leftPanel.classList.contains('locked-collapsed'));
+        leftHandle.setAttribute('aria-expanded', String(!collapsed));
+        const arrow = leftHandle.querySelector('.arrow');
+        if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
+      }
+      if (leftCollapseBtn) leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+    };
+    const setRightCollapsed = (collapsed) => {
+      if (!rightPanel) return;
+      rightPanel.classList.toggle('collapsed', collapsed);
+      document.body.classList.toggle('right-collapsed', collapsed);
+    };
+    if (leftPanel && leftCollapseBtn) {
+      setLeftCollapsed(false);
+      leftCollapseBtn.addEventListener('click', () => { userLeftCollapsed = true; setLeftCollapsed(true); });
+      if (leftHandle) {
+        const toggleLeft = () => {
+          const next = !leftPanel.classList.contains('locked-collapsed');
+          userLeftCollapsed = next;
+          setLeftCollapsed(next);
+        };
         leftHandle.addEventListener('click', toggleLeft);
         leftHandle.addEventListener('keydown', (e) => handleKey(e, toggleLeft));
       }
     }
     if (rightPanel && rightCollapseBtn) {
       rightCollapseBtn.addEventListener('click', () => {
-        rightPanel.classList.toggle('collapsed');
-        document.body.classList.toggle('right-collapsed');
+        const next = !rightPanel.classList.contains('collapsed');
+        userRightCollapsed = next;
+        setRightCollapsed(next);
       });
     }
     if (rightPanel && rightHandle) {
       const toggleRight = () => {
-        rightPanel.classList.toggle('collapsed');
-        document.body.classList.toggle('right-collapsed');
+        const next = !rightPanel.classList.contains('collapsed');
+        userRightCollapsed = next;
+        setRightCollapsed(next);
       };
       rightHandle.addEventListener('click', toggleRight);
       rightHandle.addEventListener('keydown', (e) => handleKey(e, toggleRight));
     }
+
+    // Responsive auto-collapse (C-006) + command-bar height re-measure (C-052).
+    // Crossing below a breakpoint collapses a rail; crossing back restores the
+    // user's last explicit choice (or expands when they never chose).
+    let wasNarrowRight = null, wasNarrowLeft = null;
+    const applyResponsiveShell = () => {
+      const w = window.innerWidth;
+      const narrowRight = w < 1080, narrowLeft = w < 860;
+      if (narrowRight !== wasNarrowRight) {
+        setRightCollapsed(narrowRight ? true : (userRightCollapsed ?? false));
+        wasNarrowRight = narrowRight;
+      }
+      if (narrowLeft !== wasNarrowLeft) {
+        setLeftCollapsed(narrowLeft ? true : (userLeftCollapsed ?? false));
+        wasNarrowLeft = narrowLeft;
+      }
+      // The bar wraps below 1000px (CSS, height:auto there); republish its real
+      // height so every var(--bar-h) consumer (app top, radar, banner, WG HUD)
+      // follows. At full width the bar's height IS var(--bar-h), so measuring
+      // would be circular — reset to the stylesheet default instead.
+      const bar = document.getElementById('cmd-bar');
+      if (bar) {
+        if (w < 1000) {
+          const h = Math.max(56, Math.round(bar.getBoundingClientRect().height));
+          document.documentElement.style.setProperty('--bar-h', h + 'px');
+        } else {
+          document.documentElement.style.removeProperty('--bar-h');
+        }
+      }
+    };
+    applyResponsiveShell();
+    // The bar's content changes after load (module launch buttons relocate into it),
+    // which can change its wrapped height — re-measure whenever the bar resizes.
+    // No feedback loop: below 1000px the bar's height is content-driven (height:auto,
+    // literal min-height), so writing --bar-h never changes the bar itself.
+    try {
+      const barEl = document.getElementById('cmd-bar');
+      if (barEl && window.ResizeObserver) new ResizeObserver(() => applyResponsiveShell()).observe(barEl);
+    } catch (e) {}
 
     // Event Log
     document.getElementById('toggle-log-btn').addEventListener('click', toggleEventLog);
@@ -3431,6 +3812,8 @@
     // Space = pause/resume sim tick timer
     window.addEventListener('keydown', (e) => {
       if (isTypingTarget(e.target)) return;
+      // C-027: don't let global shortcuts fire behind an open modal (Escape still passes).
+      if (e.key !== 'Escape' && Array.prototype.some.call(document.querySelectorAll('.modal-backdrop'), m => getComputedStyle(m).display !== 'none')) return;
       const key = e.key;
       if (key === 'Escape') {
         selectNode(null);
@@ -3470,7 +3853,19 @@
     // Import modal
     document.getElementById('import-cancel-btn').addEventListener('click', closeImportModal);
     document.getElementById('import-add-btn').addEventListener('click', () => processImport('add'));
-    document.getElementById('import-replace-btn').addEventListener('click', () => processImport('replace'));
+    document.getElementById('import-replace-btn').addEventListener('click', async () => {
+      const file = document.getElementById('import-file-input').files[0];
+      if (file) { // no-file path falls through to processImport's own guard/toast
+        const ok = await ModalService.confirm({
+          title: 'Replace entire graph?',
+          body: `The current scenario graph will be replaced by "${file.name}".`,
+          detail: 'The file is validated before anything is destroyed, and Undo restores the previous graph.',
+          confirmLabel: 'Replace Graph'
+        });
+        if (!ok) return;
+      }
+      processImport('replace');
+    });
     // Fix last import assignment
     document.getElementById('fix-import-team-btn').addEventListener('click', () => {
       const sel = document.getElementById('fix-import-team-select');
@@ -3486,8 +3881,12 @@
       if (leftPanelEl) leftPanelEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
     });
 
-    // Resize handling for map
+    // Resize handling for map + the responsive shell contract (rAF-throttled)
+    let resizeRaf = 0;
     window.addEventListener('resize', () => {
+    if (!resizeRaf) {
+      resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; applyResponsiveShell(); });
+    }
     if (mapModeEnabled && MapModule.getMap()) setTimeout(() => MapModule.invalidateSize(), 50);
     if (selectedNode && !mapModeEnabled) setTimeout(() => updateNodePopupPosition(selectedNode), 30);
     if (orgModeEnabled) setTimeout(renderOrgChart, 80);
@@ -3495,6 +3894,42 @@
 
     // COA Generator
     document.getElementById('generate-coa-btn').addEventListener('click', openCOAWizard);
+    // --- Goal-driven (denial-MOE) COA generation from commander's intent ---
+    (function wireIntentGenerator() {
+      const open = document.getElementById('gen-intent-btn');
+      const modal = document.getElementById('intent-modal');
+      if (!open || !modal) return;
+      const slider = document.getElementById('intent-balance');
+      const balLbl = document.getElementById('intent-balance-label');
+      const emphasis = v => v < 34 ? 'Deny capability' : v > 66 ? 'Impose cost' : 'Balanced (capability + cost)';
+      const refreshLbl = () => { if (slider && balLbl) balLbl.textContent = emphasis(Number(slider.value)) + ' · balance ' + (Number(slider.value) / 100).toFixed(2); };
+      if (slider) slider.addEventListener('input', refreshLbl);
+      refreshLbl();
+      open.addEventListener('click', () => { ModalService.open(modal); refreshLbl(); });
+      document.getElementById('intent-cancel').addEventListener('click', () => { ModalService.close(modal); });
+      document.getElementById('intent-generate').addEventListener('click', () => {
+        try {
+          if (!window.MoeModule) { showToast('MOE engine unavailable.', 'error'); return; }
+          const balance = Math.min(1, Math.max(0, Number(slider.value) / 100));
+          const riskMap = { low: 0.25, medium: 0.5, high: 0.8 };
+          const riskTolerance = riskMap[document.getElementById('intent-risk').value] || 0.5;
+          const maxSteps = Math.max(1, Math.min(120, Number(document.getElementById('intent-steps').value) || 12));
+          const methods = Object.keys(strikeMethods).map(k => ({ key: k, name: strikeMethods[k].name, cost: strikeMethods[k].cost || 1 }));
+          const res = window.MoeModule.generateCoa(data.nodes, { balance, maxSteps, riskTolerance }, { methods, strikeProb: strikeProbFor });
+          if (!res.steps.length) { showToast('No effective denial steps found — raise risk tolerance or steps.', 'warn'); return; }
+          builtCOA = res.steps.slice();
+          updateCOAListUI();
+          window.__denialIntent = { balance, riskTolerance };
+          const sel = document.getElementById('mc-success-mode'); if (sel) sel.value = 'denial';
+          const mixStr = Object.keys(res.resourceMix).map(k => (strikeMethods[k] ? strikeMethods[k].name : k) + ' ' + res.resourceMix[k] + '%').join(', ');
+          const hint = document.getElementById('coa-step-hint');
+          if (hint) hint.textContent = res.rationale + (mixStr ? ' Resource mix: ' + mixStr + '.' : '');
+          addEvent({ type: 'COA', text: 'Intent-based denial COA: ' + res.steps.length + ' steps, projected denial ' + Math.round(res.projectedDenial * 100) + '%.' });
+          showToast('Denial COA generated (' + res.steps.length + ' steps). Review, then Simulate Plan.', 'success', 6000);
+          ModalService.close(modal);
+        } catch (e) { showToast('Generation failed: ' + (e && e.message ? e.message : e), 'error'); }
+      });
+    })();
     document.getElementById('coa-close-btn').addEventListener('click', closeCOAModal);
     document.getElementById('coa-simulate-btn').addEventListener('click', simulateCOA);
     // Monte Carlo
@@ -3504,7 +3939,7 @@
     });
     document.getElementById('run-single-btn').addEventListener('click', simulatePlanOnce);
     document.getElementById('mc-report-btn').addEventListener('click', openMcReport);
-    document.getElementById('mc-report-close').addEventListener('click', () => { document.getElementById('mc-report-modal').style.display = 'none'; });
+    document.getElementById('mc-report-close').addEventListener('click', () => { ModalService.close('mc-report-modal'); });
     // MC controls
     const trialsInput = document.getElementById('mc-trials');
     if (trialsInput) trialsInput.addEventListener('input', updateMcRunButtonLabel);
@@ -3584,7 +4019,16 @@
       if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% success.`;
     });
     document.getElementById('coa-clear-btn').addEventListener('click', clearCOAPlan);
-    document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => runMonteCarlo(getMcTrialCount()));
+    document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => {
+      // C-004: the builder's "Simulate Plan" must simulate the BUILT plan, never silently
+      // fall back to a stale last-generated COA. Require at least one built step.
+      if (!builtCOA || !builtCOA.length) {
+        addEvent({ type: 'COA', text: 'Add at least one step to the COA Builder before simulating the plan.' });
+        showToast('Add a step to the plan first — nothing to simulate.', 'warn');
+        return;
+      }
+      runMonteCarlo(getMcTrialCount());
+    });
 
     // COA Wizard bindings
     const wiz = {
@@ -3865,291 +4309,20 @@
     // blueProfiles/redProfiles, randIn/createRng/percentile and buildSimContext now
     // live in SimModule (sim.js); aliased to their original global names at load.
 
-    function methodKeyFromStep(step) {
-      if (step.methodKey) return step.methodKey;
-      if (step.blueKey) return step.blueKey;
-      if (step.blue === 'Kinetic Strike') return 'kinetic';
-      if (step.blue === 'Cyber Attack') return 'cyber';
-      if (step.blue === 'EW Jamming') return 'ew';
-      if (step.blue === 'SOF Mission') return 'sof';
-      return 'kinetic';
-    }
-
-    function domainAffinity(srcInfo, dstInfo, methodKey) {
-      if (!srcInfo || !dstInfo) return 1.0;
-      const sd = new Set(srcInfo.domain || []);
-      const dd = new Set(dstInfo.domain || []);
-      const shared = Array.from(sd).some(d => dd.has(d));
-      let mult = shared ? 1.3 : 1.0;
-      const srcType = String(srcInfo.type || '').toLowerCase();
-      const dstType = String(dstInfo.type || '').toLowerCase();
-      if (srcType.includes('command') || dstType.includes('command') || srcType.includes('relay') || dstType.includes('relay')) {
-        mult *= 1.15;
-      }
-      if ((methodKey === 'cyber' || methodKey === 'ew') && (dd.has('Cyber') || dd.has('EW') || dstType.includes('relay'))) {
-        mult *= 1.15;
-      }
-      return Math.min(1.8, Math.max(0.8, mult));
-    }
-
-    function computeVulnMultiplier(info, method, intelQ) {
-      const hasV = (info.vulnerabilities || []).includes(method.vulnerability);
-      if (hasV) return Math.min(1.35, Math.max(1.0, 1.2 + (intelQ - 1) * 0.5));
-      return Math.min(1.0, Math.max(0.6, 0.85 - (intelQ - 1) * 0.35));
-    }
-
-    function chooseRedCounter(methodKey, redBudget, redTypeBudget, detectionLevel = 0) {
-      const optionsByMethod = {
-        kinetic: ['Counter-Strike', 'Reinforcement', 'Sabotage'],
-        cyber: ['Cyber Defense', 'Deception', 'Reinforcement'],
-        ew: ['EW Countermeasure', 'Deception', 'Reinforcement'],
-        sof: ['SOF Interception', 'Reinforcement']
-      };
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const opts = optionsByMethod[methodKey] || optionsByMethod.kinetic;
-      let best = null;
-      opts.forEach(name => {
-        const cost = redCounterCosts[name] || 0;
-        const cat = redCounterType[name] || 'ke';
-        const canAfford = (redTypeBudget?.[cat] !== undefined ? redTypeBudget[cat] >= cost : redBudget >= cost);
-        if (!canAfford) return;
-        const prof = redProfiles[name] || {};
-        const pMult = prof.pMult ?? prof.globalPmult ?? 0.95;
-        const strength = (1 - pMult) + detectionLevel * 0.2;
-        if (!best || strength > best.strength) best = { name, cost, cat, strength };
-      });
-      return best;
-    }
-
+    // B0 (Increment B): the inline per-trial mirror (simulateTrial + its private
+    // helpers methodKeyFromStep/domainAffinity/computeVulnMultiplier/chooseRedCounter)
+    // is retired. ALL trial execution — including successMode 'denial' — routes through
+    // the canonical shared core in sim.js (SimModule.simulateTrialCore, aliased to
+    // window.simulateTrialCore). This thin shim only injects the shell's live config
+    // globals; context/rng fallbacks and the injected MOE handle (context.moe, wired
+    // from window.MoeModule) are handled by the sim.js wrapper layer.
     function simulateTrial(actionPlan, opts = {}) {
-      const {
-        context = buildSimContext(),
-        rng = createRng(),
-        successMode = 'impact',
-        successN = 3,
-        victoryThreshold = 100,
-        prioritySet = null,
-        maxBlueLoss = Infinity,
-        regenFrac = 0,
-        detectionGrowthTarget = 0.08,
-        detectionGrowthDomain = 0.04,
-        detectionPenalty = 0.18,
-        intelNoise = 0.15,
-        fatigueRate = 0.03,
-        dynamicRed = true,
-        logSteps = false
-      } = opts;
-
-      const { nodeInfo, adj } = context;
-      const blueBudgetBase = teamResources?.blue ?? 0;
-      const redBudgetBase = teamResources?.red ?? 0;
-      const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 }));
-      const redTypeBase  = JSON.parse(JSON.stringify(teamResources?.redTypes  || { ke:0, ew:0, jam:0, sof:0 }));
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const blueMethodType = { kinetic:'ke', cyber:'ew', ew:'jam', sof:'sof' };
-
-      const state = new Map();
-      nodeInfo.forEach((info, id) => state.set(id, { alive: info.status !== 'Neutralized', health: info.health }));
-      const detectionTarget = new Map();
-      const detectionDomain = new Map();
-      const fatigue = { kinetic: 0, cyber: 0, ew: 0, sof: 0 };
-      const intelQ = 1 + (rng.next() * 2 - 1) * intelNoise;
-
-      let impact = 0;
-      let stepsToGoal = null;
-      let blueBudget = blueBudgetBase;
-      let redBudget = redBudgetBase;
-      let blueSpent = 0;
-      let redSpent = 0;
-      let blueTypeBudget = JSON.parse(JSON.stringify(blueTypeBase));
-      let redTypeBudget  = JSON.parse(JSON.stringify(redTypeBase));
-      const redNeutralized = new Set();
-      const blueNeutralized = new Set();
-      const damageThisRun = new Map();
-      const log = [];
-
-      function recordDamage(id, delta, info) {
-        if (!info || info.team !== 'red' || !delta || delta <= 0) return;
-        const prev = damageThisRun.get(id) || 0;
-        damageThisRun.set(id, prev + delta);
-      }
-
-      function pickRedTargetFromState() {
-        let bestId = null, bestScore = -Infinity;
-        nodeInfo.forEach((info, id) => {
-          const st = state.get(id);
-          if (!st || !st.alive) return;
-          if (info.team !== 'red') return;
-          const diffW = { Soft: 1.1, Medium: 1.0, Hardened: 0.8, Buried: 0.6 };
-          const base = (info.importance || 5) * 2 + (info.cascScore || 1) * 4;
-          const sc = base * (diffW[info.difficulty] || 1.0);
-          if (sc > bestScore) { bestScore = sc; bestId = id; }
-        });
-        return bestId;
-      }
-
-      function applyCascade(srcId, srcInfo, methodKey) {
-        const base = 5 * (srcInfo.cascScore || 1) * settings.cascadeAlpha;
-        const neigh = adj.get(srcId) || new Set();
-        neigh.forEach(nid => {
-          const ninfo = nodeInfo.get(nid);
-          const stn = state.get(nid);
-          if (!ninfo || !stn?.alive) return;
-          const mult = domainAffinity(srcInfo, ninfo, methodKey);
-          const cd = base * mult;
-          stn.health = Math.max(0, stn.health - cd);
-          recordDamage(nid, cd, ninfo);
-          if (stn.health <= 0 && stn.alive) {
-            stn.alive = false;
-            if (ninfo.team === 'red') redNeutralized.add(nid);
-            else if (ninfo.team === 'blue') blueNeutralized.add(nid);
-          }
-        });
-      }
-
-      function successSatisfied() {
-        if (successMode === 'impact') return impact >= victoryThreshold;
-        if (successMode === 'nodes_any') return redNeutralized.size >= successN;
-        if (successMode === 'nodes') {
-          const pri = prioritySet || new Set();
-          let count = 0;
-          redNeutralized.forEach(id => { if (pri.has(id)) count++; });
-          return count >= successN;
-        }
-        if (successMode === 'goal') {
-          const pri = prioritySet || new Set();
-          let count = 0;
-          redNeutralized.forEach(id => { if (pri.has(id)) count++; });
-          return count >= successN && blueNeutralized.size <= maxBlueLoss;
-        }
-        return false;
-      }
-
-      for (let i = 0; i < actionPlan.length; i++) {
-        const step = actionPlan[i];
-        const methodKey = methodKeyFromStep(step);
-        const method = strikeMethods[methodKey] || strikeMethods.kinetic;
-        const targetId = step.targetId || pickRedTargetFromState();
-        if (!targetId) break;
-        let info = nodeInfo.get(targetId);
-        let st = state.get(targetId);
-        if (!info || !st?.alive) {
-          const alt = pickRedTargetFromState();
-          if (!alt) break;
-          info = nodeInfo.get(alt);
-          st = state.get(alt);
-        }
-
-        const diff = settings.difficultyModifiers[info.difficulty] || 1.0;
-        const vuln = computeVulnMultiplier(info, method, intelQ);
-        let p = method.baseProb * diff * vuln;
-
-        const targetDet = detectionTarget.get(info.id) || 0;
-        const domainKey = (info.domain || [])[0] || methodKey;
-        const domainDet = detectionDomain.get(domainKey) || 0;
-        const detPenalty = 1 - Math.min(0.6, (targetDet + domainDet) * detectionPenalty);
-        p *= detPenalty;
-
-        const fatiguePenalty = Math.max(0.7, 1 - fatigueRate * (fatigue[methodKey] || 0));
-        p *= fatiguePenalty;
-
-        let redChoice = null;
-        if (dynamicRed) {
-          redChoice = chooseRedCounter(methodKey, redBudget, redTypeBudget, targetDet + domainDet);
-        } else if (step.red) {
-          redChoice = { name: step.red, cost: redCounterCosts[step.red] || 0, cat: redCounterType[step.red] || 'ke' };
-        }
-        const redProfile = redChoice ? redProfiles[redChoice.name] || null : null;
-        const redActive = redChoice && (redTypeBudget?.[redChoice.cat] !== undefined ? (redTypeBudget[redChoice.cat] >= redChoice.cost) : (redBudget >= redChoice.cost));
-        if (redActive && redProfile) {
-          if (redProfile.globalPmult) p *= redProfile.globalPmult;
-          if (redProfile.pMult) p *= redProfile.pMult;
-        }
-
-        p = Math.min(Math.max(p, 0.05), 0.98);
-        const blueCost = method.cost || 0;
-        const blueCat = blueMethodType[methodKey] || 'ke';
-        const canAct = (blueTypeBudget[blueCat] !== undefined ? blueTypeBudget[blueCat] >= blueCost : blueBudget >= blueCost);
-
-        let line = logSteps ? `S${i+1}: ${method.name} -> ${info.name} (${info.id})` : '';
-        if (!canAct) {
-          if (logSteps) log.push(`${line} [Skipped: insufficient Blue resources]`);
-          continue;
-        }
-        if (blueTypeBudget[blueCat] !== undefined) blueTypeBudget[blueCat] -= blueCost;
-        else blueBudget -= blueCost;
-        blueSpent += blueCost;
-
-        if (redActive) {
-          if (redTypeBudget?.[redChoice.cat] !== undefined) redTypeBudget[redChoice.cat] -= redChoice.cost;
-          else redBudget -= redChoice.cost;
-          redSpent += redChoice.cost;
-        }
-
-        const success = rng.next() < p;
-        if (success) {
-          const dmg = method.baseDamage[0] + rng.next() * (method.baseDamage[1] - method.baseDamage[0]);
-          st.health = Math.max(0, st.health - dmg);
-          recordDamage(info.id, dmg, info);
-          if (st.health <= 0 && st.alive) {
-            st.alive = false;
-            if (info.team === 'red') redNeutralized.add(info.id);
-            else if (info.team === 'blue') blueNeutralized.add(info.id);
-          }
-          impact += (info.importance || 5) * (info.cascScore || 1);
-          applyCascade(info.id, info, methodKey);
-          if (logSteps) line += ` — Hit (${Math.round(dmg)} dmg)`;
-        } else if (logSteps) {
-          line += ' — Missed';
-        }
-
-        detectionTarget.set(info.id, Math.min(1.0, (detectionTarget.get(info.id) || 0) + detectionGrowthTarget));
-        detectionDomain.set(domainKey, Math.min(1.0, (detectionDomain.get(domainKey) || 0) + detectionGrowthDomain));
-        fatigue[methodKey] = (fatigue[methodKey] || 0) + 1;
-
-        if (redActive && (redChoice.name === 'Counter-Strike' || redChoice.name === 'SOF Interception')) {
-          let cand = null, best = -1;
-          nodeInfo.forEach((bi, bid) => {
-            const st2 = state.get(bid);
-            if (bi.team === 'blue' && st2?.alive) {
-              const s = (bi.importance || 5) + (bi.cascScore || 1) * 2;
-              if (s > best) { best = s; cand = bid; }
-            }
-          });
-          if (cand) {
-            const st2 = state.get(cand);
-            const bi = nodeInfo.get(cand);
-            const rd = 15 + rng.next() * 35;
-            st2.health = Math.max(0, st2.health - rd);
-            if (st2.health <= 0 && st2.alive) { st2.alive = false; blueNeutralized.add(cand); }
-            if (logSteps) line += `; Red counter damaged ${bi.name} (${Math.round(rd)} dmg)`;
-          }
-        }
-
-        if (logSteps) log.push(line);
-
-        if (regenFrac > 0) {
-          blueBudget += blueBudgetBase * regenFrac;
-          redBudget += redBudgetBase * regenFrac;
-        }
-
-        if (blueNeutralized.size > maxBlueLoss) break;
-        if (successSatisfied() && stepsToGoal === null) stepsToGoal = i + 1;
-      }
-
-      return {
-        success: successSatisfied(),
-        stepsToGoal: stepsToGoal ?? actionPlan.length,
-        impact,
-        redNeutralized,
-        blueNeutralized,
-        blueSpend: blueSpent,
-        redSpend: redSpent,
-        damageThisRun,
-        log
-      };
+      return simulateTrialCore(actionPlan, Object.assign({
+        teamResources,
+        settings,
+        strikeMethods,
+        redProfiles
+      }, opts));
     }
 
     function redResponseForMethod(methodKey, stepIdx) {
@@ -4171,453 +4344,6 @@
         const redAct = redResponseForMethod(s.methodKey, i);
         return { step: i+1, blue: methodName, blueKey: s.methodKey, targetId: s.targetId, red: redAct };
       });
-    }
-
-    async function runMonteCarloLegacy(trials = 10000) {
-      const btn = document.getElementById('run-mc-btn');
-      const bar = document.getElementById('mc-progress');
-      const outSuccess = document.getElementById('mc-success');
-      const outDmg = document.getElementById('mc-exp-dmg');
-      const outTime = document.getElementById('mc-time');
-      const singleBtn = document.getElementById('run-single-btn');
-      const btnLabel = btn ? btn.textContent : '';
-      const singleLabel = singleBtn ? singleBtn.textContent : '';
-
-      // choose source plan: builtCOA (preferred) or last generated
-      let actionPlan = null;
-      if (builtCOA && builtCOA.length) {
-        actionPlan = toActionPlanFromBuilt();
-        const note = document.getElementById('mc-note');
-        if (note) note.textContent = 'Using custom plan built below.';
-      } else if (lastCOA && Array.isArray(lastCOA) && lastCOA.length) {
-        actionPlan = lastCOA;
-        const note = document.getElementById('mc-note');
-        if (note) note.textContent = 'Using last generated plan.';
-      }
-      if (!actionPlan) {
-        addEvent({ type: 'MC', text: 'Build or generate a COA first, then run Monte Carlo.' });
-        showToast('Build or generate a COA first, then run Monte Carlo.', 'warn');
-        return;
-      }
-
-      try {
-        if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
-        if (singleBtn) singleBtn.disabled = true;
-        if (bar) { bar.style.width = '0%'; bar.textContent = '0%'; }
-
-      // Success criteria & controls
-      const successMode = (document.getElementById('mc-success-mode')?.value || 'impact');
-      const successN = Math.max(1, Number(document.getElementById('mc-success-n')?.value || 3));
-      const victoryThreshold = Math.max(1, Number(document.getElementById('mc-impact-threshold')?.value || 100));
-      const highlightThresh = Math.min(0.9, Math.max(0.2, Number(document.getElementById('mc-highlight-threshold')?.value || 0.5)));
-      const regenFrac = Math.min(1, Math.max(0, Number(document.getElementById('mc-regen-frac')?.value || 0)));
-      let trialsSuccess = 0;
-      let totalImpactOnSuccess = 0;
-      let totalStepsToSuccess = 0;
-      const successImpacts = [];
-      const stepsToSuccessArr = [];
-      const stepSuccessCounts = new Array(actionPlan.length).fill(0);
-
-      const chunk = Math.max(100, Math.floor(trials / 100));
-      const blueBudgetBase = teamResources?.blue ?? 0;
-      const redBudgetBase = teamResources?.red ?? 0;
-      const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 }));
-      const redTypeBase  = JSON.parse(JSON.stringify(teamResources?.redTypes  || { ke:0, ew:0, jam:0, sof:0 }));
-      const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-      const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike':'ke', 'Reinforcement':'ke', 'Deception':'ew', 'Sabotage':'ke' };
-      const blueMethodType = { kinetic:'ke', cyber:'ew', ew:'jam', sof:'sof' };
-
-      // Build static maps from current data for per-trial state simulation
-      const nodeInfo = new Map();
-      data.nodes.forEach(n => {
-        nodeInfo.set(n.id, {
-          id: n.id,
-          name: n.name,
-          team: n.team,
-          difficulty: n.difficulty,
-          vulnerabilities: n.vulnerabilities || [],
-          cascScore: n.cascScore || 1,
-          importance: n.importance || 5,
-          healthMax: n.healthMax || 100,
-          health: n.health ?? (n.healthMax || 100),
-          status: n.status || 'Active'
-        });
-      });
-      const adj = new Map();
-      data.links.forEach(l => {
-        const s = l.source?.id ?? l.source;
-        const t = l.target?.id ?? l.target;
-        if (!nodeInfo.has(s) || !nodeInfo.has(t)) return;
-        if (!adj.has(s)) adj.set(s, new Set());
-        if (!adj.has(t)) adj.set(t, new Set());
-        adj.get(s).add(t); adj.get(t).add(s);
-      });
-
-      function pickRedTargetFromState(state) {
-        // choose highest payoff red alive
-        let bestId = null, bestScore = -Infinity;
-        nodeInfo.forEach((info, id) => {
-          const st = state.get(id);
-          if (!st || !st.alive) return;
-          if (info.team !== 'red') return;
-          const diffW = { Soft: 1.1, Medium: 1.0, Hardened: 0.8, Buried: 0.6 };
-          const base = (info.importance || 5) * 2 + (info.cascScore || 1) * 4;
-          const sc = base * (diffW[info.difficulty] || 1.0);
-          if (sc > bestScore) { bestScore = sc; bestId = id; }
-        });
-        return bestId;
-      }
-
-      function strikeProbForInfo(info, methodKey) {
-        const method = strikeMethods[methodKey];
-        if (!method || !info) return 0.5;
-        const diff = settings.difficultyModifiers[info.difficulty] || 1.0;
-        const vuln = (info.vulnerabilities || []).includes(method.vulnerability) ? 1.25 : 0.8;
-        return Math.min(1.0, method.baseProb * diff * vuln);
-      }
-
-      function topRedByPayoff(n) {
-        const arr = [];
-        nodeInfo.forEach((info, id) => { if (info.team==='red') { const s=(info.importance||5)*(info.cascScore||1); arr.push({id, s}); } });
-        arr.sort((a,b)=>b.s-a.s);
-        return new Set(arr.slice(0, Math.max(1,n)).map(x=>x.id));
-      }
-
-      // tally arrays for averages
-      const redNeutralizedArr = [];
-      const blueNeutralizedArr = [];
-      const blueSpendArr = [];
-      const redSpendArr = [];
-      const neutralizedCounts = new Map(); // nodeId -> count
-      const damageTotals = new Map(); // nodeId -> total damage dealt across trials
-      const damageHitCounts = new Map(); // nodeId -> trials where any damage was taken
-      const prioritySet = (successMode==='nodes') ? topRedByPayoff(Number(successN)) : null;
-
-      for (let t = 1; t <= trials; t++) {
-        let impact = 0;
-        let stepsToWin = null;
-
-        const ctx = { pMult: 1.0, impactMult: 1.0, nextStepPMult: 1.0, impactMultDecay: 0 };
-        let blueBudget = blueBudgetBase;
-        let redBudget = redBudgetBase;
-        let blueTypeBudget = JSON.parse(JSON.stringify(blueTypeBase));
-        let redTypeBudget  = JSON.parse(JSON.stringify(redTypeBase));
-
-        // Per-trial live state
-        const state = new Map();
-        nodeInfo.forEach((info, id) => state.set(id, { alive: info.status !== 'Neutralized', health: info.health }));
-        let redNeutralized = 0;
-        let blueNeutralized = 0;
-        let blueSpend = 0;
-        let redSpend = 0;
-        const redNeutralizedSet = new Set();
-        const damageThisRun = new Map(); // nodeId -> cumulative damage this trial (red only)
-
-        function recordDamage(id, delta, info) {
-          if (!info || info.team !== 'red' || !delta || delta <= 0) return;
-          const prev = damageThisRun.get(id) || 0;
-          damageThisRun.set(id, prev + delta);
-        }
-
-      for (let i = 0; i < actionPlan.length; i++) {
-        const step = actionPlan[i];
-        const blue = blueProfiles[step.blue] || { baseP: 0.5, impact: [5, 10] };
-        const red = redProfiles[step.red] || null;
-
-          // Select target (prefer explicit target, else top red alive)
-          const targetId = step.targetId || pickRedTargetFromState(state);
-          const info = nodeInfo.get(targetId);
-
-          // Build success probability; if method known and target known, use method-target P and damage
-          let p0 = blue.baseP;
-          let dmgRange = blue.impact;
-          const blueKey = step.blueKey || (step.blue === 'Kinetic Strike' ? 'kinetic' : step.blue === 'Cyber Attack' ? 'cyber' : step.blue === 'EW Jamming' ? 'ew' : step.blue === 'SOF Mission' ? 'sof' : null);
-          if (blueKey && info) {
-            p0 = strikeProbForInfo(info, blueKey);
-            const method = strikeMethods[blueKey];
-            if (method) dmgRange = method.baseDamage;
-          }
-          let p = p0 * ctx.pMult * ctx.nextStepPMult;
-          ctx.nextStepPMult = 1.0; // consume 1-step buff
-
-          // Only apply red modifiers if they can afford the counter (per-type)
-          const redCost = redCounterCosts[step.red] || 0;
-          const redCat  = redCounterType[step.red] || 'ke';
-          const redActive = red && (redTypeBudget[redCat] !== undefined ? (redTypeBudget[redCat] >= redCost) : (redBudget >= redCost));
-          if (redActive) {
-            if (red.globalPmult) p *= red.globalPmult;
-            if (red.pMult) p *= red.pMult;
-            if (red.tag && blue.tag && red.tag === blue.tag && red.pMult) p *= red.pMult;
-          }
-          if (blue.defenseBuff && redActive && red.pMult) {
-            p *= blue.defenseBuff.reduceRed; // defensive maneuver mitigates some red reduction
-          }
-
-          p = Math.min(Math.max(p, 0.05), 0.98);
-          // Blue must afford the step (per-type)
-          const blueCost = (strikeMethods[blueKey]?.cost) || 0;
-          const blueCat = blueMethodType[blueKey] || 'ke';
-          const canAct = (blueTypeBudget[blueCat] !== undefined ? (blueTypeBudget[blueCat] >= blueCost) : (blueBudget >= blueCost));
-          const success = canAct && (Math.random() < p);
-
-          // Impact multiplier from red reinforcement decay
-          let stepImpactMult = ctx.impactMult;
-          if (redActive && red.impactMult) {
-            // reinforcement reduces next N steps impact
-            ctx.impactMult *= red.impactMult;
-            ctx.impactMultDecay = Math.max(ctx.impactMultDecay, red.duration || 1);
-          }
-
-          if (success) {
-            const delta = randIn(dmgRange) * stepImpactMult;
-            impact += delta;
-            // Apply damage to target and cascade
-            if (info && state.get(targetId)?.alive) {
-              const st = state.get(targetId);
-              st.health = Math.max(0, (st.health ?? info.healthMax) - delta);
-              recordDamage(targetId, delta, info);
-              if (st.health <= 0 && st.alive) {
-                st.alive = false;
-                if (info.team === 'red') { redNeutralized++; redNeutralizedSet.add(targetId); }
-                if (info.team === 'blue') blueNeutralized++;
-              }
-              const cascade = 5 * (info.cascScore || 1) * settings.cascadeAlpha;
-              const neighbors = adj.get(targetId) || new Set();
-              neighbors.forEach(nid => {
-                const ni = nodeInfo.get(nid);
-                const stn = state.get(nid);
-                if (!ni || !stn?.alive) return;
-                stn.health = Math.max(0, (stn.health ?? ni.healthMax) - cascade);
-                recordDamage(nid, cascade, ni);
-                if (stn.health <= 0 && stn.alive) {
-                  stn.alive = false;
-                  if (ni.team === 'red') { redNeutralized++; redNeutralizedSet.add(nid); }
-                  if (ni.team === 'blue') blueNeutralized++;
-                }
-              });
-            }
-            // Apply Blue buffs
-            if (blue.buffNext?.pMult) ctx.nextStepPMult *= blue.buffNext.pMult * (red?.infoNerf || 1);
-            if (blue.globalBuff?.pMult) ctx.pMult *= blue.globalBuff.pMult;
-            // spend handled below (per-type)
-          } else if (canAct) {
-            // spend handled below (per-type)
-          }
-
-          // Check success-at-step conditions
-          if (stepsToWin === null) {
-            if (successMode === 'impact' && impact >= victoryThreshold) {
-              stepsToWin = i + 1;
-            } else if (successMode === 'nodes') {
-              const met = Array.from(redNeutralizedSet).filter(id => prioritySet?.has(id)).length >= successN;
-              if (met) stepsToWin = i + 1;
-            } else if (successMode === 'nodes_any') {
-              if (redNeutralized >= successN) stepsToWin = i + 1;
-            }
-          }
-
-          // Decay temporary impact debuff
-          if (ctx.impactMultDecay > 0) {
-            ctx.impactMultDecay--;
-            if (ctx.impactMultDecay === 0) ctx.impactMult = 1.0;
-          }
-
-          // Red countermeasures that can cause Blue losses (align with Preview Outcome logic)
-          if (redActive && (step.red === 'Counter-Strike' || step.red === 'SOF Interception')) {
-            // pick a high-value Blue target that is still alive
-            let candId = null; let bestScore = -Infinity;
-            nodeInfo.forEach((bi, bid) => {
-              const stB = state.get(bid);
-              if (bi.team === 'blue' && stB?.alive) {
-                const s = (bi.importance || 5) + (bi.cascScore || 1) * 2;
-                if (s > bestScore) { bestScore = s; candId = bid; }
-              }
-            });
-            if (candId) {
-              const stB = state.get(candId);
-              const dmg = 20 + Math.random() * 30; // 20–50 damage, no cascade
-              stB.health = Math.max(0, (stB.health ?? (nodeInfo.get(candId)?.healthMax || 100)) - dmg);
-              if (stB.health <= 0 && stB.alive) {
-                stB.alive = false;
-                blueNeutralized++;
-              }
-            }
-          }
-
-          // Spend red if they used a counter
-          if (redActive) {
-            if (redTypeBudget[redCat] !== undefined) redTypeBudget[redCat] = Math.max(0, redTypeBudget[redCat] - redCost);
-            else redBudget -= redCost;
-            redSpend += redCost;
-          }
-          if (canAct) {
-            if (blueTypeBudget[blueCat] !== undefined) blueTypeBudget[blueCat] = Math.max(0, blueTypeBudget[blueCat] - blueCost);
-            else blueBudget -= blueCost;
-            blueSpend += blueCost;
-          }
-          // Per-step regeneration (optional)
-          if (regenFrac > 0) {
-            ['ke','ew','jam','sof'].forEach(k => {
-              if (blueTypeBudget[k] !== undefined) blueTypeBudget[k] += Math.round((blueTypeBase[k]||0) * regenFrac);
-              if (redTypeBudget[k]  !== undefined) redTypeBudget[k]  += Math.round((redTypeBase[k]||0)  * regenFrac);
-            });
-          }
-          // per-step regen handled below
-        }
-
-        const won = (stepsToWin !== null);
-        if (won) {
-          trialsSuccess++;
-          totalImpactOnSuccess += impact;
-          const st = (stepsToWin ?? actionPlan.length);
-          totalStepsToSuccess += st;
-          successImpacts.push(impact);
-          stepsToSuccessArr.push(st);
-          stepSuccessCounts[st - 1]++;
-        }
-        // Accumulate tallies
-        redNeutralizedArr.push(redNeutralized);
-        blueNeutralizedArr.push(blueNeutralized);
-        blueSpendArr.push(blueSpend);
-        redSpendArr.push(redSpend);
-        // Count per-node neutralizations
-        redNeutralizedSet.forEach(id => neutralizedCounts.set(id, (neutralizedCounts.get(id) || 0) + 1));
-        damageThisRun.forEach((dmg, id) => {
-          damageTotals.set(id, (damageTotals.get(id) || 0) + dmg);
-          damageHitCounts.set(id, (damageHitCounts.get(id) || 0) + 1);
-        });
-
-        if (t % chunk === 0 || t === trials) {
-          const pct = Math.round((t / trials) * 100);
-          if (bar) { bar.style.width = pct + '%'; bar.textContent = pct + '%'; }
-          await new Promise(r => setTimeout(r, 0));
-        }
-      }
-
-      const successRate = trialsSuccess / trials;
-      const expImpact = trialsSuccess ? (totalImpactOnSuccess / trialsSuccess) : 0;
-      const avgSteps = trialsSuccess ? (totalStepsToSuccess / trialsSuccess) : actionPlan.length;
-      const p50Impact = Math.round(percentile(successImpacts, 0.5));
-      const p90Impact = Math.round(percentile(successImpacts, 0.9));
-      const p50Steps = Math.round(percentile(stepsToSuccessArr, 0.5));
-      const p90Steps = Math.round(percentile(stepsToSuccessArr, 0.9));
-
-      // cumulative success by step
-      const cumulativeByStep = stepSuccessCounts.reduce((acc, c, i) => {
-        acc.push((acc.length ? acc[acc.length-1] : 0) + c);
-        return acc;
-      }, []).map(v => v / trials);
-
-      if (outSuccess) outSuccess.textContent = Math.round(successRate * 100) + '%';
-      if (outDmg) outDmg.textContent = Math.round(expImpact);
-      if (outTime) outTime.textContent = Math.round(avgSteps * 10) / 10;
-      const elP50I = document.getElementById('mc-impact-p50'); if (elP50I) elP50I.textContent = p50Impact;
-      const elP90I = document.getElementById('mc-impact-p90'); if (elP90I) elP90I.textContent = p90Impact;
-      const elP50S = document.getElementById('mc-steps-p50'); if (elP50S) elP50S.textContent = p50Steps || '—';
-      const elP90S = document.getElementById('mc-steps-p90'); if (elP90S) elP90S.textContent = p90Steps || '—';
-      // Averages for outcomes
-      const redNeuAvg = Math.round((redNeutralizedArr.reduce((a,b)=>a+b,0) / trials) * 10) / 10;
-      const blueLostAvg = Math.round((blueNeutralizedArr.reduce((a,b)=>a+b,0) / trials) * 10) / 10;
-      const blueSpendAvg = Math.round(blueSpendArr.reduce((a,b)=>a+b,0) / trials);
-      const redSpendAvg = Math.round(redSpendArr.reduce((a,b)=>a+b,0) / trials);
-      const elRN = document.getElementById('mc-red-neutral-avg'); if (elRN) elRN.textContent = redNeuAvg;
-      const elBL = document.getElementById('mc-blue-lost-avg'); if (elBL) elBL.textContent = blueLostAvg;
-      const elBS = document.getElementById('mc-blue-spend-avg'); if (elBS) elBS.textContent = blueSpendAvg;
-      const elRS = document.getElementById('mc-red-spend-avg'); if (elRS) elRS.textContent = redSpendAvg;
-
-      // Highlight likely neutralizations on graph/map (>= threshold of trials)
-      const likely = new Set();
-      neutralizedCounts.forEach((cnt, id) => { if ((cnt / trials) >= highlightThresh) likely.add(id); });
-      highlightMode = 'coa';
-      highlightSet = likely;
-      applyHighlight();
-      if (mapModeEnabled) refreshMapMarkers();
-      const note = document.getElementById('mc-note');
-      if (note) note.textContent = `Green highlight shows nodes neutralized in at least ${Math.round(highlightThresh*100)}% of runs.`;
-
-      // Quick list of likely neutralized and often-damaged nodes
-      const likelihoodEl = document.getElementById('mc-likely');
-      if (likelihoodEl) {
-        const topNeutralized = [];
-        neutralizedCounts.forEach((cnt, id) => {
-          const info = nodeInfo.get(id);
-          if (info?.team === 'red') topNeutralized.push({ id, name: info.name, p: (cnt / trials) });
-        });
-        topNeutralized.sort((a,b)=>b.p-a.p);
-        const topDamaged = [];
-        damageHitCounts.forEach((cnt, id) => {
-          const info = nodeInfo.get(id);
-          if (info?.team !== 'red') return;
-          const neutralCnt = neutralizedCounts.get(id) || 0;
-          const damagedButAlivePct = Math.max(0, cnt - neutralCnt) / trials;
-          const avgDmg = Math.round((damageTotals.get(id) || 0) / trials);
-          topDamaged.push({ id, name: info.name, hitPct: cnt / trials, surviveHitPct: damagedButAlivePct, avgDmg });
-        });
-        topDamaged.sort((a,b)=>b.hitPct-a.hitPct);
-        const fmt = (list, label, accessor) => {
-          if (!list.length) return `<div class="muted">${label}: none</div>`;
-          return `<div><strong>${label}:</strong> ${list.slice(0,6).map(n => `${n.name} (${Math.round(accessor(n)*100)}%)`).join(' · ')}</div>`;
-        };
-        const neutralLine = fmt(topNeutralized.filter(n=>n.p>=0.01), 'Likely neutralized', n=>n.p);
-        const damagedLine = fmt(topDamaged.filter(n=>n.surviveHitPct>=0.01), 'Often damaged (survived)', n=>n.surviveHitPct);
-        likelihoodEl.innerHTML = `${neutralLine}${damagedLine ? `<div class="muted" style="margin-top:4px;">${damagedLine}</div>` : ''}`;
-      }
-
-      // brief detailed summary text (plain language)
-      const details = document.getElementById('mc-details');
-      if (details) {
-        const n = actionPlan.length;
-        const succeededRuns = Math.round(trials * successRate);
-        const byHalf = p50Steps || n;
-        const byMost = p90Steps || n;
-        // Budget overview if custom plan
-        let budgetLine = '';
-        if (builtCOA && builtCOA.length) {
-          const planCost = builtCOA.reduce((s, st) => s + (strikeMethods[st.methodKey]?.cost || 0), 0);
-          const blueBudget = teamResources?.blue ?? 0;
-          const margin = blueBudget - planCost;
-          budgetLine = `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`;
-        }
-        const desc = [
-          `Plan length: ${n} steps.`,
-          `${(successRate*100).toFixed(0)}% chance this plan works (${succeededRuns.toLocaleString()} of ${trials.toLocaleString()} tries).`,
-          `When it works, it usually takes about ${avgSteps.toFixed(1)} actions (half finish by step ${byHalf}; most by step ${byMost}).`,
-          `On a winning run, the effect is typically around ${p50Impact}, with stronger wins near ${p90Impact}.`,
-          budgetLine
-        ];
-        // Add plan outline for brief if custom plan
-        if (builtCOA && builtCOA.length) {
-          const outline = builtCOA.map((st, i) => {
-            const node = data.nodes.find(n => n.id === st.targetId);
-            const name = node ? `${node.name} (${node.id})` : st.targetId;
-            const methodName = strikeMethods[st.methodKey]?.name || st.methodKey;
-            const p = node ? Math.round(strikeProbFor(node, st.methodKey) * 100) : 0;
-            return `S${i+1}: ${methodName} -> ${name} (~${p}%)`;
-          }).join('<br>');
-          desc.push(outline);
-        }
-        details.innerHTML = desc.filter(Boolean).join('<br>');
-      }
-
-      // Save minimal results for Detailed Report
-      // Compute per-node odds for report
-      const nodeOdds = [];
-      neutralizedCounts.forEach((cnt, id) => { const info = nodeInfo.get(id); if (info?.team==='red') nodeOdds.push({ id, name: info.name, p: Math.round((cnt/trials)*100) }); });
-      nodeOdds.sort((a,b)=>b.p-a.p);
-      mcLastResults = {
-        actionPlan, trials,
-        successRate,
-        expImpact: Math.round(expImpact), avgSteps: Math.round(avgSteps*10)/10,
-        p50Impact, p90Impact, p50Steps, p90Steps,
-        redNeutralizedArr, blueNeutralizedArr, blueSpendArr, redSpendArr,
-        nodeOdds
-      };
-      addEvent({ type: 'MC', text: `MC(${trials}) on COA(${actionPlan.length} steps): ${Math.round(successRate*100)}% success, ~${Math.round(expImpact)} impact, avg ${Math.round(avgSteps*10)/10} steps.` });
-      showToast(`MC(${trials}) done: ${Math.round(successRate*100)}% success, ~${Math.round(expImpact)} impact.`, 'success', 5000);
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = btnLabel || 'Run 10,000 Trials'; }
-        if (singleBtn) { singleBtn.disabled = false; singleBtn.textContent = singleLabel || singleBtn.textContent; }
-      }
     }
 
     // COA logic
@@ -4759,7 +4485,7 @@
       const runId = ++mcWorkerRunId;
       mcWorkerActiveRunId = runId;
       try {
-        mcWorker = new Worker('sim-worker.js');
+        mcWorker = new Worker('sim-worker.js?v=p7');
       } catch (err) {
         clearMonteCarloWorker();
         return Promise.resolve(null);
@@ -4902,7 +4628,7 @@
 
     function handleMcAction(action) {
       const reportModal = document.getElementById('mc-report-modal');
-      if (reportModal) reportModal.style.display = 'none';
+      if (reportModal) ModalService.close(reportModal);
       if (action === 'wizard') openCOAWizard();
       else if (action === 'goal') document.getElementById('goal-plan-btn')?.click();
       else if (action === 'recommend') document.getElementById('coa-recommend-btn')?.click();
@@ -4962,6 +4688,12 @@
         const victoryThreshold = Math.max(1, Number(document.getElementById('mc-impact-threshold')?.value || 100));
         const highlightThresh = Math.min(0.9, Math.max(0.2, Number(document.getElementById('mc-highlight-threshold')?.value || 0.5)));
         const regenFrac = Math.min(1, Math.max(0, Number(document.getElementById('mc-regen-frac')?.value || 0)));
+        // Denial MOE: capability<->cost balance from commander's intent (set by the interview).
+        const denialBalance = (window.__denialIntent && typeof window.__denialIntent.balance === 'number') ? window.__denialIntent.balance : (window.MoeModule ? window.MoeModule.DEFAULTS.balance : 0.35);
+        // B0: the old main-thread-only denial path (and its 3,000-trial responsiveness
+        // cap) is retired — the worker importScripts moe.js and the shared core scores
+        // denial through the injected context.moe handle, so denial runs at full trial
+        // counts on the worker like every other mode.
 
         const context = buildSimContext();
         const prioritySet = (successMode === 'nodes') ? getTopPayoffRedIds(Number(successN)) : null;
@@ -4982,11 +4714,16 @@
         let neutralizedCounts = new Map();
         let damageTotals = new Map();
         let damageHitCounts = new Map();
+        // Denial MOE accumulators (continuous effect; populated only in 'denial' mode).
+        let denialDiArr = [], denialTputArr = [], denialOsviArr = [], denialHalt = 0, denialCap = 0;
 
         const chunk = Math.max(100, Math.floor(trials / 100));
 
         const note = document.getElementById('mc-note');
         let workerResult = null;
+        // B0: every mode — denial included — runs on the worker when one is available
+        // (the worker importScripts moe.js and injects it as context.moe). The inline
+        // chunked path below stays as the no-worker fallback for every mode.
         if (canUseMonteCarloWorker()) {
           if (note) note.textContent = `Worker thread running ${trials.toLocaleString()} trials...`;
           try {
@@ -5002,6 +4739,9 @@
               prioritySet: prioritySet ? Array.from(prioritySet) : [],
               maxBlueLoss: Infinity,
               regenFrac,
+              // B0: denial MOE knobs for the worker's shared core (denialParams has no
+              // shell-side source yet; the worker defaults it to null).
+              denialBalance,
               teamResources: clonePlain(teamResources),
               settings: clonePlain(settings),
               strikeMethods: clonePlain(strikeMethods),
@@ -5034,6 +4774,16 @@
           neutralizedCounts = new Map(workerResult.neutralizedCounts || []);
           damageTotals = new Map(workerResult.damageTotals || []);
           damageHitCounts = new Map(workerResult.damageHitCounts || []);
+          // B0: denial aggregate rides the done payload under a 'denial' key (denial
+          // mode only). Feed the same accumulators the inline fallback fills so the
+          // denial breakdown panel below is path-agnostic.
+          if (workerResult.denial) {
+            denialDiArr = workerResult.denial.denialDiArr || [];
+            denialTputArr = workerResult.denial.denialTputArr || [];
+            denialOsviArr = workerResult.denial.denialOsviArr || [];
+            denialHalt = workerResult.denial.denialHalt || 0;
+            denialCap = workerResult.denial.denialCap || 0;
+          }
           if (note) note.textContent = cancelled ? 'Worker run canceled; partial results shown.' : 'Worker run complete. UI stayed responsive during computation.';
         } else {
           if (note) note.textContent = `Worker unavailable; running ${trials.toLocaleString()} trials in animation-frame chunks.`;
@@ -5054,7 +4804,7 @@
               victoryThreshold,
               prioritySet,
               regenFrac,
-              logSteps: false
+              denialBalance
             });
             completedTrials = t;
 
@@ -5070,6 +4820,13 @@
             blueNeutralizedArr.push(result.blueNeutralized.size);
             blueSpendArr.push(result.blueSpend);
             redSpendArr.push(result.redSpend);
+            if (successMode === 'denial' && result.denial) {
+              denialDiArr.push(result.denial.denialIndex);
+              denialTputArr.push(result.denial.throughput);
+              denialOsviArr.push(result.denial.osviRed);
+              if (result.denial.halt) denialHalt++;
+              if (result.denial.capitulation) denialCap++;
+            }
 
             result.redNeutralized.forEach(id => {
               neutralizedCounts.set(id, (neutralizedCounts.get(id) || 0) + 1);
@@ -5097,13 +4854,24 @@
         const p50Steps = percentile(stepsToSuccessArr, 0.5);
         const p90Steps = percentile(stepsToSuccessArr, 0.9);
 
-        // 95% confidence interval (Wald) on the success proportion — so an analyst can tell
-        // whether two COAs at e.g. 62% vs 65% actually differ or are within noise.
-        const ciHalf = 1.96 * Math.sqrt(Math.max(0, successRate * (1 - successRate)) / effectiveTrials);
-        const ciPct = (ciHalf * 100).toFixed(1);
+        // 95% confidence interval (Wilson score) on the success proportion — robust at the
+        // extremes where the Wald interval collapses (0% / 100%). Falls back to Wald only if
+        // SimModule is unavailable. Lets an analyst tell whether two COAs really differ.
+        let ciLoPct, ciHiPct;
+        const _wi = (window.SimModule && SimModule.wilsonInterval)
+          ? SimModule.wilsonInterval(trialsSuccess, effectiveTrials)
+          : null;
+        if (_wi) {
+          ciLoPct = Math.round(_wi.lo * 100); ciHiPct = Math.round(_wi.hi * 100);
+        } else {
+          const ciHalf = 1.96 * Math.sqrt(Math.max(0, successRate * (1 - successRate)) / effectiveTrials);
+          ciLoPct = Math.max(0, Math.round((successRate - ciHalf) * 100));
+          ciHiPct = Math.min(100, Math.round((successRate + ciHalf) * 100));
+        }
+        const ciText = `${ciLoPct}–${ciHiPct}%`;
         if (outSuccess) outSuccess.textContent = `${Math.round(successRate * 100)}%`;
         const ciEl = document.getElementById('mc-success-ci');
-        if (ciEl) ciEl.textContent = `±${ciPct}% (95% CI)`;
+        if (ciEl) ciEl.textContent = `${ciText} (95% CI)`;
         if (outDmg) outDmg.textContent = Math.round(expImpact);
         if (outTime) outTime.textContent = avgSteps.toFixed(1);
         const mcHealth = Math.max(0, Math.min(100, Math.round(successRate * 100)));
@@ -5136,7 +4904,7 @@
           const margin = blueBudget - planCost;
           details.innerHTML = [
             `Plan length: ${actionPlan.length} steps.`,
-            `${Math.round(successRate * 100)}% ±${ciPct}% success (95% CI) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `${Math.round(successRate * 100)}% success (95% CI ${ciText}) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
             `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
             `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
             `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
@@ -5159,6 +4927,8 @@
           successN,
           victoryThreshold,
           successRate,
+          successCiLo: ciLoPct / 100,
+          successCiHi: ciHiPct / 100,
           avgSteps: avgSteps.toFixed(1),
           expImpact: Math.round(expImpact),
           p50Impact: Math.round(p50Impact),
@@ -5175,10 +4945,37 @@
         if (bar && cancelled) bar.textContent = `Canceled at ${Math.round((effectiveTrials / trials) * 100)}%`;
         addEvent({ type: 'MC', text: `${runStatus}: ${pct}% success, ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
         showToast(`${runStatus}: ${pct}% success.`, cancelled ? 'warn' : 'success', 5000);
+        // Denial MOE breakdown (continuous effect) — shown only in denial mode, after the
+        // shared renderer so it isn't overwritten.
+        if (successMode === 'denial' && denialDiArr.length) {
+          // B0: one shared arithmetic path — the same SimModule.summarizeDenialStats the
+          // worker uses for its done-payload summary, fed here from either source
+          // (worker denial aggregate or inline fallback accumulators).
+          const dstats = SimModule.summarizeDenialStats({ denialDiArr, denialTputArr, denialOsviArr, denialHalt, denialCap });
+          const mDI = dstats.meanDenialIndex, mTput = dstats.meanThroughput, mOsvi = dstats.meanOsvi;
+          const haltPct = Math.round(dstats.haltRate * 100);
+          const capPct = Math.round(dstats.capitulationRate * 100);
+          const interp = document.getElementById('mc-interpretation');
+          if (interp) {
+            interp.setAttribute('data-tone', mDI >= 0.5 ? 'good' : mDI >= 0.25 ? 'warn' : 'bad');
+            interp.innerHTML = '<strong>Denial effect (MOE):</strong> mean denial index '
+              + Math.round(mDI * 100) + '%. Red amphibious throughput driven to ~' + Math.round(mTput * 100)
+              + '% of capacity (operational viability ~' + Math.round(mOsvi * 100) + '%). Operation halts in '
+              + haltPct + '% of trials; capitulates in ' + capPct + '%. '
+              + (haltPct >= 50 ? 'This COA is sufficient to deny the operation.'
+                 : 'Partial denial — sustained pressure or a larger plan is needed to force culmination.');
+          }
+          const noteD = document.getElementById('mc-note');
+          if (noteD) noteD.textContent = 'Denial MOE — “Chance of Success” = P(denial index ≥ 0.5). Continuous effect breakdown shown above.';
+          addEvent({ type: 'MC', text: 'Denial MOE: index ' + Math.round(mDI * 100) + '%, throughput ' + Math.round(mTput * 100) + '%, halt ' + haltPct + '%.' });
+        }
       } catch (err) {
         console.error('Monte Carlo failed', err);
-        addEvent({ type: 'MC', text: 'Monte Carlo failed (see console).' });
-        showToast('Monte Carlo failed (see console).', 'error');
+        const msg = (err && err.message) ? String(err.message) : 'unexpected error';
+        addEvent({ type: 'MC', text: 'Monte Carlo run failed — try fewer trials or rebuild the plan.' });
+        showToast('Monte Carlo failed: ' + msg + '. Try fewer trials or rebuild the plan.', 'error', 9000);
+        const interp = document.getElementById('mc-interpretation');
+        if (interp) { interp.setAttribute('data-tone', 'bad'); interp.textContent = 'Run failed: ' + msg + '. Try reducing trials or rebuilding the plan.'; }
       } finally {
         mcRunInProgress = false;
         mcCancelRequested = false;
@@ -5288,12 +5085,12 @@
         <h3 class="muted" style="margin:8px 0 4px;">Recommended Sequence</h3>
         ${stepList}
       `;
-      document.getElementById('coa-modal').style.display = 'flex';
+      ModalService.open('coa-modal');
       addEvent({ type: 'COA', text: `Recommended COA generated for ${rec.targets.length} high-payoff targets.` });
     }
 
     function closeCOAModal() {
-      document.getElementById('coa-modal').style.display = 'none';
+      ModalService.close('coa-modal');
     }
 
     // Placeholder for simulate COA
@@ -5314,14 +5111,14 @@
       coaWizardPlanCache = null;
       // show step 1 only
       wizardSwitch(0);
-      m.style.display = 'flex';
+      ModalService.open(m);
       updateWizardNav();
       addEvent({ type: 'COA', text: 'Opened COA Wizard.' });
     }
 
     function closeCOAWizard() {
       const m = document.getElementById('coa-wizard-modal');
-      if (m) m.style.display = 'none';
+      if (m) ModalService.close(m);
     }
 
     function wizardSwitch(idx) {
@@ -5544,8 +5341,7 @@
           successN,
           prioritySet,
           maxBlueLoss,
-          regenFrac,
-          logSteps: false
+          regenFrac
         });
         if (result.success) success++;
         stepsArr.push(result.stepsToGoal);
@@ -5784,8 +5580,9 @@
         const avgRS = Math.round(mean(r.redSpendArr || []));
         const interp = mcInterpretationFor(r);
         const runStatus = r.cancelled ? `Partial (${r.trials.toLocaleString()} / ${r.requestedTrials.toLocaleString()})` : 'Complete';
-        const oddsTable = (r.nodeOdds && r.nodeOdds.length) ? (`<h3 class=\"muted\" style=\"margin-top:10px;\">Neutralization Odds by Node (Top 10)</h3>` +
-          `<div>${r.nodeOdds.slice(0,10).map(o=>`<div class=\\\"kv-row\\\"><span>${o.name} (${o.id})</span><strong>${o.p}%</strong></div>`).join('')}</div>`) : '';
+        const escOdds = (s) => (window.UiModule && UiModule.escapeHtml) ? UiModule.escapeHtml(String(s ?? '')) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const oddsTable = (r.nodeOdds && r.nodeOdds.length) ? (`<h3 class="muted" style="margin-top:10px;">Neutralization Odds by Node (Top 10)</h3>` +
+          `<div>${r.nodeOdds.slice(0,10).map(o=>`<div class="kv-row"><span>${escOdds(o.name)} (${escOdds(o.id)})</span><strong>${o.p}%</strong></div>`).join('')}</div>`) : '';
         body.innerHTML = `
           <div class="interpretation-strip" data-tone="${interp.tone}">
             <strong>What this means:</strong> ${interp.text}
@@ -5812,17 +5609,19 @@
           btn.addEventListener('click', () => handleMcAction(btn.dataset.mcAction));
         });
       }
-      modal.style.display = 'flex';
+      ModalService.open(modal);
     }
 
     function simulatePlanOnce() {
       if (!builtCOA || !builtCOA.length) { addEvent({ type: 'COA', text: 'Build a plan first in the COA Builder.' }); return; }
       const plan = toActionPlanFromBuilt();
       const context = buildSimContext();
+      // B0: routed through the shared core (SimModule), which does not emit the old
+      // narrative logSteps transcript — the step list below is rendered from the plan
+      // plus the trial's actual per-node outcomes (damageThisRun / neutralized sets).
       const result = simulateTrial(plan, {
         context,
-        rng: createRng(),
-        logSteps: true
+        rng: createRng()
       });
 
       highlightMode = 'coa';
@@ -5845,12 +5644,24 @@
         `<div class=\"kv-row\"><span>Blue Spend</span><strong>${planCost}</strong></div>`,
         `<div class=\"kv-row\"><span>Red Spend (counters)</span><strong>${Math.round(result.redSpend)}</strong></div>`,
         `</div>`,
-        `<h3 class=\"muted\">Step-by-step</h3>`,
-        `<div>${result.log.map(l=>`<div class=\"kv-row\"><span>${l}</span></div>`).join('')}</div>`,
+        `<h3 class=\"muted\">Plan sequence</h3>`,
+        `<div>${plan.map((st, i) => {
+          const node = context.nodeInfo.get(st.targetId);
+          const name = node ? `${node.name} (${st.targetId})` : (st.targetId || 'auto-target');
+          return `<div class=\"kv-row\"><span>S${i + 1}: ${st.blue} -> ${name}</span></div>`;
+        }).join('')}</div>`,
+        `<h3 class=\"muted\">Damage dealt this sample (red nodes)</h3>`,
+        `<div>${result.damageThisRun.size
+          ? Array.from(result.damageThisRun.entries()).sort((a, b) => b[1] - a[1]).map(([id, dmg]) => {
+              const node = context.nodeInfo.get(id);
+              const name = node ? `${node.name} (${id})` : id;
+              return `<div class=\"kv-row\"><span>${name} — ${Math.round(dmg)} dmg${result.redNeutralized.has(id) ? ' — NEUTRALIZED' : ''}</span></div>`;
+            }).join('')
+          : '<div class=\"kv-row\"><span>No damage inflicted on red nodes.</span></div>'}</div>`,
         `<p class=\"muted\">Preview Outcome is a single sample run with randomness. Use Monte Carlo for averages and ranges.</p>`
       ].join('');
       body.innerHTML = sum;
-      modal.style.display = 'flex';
+      ModalService.open(modal);
     }
 
     window.runCoaStressTest = function runCoaStressTest(options = {}) {
@@ -5884,6 +5695,34 @@
     };
 
     init();
+
+    // C-009: boot-time engine parity assertion. Ask the worker for its parityHash
+    // and compare against the inline core's — the two copies must agree or Monte
+    // Carlo results could differ by execution path. Deferred so it never competes
+    // with first render; silent unless something is actually wrong (the pass/fail
+    // lands in the event log either way).
+    setTimeout(function assertSimParity() {
+      if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
+      try {
+        const pw = new Worker('sim-worker.js?v=p7');
+        const bail = setTimeout(() => { try { pw.terminate(); } catch (e) {} }, 5000);
+        pw.onmessage = (ev) => {
+          const m = ev.data || {};
+          if (m.type !== 'parity') return;
+          clearTimeout(bail);
+          try { pw.terminate(); } catch (e) {}
+          const local = SimModule.parityHash(m.seed, m.n);
+          if (local === m.hash) {
+            addEvent({ type: 'Sim', text: `Engine parity check passed (inline ≡ worker, hash ${m.hash}).` });
+          } else {
+            addEvent({ type: 'Sim', text: `ENGINE PARITY MISMATCH — inline ${local} vs worker ${m.hash}. Monte Carlo paths may disagree; do not trust cross-run comparisons until sim.js and sim-worker.js are re-synced.` });
+            UiModule.toast('Engine parity mismatch — see event log', 'error');
+          }
+        };
+        pw.onerror = () => { clearTimeout(bail); try { pw.terminate(); } catch (e) {} };
+        pw.postMessage({ type: 'parity', runId: 'parity-boot', seed: 42, n: 64 });
+      } catch (e) { /* parity probe must never break boot */ }
+    }, 2500);
   </script>
 
   <!-- ── Stark-HUD overhaul: boot fade, live telemetry clock, readout FX ── -->
@@ -5898,15 +5737,37 @@
         '▸ establishing geospatial link ..... <span class="ok">OK</span>',
         '▸ rendering command picture ........ <span class="ok">OK</span>'
       ];
+      // C-050: cinematic boot is first-run-only and always skippable. Returning
+      // operators get a fast branded fade; reduced-motion gets near-instant.
+      var bootEl = document.getElementById('boot');
+      var bootReduced = window.AppShell ? AppShell.prefersReducedMotion()
+        : !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var bootSeen = false; try { bootSeen = localStorage.getItem('strikesim_boot_seen') === '1'; } catch(e) {}
+      var bootDwell = bootReduced ? 150 : (bootSeen ? 650 : 2300);
       var logEl = document.getElementById('boot-log'), i = 0;
-      (function nextLine(){
-        if (!logEl || i >= lines.length) return;
-        var d = document.createElement('div'); d.innerHTML = lines[i++];
-        logEl.appendChild(d); setTimeout(nextLine, 300);
-      })();
-      function killBoot(){ var b = document.getElementById('boot'); if (b) b.classList.add('gone'); }
+      if (bootReduced || bootSeen) {
+        // no typing theater on repeat visits — render the log at once
+        if (logEl) logEl.innerHTML = lines.map(function(l){ return '<div>' + l + '</div>'; }).join('');
+      } else {
+        (function nextLine(){
+          if (!logEl || i >= lines.length) return;
+          var d = document.createElement('div'); d.innerHTML = lines[i++];
+          logEl.appendChild(d); setTimeout(nextLine, 300);
+        })();
+      }
+      function killBoot(){
+        var b = document.getElementById('boot'); if (b) b.classList.add('gone');
+        try { localStorage.setItem('strikesim_boot_seen', '1'); } catch(e) {}
+      }
+      if (bootEl) {
+        var hint = document.createElement('div'); hint.className = 'boot-skip';
+        hint.textContent = 'CLICK OR PRESS ANY KEY TO SKIP';
+        bootEl.appendChild(hint);
+        bootEl.addEventListener('pointerdown', killBoot);
+      }
+      window.addEventListener('keydown', killBoot, { once: true });
       var bootStart = Date.now();
-      function scheduleKill(){ setTimeout(killBoot, Math.max(0, 2300 - (Date.now()-bootStart))); }
+      function scheduleKill(){ setTimeout(killBoot, Math.max(0, bootDwell - (Date.now()-bootStart))); }
       if (document.readyState === 'complete') scheduleKill(); else window.addEventListener('load', scheduleKill);
       setTimeout(killBoot, 6000); // hard cap — boot never hangs
 
@@ -5919,7 +5780,9 @@
                     + '<span class="tlm">SECTOR <b>INDO-PAC</b></span>'
                     + '<span class="tlm"><b id="cb-clock">--:--:--</b> UTC</span>';
         brand.insertAdjacentElement('afterend', t);
-        (function tick(){ var el=document.getElementById('cb-clock'); if(el) el.textContent=new Date().toISOString().slice(11,19); setTimeout(tick,1000); })();
+        var tickClock = function(){ var el=document.getElementById('cb-clock'); if(el) el.textContent=new Date().toISOString().slice(11,19); };
+        tickClock();
+        if (window.AppShell) AppShell.every(1000, tickClock); else setInterval(tickClock, 1000); // pauses on hidden tab (C-050)
       }
       if (document.getElementById('cmd-bar')) buildTelemetry(); else document.addEventListener('DOMContentLoaded', buildTelemetry);
 
@@ -6016,7 +5879,8 @@
         alert:function(){ setThreatVal(1); },
         screenShake:screenShake
       };
-      setInterval(function(){ if(threatVal>0) setThreatVal(threatVal-0.05); }, 1300); // calm decays
+      var threatDecay = function(){ if(threatVal>0) setThreatVal(threatVal-0.05); };
+      if (window.AppShell) AppShell.every(1300, threatDecay); else setInterval(threatDecay, 1300); // calm decays; pauses on hidden tab (C-050)
 
       // ---- DEFCON chip + sound toggle into the telemetry cluster ----
       function updateAudioBtn(){ var b=document.getElementById('cb-audio-btn'); if(b) b.textContent=muted?'🔇':'🔊'; }
@@ -6045,10 +5909,10 @@
     try {
       var css=document.createElement('style');
       css.textContent=[
-        '#hud-radar{position:fixed;top:calc(var(--bar-h) + 14px);left:352px;width:150px;height:170px;z-index:1180;pointer-events:none;font-family:var(--mono)}',
+        '#hud-radar{position:fixed;top:calc(var(--bar-h) + 14px);left:calc(var(--left-w, 340px) + 12px);width:150px;height:170px;z-index:1180;pointer-events:none;font-family:var(--mono);transition:left .2s ease}',
         '#hud-radar canvas{display:block;filter:drop-shadow(0 0 9px rgba(0,216,255,.28))}',
         '#hud-radar .hr-label{margin-top:3px;text-align:center;font-size:9px;letter-spacing:2.5px;color:#6f93ad}',
-        '#hud-ticker{position:fixed;left:352px;right:var(--side-width);bottom:0;height:26px;z-index:1180;pointer-events:none;display:flex;align-items:center;overflow:hidden;background:linear-gradient(180deg,rgba(6,13,20,0),rgba(5,11,18,.86));border-top:1px solid var(--glass-brd);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--mono);font-size:11px}',
+        '#hud-ticker{position:fixed;left:calc(var(--left-w, 340px) + 12px);right:var(--side-width);bottom:0;height:26px;z-index:1180;pointer-events:none;display:flex;align-items:center;overflow:hidden;background:linear-gradient(180deg,rgba(6,13,20,0),rgba(5,11,18,.86));border-top:1px solid var(--glass-brd);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-family:var(--mono);font-size:11px;transition:left .2s ease}',
         '#hud-ticker .ht-tag{flex:0 0 auto;padding:0 12px 0 10px;height:100%;display:flex;align-items:center;color:#04121b;background:linear-gradient(90deg,var(--amber),#ffd36b);font-weight:700;letter-spacing:1.5px;clip-path:polygon(0 0,100% 0,calc(100% - 11px) 100%,0 100%)}',
         '#hud-ticker .ht-view{flex:1 1 auto;overflow:hidden;position:relative;height:100%}',
         '#hud-ticker .ht-track{position:absolute;top:0;left:0;white-space:nowrap;display:inline-flex;align-items:center;height:100%;will-change:transform;animation:tickerScroll 42s linear infinite}',
@@ -6063,13 +5927,20 @@
       var radarWrap=document.createElement('div'); radarWrap.id='hud-radar';
       radarWrap.innerHTML='<canvas width="150" height="150"></canvas><div class="hr-label">TACTICAL SCAN</div>';
       document.body.appendChild(radarWrap);
-      var rAng=0, rLast=0;
+      // C-032: the scope's loop is owned by the shell lifecycle — it runs only while
+      // a view that shows the radar is active AND the tab is visible. Reduced motion
+      // drops to a static 1 Hz picture with no sweep.
+      var rAng=0, radarOn=false, radarTimer=0, radarRaf=0;
       function radarNodes(){ try{ var g=window.AppState&&AppState.activeGraph&&AppState.activeGraph(); return (g&&g.nodes)||[]; }catch(e){ return []; } }
-      function drawRadar(ts){
-        var wrap=document.getElementById('hud-radar'); if(!wrap) return; requestAnimationFrame(drawRadar);
-        if(wrap.style.display==='none') return; if(ts-rLast<33) return; rLast=ts;
-        var cv=wrap.querySelector('canvas'); if(!cv) return; var ctx=cv.getContext('2d'); if(!ctx) return;
-        var cx=75,cy=75,R=66; rAng+=0.045; if(rAng>Math.PI*2) rAng-=Math.PI*2;
+      function radarReduced(){ return window.AppShell ? AppShell.prefersReducedMotion() : false; }
+      function paintRadar(){
+        if(!radarOn) return;
+        var reduced=radarReduced();
+        var wrap=document.getElementById('hud-radar');
+        var cv=wrap&&wrap.querySelector('canvas'); var ctx=cv&&cv.getContext('2d');
+        if(!ctx){ scheduleRadar(); return; }
+        var cx=75,cy=75,R=66;
+        if(!reduced){ rAng+=0.045; if(rAng>Math.PI*2) rAng-=Math.PI*2; }
         ctx.clearRect(0,0,150,150);
         ctx.fillStyle='rgba(4,12,19,0.5)'; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
         ctx.strokeStyle='rgba(0,216,255,0.2)'; ctx.lineWidth=1;
@@ -6084,23 +5955,43 @@
             ns.forEach(function(n){ if(n.lat==null||n.lon==null) return;
               var nx=((+n.lon-miO)/spO)*2-1, ny=((+n.lat-miA)/spA)*2-1;
               var x=cx+nx*R*0.86, y=cy-ny*R*0.86;
-              var na=Math.atan2(y-cy,x-cx); if(na<0) na+=Math.PI*2;
-              var diff=Math.abs(((rAng-na+Math.PI*3)%(Math.PI*2))-Math.PI); var ping=Math.max(0,1-diff*1.5);
+              var ping=0;
+              if(!reduced){
+                var na=Math.atan2(y-cy,x-cx); if(na<0) na+=Math.PI*2;
+                var diff=Math.abs(((rAng-na+Math.PI*3)%(Math.PI*2))-Math.PI); ping=Math.max(0,1-diff*1.5);
+              }
               var tm=(n.team||'').toLowerCase();
               var col=tm==='blue'?'56,189,248':tm==='red'?'255,77,94':tm==='green'?'81,207,102':'255,212,59';
-              ctx.fillStyle='rgba('+col+','+(0.32+ping*0.68).toFixed(2)+')';
-              ctx.beginPath(); ctx.arc(x,y,1.5+ping*2.6,0,Math.PI*2); ctx.fill();
+              ctx.fillStyle='rgba('+col+','+(reduced?'0.75':(0.32+ping*0.68).toFixed(2))+')';
+              ctx.beginPath(); ctx.arc(x,y,reduced?2.2:(1.5+ping*2.6),0,Math.PI*2); ctx.fill();
             });
           }
         }
-        ctx.save(); ctx.translate(cx,cy); ctx.rotate(rAng);
-        var grad=ctx.createLinearGradient(0,0,R,0); grad.addColorStop(0,'rgba(0,216,255,0)'); grad.addColorStop(1,'rgba(0,216,255,0.3)');
-        ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.4,0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
-        ctx.strokeStyle='rgba(0,216,255,0.8)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0); ctx.stroke();
-        ctx.restore();
+        if(!reduced){
+          ctx.save(); ctx.translate(cx,cy); ctx.rotate(rAng);
+          var grad=ctx.createLinearGradient(0,0,R,0); grad.addColorStop(0,'rgba(0,216,255,0)'); grad.addColorStop(1,'rgba(0,216,255,0.3)');
+          ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,R,-0.4,0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+          ctx.strokeStyle='rgba(0,216,255,0.8)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(R,0); ctx.stroke();
+          ctx.restore();
+        }
         ctx.strokeStyle='rgba(0,216,255,0.5)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+        scheduleRadar();
       }
-      requestAnimationFrame(drawRadar);
+      function scheduleRadar(){
+        if(!radarOn) return;
+        radarTimer=setTimeout(function(){ radarTimer=0; radarRaf=requestAnimationFrame(paintRadar); }, radarReduced()?1000:33);
+      }
+      function startRadar(){ if(radarOn) return; radarOn=true; paintRadar(); }
+      function stopRadar(){
+        radarOn=false;
+        if(radarTimer){ clearTimeout(radarTimer); radarTimer=0; }
+        if(radarRaf){ cancelAnimationFrame(radarRaf); radarRaf=0; }
+      }
+      function syncRadar(){
+        var s=window.AppShell?AppShell.state:{view:'3d',hidden:document.hidden};
+        var wants=(s.view==='3d'||s.view==='map')&&!s.hidden;
+        if(wants) startRadar(); else stopRadar();
+      }
 
       // ---- Live C2 intel ticker -------------------------------------------------
       var ticker=document.createElement('div'); ticker.id='hud-ticker';
@@ -6120,21 +6011,36 @@
         tr.innerHTML=html+'<span class="ht-sep">//</span>'+html;
       }
       function pushFeed(t){ t=(t||'').replace(/\s+/g,' ').trim(); if(!t) return; feed.unshift(t.slice(0,90)); if(feed.length>10) feed.pop(); renderTrack(); }
-      renderTrack(); setInterval(renderTrack, 6000);
+      renderTrack();
+      if (window.AppShell) AppShell.every(6000, renderTrack); else setInterval(renderTrack, 6000); // pauses on hidden tab (C-050)
       var elist=document.getElementById('event-list');
       if(elist && window.MutationObserver){
         new MutationObserver(function(muts){ muts.forEach(function(m){ Array.prototype.forEach.call(m.addedNodes||[],function(nd){ if(nd && nd.nodeType===1) pushFeed(nd.textContent); }); }); }).observe(elist,{childList:true});
       }
 
       // ---- view-aware visibility (radar on 3D+map, ticker on 3D) ----------------
+      // C-025: chrome follows AppShell state — no more setView monkey-patching.
+      // updateViewStatus() publishes the canonical view; hidden/reduced-motion
+      // changes re-sync the radar loop through the same subscription.
       function applyViewChrome(view){
         var r=document.getElementById('hud-radar'), t=document.getElementById('hud-ticker');
         if(r) r.style.display=(view==='map'||view==='3d')?'block':'none';
         if(t) t.style.display=(view==='3d')?'flex':'none';
+        syncRadar();
       }
-      (function hook(){ var tries=0; (function go(){ var orig=window.setView;
-        if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
-        if(++tries<50) setTimeout(go,120); })(); })();
+      if (window.AppShell) {
+        AppShell.subscribe(function(s, changed){
+          if (changed.indexOf('view') !== -1) applyViewChrome(s.view);
+          else if (changed.indexOf('hidden') !== -1 || changed.indexOf('reducedMotion') !== -1) syncRadar();
+        });
+        applyViewChrome(AppShell.state.view);
+      } else {
+        // resilience fallback (AppShell lives in this same document, so this
+        // branch only runs if that script somehow failed): hook setView.
+        (function hook(){ var tries=0; (function go(){ var orig=window.setView;
+          if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
+          if(++tries<50) setTimeout(go,120); })(); })();
+      }
     } catch(e){ /* HUD III layer must never break the app */ }
   })();
   </script>

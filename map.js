@@ -167,11 +167,20 @@ window.MapModule = (function () {
       if (!visible && hasLayer) leafletMap.removeLayer(coastlineLayer);
     };
 
-    // ---- Basemaps: crisp online tiles with an automatic offline fallback ------------
-    // A dark "command picture" basemap by default so colored symbols and overlays pop —
-    // the convention real C2/COP tools use — with a photographic satellite option and the
-    // bundled Blue Marble image as a no-network safety net. Slippy tiles wrap across the
-    // antimeridian, so the Pacific-centered view stays seamless out to the Americas.
+    // ---- Basemaps ----------------------------------------------------------------
+    // C-002 (P1): OFFLINE-FIRST. The map boots into the blank canvas grid (already
+    // added above) — ZERO network requests at startup. Online basemaps (CARTO dark,
+    // Esri satellite) are available as explicit opt-in layer toggles only; they are
+    // NOT added to the map at init time. The offline bundled imagery (Blue Marble) is
+    // the default "rich" fallback when the user wants a real photo basemap without going
+    // online. The basemap-status badge clearly shows "offline grid" until the user
+    // deliberately enables an online layer.
+    //
+    // C-019 (P1): Every online tile layer (darkLayer, satImagery, satLabels) gets the
+    // same tile-error fallback handler so a failed online selection always recovers to
+    // the offline layer, never leaves a blank map.
+
+    // Online-capable layers (constructed but NOT added to map at startup)
     const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       subdomains: 'abcd', maxZoom: 19, crossOrigin: true, keepBuffer: 4,
       attribution: '© OpenStreetMap contributors, © CARTO'
@@ -184,34 +193,66 @@ window.MapModule = (function () {
       subdomains: 'abcd', maxZoom: 19, crossOrigin: true, opacity: 0.85
     });
     const satLayer = L.layerGroup([satImagery, satLabels]);
-    // Offline bundled imagery (two copies so the dateline stays covered) — used when the
-    // network is unavailable, or selectable directly.
+    // Offline bundled imagery (two copies so the dateline stays covered).
     const offlineLayer = L.layerGroup([
       L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' }),
       L.imageOverlay(GLOBAL_SATELLITE_BASEMAP, GLOBAL_SATELLITE_BOUNDS_WRAP, { pane: 'basemapPane', interactive: false, className: 'global-satellite-overlay' })
     ]);
 
-    darkLayer.addTo(leafletMap);
-    globalSatelliteLoaded = true; // a real basemap is up; suppress the bare-grid status
-    setBasemapStatus('Basemap: dark (online)', 'ok');
-    L.control.layers(
-      { 'Dark (command picture)': darkLayer, 'Satellite': satLayer, 'Offline imagery': offlineLayer },
-      { 'Engagement zones (notional)': rangeRingsLayer },
-      { position: 'topright', collapsed: true }
-    ).addTo(leafletMap);
-    leafletMap.on('baselayerchange', (e) => setBasemapStatus('Basemap: ' + e.name, 'ok'));
-
-    // Auto-fallback: if online tiles can't load (offline / blocked), switch to the bundled
-    // imagery so the map is never blank. A handful of tile errors is the trigger.
+    // C-019: shared tile-error fallback for ALL online layers.
+    // Counts errors across dark+sat layers; trips after 4 cumulative failures,
+    // removes whichever online layers are active, and activates the offline layer.
     let onlineTileErrors = 0, fellBack = false;
     const fallBackToOffline = () => {
       if (fellBack || !leafletMap) return;
       fellBack = true;
       if (leafletMap.hasLayer(darkLayer)) leafletMap.removeLayer(darkLayer);
+      if (leafletMap.hasLayer(satImagery)) leafletMap.removeLayer(satImagery);
+      if (leafletMap.hasLayer(satLabels)) leafletMap.removeLayer(satLabels);
+      if (leafletMap.hasLayer(satLayer)) leafletMap.removeLayer(satLayer);
       offlineLayer.addTo(leafletMap);
-      setBasemapStatus('Basemap: offline imagery', 'offline');
+      globalSatelliteLoaded = true;
+      refreshCoastlineFallback();
+      setBasemapStatus('Basemap: offline imagery (online failed)', 'offline');
     };
-    darkLayer.on('tileerror', () => { if (++onlineTileErrors >= 4) fallBackToOffline(); });
+    const onTileError = () => { if (++onlineTileErrors >= 4) fallBackToOffline(); };
+    // Attach to every online tile layer (C-019)
+    darkLayer.on('tileerror', onTileError);
+    satImagery.on('tileerror', onTileError);
+    satLabels.on('tileerror', onTileError);
+
+    // C-002: The layers control lists online basemaps as opt-in choices.
+    // The map starts on the blank offline grid (no entry selected in base layers).
+    // We add offlineLayer as the default "rich offline" base so users have a
+    // photographic option without any network request.
+    offlineLayer.addTo(leafletMap);
+    globalSatelliteLoaded = true;
+    setBasemapStatus('Basemap: offline imagery', 'ok');
+
+    L.control.layers(
+      {
+        'Offline imagery (default)': offlineLayer,
+        'Dark — online opt-in': darkLayer,
+        'Satellite — online opt-in': satLayer
+      },
+      { 'Engagement zones (notional)': rangeRingsLayer },
+      { position: 'topright', collapsed: true }
+    ).addTo(leafletMap);
+
+    // Update the badge when the user explicitly switches basemaps.
+    // Flag online layers clearly so the operator knows a network request will fire.
+    leafletMap.on('baselayerchange', (e) => {
+      const isOnline = e.name.indexOf('online') !== -1;
+      if (isOnline) {
+        // Reset fallback counter when the user intentionally opts into an online layer
+        onlineTileErrors = 0;
+        fellBack = false;
+      }
+      setBasemapStatus(
+        'Basemap: ' + e.name.replace(' — online opt-in', ' (ONLINE)').replace(' (default)', ''),
+        isOnline ? 'ok' : 'ok'
+      );
+    });
 
     // Map overlays: scale + compass
     L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(leafletMap);
@@ -287,8 +328,8 @@ window.MapModule = (function () {
       }
     });
     new BasemapStatusControl({ position: 'bottomleft' }).addTo(leafletMap);
-    // Now that the badge exists, reflect the active online basemap (or the fallback).
-    setBasemapStatus(fellBack ? 'Basemap: offline imagery' : 'Basemap: dark (online)', fellBack ? 'offline' : 'ok');
+    // C-002: badge reflects the offline-first default (not any online layer).
+    setBasemapStatus('Basemap: offline imagery', 'ok');
 
     // Quietly check whether real local tiles exist (root z/x/y). A `fetch` HEAD to a
     // missing file returns ok:false WITHOUT logging a console error (unlike an <img>
@@ -320,7 +361,12 @@ window.MapModule = (function () {
 
     markersLayer = L.layerGroup().addTo(leafletMap);
     mapLinksLayer = L.layerGroup().addTo(leafletMap);
-    setTimeout(() => { leafletMap.invalidateSize(); clampMinZoom(); fitMapToMarkers(); }, 50);
+    setTimeout(() => {
+      leafletMap.invalidateSize();
+      clampMinZoom();
+      fitMapToMarkers();
+      _wireMapVisibilityObserver(); // C-020: auto-replay queued strikes on map show
+    }, 50);
   }
 
   // Set the minimum zoom to exactly the level at which the world imagery fills the
@@ -382,6 +428,7 @@ window.MapModule = (function () {
       if (n.lat == null || n.lon == null) return;
       const off = offsetById.get(n.id) || [0, 0];
       const mlat = n.lat + off[0], mlon = pacLon(n.lon) + off[1];
+      const hasOffset = off[0] !== 0 || off[1] !== 0;
 
       let marker;
       if (useSym) {
@@ -420,6 +467,31 @@ window.MapModule = (function () {
         }).addTo(markersLayer).on('click', () => selectNodeById(n.id));
       }
 
+      // C-017 (P1/P2): When a marker has been offset from its true position by the
+      // declutter spiral, draw a thin leader line back to the true coordinate so the
+      // operator can see where the unit actually is. The line is non-interactive and
+      // very faint to avoid cluttering the COP. Only drawn for genuinely offset markers.
+      if (hasOffset) {
+        try {
+          L.polyline([[n.lat, pacLon(n.lon)], [mlat, mlon]], {
+            color: _affiliationColor(n),
+            weight: 0.8,
+            opacity: 0.35,
+            interactive: false,
+            dashArray: '3 4'
+          }).addTo(markersLayer);
+          // Small true-position dot so the anchor point is unambiguous.
+          L.circleMarker([n.lat, pacLon(n.lon)], {
+            radius: 2,
+            color: _affiliationColor(n),
+            fillColor: _affiliationColor(n),
+            fillOpacity: 0.55,
+            weight: 0,
+            interactive: false
+          }).addTo(markersLayer);
+        } catch (e) { /* non-fatal */ }
+      }
+
       marker.__node = n;
       // HUD-styled popup: name in mono accent, ID in muted mono.
       marker.bindPopup(
@@ -430,8 +502,8 @@ window.MapModule = (function () {
       mapMarkers.set(n.id, marker);
     });
 
-    refreshRangeRings();
-    refreshObjectiveMarkers();
+    refreshRangeRings(offsetById);
+    refreshObjectiveMarkers(offsetById);
     highlightSelectedOnMap();
   }
 
@@ -444,12 +516,16 @@ window.MapModule = (function () {
     return '#ffd43b'; // unknown
   }
 
-  // --- Objective markers (Audit #17) -----------------------------------------------
-  // Reads objectiveIds from the active wargame state if available. Renders a distinct
-  // animated objective marker for each objective node that is currently visible on the map.
-  // Gracefully no-ops if GameModule / getState / objectiveIds are absent.
+  // --- Objective markers (C-044) ---------------------------------------------------
+  // C-044 (P2): Objective markers now respect active visibility filters — only nodes
+  // that are in currentVisible().visibleNodes receive a badge. They also use the same
+  // display coordinate (true lat/lon + declutter offset) as their unit marker, so the
+  // badge sits on top of the symbol rather than floating at a diverging position.
+  // The offsetById map is passed in from refreshMapMarkers so the two calls share one
+  // computed declutter table; when called stand-alone (e.g. on game state change) it
+  // recomputes the table from the current visible set.
   let objectiveMarkersLayer = null;
-  function refreshObjectiveMarkers() {
+  function refreshObjectiveMarkers(offsetById) {
     if (!leafletMap) return;
     // Lazy-create the layer (above rings, below unit markers)
     if (!objectiveMarkersLayer) {
@@ -474,19 +550,31 @@ window.MapModule = (function () {
 
     if (!objIds || objIds.size === 0) return; // no active game / no objectives
 
-    const g = graph();
-    g.nodes.forEach(n => {
+    // C-044: use currentVisible() to respect active filters; build ID set for O(1) lookup.
+    const { visibleNodes } = currentVisible();
+    const visibleIdSet = new Set(visibleNodes.map(n => n.id));
+
+    // If no offsetById was passed in (standalone call), recompute from visible nodes.
+    if (!offsetById) offsetById = computeDeclutter(visibleNodes);
+
+    visibleNodes.forEach(n => {
       if (!objIds.has(n.id)) return;
+      if (!visibleIdSet.has(n.id)) return; // already guaranteed by visibleNodes, but be explicit
       if (n.lat == null || n.lon == null) return;
       const side = objIds.get(n.id); // 'blue' or 'red'
       const isHostile = side === 'red';
+
+      // C-044: place badge at the same display coordinate as the unit marker.
+      const off = offsetById.get(n.id) || [0, 0];
+      const mlat = n.lat + off[0], mlon = pacLon(n.lon) + off[1];
+
       const icon = L.divIcon({
         className: '',
         html: `<div class="map-obj-marker${isHostile ? ' obj-hostile' : ''}" title="KEY OBJ: ${n.name}">★</div>`,
         iconSize: [22, 22],
         iconAnchor: [11, 11]
       });
-      L.marker([n.lat, pacLon(n.lon)], { icon, interactive: false, keyboard: false, zIndexOffset: -10 })
+      L.marker([mlat, mlon], { icon, interactive: false, keyboard: false, zIndexOffset: -10 })
         .addTo(objectiveMarkersLayer);
     });
   }
@@ -535,7 +623,12 @@ window.MapModule = (function () {
   }
 
   const MAX_RINGS = 22;   // show the biggest threat/defense envelopes only — readable, not noisy
-  function refreshRangeRings() {
+  // C-017 (P1/P2): rings are drawn at the TRUE coordinate (n.lat/n.lon), not the
+  // decluttered display position. This keeps geometry truthful — a ring centered at the
+  // true coordinate is correct even when its symbol is offset. A thin leader line is
+  // drawn separately in refreshMapMarkers for offset symbols so the user can see the
+  // connection between the displayed icon and its true ground position.
+  function refreshRangeRings(offsetById) {
     if (!rangeRingsLayer) return;
     rangeRingsLayer.clearLayers();
     const { visibleNodes } = currentVisible();
@@ -552,6 +645,7 @@ window.MapModule = (function () {
     candidates.sort((a, b) => b.imp - a.imp);
     candidates.slice(0, MAX_RINGS).forEach(({ n, z }) => {
       const st = ringStyle(z.kind, n.team);
+      // Rings always anchor to true coordinate so geometry is tactically truthful.
       L.circle([n.lat, pacLon(n.lon)], {
         pane: 'ringsPane', interactive: false, radius: z.km * 1000,
         color: st.color, weight: st.weight, opacity: st.opacity !== undefined ? st.opacity : 0.9,
@@ -611,7 +705,12 @@ window.MapModule = (function () {
         { autoPan: true }
       ).openPopup();
       if (selectedNode.lat != null && selectedNode.lon != null) {
-        leafletMap.setView([selectedNode.lat, pacLon(selectedNode.lon)], Math.max(leafletMap.getZoom(), 3), { animate: true });
+        // C-017: pan to the marker's display coordinate (which may be offset by declutter)
+        // so the map recenters on where the symbol is actually drawn, not a hidden true pos.
+        let viewPos;
+        try { viewPos = m.getLatLng(); } catch (e) { viewPos = null; }
+        if (!viewPos) viewPos = { lat: selectedNode.lat, lng: pacLon(selectedNode.lon) };
+        leafletMap.setView([viewPos.lat, viewPos.lng], Math.max(leafletMap.getZoom(), 3), { animate: true });
       }
     }
     refreshMapLinks();
@@ -635,10 +734,23 @@ window.MapModule = (function () {
         if (n && n.lat != null && n.lon != null) neighbors.push(n);
       }
     });
+
+    // C-017: use display coordinates (marker.getLatLng()) for link endpoints so lines
+    // connect to where the symbols are actually drawn, not a diverging true position.
+    const selMarker = mapMarkers.get(selectedNode.id);
+    let selDispPos;
+    try { selDispPos = selMarker ? selMarker.getLatLng() : null; } catch (e) { selDispPos = null; }
+    const from = selDispPos
+      ? [selDispPos.lat, selDispPos.lng]
+      : [selectedNode.lat, pacLon(selectedNode.lon)];
+
     neighbors.forEach(n => {
       // Inner glow line (thicker, very faint) + crisp accent line on top.
-      const from = [selectedNode.lat, pacLon(selectedNode.lon)];
-      const to = [n.lat, pacLon(n.lon)];
+      const nMarker = mapMarkers.get(n.id);
+      let nDispPos;
+      try { nDispPos = nMarker ? nMarker.getLatLng() : null; } catch (e) { nDispPos = null; }
+      const to = nDispPos ? [nDispPos.lat, nDispPos.lng] : [n.lat, pacLon(n.lon)];
+
       // Glow layer: wide, low opacity
       L.polyline([from, to], {
         color: '#00d8ff',
@@ -996,6 +1108,52 @@ window.MapModule = (function () {
     try { return leafletMap && leafletMap.getContainer().offsetParent !== null; } catch (e) { return false; }
   }
 
+  // C-020 (P1): Hidden-strike queue.
+  // When flashStrike / playStrikes are called while the map panel is not visible,
+  // events are queued rather than silently dropped. When the map becomes visible again
+  // (detected via replayHiddenStrikes(), which the main script calls on map-mode
+  // activation, or which fires automatically if an IntersectionObserver is available),
+  // a condensed replay is shown: at most MAX_QUEUED_STRIKES events staggered over ~2 s,
+  // oldest-first. The queue is capped so a long hidden session never floods the COP.
+  const MAX_QUEUED_STRIKES = 30;
+  const _hiddenStrikeQueue = [];
+
+  function _enqueueStrike(srcId, dstId, opts) {
+    if (_hiddenStrikeQueue.length >= MAX_QUEUED_STRIKES) {
+      _hiddenStrikeQueue.shift(); // drop oldest to make room (keep recency)
+    }
+    _hiddenStrikeQueue.push({ srcId, dstId, opts: Object.assign({}, opts) });
+  }
+
+  // Called by the main script when the map panel becomes visible (mode toggle).
+  // Also wired to an IntersectionObserver below when the DOM is available.
+  function replayHiddenStrikes() {
+    if (_hiddenStrikeQueue.length === 0) return;
+    if (!mapVisible()) return; // still hidden; keep the queue for next activation
+    const batch = _hiddenStrikeQueue.splice(0); // drain queue atomically
+    // Condensed replay: stagger over ~2 s (max 30 events → ~67 ms apart).
+    const interval = Math.max(60, Math.min(200, 2000 / batch.length));
+    batch.forEach((ev, i) => {
+      setTimeout(() => {
+        if (mapVisible()) flashStrike(ev.srcId, ev.dstId, ev.opts);
+      }, i * interval);
+    });
+  }
+
+  // Wire IntersectionObserver so replayHiddenStrikes fires automatically when the
+  // map container scrolls into view (works even without a main-script hook).
+  function _wireMapVisibilityObserver() {
+    if (typeof IntersectionObserver === 'undefined' || !leafletMap) return;
+    try {
+      const container = leafletMap.getContainer();
+      if (!container) return;
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => { if (entry.isIntersecting) replayHiddenStrikes(); });
+      }, { threshold: 0.1 });
+      obs.observe(container);
+    } catch (e) { /* non-fatal — main-script can call replayHiddenStrikes() directly */ }
+  }
+
   // Quadratic-bezier arc (list of [lat,lon]) bowed off the straight line for a ballistic feel.
   function arcPoints(from, to, bend, n) {
     const lat1 = from[0], lon1 = from[1], lat2 = to[0], lon2 = to[1];
@@ -1011,9 +1169,14 @@ window.MapModule = (function () {
   }
 
   // Animate a strike from one node to another. opts: { team:'red'|'blue', kill:bool }.
+  // C-020 (P1): If the map is not currently visible, queue the event for replay rather
+  // than silently discarding it.
   function flashStrike(srcId, dstId, opts) {
     opts = opts || {};
-    if (!leafletMap || !mapVisible()) return;
+    if (!leafletMap || !mapVisible()) {
+      _enqueueStrike(srcId, dstId, opts);
+      return;
+    }
     const s = nodeById(srcId), d = nodeById(dstId);
     if (!d || d.lat == null || d.lon == null) return;
     const team = opts.team === 'blue' ? 'blue' : 'red';
@@ -1181,9 +1344,18 @@ window.MapModule = (function () {
   }
 
   // Play a turn's resolution events as a staggered volley.
+  // C-020 (P1): If the map is hidden, enqueue each strike rather than dropping the whole
+  // batch. They will be replayed (condensed) when the map becomes visible again.
   function playStrikes(events) {
-    if (!Array.isArray(events) || !mapVisible()) return;
+    if (!Array.isArray(events)) return;
     const shots = events.filter(e => e && (e.kind === 'hit' || e.kind === 'kill') && e.targetId);
+    if (!mapVisible()) {
+      // Queue all shots for later replay (each respects the MAX_QUEUED_STRIKES cap).
+      shots.forEach(e => _enqueueStrike(e.sourceId, e.targetId, {
+        team: e.side === 'blue' ? 'blue' : 'red', kill: e.kind === 'kill'
+      }));
+      return;
+    }
     shots.forEach((e, i) => {
       setTimeout(() => flashStrike(e.sourceId, e.targetId, {
         team: e.side === 'blue' ? 'blue' : 'red', kill: e.kind === 'kill'
@@ -1206,6 +1378,7 @@ window.MapModule = (function () {
     invalidateSize,
     flashStrike,
     playStrikes,
+    replayHiddenStrikes,  // C-020: call from main script on map-mode activation
     getMap,
     getMarkers
   };

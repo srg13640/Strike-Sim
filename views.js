@@ -15,6 +15,13 @@
  * are injected via ViewsModule.init(ctx). orgExpandedTeams (the per-team expand state,
  * mutated by the main toggles) is shared via window.orgExpandedTeams. Public renderers
  * self-alias to their original global names so existing call sites keep working.
+ *
+ * C-026: Table headers keyboard-operable (Enter/Space), rows keyboard-selectable
+ *        (roving tabindex), org-chart nodes keyboard-focusable/activatable.
+ * C-034: "Analysis columns" toggle that reveals cascScore, resourceGen, subsystem,
+ *        vulnerabilities, and precise coordinates. Default view stays lean.
+ * C-051: Teams derived from visible nodes (not hard-coded), per-branch collapse/focus,
+ *        and a compact legend strip.
  */
 window.ViewsModule = (function () {
   'use strict';
@@ -33,48 +40,236 @@ window.ViewsModule = (function () {
   };
   function init(context) { ctx = Object.assign({}, ctx, context || {}); }
 
+  // --- C-030 adjacency: HTML-escape helper for innerHTML template literals ---
+  // Scenario JSON is user-importable, so every node-derived string interpolated
+  // into markup (names, types, statuses, ids, vulns, ...) must be escaped.
+  // Delegates to the shared UiModule.escapeHtml, resolved LAZILY per call
+  // (views.js may load before ui.js); identical local fallback otherwise.
+  function esc(s) {
+    if (window.UiModule && typeof window.UiModule.escapeHtml === 'function') {
+      return window.UiModule.escapeHtml(s);
+    }
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   // --- Table sort state ---
   // Column index (0-based) and direction for the active sort.
   let sortCol = -1;   // -1 = no active sort
   let sortAsc = true;
 
+  // --- Analysis-columns toggle state (C-034) ---
+  // When true, extra columns (cascScore, resourceGen, subsystem, vulnerabilities,
+  // precise coords) are appended after the base columns.
+  let analysisMode = false;
+
+  // Base columns: ID, Name, Team, Domain, Type, Health, Status, Importance, Difficulty, Coords
   // Columns that sort numerically (by index matching the th order).
   // 0=ID 1=Name 2=Team 3=Domain 4=Type 5=Health 6=Status 7=Importance 8=Difficulty 9=Coords
-  const NUMERIC_COLS = new Set([5, 7]);  // Health, Importance
+  // Analysis cols (only when analysisMode): 10=Casc 11=Resources 12=Subsystem 13=Vulns 14=Precise Coords
+  const NUMERIC_COLS = new Set([5, 7, 10, 11]);  // Health, Importance, CascScore, ResourceGen
 
   // Wire up click handlers on thead <th> elements once the DOM is ready.
   // Called lazily on first refreshTable so we don't need a DOMContentLoaded hook.
   let sortHeadersWired = false;
+
+  // --- C-034: inject analysis-toggle toolbar above the table ---
+  // Injected once; removed and re-injected if the #nodes-table container changes.
+  let analysisToolbarEl = null;
+  function ensureAnalysisToolbar() {
+    const table = document.getElementById('nodes-table');
+    if (!table) return;
+    const wrap = table.closest('.table-wrap') || table.parentElement;
+    if (!wrap) return;
+    // Only inject once; check by id
+    if (wrap.querySelector('#analysis-toggle-bar')) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'analysis-toggle-bar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Table column presets');
+    bar.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:8px',
+      'padding:6px 2px 8px',
+      'font-size:11px',
+      'color:var(--muted)',
+      'font-family:var(--mono)',
+      'flex-wrap:wrap'
+    ].join(';');
+
+    const label = document.createElement('span');
+    label.textContent = 'COLUMNS:';
+    label.setAttribute('aria-hidden', 'true');
+    bar.appendChild(label);
+
+    // "Default" preset pill
+    const btnDefault = document.createElement('button');
+    btnDefault.type = 'button';
+    btnDefault.id = 'analysis-btn-default';
+    btnDefault.setAttribute('aria-pressed', 'true');
+    btnDefault.textContent = 'Default';
+    _stylePresetBtn(btnDefault, true);
+    btnDefault.addEventListener('click', () => {
+      analysisMode = false;
+      _updatePresetBtns();
+      sortHeadersWired = false;
+      refreshTable();
+    });
+    btnDefault.addEventListener('keydown', _presetBtnKeydown);
+    bar.appendChild(btnDefault);
+
+    // "Analysis" preset pill
+    const btnAnalysis = document.createElement('button');
+    btnAnalysis.type = 'button';
+    btnAnalysis.id = 'analysis-btn-analysis';
+    btnAnalysis.setAttribute('aria-pressed', 'false');
+    btnAnalysis.textContent = '+ Analysis';
+    _stylePresetBtn(btnAnalysis, false);
+    btnAnalysis.addEventListener('click', () => {
+      analysisMode = true;
+      _updatePresetBtns();
+      sortHeadersWired = false;
+      refreshTable();
+    });
+    btnAnalysis.addEventListener('keydown', _presetBtnKeydown);
+    bar.appendChild(btnAnalysis);
+
+    const hint = document.createElement('span');
+    hint.style.cssText = 'margin-left:4px;color:var(--muted);opacity:.65';
+    hint.textContent = analysisMode
+      ? '(Cascade · Resources · Subsystem · Vulns · Precise Coords shown)'
+      : '(click "+ Analysis" to reveal cascade, resources, subsystem, vulns)';
+    hint.id = 'analysis-toggle-hint';
+    bar.appendChild(hint);
+
+    analysisToolbarEl = bar;
+    wrap.insertBefore(bar, table);
+  }
+
+  function _stylePresetBtn(btn, active) {
+    btn.style.cssText = [
+      'cursor:pointer',
+      'padding:2px 8px',
+      'border-radius:12px',
+      'font-size:11px',
+      'font-family:var(--mono)',
+      'font-weight:600',
+      'letter-spacing:.04em',
+      'transition:background .15s,color .15s',
+      active
+        ? 'background:var(--accent);color:#000;border:1px solid var(--accent)'
+        : 'background:transparent;color:var(--muted);border:1px solid var(--border)'
+    ].join(';');
+  }
+
+  function _updatePresetBtns() {
+    const btnD = document.getElementById('analysis-btn-default');
+    const btnA = document.getElementById('analysis-btn-analysis');
+    const hint = document.getElementById('analysis-toggle-hint');
+    if (btnD) {
+      btnD.setAttribute('aria-pressed', analysisMode ? 'false' : 'true');
+      _stylePresetBtn(btnD, !analysisMode);
+    }
+    if (btnA) {
+      btnA.setAttribute('aria-pressed', analysisMode ? 'true' : 'false');
+      _stylePresetBtn(btnA, analysisMode);
+    }
+    if (hint) {
+      hint.textContent = analysisMode
+        ? '(Cascade · Resources · Subsystem · Vulns · Precise Coords shown)'
+        : '(click "+ Analysis" to reveal cascade, resources, subsystem, vulns)';
+    }
+  }
+
+  // Allow arrow-key navigation between the two preset buttons (roving within toolbar).
+  function _presetBtnKeydown(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const bar = document.getElementById('analysis-toggle-bar');
+      if (!bar) return;
+      const btns = Array.from(bar.querySelectorAll('button'));
+      const idx = btns.indexOf(e.currentTarget);
+      if (idx < 0) return;
+      const next = btns[(idx + (e.key === 'ArrowRight' ? 1 : -1) + btns.length) % btns.length];
+      if (next) { e.preventDefault(); next.focus(); }
+    }
+  }
+
+  // --- C-026: wire sort headers with keyboard support ---
   function wireSortHeaders() {
     const table = document.getElementById('nodes-table');
     if (!table) return;
     const ths = table.querySelectorAll('thead th');
     ths.forEach((th, idx) => {
+      // Remove old listeners by cloning the node (safe: no child state to preserve)
+      const fresh = th.cloneNode(true);
+      th.parentNode.replaceChild(fresh, th);
+    });
+
+    // Re-query after clone replacements
+    const freshThs = table.querySelectorAll('thead th');
+    freshThs.forEach((th, idx) => {
       th.style.cursor = 'pointer';
-      th.addEventListener('click', () => {
+      // Make th keyboard-reachable (C-026)
+      th.setAttribute('tabindex', '0');
+      th.setAttribute('role', 'columnheader');
+      th.setAttribute('aria-sort', 'none');
+      th.setAttribute('title', 'Click, Enter, or Space to sort');
+
+      function doSort() {
         if (sortCol === idx) {
           sortAsc = !sortAsc;
         } else {
           sortCol = idx;
           sortAsc = true;
         }
-        // Update aria-sort and caret indicators on all headers.
-        ths.forEach((h, i) => {
-          h.removeAttribute('aria-sort');
-          const old = h.querySelector('.sort-caret');
-          if (old) old.remove();
-          if (i === sortCol) {
-            h.setAttribute('aria-sort', sortAsc ? 'ascending' : 'descending');
-            const caret = document.createElement('span');
-            caret.className = 'sort-caret';
-            caret.textContent = sortAsc ? ' ▲' : ' ▼';
-            h.appendChild(caret);
-          }
-        });
+        _updateSortIndicators(freshThs);
         refreshTable();
+      }
+
+      th.addEventListener('click', doSort);
+      // C-026: Enter/Space activates sort on focused header
+      th.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          doSort();
+        }
+        // Allow left/right arrow to move focus between headers
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const next = freshThs[idx + 1];
+          if (next) next.focus();
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const prev = freshThs[idx - 1];
+          if (prev) prev.focus();
+        }
       });
     });
+
+    // Apply current sort indicators (if any active sort)
+    _updateSortIndicators(freshThs);
     sortHeadersWired = true;
+  }
+
+  function _updateSortIndicators(ths) {
+    ths.forEach((h, i) => {
+      h.removeAttribute('aria-sort');
+      h.setAttribute('aria-sort', 'none');
+      const old = h.querySelector('.sort-caret');
+      if (old) old.remove();
+      if (i === sortCol) {
+        h.setAttribute('aria-sort', sortAsc ? 'ascending' : 'descending');
+        const caret = document.createElement('span');
+        caret.className = 'sort-caret';
+        caret.textContent = sortAsc ? ' ▲' : ' ▼';
+        caret.setAttribute('aria-hidden', 'true');
+        h.appendChild(caret);
+      }
+    });
   }
 
   // --- Table view ---
@@ -140,16 +335,150 @@ window.ViewsModule = (function () {
       case 7: return Number(n.importance) || 0;
       case 8: return (n.difficulty || '').toLowerCase();
       case 9: return (n.lat != null) ? Number(n.lat) : -Infinity;
+      // Analysis columns (C-034)
+      case 10: return Number(n.cascScore) || 0;          // Cascade score (numeric)
+      case 11: return Number(n.resourceGen) || 0;        // Resources (numeric)
+      case 12: return (n.subsystem || '').toLowerCase(); // Subsystem
+      case 13: return ((n.vulnerabilities || []).length); // Vuln count (numeric proxy)
+      case 14: return (n.lat != null) ? Number(n.lat) : -Infinity; // Precise coords
       default: return '';
     }
   }
 
+  // --- C-026: roving-tabindex state for table rows ---
+  // Tracks which row (data-id) currently holds tabindex="0" so the user can
+  // re-enter the row list without Tab-through-every-row overhead.
+  let _focusedRowId = null;
+
+  function _wireRowKeyboard(tbody) {
+    const rows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+    if (!rows.length) return;
+
+    // Roving tabindex: exactly one row at a time has tabindex="0"; rest get "-1".
+    // Restore focus to the previously-focused row if it still exists, else first row.
+    const focusTarget = _focusedRowId
+      ? (rows.find(r => r.getAttribute('data-id') === _focusedRowId) || rows[0])
+      : rows[0];
+
+    rows.forEach(r => {
+      r.setAttribute('tabindex', r === focusTarget ? '0' : '-1');
+      r.setAttribute('role', 'row');
+      // aria-selected reflects whether this is the currently-selected node
+      const id = r.getAttribute('data-id');
+      const sel = ctx.getSelectedNode && ctx.getSelectedNode();
+      r.setAttribute('aria-selected', (sel && String(sel.id) === String(id)) ? 'true' : 'false');
+    });
+
+    rows.forEach((row, idx) => {
+      // Remove stale listeners (rows are rebuilt via innerHTML; listeners are fresh)
+      row.addEventListener('click', () => {
+        _setFocusedRow(rows, row);
+        selectNodeById(row.getAttribute('data-id'));
+      });
+
+      // C-026: Enter/Space selects the focused row; arrow keys move between rows
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          _setFocusedRow(rows, row);
+          selectNodeById(row.getAttribute('data-id'));
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const next = rows[idx + 1];
+          if (next) { _setFocusedRow(rows, next); next.focus(); }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const prev = rows[idx - 1];
+          if (prev) { _setFocusedRow(rows, prev); prev.focus(); }
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          _setFocusedRow(rows, rows[0]);
+          rows[0].focus();
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          const last = rows[rows.length - 1];
+          _setFocusedRow(rows, last);
+          last.focus();
+        }
+      });
+
+      row.addEventListener('focus', () => {
+        _focusedRowId = row.getAttribute('data-id');
+      });
+    });
+  }
+
+  function _setFocusedRow(rows, target) {
+    rows.forEach(r => r.setAttribute('tabindex', '-1'));
+    target.setAttribute('tabindex', '0');
+    _focusedRowId = target.getAttribute('data-id');
+  }
+
+  // --- C-034: build the analysis-columns <th> header cells ---
+  function _analysisHeaders() {
+    return [
+      '<th tabindex="0" role="columnheader" aria-sort="none" title="Cascading failure score — click to sort" style="color:var(--amber)">Casc▸</th>',
+      '<th tabindex="0" role="columnheader" aria-sort="none" title="Resource generation — click to sort" style="color:var(--accent)">Res▸</th>',
+      '<th tabindex="0" role="columnheader" aria-sort="none" title="Subsystem">Subsystem</th>',
+      '<th tabindex="0" role="columnheader" aria-sort="none" title="Vulnerabilities">Vulns</th>',
+      '<th tabindex="0" role="columnheader" aria-sort="none" title="Precise coordinates (lat, lon)">Precise Coords</th>'
+    ].join('');
+  }
+
+  // --- C-034: render analysis cells for a node ---
+  function _analysisCells(n) {
+    const casc = Number(n.cascScore) || 0;
+    const cascColor = casc >= 3 ? 'var(--alert)' : casc >= 1.5 ? 'var(--amber)' : 'var(--muted)';
+    const cascCell = `<td style="font-family:var(--mono);color:${cascColor}">${casc.toFixed(1)}</td>`;
+
+    const resGen = Number(n.resourceGen) || 0;
+    const resCell = `<td style="font-family:var(--mono);color:var(--accent)">${resGen}</td>`;
+
+    const sub = n.subsystem || '—';
+    const subCell = `<td style="color:var(--muted)">${esc(sub)}</td>`;
+
+    const vulns = Array.isArray(n.vulnerabilities) ? n.vulnerabilities : [];
+    const vulnColor = vulns.length >= 2 ? 'var(--alert)' : vulns.length === 1 ? 'var(--amber)' : 'var(--muted)';
+    const vulnTitle = vulns.length ? vulns.join(', ') : 'None';
+    const vulnCell = `<td><span title="${esc(vulnTitle)}" style="cursor:default;color:${vulnColor};font-family:var(--mono)">${vulns.length ? esc(vulns.slice(0,2).join(', ')) + (vulns.length > 2 ? ' +' + (vulns.length - 2) : '') : '—'}</span></td>`;
+
+    const precCoords = (n.lat != null && n.lon != null)
+      ? `${Number(n.lat).toFixed(5)}, ${Number(n.lon).toFixed(5)}`
+      : '—';
+    const precCell = `<td style="font-family:var(--mono);color:var(--muted);font-size:10px">${precCoords}</td>`;
+
+    return cascCell + resCell + subCell + vulnCell + precCell;
+  }
+
   function refreshTable() {
-    // Wire sort headers on first call.
+    // Ensure analysis toolbar exists (idempotent)
+    ensureAnalysisToolbar();
+
+    // Wire sort headers on first call (or after column preset change reset it)
     if (!sortHeadersWired) wireSortHeaders();
 
-    const tbody = document.querySelector('#nodes-table tbody');
+    const table = document.getElementById('nodes-table');
+    const tbody = table ? table.querySelector('tbody') : null;
     if (!tbody) return;
+
+    // --- C-034: sync thead to current column preset ---
+    const thead = table.querySelector('thead tr');
+    if (thead) {
+      // Base headers always come from HTML; add/remove analysis headers dynamically
+      // Count existing ths; analysis cols start at index 10
+      const existingThs = thead.querySelectorAll('th');
+      // Remove analysis cols if too many (> 10) and not in analysis mode
+      if (existingThs.length > 10 && !analysisMode) {
+        Array.from(existingThs).slice(10).forEach(th => th.remove());
+        sortHeadersWired = false; // re-wire after structural change
+        wireSortHeaders();
+      } else if (existingThs.length <= 10 && analysisMode) {
+        thead.insertAdjacentHTML('beforeend', _analysisHeaders());
+        sortHeadersWired = false;
+        wireSortHeaders();
+      }
+    }
+
     const { visibleNodes } = currentVisible();
 
     // Sort if a column is active.
@@ -180,6 +509,9 @@ window.ViewsModule = (function () {
         ? (ctx.getHighlightSet().has(n.id) ? 'row-highlight' : 'row-dim')
         : '';
 
+      const sel = ctx.getSelectedNode && ctx.getSelectedNode();
+      const isSelected = sel && String(sel.id) === String(n.id);
+
       // --- Health cell: small inline bar + colored mono text ---
       const hColor = healthColor(healthPct);
       const healthCell = `<span style="display:inline-flex;align-items:center;gap:6px;font-family:var(--mono)">` +
@@ -191,35 +523,40 @@ window.ViewsModule = (function () {
 
       // --- Status badge with affiliation-derived color ---
       const sColor = statusColor(statusText);
-      const statusCell = `<span class="status-badge" style="border-color:${sColor};color:${sColor}">${statusText}</span>`;
+      const statusCell = `<span class="status-badge" style="border-color:${sColor};color:${sColor}">${esc(statusText)}</span>`;
 
       // --- Team cell with canonical affiliation color ---
       const affColor = teamAffColor(n.team);
       const teamLabel2 = (n.team || '3rd_party').replace('_', ' ');
       const teamCell = `<span style="display:inline-flex;align-items:center;gap:5px">` +
         `<span class="swatch" style="background:${affColor};display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>` +
-        `<span style="color:${affColor};font-family:var(--mono)">${teamLabel2}</span>` +
+        `<span style="color:${affColor};font-family:var(--mono)">${esc(teamLabel2)}</span>` +
         `</span>`;
 
+      // C-034: analysis cells only when mode is on
+      const analysisCols = analysisMode ? _analysisCells(n) : '';
+
+      // C-026: row is keyboard-reachable via roving tabindex (applied in _wireRowKeyboard)
       return `
-        <tr class="${trClass}" data-id="${n.id}">
-          <td style="font-family:var(--mono);color:var(--muted)">${n.id}</td>
-          <td>${n.name || ''}</td>
+        <tr class="${trClass}" data-id="${esc(n.id)}" role="row" aria-selected="${isSelected ? 'true' : 'false'}">
+          <td style="font-family:var(--mono);color:var(--muted)">${esc(n.id)}</td>
+          <td>${esc(n.name || '')}</td>
           <td>${teamCell}</td>
-          <td>${dom}</td>
-          <td>${n.type || ''}</td>
+          <td>${esc(dom)}</td>
+          <td>${esc(n.type || '')}</td>
           <td>${healthCell}</td>
           <td>${statusCell}</td>
-          <td style="font-family:var(--mono)">${n.importance ?? ''}</td>
-          <td>${n.difficulty || ''}</td>
+          <td style="font-family:var(--mono)">${esc(n.importance ?? '')}</td>
+          <td>${esc(n.difficulty || '')}</td>
           <td style="font-family:var(--mono);color:var(--muted)">${coords}</td>
+          ${analysisCols}
         </tr>`;
     }).join('');
+
     tbody.innerHTML = rows;
-    // Row click -> select node (preserve after sort since we rebuilt from sorted array)
-    tbody.querySelectorAll('tr[data-id]').forEach(tr =>
-      tr.addEventListener('click', () => selectNodeById(tr.getAttribute('data-id')))
-    );
+
+    // C-026: wire keyboard navigation on rows (roving tabindex + Enter/Space/Arrow)
+    _wireRowKeyboard(tbody);
   }
 
   // --- Task-org / wire diagram ---
@@ -309,6 +646,76 @@ window.ViewsModule = (function () {
     return root;
   }
 
+  // --- C-051: derive teams from visibleNodes (not hard-coded) ---
+  // Blue/Red are pinned first; any additional affiliations follow alphabetically.
+  function _deriveTeams(visibleNodes) {
+    const seen = new Set();
+    visibleNodes.forEach(n => seen.add(n.team || '3rd_party'));
+    const pinned = ['blue', 'red'].filter(t => seen.has(t));
+    const rest = Array.from(seen).filter(t => t !== 'blue' && t !== 'red').sort();
+    return [...pinned, ...rest];
+  }
+
+  // --- C-051: render a compact legend strip into the org-chart wrapper ---
+  function _renderOrgLegend(wrap, teams) {
+    // Remove stale legend
+    const old = wrap.querySelector('#org-legend');
+    if (old) old.remove();
+
+    const legend = document.createElement('div');
+    legend.id = 'org-legend';
+    legend.setAttribute('role', 'note');
+    legend.setAttribute('aria-label', 'Task-org chart legend');
+    legend.style.cssText = [
+      'display:flex',
+      'flex-wrap:wrap',
+      'gap:12px',
+      'align-items:center',
+      'padding:5px 10px 4px',
+      'font-size:10px',
+      'font-family:var(--mono)',
+      'color:var(--muted)',
+      'border-bottom:1px solid var(--border)',
+      'background:rgba(0,0,0,.25)'
+    ].join(';');
+
+    const items = [
+      { label: 'Card', style: 'display:inline-block;width:14px;height:9px;border-radius:2px;border:1px solid var(--muted);background:rgba(255,255,255,.05)', desc: 'Unit node' },
+      { label: 'Health bar', style: 'display:inline-block;width:18px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--alert) 33%,var(--amber) 66%,var(--aff-neutral) 100%)', desc: 'Low→High' },
+      { label: 'Dashed border', style: 'display:inline-block;width:14px;height:9px;border-radius:2px;border:1px dashed var(--muted)', desc: 'Domain bucket (click to expand)' },
+    ];
+
+    // Affiliation swatches
+    teams.forEach(team => {
+      const color = team === 'blue' ? 'var(--aff-friend)'
+        : team === 'red' ? 'var(--aff-hostile)'
+        : team === 'green' ? 'var(--aff-neutral)'
+        : team === 'yellow' ? 'var(--aff-unknown)'
+        : 'var(--team-3rd_party, #bfc9d4)';
+      items.push({ label: team.replace('_', ' '), style: `display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}`, desc: `${team} affiliation` });
+    });
+
+    items.forEach(({ label, style, desc }) => {
+      const span = document.createElement('span');
+      span.style.cssText = 'display:inline-flex;align-items:center;gap:5px';
+      span.title = desc;
+      span.innerHTML = `<span style="${style}" aria-hidden="true"></span><span>${esc(label)}</span>`;
+      legend.appendChild(span);
+    });
+
+    // Insert the legend at the top of the org-chart container. The <svg> lives inside
+    // .org-chart-wrap (a grandchild of `wrap`), so inserting relative to it throws a
+    // NotFoundError and aborts the whole render — insert before the first child instead.
+    if (wrap.firstChild) wrap.insertBefore(legend, wrap.firstChild);
+    else wrap.appendChild(legend);
+  }
+
+  // --- C-026/C-051: focused org-node tracking for keyboard nav ---
+  // We use a roving-tabindex model: only one SVG <g.org-node> at a time gets
+  // tabindex="0"; all others get "-1". The user Tab-ins to the focused node and
+  // then uses Arrow/Enter/Space/Escape to navigate/activate.
+  let _orgFocusedNodeId = null;  // data-id of the currently keyboard-focused org node
+
   function renderOrgChart() {
     const wrap = document.getElementById('org-chart');
     const svg = d3.select('#org-chart-svg');
@@ -329,17 +736,27 @@ window.ViewsModule = (function () {
     svg.call(orgZoomBehavior);
 
     const zoomLayer = svg.append('g').attr('id', 'org-zoom');
-    const teams = ['blue', 'red'];
+
+    // C-051: derive teams dynamically from visible nodes
+    const teams = _deriveTeams(visibleNodes);
+
+    // C-051: render compact legend
+    _renderOrgLegend(wrap, teams);
+
     const nodeSize = { w: 236, h: 58 };
     const nodeSpacingX = 304;   // > card width (236) + gutter, so sibling cards never collide
     const levelSpacingY = 150;  // card (58) + clear elbow routing
     const marginTop = 36;
-    const BAND_GAP = 90;        // vertical gap between the Blue and Red trees
+    const BAND_GAP = 90;        // vertical gap between team trees
 
     // Teams are stacked VERTICALLY (Blue on top, Red below), each using the full canvas
     // width — never squeezed into half-width columns. The canvas grows tall; pan/zoom to navigate.
     let yCursor = marginTop;
     let widestTree = nodeSpacingX;
+
+    // Collect all renderable org-node elements for keyboard nav (built below)
+    const allOrgNodes = [];  // { el: SVGGElement, nodeId: string, depth: number, data: object }
+
     teams.forEach((team) => {
       const rootData = buildOrgTree(team, visibleNodes, visibleLinks, orgExpandedTeams.has(team));
       const root = d3.hierarchy(rootData);
@@ -355,15 +772,20 @@ window.ViewsModule = (function () {
       const shiftY = yCursor;
 
       // Use canonical affiliation colors for team bands.
-      const teamColor = team === 'blue'
-        ? getCssVar('--aff-friend')
-        : getCssVar('--aff-hostile');
+      const teamColor = team === 'blue' ? getCssVar('--aff-friend')
+        : team === 'red' ? getCssVar('--aff-hostile')
+        : team === 'green' ? getCssVar('--aff-neutral')
+        : team === 'yellow' ? getCssVar('--aff-unknown')
+        : getCssVar('--team-3rd_party') || '#bfc9d4';
 
       // Team band label above each tree — uses --display font via CSS class.
+      const bandLabel = team === 'blue' ? 'BLUE — US / ALLIED'
+        : team === 'red' ? 'RED — PLA'
+        : (team.replace('_', ' ')).toUpperCase();
       zoomLayer.append('text')
         .attr('x', shiftX + minX - nodeSize.w / 2).attr('y', shiftY - 12)
         .attr('class', 'org-band').attr('fill', teamColor)
-        .text(team === 'blue' ? 'BLUE — US / ALLIED' : 'RED — PLA');
+        .text(bandLabel);
 
       zoomLayer.append('g')
         .selectAll('path').data(root.links()).join('path')
@@ -379,19 +801,56 @@ window.ViewsModule = (function () {
         .selectAll('g').data(nodes).join('g')
         .attr('class', 'org-node')
         .attr('transform', d => `translate(${shiftX + d.x - nodeSize.w / 2},${shiftY + d.y - nodeSize.h / 2})`)
-        .style('cursor', d => (d.depth === 0 || d.data?.group || d.data?.data) ? 'pointer' : 'default')
-        .on('click', (event, d) => {
-          if (d.depth === 0 && d.data?.team) toggleOrgTeam(d.data.team);
-          else if (d.data?.group) {                       // toggle a domain bucket
-            if (orgExpandedGroups.has(d.data.id)) orgExpandedGroups.delete(d.data.id);
-            else orgExpandedGroups.add(d.data.id);
-            renderOrgChart();
-          } else if (d.data?.data) selectNodeById(d.data.data.id);
-        });
+        .style('cursor', d => (d.depth === 0 || d.data?.group || d.data?.data) ? 'pointer' : 'default');
+
+      // C-026: make org-chart nodes focusable and keyboard-activatable
+      nodeG.each(function(d) {
+        const el = this;
+        const nid = d.data?.data?.id || d.data?.id || null;
+        const isInteractive = d.depth === 0 || d.data?.group || d.data?.data;
+        if (!isInteractive) return;
+
+        // Set ARIA role and label
+        let ariaLabel = '';
+        if (d.depth === 0) {
+          ariaLabel = `${d.data.name} — click to ${d.data.expanded ? 'collapse' : 'expand'}`;
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-expanded', d.data.expanded ? 'true' : 'false');
+        } else if (d.data?.group) {
+          ariaLabel = `${d.data.name}, ${d.data.count} units — click to ${d.data.collapsed ? 'expand' : 'collapse'}`;
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-expanded', d.data.collapsed ? 'false' : 'true');
+        } else if (d.data?.data) {
+          const nd = d.data.data;
+          ariaLabel = `${nd.name || nd.id} — ${nd.type || ''} — ${(nd.domain || []).join('/')} — health ${Math.round((nd.health / (nd.healthMax || 100)) * 100)}% — press Enter to select`;
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-label', ariaLabel);
+        }
+        if (ariaLabel) el.setAttribute('aria-label', ariaLabel);
+
+        // Roving tabindex — default all to -1; apply 0 to the focused node or first node of first team
+        el.setAttribute('tabindex', (nid && nid === _orgFocusedNodeId) ? '0' : '-1');
+        el.setAttribute('data-org-nid', nid || '');
+
+        allOrgNodes.push({ el, nodeId: nid, depth: d.depth, data: d.data, d });
+      });
+
+      nodeG.on('click', (event, d) => {
+        if (d.depth === 0 && d.data?.team) toggleOrgTeam(d.data.team);
+        else if (d.data?.group) {                       // toggle a domain bucket
+          if (orgExpandedGroups.has(d.data.id)) orgExpandedGroups.delete(d.data.id);
+          else orgExpandedGroups.add(d.data.id);
+          renderOrgChart();
+        } else if (d.data?.data) selectNodeById(d.data.data.id);
+      });
+
       nodeG.each(function (d) { drawMilBox(d3.select(this), d, teamColor); });
 
       yCursor += maxY + nodeSize.h + BAND_GAP;
     });
+
+    // C-026: ensure at least one org-node has tabindex="0" (the focused one or first interactive)
+    _setupOrgKeyboard(allOrgNodes);
 
     // One-time framing: scale so the widest tree fits the width (readable, floor 0.62),
     // anchored at the top. Preserve the user's pan/zoom on subsequent re-renders.
@@ -404,6 +863,63 @@ window.ViewsModule = (function () {
   }
   let orgFramed = false;
   function resetOrgFraming() { orgFramed = false; }
+
+  // C-026: set up roving-tabindex keyboard navigation for org-chart nodes
+  function _setupOrgKeyboard(allOrgNodes) {
+    if (!allOrgNodes.length) return;
+
+    // Find the currently-focused node or fall back to the first interactive node
+    let focusedIdx = allOrgNodes.findIndex(n => n.nodeId && n.nodeId === _orgFocusedNodeId);
+    if (focusedIdx < 0) focusedIdx = 0;
+
+    // Apply roving tabindex
+    allOrgNodes.forEach((n, i) => {
+      n.el.setAttribute('tabindex', i === focusedIdx ? '0' : '-1');
+    });
+
+    allOrgNodes.forEach((item, idx) => {
+      // Keyboard handler
+      item.el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          // Activate node (same logic as click)
+          const d = item.d;
+          if (d.depth === 0 && item.data?.team) toggleOrgTeam(item.data.team);
+          else if (item.data?.group) {
+            if (orgExpandedGroups.has(item.data.id)) orgExpandedGroups.delete(item.data.id);
+            else orgExpandedGroups.add(item.data.id);
+            renderOrgChart();
+          } else if (item.data?.data) selectNodeById(item.data.data.id);
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          _orgMoveFocus(allOrgNodes, idx, 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          _orgMoveFocus(allOrgNodes, idx, -1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          _orgMoveFocus(allOrgNodes, -1, 1); // jump to index 0
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          _orgMoveFocus(allOrgNodes, allOrgNodes.length, -1); // jump to last
+        }
+      });
+
+      item.el.addEventListener('focus', () => {
+        _orgFocusedNodeId = item.nodeId;
+        allOrgNodes.forEach((n, i) => n.el.setAttribute('tabindex', i === idx ? '0' : '-1'));
+      });
+    });
+  }
+
+  function _orgMoveFocus(allOrgNodes, currentIdx, delta) {
+    const next = allOrgNodes[currentIdx + delta];
+    if (next) {
+      allOrgNodes.forEach((n, i) => n.el.setAttribute('tabindex', (currentIdx + delta === i) ? '0' : '-1'));
+      _orgFocusedNodeId = next.nodeId;
+      try { next.el.focus(); } catch (e) { /* SVG focus may fail in some browsers; ignore */ }
+    }
+  }
 
   function fitOrgChartToView(svg, zoomLayer, width, height) {
     try {
@@ -454,7 +970,7 @@ window.ViewsModule = (function () {
         .attr('font-family', 'var(--display)')
         .text(teamLabel(team).toUpperCase());
       box.append('text').attr('x', 16).attr('y', 43).attr('class', 'sub')
-        .text(count ? count + ' units · click to ' + (d.data.expanded ? 'collapse' : 'expand') : 'Task organization');
+        .text(count ? count + ' units · click or Enter to ' + (d.data.expanded ? 'collapse' : 'expand') : 'Task organization');
       box.append('text').attr('x', w - 14).attr('y', 32).attr('text-anchor', 'end')
         .attr('class', 'org-chevron').attr('fill', strokeColor).text(d.data.expanded ? '▾' : '▸');
       return;
@@ -468,7 +984,7 @@ window.ViewsModule = (function () {
       box.append('rect').attr('x', 0).attr('y', 0).attr('width', 4).attr('height', h).attr('rx', 2).attr('fill', strokeColor);
       box.append('text').attr('x', 16).attr('y', 26).attr('class', 'org-name').attr('fill', '#dfeaf5').text(d.data.name);
       box.append('text').attr('x', 16).attr('y', 42).attr('class', 'sub')
-        .text(d.data.count + ' units · click to ' + (d.data.collapsed ? 'expand' : 'collapse'));
+        .text(d.data.count + ' units · click or Enter to ' + (d.data.collapsed ? 'expand' : 'collapse'));
       box.append('text').attr('x', w - 14).attr('y', 33).attr('text-anchor', 'end')
         .attr('class', 'org-chevron').attr('fill', strokeColor).text(d.data.collapsed ? '▸' : '▾');
       return;
