@@ -55,6 +55,9 @@
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
+  <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
+       Drives GameModule; hides the legacy War Game / Campaign launchers. -->
+  <script src="director.js?v=1"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
   <script src="inline-datasets.js?v=p5"></script>
@@ -2499,7 +2502,7 @@
     function relocateBarButtons() {
       const bar = document.getElementById('cmd-actions');
       if (!bar) return;
-      const order = ['cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
+      const order = ['dir-launch', 'cp-launch', 'wg-launch', 'stage-fs-btn', 'retry-3d-btn'];
       const move = () => order.forEach(id => { const el = document.getElementById(id); if (el && el.parentElement !== bar) bar.appendChild(el); });
       move();
       // subtree:true — some modules append their launcher inside #app rather than

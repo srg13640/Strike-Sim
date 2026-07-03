@@ -60,7 +60,8 @@ static server.
 | `ui.js` (`UiModule`) | UI notification primitives: toasts + the event log. |
 | `state.js` (`AppState`) | Scenario-centric application state. A *scenario* owns the graph; foundation for future multi-scenario support. |
 | `sim.js` (`SimModule`) | Simulation foundation: seeded RNG, action/counter profiles, statistics, and the graph→context snapshot builder. |
-| `campaign.js` (`CampaignModule`) | NDS-aligned campaign game layer: phase planning, strategic metrics, campaign brief export, and War Game posture handoff. |
+| `director.js` (`DirectorModule`) | **The Operation Loop — the game's front door.** Brief → Plan → Commit → Watch → AAR phase machine over the War Game engine: ghost-world forecasts at commit (honest ranges, never predictions), paced turn playback, and a counterfactual AAR that re-runs the same seeded world under a changed policy. Design spine: `docs/GAME_DESIGN.md`. |
+| `campaign.js` (`CampaignModule`) | NDS-aligned campaign game layer: phase planning, strategic metrics, campaign brief export, and War Game posture handoff. *(Launcher hidden — pending rebuild as operation framing per the design spine.)* |
 | `map.js` (`MapModule`) | Leaflet 2D map rendering: markers, links, popups, offline tile detection. |
 | `engine.js` (`EngineModule`) | 3D engine lifecycle (3d-force-graph / Three.js), the Blue→Red opening camera shot, and geo-mode layout. |
 | `views.js` (`ViewsModule`) | Alternate render views: the data table and the D3 task-org chart. |
