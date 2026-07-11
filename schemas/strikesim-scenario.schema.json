@@ -29,6 +29,32 @@
       "items": {
         "$ref": "#/$defs/link"
       }
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional operation narrative consumed by the Director BRIEF (background, initiatingEvent, blueRole, redObjective). CO-005 C5.",
+      "properties": {
+        "background": { "type": "string" },
+        "initiatingEvent": { "type": "string" },
+        "blueRole": { "type": "string" },
+        "redObjective": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "matchConfig": {
+      "type": "object",
+      "description": "Optional authored match overrides applied when this scenario/variant is selected at BRIEF (CO-005 C5). Keys mirror game.js newMatch cfgOverrides.",
+      "properties": {
+        "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "lodgmentRequiredTurns": { "type": "number", "exclusiveMinimum": 0 },
+        "doctrinePrior": {
+          "type": "object",
+          "description": "Disclosed prior over Red doctrine types; values are re-normalized at load.",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "strategic": { "type": "object", "description": "strategic-state.js config overrides (escalation, indicators, signals)." }
+      },
+      "additionalProperties": true
     }
   },
   "additionalProperties": true,

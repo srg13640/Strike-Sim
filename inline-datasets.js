@@ -147,6 +147,20 @@
         detail: { ready: bothForcesLoaded, nodeCount: totalNodes, teams: loadedTeams, context: BUNDLED_SCENARIO_CONTEXT }
       }));
     } catch (e) { /* non-fatal */ }
+
+    // CO-005 C5: register bundled operation VARIANTS — alternate briefs the Director
+    // swaps in-place at BRIEF (small-island fait accompli, etc.). Failure is non-fatal:
+    // the default cross-strait operation must never depend on a variant loading.
+    window.StrikeSimVariants = window.StrikeSimVariants || {};
+    try {
+      var variantRaw = await fetchScenario('scenarios/small-island-fait-accompli.json');
+      if (variantRaw && variantRaw.nodes && variantRaw.nodes.length && variantRaw.metadata) {
+        window.StrikeSimVariants[variantRaw.metadata.id || 'small-island-fait-accompli'] = variantRaw;
+        if (typeof window.addEvent === 'function') {
+          window.addEvent({ type: 'Import', text: 'Operation variant available: ' + (variantRaw.metadata.title || variantRaw.metadata.id) });
+        }
+      }
+    } catch (e) { console.warn('[inline-datasets] Variant scenario not loaded:', e && e.message); }
   }
 
   // The app publishes its import pipeline at the end of the main script. Start as soon

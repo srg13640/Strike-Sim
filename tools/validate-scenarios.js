@@ -15,7 +15,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-const SCENARIO_FILES = ['grok150red.json', 'grokblue90.json'];
+const SCENARIO_FILES = ['grok150red.json', 'grokblue90.json', 'scenarios/small-island-fait-accompli.json'];
 const RESOURCE_KEYS = ['kinetic', 'cyber', 'ew', 'sof'];
 const RESOURCE_KEY_SET = new Set(RESOURCE_KEYS);
 const errors = [];
@@ -150,6 +150,11 @@ function validateScenario(file, scenario, teamTotals) {
       for (const key of RESOURCE_KEYS) {
         if (Number.isInteger(resources[key])) teamTotals[node.team][key] += resources[key];
       }
+    }
+    // CO-005 C1: the escalation ladder's horizontal weights key off geographyClass —
+    // every shipped Red node must carry one (tools/tag-red-geography.js authors them).
+    if (node.team === 'red' && (typeof node.geographyClass !== 'string' || !node.geographyClass)) {
+      fail(`${file} node ${id}`, 'red node is missing geographyClass (run tools/tag-red-geography.js)');
     }
 
     if (node.capabilityProfile != null) {

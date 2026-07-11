@@ -1,0 +1,2666 @@
+{
+  "metadata": {
+    "id": "small-island-fait-accompli",
+    "title": "SMALL ISLAND FAIT ACCOMPLI — Kinmen Seizure (Notional 2040)",
+    "classification": "UNCLASSIFIED // NOTIONAL RESEARCH TOOL",
+    "version": 1,
+    "generatedBy": "tools/build-small-island-scenario.js (authored derivation; reviewable; never run at load time)",
+    "boundary": "Derived from the two canonical StrikeSim force networks. Node selection, Kinmen garrison emplacements, staging locations, and all thresholds are explicit scenario assumptions — not intelligence estimates or predictions."
+  },
+  "sources": [
+    {
+      "id": "DOD-CMPR-2024",
+      "title": "Military and Security Developments Involving the PRC 2024",
+      "publisher": "U.S. Department of Defense",
+      "year": 2024,
+      "url": "https://media.defense.gov/2024/Dec/18/2003615520/-1/-1/0/MILITARY-AND-SECURITY-DEVELOPMENTS%20-INVOLVING-THE-PEOPLES-REPUBLIC-OF-CHINA-2024.PDF",
+      "supports": "PLA 2024 reorganization and present-day information-force context; not exact modeled units or locations."
+    },
+    {
+      "id": "DOD-CMPR-2025",
+      "title": "Military and Security Developments Involving the PRC 2025",
+      "publisher": "U.S. Department of Defense",
+      "year": 2025,
+      "url": "https://media.defense.gov/2025/Dec/23/2003849070/-1/-1/1/ANNUAL-REPORT-TO-CONGRESS-MILITARY-AND-SECURITY-DEVELOPMENTS-INVOLVING-THE-PEOPLES-REPUBLIC-OF-CHINA-2025.PDF",
+      "supports": "Public assessment of PLA cyber, information-support, space, and Taiwan-contingency mission areas."
+    },
+    {
+      "id": "CISA-VOLT-2024",
+      "title": "PRC State-Sponsored Actors Compromise and Maintain Persistent Access to U.S. Critical Infrastructure",
+      "publisher": "CISA, NSA, FBI and partners",
+      "year": 2024,
+      "url": "https://www.cisa.gov/sites/default/files/2024-02/aa24-038a-jcsa-prc-state-sponsored-actors-compromise-us-critical-infrastructure_1.pdf",
+      "supports": "Public basis for modeling pre-positioned access risk; not proof of on-demand effects in this scenario."
+    },
+    {
+      "id": "TWN-QDR-2025",
+      "title": "2025 Quadrennial Defense Review",
+      "publisher": "Taiwan Ministry of National Defense",
+      "year": 2025,
+      "url": "https://www.mnd.gov.tw/InformationServices/QDRFile/6/2/2025QDR%E8%8B%B1%E6%96%87%E7%89%88.pdf",
+      "supports": "Multi-domain denial, resilient defense, redundant C2 and logistics; not exact modeled formations."
+    },
+    {
+      "id": "TWN-NDR-2025",
+      "title": "National Defense Report 2025",
+      "publisher": "Taiwan Ministry of National Defense",
+      "year": 2025,
+      "url": "https://www.mnd.gov.tw/newupload/ndr/114/114ndreng.pdf",
+      "supports": "Taiwan force development, joint readiness and whole-of-society resilience."
+    },
+    {
+      "id": "USN-C7F",
+      "title": "Seventh Fleet Facts Sheet",
+      "publisher": "U.S. Seventh Fleet",
+      "year": 2025,
+      "url": "https://www.c7f.navy.mil/About-Us/Facts-Sheet/",
+      "supports": "Public maritime command, surface, undersea and naval aviation capability classes; not scenario presence or readiness."
+    },
+    {
+      "id": "USN-PACFLT",
+      "title": "Pacific Fleet Organization",
+      "publisher": "U.S. Pacific Fleet",
+      "year": 2026,
+      "url": "https://www.cpf.navy.mil/About-Us/Organization/",
+      "supports": "Distributed maritime operations, information warfare and fleet readiness mission areas."
+    },
+    {
+      "id": "USN-SUBPAC",
+      "title": "Commander, Submarine Force Pacific Mission",
+      "publisher": "U.S. Navy",
+      "year": 2026,
+      "url": "https://www.csp.navy.mil/About-SUBPAC/",
+      "supports": "Public undersea warfare, strike, ISR, mine and special-warfare mission classes."
+    },
+    {
+      "id": "USN-P8",
+      "title": "P-8A Poseidon Fact File",
+      "publisher": "U.S. Navy",
+      "year": 2025,
+      "url": "https://www.navy.mil/Resources/Fact-Files/Display-FactFiles/Article/2166300/p-8a-poseidon-multi-mission-maritime-aircraft-mma/",
+      "supports": "Maritime patrol, reconnaissance and anti-submarine mission class."
+    },
+    {
+      "id": "USN-MQ4C",
+      "title": "MQ-4C Triton",
+      "publisher": "Naval Air Systems Command",
+      "year": 2026,
+      "url": "https://www.navair.navy.mil/product/MQ-4C",
+      "supports": "Persistent maritime ISR capability class."
+    },
+    {
+      "id": "USAF-PACAF",
+      "title": "PACAF Mission, Vision and Priorities",
+      "publisher": "Pacific Air Forces",
+      "year": 2026,
+      "url": "https://www.pacaf.af.mil/Info/Mission-Vision-Priorities/PACAFSelectorButton/",
+      "supports": "Joint air, space and cyberspace integration with allies and partners."
+    },
+    {
+      "id": "USAF-ACE",
+      "title": "Agile Combat Employment",
+      "publisher": "U.S. Air Force Doctrine",
+      "year": 2022,
+      "url": "https://www.doctrine.af.mil/Portals/61/documents/AFDN_1-21/AFDN%201-21%20ACE.pdf",
+      "supports": "Distributed, resilient air operations from dispersed locations."
+    },
+    {
+      "id": "USAF-BTF",
+      "title": "Bomber Task Force 25-1",
+      "publisher": "Air Force Global Strike Command",
+      "year": 2025,
+      "url": "https://www.afgsc.af.mil/News/Article-Display/Article/4053007/btf-25-1-projects-indo-pacific-air-power-capabilities/",
+      "supports": "Public long-range strike, refueling and joint/coalition training context."
+    },
+    {
+      "id": "USAF-CCA",
+      "title": "Collaborative Combat Aircraft Mission Design Series",
+      "publisher": "U.S. Air Force",
+      "year": 2025,
+      "url": "https://www.aflcmc.af.mil/NEWS/Article-Display/Article/4096130/air-force-designates-two-mission-design-series-for-collaborative-combat-aircraft/",
+      "supports": "Current CCA development; scaled 2040 formations remain notional."
+    },
+    {
+      "id": "USCYBERCOM-2025",
+      "title": "2025 Posture Statement",
+      "publisher": "U.S. Cyber Command",
+      "year": 2025,
+      "url": "https://www.cybercom.mil/Media/News/Article/4150133/posture-statement-of-lieutenant-general-william-j-hartman/",
+      "supports": "JFHQ-C, defensive cyber, partner activity, mission assurance and theater support."
+    },
+    {
+      "id": "MSC-FE",
+      "title": "MSC Far East Mission, Vision and History",
+      "publisher": "Military Sealift Command",
+      "year": 2026,
+      "url": "https://www.msc.usff.navy.mil/Organization/MSC-Area-Commands/MSC-Far-East/Mission-Vision-History/",
+      "supports": "Combat logistics, special mission, prepositioning and strategic sealift roles."
+    },
+    {
+      "id": "SOCOM-FACT-2025",
+      "title": "2025 USSOCOM Fact Book",
+      "publisher": "U.S. Special Operations Command",
+      "year": 2025,
+      "url": "https://www.socom.mil/FactBook/2025%20Fact%20Book.pdf",
+      "supports": "SOCPAC as the theater functional component; not fungible strike capacity."
+    }
+  ],
+  "context": {
+    "background": "Red moves against Kinmen: a fait accompli at the lowest rung of the island-operations ladder. Lift requirements are tiny and the lodgment clock runs fast. The contested question is not whether Red CAN take the island — it is whether Blue fights for a rung this low, what that decision does to escalation, and whether allied commitment materializes for ten square miles of forward garrison.",
+    "initiatingEvent": "Red amphibious and air-assault elements have begun loading at Xiamen anchorage, eight kilometers from Kinmen. Assessed window to a consolidated lodgment: six turns.",
+    "blueRole": "Blue operational planner, Taiwan Joint Operations Center. Kinmen Defense Command reports ready. Strikes on mainland staging are within your authority — and every rung you climb is a rung Red can climb back.",
+    "redObjective": "Seize Kinmen before allied commitment consolidates; keep every action below the threshold that brings allies in. Speed IS the strategy."
+  },
+  "matchConfig": {
+    "turnLimit": 6,
+    "lodgmentRequiredTurns": 2,
+    "doctrinePrior": {
+      "attrition": 0.2,
+      "decapitation": 0.2,
+      "denial": 0.6
+    },
+    "strategic": {
+      "escalation": {
+        "initial": 1
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "PLA-CMD-002",
+      "name": "Eastern Theater Command JOC Fuzhou",
+      "team": "red",
+      "subsystem": "Firepower Strike",
+      "domain": [
+        "Land"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Cyber",
+        "Precision Strike"
+      ],
+      "importance": 10,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 100,
+      "y": 100,
+      "z": 0,
+      "lat": 26.08,
+      "lon": 119.3,
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-CMD-007",
+      "name": "73rd Group Army HQ Xiamen",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Missile",
+        "Air"
+      ],
+      "importance": 8,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 80,
+      "y": 50,
+      "z": 0,
+      "lat": 24.4798,
+      "lon": 118.0894,
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-ASS-001",
+      "name": "1st Amphibious Combined Arms Brigade (73rd GA)",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air",
+        "Missile"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 85,
+      "y": 55,
+      "z": 0,
+      "lat": 24.47,
+      "lon": 118.03,
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-ASS-002",
+      "name": "2nd Amphibious Combined Arms Brigade (73rd GA)",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 90,
+      "y": 60,
+      "z": 0,
+      "lat": 24.49,
+      "lon": 118.03,
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-ASS-003",
+      "name": "3rd Amphibious Combined Arms Brigade (73rd GA)",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 80,
+      "y": 45,
+      "z": 0,
+      "lat": 24.509999999999998,
+      "lon": 118.03,
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-ASS-008",
+      "name": "6th Marine Brigade (STC Navy)",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 60,
+      "y": -80,
+      "z": 0,
+      "lat": 24.529999999999998,
+      "lon": 118.03,
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-ASS-009",
+      "name": "1st Marine Brigade (STC Navy)",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 65,
+      "y": -70,
+      "z": 0,
+      "lat": 24.47,
+      "lon": 118.05,
+      "resourceGen": 4,
+      "geographyClass": "prc-mainland"
+    },
+    {
+      "id": "PLA-ASS-012",
+      "name": "124th Amphibious Mech Inf Division",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land"
+      ],
+      "type": "Assault",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air",
+        "Artillery"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 5,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 100,
+      "y": 40,
+      "z": 0,
+      "lat": 24.49,
+      "lon": 118.05,
+      "resourceGen": 5,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-SEN-003",
+      "name": "KJ-500 AEW&C (Eastern TC)",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Air"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Air-to-Air",
+        "SAM"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 120,
+      "y": 120,
+      "z": 10,
+      "lat": 26.1255,
+      "lon": 119.2479,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
+    },
+    {
+      "id": "PLA-SEN-004",
+      "name": "Divine Eagle High-Altitude UAV",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Air"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "SAM"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 80,
+      "y": 80,
+      "z": 20,
+      "lat": 26.9231,
+      "lon": 116.2503,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
+    },
+    {
+      "id": "PLA-SEN-005",
+      "name": "OTH-B Radar Site Fujian",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Land"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "ARMs",
+        "SOF"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 110,
+      "y": 90,
+      "z": 0,
+      "lat": 26,
+      "lon": 119,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-SEN-006",
+      "name": "WZ-8 Supersonic Recon UAV",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Air"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "SAM"
+      ],
+      "importance": 7,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 90,
+      "y": 110,
+      "z": 15,
+      "lat": 26.8606,
+      "lon": 115.7809,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
+    },
+    {
+      "id": "PLA-IAK-001",
+      "name": "CMC Cyberspace Force Operations Center",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Cyber"
+      ],
+      "importance": 8,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 20,
+      "y": 280,
+      "z": 0,
+      "lat": 26.1813,
+      "lon": 119.5124,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "cyber-command",
+        "functions": [
+          "cyber-command-and-control"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2024",
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "Observed force role represented as an aggregate command service; no offensive capacity is assigned to the headquarters itself."
+      },
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
+    },
+    {
+      "id": "PLA-IAK-002",
+      "name": "Taiwan Theater Cyber Mission Group",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Cyber"
+      ],
+      "importance": 8,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 4,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 30,
+      "y": 290,
+      "z": 0,
+      "lat": 26.1883,
+      "lon": 119.5171,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "cyber-effects",
+        "functions": [
+          "c4isr-disruption",
+          "network-access"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The mission group and value are analytical aggregates; exact force structure, access, and timing are unknown."
+      },
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
+    },
+    {
+      "id": "PLA-IAK-009",
+      "name": "Critical Infrastructure Access Portfolio",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Cyber"
+      ],
+      "importance": 8,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 3,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 40,
+      "y": 280,
+      "z": 0,
+      "lat": 26.1626,
+      "lon": 119.5122,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "cyber-access",
+        "functions": [
+          "pre-positioned-access",
+          "critical-infrastructure-risk"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "CISA-VOLT-2024"
+        ],
+        "assumption": "The source supports persistent-access risk, not guaranteed wartime access, effect, attribution, or timing."
+      },
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
+    },
+    {
+      "id": "PLA-CMD-015",
+      "name": "Joint Logistics Support Center Wuhan",
+      "team": "red",
+      "subsystem": "Firepower Strike",
+      "domain": [
+        "Land"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Missile",
+        "Air"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -50,
+      "y": 100,
+      "z": 0,
+      "lat": 30.5833,
+      "lon": 114.2667,
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
+    },
+    {
+      "id": "PLA-LOG-001",
+      "name": "Joint Logistics Support Base Fuzhou",
+      "team": "red",
+      "subsystem": "Firepower Strike",
+      "domain": [
+        "Land"
+      ],
+      "type": "Logistics",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Missile",
+        "Air"
+      ],
+      "importance": 7,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 100,
+      "y": 120,
+      "z": 0,
+      "lat": 26.0622,
+      "lon": 119.1952,
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-LOG-004",
+      "name": "Naval Logistics Base Ningbo",
+      "team": "red",
+      "subsystem": "Blockade",
+      "domain": [
+        "Sea"
+      ],
+      "type": "Logistics",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Missile"
+      ],
+      "importance": 7,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 150,
+      "y": 210,
+      "z": 0,
+      "lat": 29.8475,
+      "lon": 121.447,
+      "resourceGen": 0,
+      "geographyClass": "afloat"
+    },
+    {
+      "id": "PLA-SUP-001",
+      "name": "S-400 SAM Regiment Fujian",
+      "team": "red",
+      "subsystem": "Firepower Strike",
+      "domain": [
+        "Land"
+      ],
+      "type": "Protection",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Camouflaged",
+      "vulnerabilities": [
+        "ARMs"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 5,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 100,
+      "y": 100,
+      "z": 0,
+      "lat": 26.0802,
+      "lon": 118.5158,
+      "resourceGen": 5,
+      "geographyClass": "prc-mainland"
+    },
+    {
+      "id": "PLA-FIR-017",
+      "name": "HQ-9B SAM Regiment Fuzhou",
+      "team": "red",
+      "subsystem": "Firepower Strike",
+      "domain": [
+        "Land"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Camouflaged",
+      "vulnerabilities": [
+        "ARMs"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 5,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 100,
+      "y": 105,
+      "z": 0,
+      "lat": 26.1645,
+      "lon": 119.2845,
+      "resourceGen": 5,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-SUP-002",
+      "name": "HQ-9B Regiment Xiamen",
+      "team": "red",
+      "subsystem": "Assault",
+      "domain": [
+        "Land"
+      ],
+      "type": "Protection",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Camouflaged",
+      "vulnerabilities": [
+        "ARMs"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 80,
+      "y": 65,
+      "z": 0,
+      "lat": 24.5612,
+      "lon": 118.0965,
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
+    },
+    {
+      "id": "PLA-BLK-003",
+      "name": "CV-18 Fujian Carrier Group",
+      "team": "red",
+      "subsystem": "Blockade",
+      "domain": [
+        "Sea",
+        "Air"
+      ],
+      "type": "Blockade",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "ASCM"
+      ],
+      "importance": 9,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 8,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 270,
+      "y": 170,
+      "z": 0,
+      "lat": 25.8998,
+      "lon": 118.5911,
+      "resourceGen": 8,
+      "geographyClass": "afloat"
+    },
+    {
+      "id": "PLA-CMD-003",
+      "name": "Southern Theater Command JOC Guangzhou",
+      "team": "red",
+      "subsystem": "Blockade",
+      "domain": [
+        "Land"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Fortified",
+      "vulnerabilities": [
+        "Cyber",
+        "Precision Strike"
+      ],
+      "importance": 9,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 50,
+      "y": -100,
+      "z": 0,
+      "lat": 23.1291,
+      "lon": 113.2644,
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
+    },
+    {
+      "id": "PLA-BLK-001",
+      "name": "CV-16 Liaoning Carrier Group",
+      "team": "red",
+      "subsystem": "Blockade",
+      "domain": [
+        "Sea",
+        "Air"
+      ],
+      "type": "Blockade",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "ASCM",
+        "Torpedo"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 6,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 250,
+      "y": 150,
+      "z": 0,
+      "lat": 29.613,
+      "lon": 121.749,
+      "resourceGen": 6,
+      "geographyClass": "afloat"
+    },
+    {
+      "id": "TWN-CMD-001",
+      "name": "Taiwan Integrated Joint Operations Center",
+      "team": "blue",
+      "subsystem": "Joint Command & Mission Networks",
+      "domain": [
+        "Land",
+        "Sea",
+        "Air",
+        "Cyber",
+        "EW"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 10,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.7,
+      "lon": 120.9,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "joint-command-mission-networks",
+        "functions": [
+          "taiwan-integrated-joint-operations-center"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide taiwan integrated joint operations center as a theater-level joint mission aggregate.",
+      "tempoRole": "command",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "USA-FIR-022",
+      "name": "Taiwan Distributed Coastal-Defense Force",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 60,
+      "y": 130,
+      "z": 0,
+      "lat": 26.6911,
+      "lon": 128.2092,
+      "resourceGen": 4,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide taiwan distributed coastal-defense force as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "taiwan-distributed-coastal-defense-force"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-FIR-023",
+      "name": "Taiwan Mobile Anti-Ship Missile Group",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -170,
+      "y": -170,
+      "z": 0,
+      "lat": 13.5288,
+      "lon": 144.6764,
+      "resourceGen": 4,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide taiwan mobile anti-ship missile group as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "taiwan-mobile-anti-ship-missile-group"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-FIR-024",
+      "name": "Taiwan Integrated Air-Defense Fires",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Land",
+        "Air"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 110,
+      "y": 210,
+      "z": 0,
+      "lat": 35.7383,
+      "lon": 139.1151,
+      "resourceGen": 4,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide taiwan integrated air-defense fires as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "taiwan-integrated-air-defense-fires"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-FIR-025",
+      "name": "Taiwan Dispersed Precision-Fires Group",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Land"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -110,
+      "y": -140,
+      "z": 0,
+      "lat": 14.6907,
+      "lon": 120.8826,
+      "resourceGen": 4,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide taiwan dispersed precision-fires group as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "taiwan-dispersed-precision-fires-group"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "TWN-SEN-001",
+      "name": "Taiwan EO / SAR Mission Service",
+      "team": "blue",
+      "subsystem": "Joint Sensing & Targeting",
+      "domain": [
+        "Land"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24.3,
+      "lon": 121,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "joint-sensing-targeting",
+        "functions": [
+          "taiwan-eo-sar-mission-service"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Intelligence and targeting",
+      "operationalRole": "Provide taiwan eo / sar mission service as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "USA-SEN-016",
+      "name": "Taiwan Joint Maritime and Air Awareness Network",
+      "team": "blue",
+      "subsystem": "Joint Sensing & Targeting",
+      "domain": [
+        "Land",
+        "Air",
+        "Sea",
+        "Cyber"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -195,
+      "y": -195,
+      "z": 10,
+      "lat": 13.4207,
+      "lon": 144.8903,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Intelligence and targeting",
+      "operationalRole": "Provide taiwan joint maritime and air awareness network as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "joint-sensing-targeting",
+        "functions": [
+          "taiwan-joint-maritime-and-air-awareness-network"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-SEN-017",
+      "name": "Taiwan Dispersed Passive-Sensor Network",
+      "team": "blue",
+      "subsystem": "Joint Sensing & Targeting",
+      "domain": [
+        "Land",
+        "Cyber"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -95,
+      "y": -135,
+      "z": 0,
+      "lat": 14.5798,
+      "lon": 121.0946,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Intelligence and targeting",
+      "operationalRole": "Provide taiwan dispersed passive-sensor network as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "joint-sensing-targeting",
+        "functions": [
+          "taiwan-dispersed-passive-sensor-network"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "TWN-EW-002",
+      "name": "Taiwan Dispersed Electronic Protection / EW Package",
+      "team": "blue",
+      "subsystem": "Space, Cyber & Spectrum",
+      "domain": [
+        "Cyber",
+        "EW"
+      ],
+      "type": "Information Capability",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 2,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 22.9,
+      "lon": 120.7,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "space-cyber-spectrum",
+        "functions": [
+          "taiwan-dispersed-electronic-protection-ew-package"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Information",
+      "operationalRole": "Provide taiwan dispersed electronic protection / ew package as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "USA-SUP-009",
+      "name": "Taiwan Layered Integrated Air and Missile Defense",
+      "team": "blue",
+      "subsystem": "Integrated Air & Missile Defense",
+      "domain": [
+        "Land",
+        "Air"
+      ],
+      "type": "Protection",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -100,
+      "y": -150,
+      "z": 0,
+      "lat": 14.5759,
+      "lon": 120.9023,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Protection",
+      "operationalRole": "Provide taiwan layered integrated air and missile defense as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-air-missile-defense",
+        "functions": [
+          "taiwan-layered-integrated-air-and-missile-defense"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-LOG-010",
+      "name": "Taiwan Distributed Fuel and Ammunition Network",
+      "team": "blue",
+      "subsystem": "Contested Joint Logistics",
+      "domain": [
+        "Land",
+        "Sea",
+        "Cyber"
+      ],
+      "type": "Logistics",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 140,
+      "y": 240,
+      "z": 0,
+      "lat": 35.3903,
+      "lon": 139.5693,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Sustainment",
+      "operationalRole": "Provide taiwan distributed fuel and ammunition network as a theater-level joint mission aggregate.",
+      "tempoRole": "logistics",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "contested-joint-logistics",
+        "functions": [
+          "taiwan-distributed-fuel-and-ammunition-network"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-LOG-011",
+      "name": "Taiwan Civil-Military Repair and Mobility Network",
+      "team": "blue",
+      "subsystem": "Contested Joint Logistics",
+      "domain": [
+        "Land",
+        "Sea",
+        "Air",
+        "Cyber"
+      ],
+      "type": "Logistics",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -190,
+      "y": -190,
+      "z": 0,
+      "lat": 13.5394,
+      "lon": 144.6837,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Sustainment",
+      "operationalRole": "Provide taiwan civil-military repair and mobility network as a theater-level joint mission aggregate.",
+      "tempoRole": "logistics",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "contested-joint-logistics",
+        "functions": [
+          "taiwan-civil-military-repair-and-mobility-network"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "TWN-REL-001",
+      "name": "Taiwan Distributed Defense Data Fabric",
+      "team": "blue",
+      "subsystem": "Mission Networks & Resilient C2",
+      "domain": [
+        "Land",
+        "Cyber"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.6,
+      "lon": 120.8,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "mission-networks-resilient-c2",
+        "functions": [
+          "taiwan-distributed-defense-data-fabric"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide taiwan distributed defense data fabric as a theater-level joint mission aggregate.",
+      "tempoRole": "relay",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "TWN-REL-002",
+      "name": "Taiwan Terrestrial Fiber / Microwave Backbone",
+      "team": "blue",
+      "subsystem": "Mission Networks & Resilient C2",
+      "domain": [
+        "Land",
+        "Cyber"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.4,
+      "lon": 120.7,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "mission-networks-resilient-c2",
+        "functions": [
+          "taiwan-terrestrial-fiber-microwave-backbone"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide taiwan terrestrial fiber / microwave backbone as a theater-level joint mission aggregate.",
+      "tempoRole": "relay",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "TWN-REL-005",
+      "name": "Taiwan Mission Partner Gateway",
+      "team": "blue",
+      "subsystem": "Mission Networks & Resilient C2",
+      "domain": [
+        "Land",
+        "Cyber"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24,
+      "lon": 120.7,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "mission-networks-resilient-c2",
+        "functions": [
+          "taiwan-mission-partner-gateway"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide taiwan mission partner gateway as a theater-level joint mission aggregate.",
+      "tempoRole": "relay",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "TWN-CYB-001",
+      "name": "Taiwan Military Network Defense / SOC Pool",
+      "team": "blue",
+      "subsystem": "Space, Cyber & Spectrum",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Information Capability",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 2,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 23.8,
+      "lon": 120.6,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "space-cyber-spectrum",
+        "functions": [
+          "taiwan-military-network-defense-soc-pool"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Information",
+      "operationalRole": "Provide taiwan military network defense / soc pool as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "scenarioEnabled": true
+    },
+    {
+      "id": "USA-SEN-006",
+      "name": "MQ-4C Triton Maritime ISR Service",
+      "team": "blue",
+      "subsystem": "Joint Sensing & Targeting",
+      "domain": [
+        "Sea",
+        "Air"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": -190,
+      "y": -190,
+      "z": 0,
+      "lat": 13.4338,
+      "lon": 144.7793,
+      "resourceGen": 0,
+      "nation": "United States",
+      "serviceOwner": "U.S. Navy",
+      "component": "U.S. Pacific Fleet",
+      "jointFunction": "Intelligence and targeting",
+      "operationalRole": "Provide mq-4c triton maritime isr service as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [
+        "Theater tasking",
+        "Host-nation, overflight or maritime access as applicable"
+      ],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "joint-sensing-targeting",
+        "functions": [
+          "mq-4c-triton-maritime-isr-service"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USN-C7F",
+          "USN-PACFLT",
+          "USN-SUBPAC",
+          "USN-P8",
+          "USN-MQ4C",
+          "MSC-FE"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-SEN-008",
+      "name": "Airborne Battle Management and ISR Package",
+      "team": "blue",
+      "subsystem": "Joint Sensing & Targeting",
+      "domain": [
+        "Air"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Mobile",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 115,
+      "y": 215,
+      "z": 0,
+      "lat": 35.4891,
+      "lon": 139.3769,
+      "resourceGen": 0,
+      "nation": "United States",
+      "serviceOwner": "U.S. Air Force",
+      "component": "Pacific Air Forces",
+      "jointFunction": "Intelligence and targeting",
+      "operationalRole": "Provide airborne battle management and isr package as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [
+        "Theater tasking",
+        "Host-nation, overflight or maritime access as applicable"
+      ],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "joint-sensing-targeting",
+        "functions": [
+          "airborne-battle-management-and-isr-package"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USAF-PACAF",
+          "USAF-ACE",
+          "USAF-BTF",
+          "USAF-CCA"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-FIR-006",
+      "name": "SSN Undersea Denial Group",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Subsurface",
+        "Sea"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 5,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 5,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 130,
+      "y": 230,
+      "z": 0,
+      "lat": 35.4685,
+      "lon": 138.6549,
+      "resourceGen": 5,
+      "nation": "United States",
+      "serviceOwner": "U.S. Navy",
+      "component": "U.S. Pacific Fleet",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide ssn undersea denial group as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [
+        "Theater tasking",
+        "Host-nation, overflight or maritime access as applicable"
+      ],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "ssn-undersea-denial-group"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USN-C7F",
+          "USN-PACFLT",
+          "USN-SUBPAC",
+          "USN-P8",
+          "USN-MQ4C",
+          "MSC-FE"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "USA-CMD-001",
+      "name": "Combined Joint Task Force Coordination Element — Theater",
+      "team": "blue",
+      "subsystem": "Joint Command & Mission Networks",
+      "domain": [
+        "Land",
+        "Sea",
+        "Air",
+        "Space",
+        "Cyber"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 10,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "lat": 26.3364,
+      "lon": 127.7836,
+      "resourceGen": 0,
+      "nation": "United States",
+      "serviceOwner": "U.S. Joint Force",
+      "component": "USINDOPACOM Joint Task Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide combined joint task force coordination element — theater as a theater-level joint mission aggregate.",
+      "tempoRole": "command",
+      "accessDependencies": [
+        "Taiwan request and combined planning authority"
+      ],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "joint-command-mission-networks",
+        "functions": [
+          "combined-joint-task-force-coordination-element-theater"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USCYBERCOM-2025",
+          "SOCOM-FACT-2025",
+          "USN-PACFLT"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      }
+    },
+    {
+      "id": "SIA-BLU-KDC",
+      "name": "Kinmen Defense Command",
+      "team": "blue",
+      "subsystem": "Joint Command & Mission Networks",
+      "domain": [
+        "Land",
+        "Sea",
+        "Air",
+        "Cyber",
+        "EW"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 10,
+      "cascScore": 5,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24.428,
+      "lon": 118.312,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "joint-command-mission-networks",
+        "functions": [
+          "taiwan-integrated-joint-operations-center"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Command and control",
+      "operationalRole": "Provide taiwan integrated joint operations center as a theater-level joint mission aggregate.",
+      "tempoRole": "command",
+      "accessDependencies": [],
+      "scenarioEnabled": true,
+      "geographyClass": "offshore-island",
+      "notes": "Notional Kinmen garrison emplacement derived from TWN-CMD-001 — explicit scenario assumption, not an intelligence estimate."
+    },
+    {
+      "id": "SIA-BLU-KGA",
+      "name": "Kinmen Garrison Artillery Battalion",
+      "team": "blue",
+      "subsystem": "Integrated Fires & Denial",
+      "domain": [
+        "Land",
+        "Sea"
+      ],
+      "type": "Fires",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Dispersed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 4,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "lat": 24.44,
+      "lon": 118.312,
+      "resourceGen": 4,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Fires",
+      "operationalRole": "Provide taiwan distributed coastal-defense force as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "integrated-fires-denial",
+        "functions": [
+          "taiwan-distributed-coastal-defense-force"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "geographyClass": "offshore-island",
+      "notes": "Notional Kinmen garrison emplacement derived from USA-FIR-022 — explicit scenario assumption, not an intelligence estimate."
+    },
+    {
+      "id": "SIA-BLU-KAD",
+      "name": "Kinmen Point Air Defense Battery",
+      "team": "blue",
+      "subsystem": "Space, Cyber & Spectrum",
+      "domain": [
+        "Cyber",
+        "EW"
+      ],
+      "type": "Information Capability",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 2,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 24.452,
+      "lon": 118.312,
+      "locationPrecision": "representative-operating-area",
+      "capabilityProfile": {
+        "category": "space-cyber-spectrum",
+        "functions": [
+          "taiwan-dispersed-electronic-protection-ew-package"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Information",
+      "operationalRole": "Provide taiwan dispersed electronic protection / ew package as a theater-level joint mission aggregate.",
+      "tempoRole": "none",
+      "accessDependencies": [],
+      "scenarioEnabled": true,
+      "geographyClass": "offshore-island",
+      "notes": "Notional Kinmen garrison emplacement derived from TWN-EW-002 — explicit scenario assumption, not an intelligence estimate."
+    },
+    {
+      "id": "SIA-BLU-KSP",
+      "name": "Kinmen Supply Point",
+      "team": "blue",
+      "subsystem": "Contested Joint Logistics",
+      "domain": [
+        "Land",
+        "Sea",
+        "Cyber"
+      ],
+      "type": "Logistics",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Distributed",
+      "vulnerabilities": [
+        "Kinetic",
+        "Cyber",
+        "EW"
+      ],
+      "importance": 8,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "lat": 24.428,
+      "lon": 118.327,
+      "resourceGen": 0,
+      "nation": "Taiwan",
+      "serviceOwner": "Taiwan Armed Forces",
+      "component": "Taiwan Joint Force",
+      "jointFunction": "Sustainment",
+      "operationalRole": "Provide taiwan distributed fuel and ammunition network as a theater-level joint mission aggregate.",
+      "tempoRole": "logistics",
+      "accessDependencies": [],
+      "locationPrecision": "representative-operating-area",
+      "scenarioEnabled": true,
+      "capabilityProfile": {
+        "category": "contested-joint-logistics",
+        "functions": [
+          "taiwan-distributed-fuel-and-ammunition-network"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-NDR-2025"
+        ],
+        "assumption": "Public sources support the capability class. The exact 2040 package, scale, readiness, location, access and mission output are notional scenario assumptions."
+      },
+      "geographyClass": "offshore-island",
+      "notes": "Notional Kinmen garrison emplacement derived from USA-LOG-010 — explicit scenario assumption, not an intelligence estimate."
+    }
+  ],
+  "links": [
+    {
+      "source": "PLA-CMD-002",
+      "target": "PLA-CMD-007"
+    },
+    {
+      "source": "PLA-CMD-007",
+      "target": "PLA-ASS-001"
+    },
+    {
+      "source": "PLA-CMD-007",
+      "target": "PLA-ASS-002"
+    },
+    {
+      "source": "PLA-CMD-007",
+      "target": "PLA-ASS-003"
+    },
+    {
+      "source": "PLA-CMD-007",
+      "target": "PLA-ASS-012"
+    },
+    {
+      "source": "PLA-IAK-001",
+      "target": "PLA-CMD-002"
+    },
+    {
+      "source": "PLA-IAK-002",
+      "target": "PLA-CMD-002"
+    },
+    {
+      "source": "PLA-LOG-001",
+      "target": "PLA-ASS-001"
+    },
+    {
+      "source": "PLA-CMD-003",
+      "target": "PLA-BLK-001"
+    },
+    {
+      "source": "PLA-LOG-004",
+      "target": "PLA-BLK-001"
+    },
+    {
+      "source": "PLA-CMD-003",
+      "target": "PLA-ASS-008"
+    },
+    {
+      "source": "PLA-CMD-003",
+      "target": "PLA-ASS-009"
+    },
+    {
+      "source": "PLA-CMD-002",
+      "target": "PLA-SUP-001"
+    },
+    {
+      "source": "PLA-CMD-007",
+      "target": "PLA-SUP-002"
+    },
+    {
+      "source": "PLA-CMD-002",
+      "target": "PLA-LOG-001"
+    },
+    {
+      "source": "PLA-CMD-002",
+      "target": "PLA-IAK-009"
+    },
+    {
+      "source": "PLA-CMD-003",
+      "target": "PLA-IAK-009"
+    },
+    {
+      "source": "PLA-FIR-017",
+      "target": "PLA-CMD-002"
+    },
+    {
+      "source": "TWN-CMD-001",
+      "target": "TWN-REL-001"
+    },
+    {
+      "source": "TWN-CMD-001",
+      "target": "TWN-CYB-001"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-002"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-005"
+    },
+    {
+      "source": "TWN-SEN-001",
+      "target": "TWN-REL-001"
+    },
+    {
+      "source": "USA-FIR-025",
+      "target": "TWN-CMD-001"
+    },
+    {
+      "source": "TWN-CMD-001",
+      "target": "USA-CMD-001"
+    },
+    {
+      "source": "SIA-BLU-KDC",
+      "target": "TWN-CMD-001",
+      "type": "C2",
+      "value": 2
+    },
+    {
+      "source": "SIA-BLU-KGA",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 2
+    },
+    {
+      "source": "SIA-BLU-KAD",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 2
+    },
+    {
+      "source": "SIA-BLU-KSP",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 2
+    },
+    {
+      "source": "PLA-SEN-003",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "PLA-SEN-004",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "PLA-SEN-005",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "PLA-SEN-006",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "PLA-CMD-015",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "PLA-BLK-003",
+      "target": "PLA-CMD-002",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-FIR-022",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-FIR-023",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-FIR-024",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-SEN-016",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-SEN-017",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "TWN-EW-002",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-SUP-009",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-LOG-010",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-LOG-011",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-SEN-006",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-SEN-008",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    },
+    {
+      "source": "USA-FIR-006",
+      "target": "SIA-BLU-KDC",
+      "type": "C2",
+      "value": 1
+    }
+  ]
+}

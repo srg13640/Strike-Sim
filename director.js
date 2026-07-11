@@ -94,6 +94,7 @@ window.DirectorModule = (function () {
   function curSel() { try { return (typeof selectedNode !== 'undefined') ? selectedNode : null; } catch (e) { return null; } }
   function prefersReducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
   function scenarioContext() {
+    if (op && op.variantContext) return op.variantContext;   // CO-005 C5: active operation variant
     var scen = (window.AppState && AppState.active && AppState.active()) || null;
     var attached = scen && (scen.context || (scen.graph && scen.graph.scenarioContext));
     if (attached) return attached;
@@ -396,7 +397,49 @@ window.DirectorModule = (function () {
   }
 
   // ---- BRIEF ------------------------------------------------------------------------
-  var briefOpts = { turnLimit: 8, redDiff: 'hard', roeId: 'denial' };
+  var briefOpts = { turnLimit: 8, redDiff: 'hard', roeId: 'denial', variantId: null };
+
+  // ---- CO-005 C5: operation variants (in-place graph swap, the import pipeline's idiom;
+  //      the shell binds `data` to the active graph by reference, so we mutate contents) --
+  function variantRegistry() { return (window.StrikeSimVariants && typeof window.StrikeSimVariants === 'object') ? window.StrikeSimVariants : {}; }
+
+  function swapGraphInPlace(nodes, links) {
+    var g = window.AppState && AppState.activeGraph ? AppState.activeGraph() : null;
+    if (!g) return false;
+    g.nodes.length = 0; Array.prototype.push.apply(g.nodes, nodes);
+    g.links.length = 0; Array.prototype.push.apply(g.links, links);
+    try { if (typeof window.refreshGraph === 'function') window.refreshGraph(); } catch (e) {}
+    try { if (typeof window.refreshMapMarkers === 'function') window.refreshMapMarkers(); } catch (e) {}
+    return true;
+  }
+
+  function selectVariant(id) {
+    var deep = function (v) { return JSON.parse(JSON.stringify(v)); };
+    if (!id || id === 'default') {                       // restore the boot scenario
+      if (op.baseGraphBackup) {
+        swapGraphInPlace(op.baseGraphBackup.nodes, op.baseGraphBackup.links);
+        op.baseGraphBackup = null;
+      }
+      op.variantContext = null; op.variantConfig = null; briefOpts.variantId = null;
+      briefOpts.turnLimit = 8;
+      return true;
+    }
+    var v = variantRegistry()[id];
+    if (!v || !v.nodes || !v.nodes.length) return false;
+    if (!op.baseGraphBackup) {                           // save the boot graph once
+      var g = window.AppState && AppState.activeGraph ? AppState.activeGraph() : null;
+      if (!g) return false;
+      op.baseGraphBackup = { nodes: deep(g.nodes), links: deep(g.links) };
+    }
+    swapGraphInPlace(deep(v.nodes), deep(v.links || []));
+    op.variantContext = v.context || null;
+    op.variantConfig = v.matchConfig || null;
+    briefOpts.variantId = id;
+    if (v.matchConfig && v.matchConfig.turnLimit) briefOpts.turnLimit = v.matchConfig.turnLimit;
+    return true;
+  }
+
+  function restoreBaseScenario() { try { selectVariant('default'); } catch (e) {} }
 
   function start() {
     if (!GM) return;
@@ -414,8 +457,15 @@ window.DirectorModule = (function () {
   }
 
   function newBriefMatch() {
+    // CO-005 C5: the active variant's authored matchConfig shapes the match — turn
+    // budget, lodgment clock, doctrine prior, and strategic overrides. The player's
+    // BRIEF chips still win for turn budget and difficulty.
+    var mc = op.variantConfig || {};
     GM.newMatch({
       turnLimit: briefOpts.turnLimit,
+      lodgmentRequiredTurns: mc.lodgmentRequiredTurns,
+      doctrinePrior: mc.doctrinePrior,
+      strategic: mc.strategic,
       control: { blue: 'human', red: 'ai' },
       difficulty: { blue: 'hard', red: briefOpts.redDiff },
       roeId: briefOpts.roeId
@@ -515,6 +565,15 @@ window.DirectorModule = (function () {
       '</div>' +
 
       '<div class="dir-card"><h3>OPERATION PARAMETERS</h3>' +
+      (Object.keys(variantRegistry()).length ?
+        '<div class="row" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="dir-note">Operation</span><span class="dir-chips">' +
+        '<button type="button" class="dir-chip' + (!briefOpts.variantId ? ' on' : '') + '" aria-pressed="' + (!briefOpts.variantId) + '" data-variant="default">CROSS-STRAIT INVASION</button>' +
+        Object.keys(variantRegistry()).map(function (id) {
+          var v = variantRegistry()[id];
+          var label = (v.metadata && v.metadata.title ? String(v.metadata.title).split('—')[0].trim() : id).toUpperCase();
+          return '<button type="button" class="dir-chip' + (briefOpts.variantId === id ? ' on' : '') + '" aria-pressed="' + (briefOpts.variantId === id) + '" data-variant="' + esc(id) + '">' + esc(label) + '</button>';
+        }).join('') +
+        '</span><div class="dir-note">Variants swap the force networks and the clock. The lowest rung of the ladder is a different war.</div></div>' : '') +
       '<div class="row" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">' +
       '<span class="dir-note">Turn budget</span><span class="dir-chips">' +
       [6, 8, 10].map(function (n) { return '<button type="button" class="dir-chip' + (briefOpts.turnLimit === n ? ' on' : '') + '" aria-pressed="' + (briefOpts.turnLimit === n) + '" data-turns="' + n + '">' + n + ' TURNS</button>'; }).join('') +
@@ -1738,8 +1797,9 @@ window.DirectorModule = (function () {
 
   // ---- overlay actions / lifecycle -----------------------------------------------------
   function onOverlayClick(ev) {
-    var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-roe]');
+    var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-roe],[data-variant]');
     if (!t) return;
+    if (t.hasAttribute('data-variant')) { if (selectVariant(t.getAttribute('data-variant'))) { newBriefMatch(); renderBrief(); } return; }
     if (t.hasAttribute('data-turns')) { briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); return; }
     if (t.hasAttribute('data-diff')) { briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); return; }
     if (t.hasAttribute('data-roe')) { briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); return; }
@@ -1788,6 +1848,7 @@ window.DirectorModule = (function () {
     op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
     op.record = null; op.counterfactual = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    restoreBaseScenario();                     // CO-005 C5: put the boot force networks back
     restorePanels();
     setPhase('idle');
     refreshVisuals();
