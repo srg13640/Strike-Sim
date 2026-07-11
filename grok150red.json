@@ -30,7 +30,8 @@
       "z": 0,
       "lat": 39.9042,
       "lon": 116.4074,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-002",
@@ -62,7 +63,8 @@
       "z": 0,
       "lat": 26.08,
       "lon": 119.3,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-003",
@@ -94,7 +96,8 @@
       "z": 0,
       "lat": 23.1291,
       "lon": 113.2644,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-004",
@@ -126,7 +129,8 @@
       "z": 0,
       "lat": 32.0603,
       "lon": 118.7969,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-005",
@@ -158,7 +162,8 @@
       "z": 0,
       "lat": 29.8683,
       "lon": 121.5495,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-006",
@@ -190,7 +195,8 @@
       "z": 0,
       "lat": 32.0603,
       "lon": 118.7969,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-007",
@@ -222,7 +228,8 @@
       "z": 0,
       "lat": 24.4798,
       "lon": 118.0894,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-008",
@@ -254,7 +261,8 @@
       "z": 0,
       "lat": 30.867,
       "lon": 120.1025,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-009",
@@ -286,7 +294,8 @@
       "z": 0,
       "lat": 32.6264,
       "lon": 116.9989,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-010",
@@ -318,7 +327,8 @@
       "z": 0,
       "lat": 26.5,
       "lon": 118.5,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-CMD-011",
@@ -367,7 +377,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "Observed organization and mission class; the modeled operations center, marker, and theater relationship are analytical aggregates."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-CMD-012",
@@ -415,7 +426,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "Observed force role represented as a single service node; location and capacity are illustrative."
-      }
+      },
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-CMD-013",
@@ -447,7 +459,8 @@
       "z": 0,
       "lat": 21.2749,
       "lon": 110.3594,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-014",
@@ -479,7 +492,8 @@
       "z": 0,
       "lat": 23.663,
       "lon": 116.6226,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-015",
@@ -511,7 +525,8 @@
       "z": 0,
       "lat": 30.5833,
       "lon": 114.2667,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-SEN-001",
@@ -557,7 +572,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-SEN-002",
@@ -602,7 +618,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-SEN-003",
@@ -648,7 +665,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
     },
     {
       "id": "PLA-SEN-004",
@@ -693,7 +711,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
     },
     {
       "id": "PLA-SEN-005",
@@ -739,7 +758,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-SEN-006",
@@ -784,7 +804,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
     },
     {
       "id": "PLA-SEN-007",
@@ -815,7 +836,8 @@
       "z": -200,
       "lat": 26.8919,
       "lon": 116.0156,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-SEN-008",
@@ -846,7 +868,8 @@
       "z": -100,
       "lat": 19,
       "lon": 109,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-SEN-009",
@@ -877,7 +900,8 @@
       "z": 8,
       "lat": 26.8294,
       "lon": 116.1712,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "airborne"
     },
     {
       "id": "PLA-SEN-010",
@@ -922,7 +946,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-SEN-011",
@@ -967,7 +992,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-SEN-012",
@@ -998,7 +1024,8 @@
       "z": 0,
       "lat": 16.734,
       "lon": 112.3794,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-SEN-013",
@@ -1044,7 +1071,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-SEN-014",
@@ -1089,7 +1117,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-SEN-015",
@@ -1134,7 +1163,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-REL-001",
@@ -1179,7 +1209,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-REL-002",
@@ -1224,7 +1255,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
-      }
+      },
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-REL-003",
@@ -1270,7 +1302,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-REL-004",
@@ -1315,7 +1348,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-005",
@@ -1360,7 +1394,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-006",
@@ -1405,7 +1440,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-REL-007",
@@ -1450,7 +1486,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-008",
@@ -1495,7 +1532,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-009",
@@ -1540,7 +1578,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-010",
@@ -1585,7 +1624,8 @@
           "USSF-FOE-2040"
         ],
         "assumption": "A more resilient protected backbone is a 2040 scenario assumption; no claim of universal quantum communications or immunity is made."
-      }
+      },
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-REL-011",
@@ -1630,7 +1670,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
-      }
+      },
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-REL-012",
@@ -1675,7 +1716,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "airborne"
     },
     {
       "id": "PLA-REL-013",
@@ -1720,7 +1762,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-REL-014",
@@ -1765,7 +1808,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-REL-015",
@@ -1796,7 +1840,8 @@
       "z": 0,
       "lat": 26.4509,
       "lon": 119.1048,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-REL-016",
@@ -1841,7 +1886,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
-      }
+      },
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-REL-017",
@@ -1886,7 +1932,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
-      }
+      },
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-FIR-001",
@@ -1917,7 +1964,8 @@
       "z": 0,
       "lat": 28,
       "lon": 117,
-      "resourceGen": 10
+      "resourceGen": 10,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-FIR-002",
@@ -1948,7 +1996,8 @@
       "z": 0,
       "lat": 26.5817,
       "lon": 118.5824,
-      "resourceGen": 10
+      "resourceGen": 10,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-003",
@@ -1979,7 +2028,8 @@
       "z": 0,
       "lat": 26.0808,
       "lon": 118.5768,
-      "resourceGen": 10
+      "resourceGen": 10,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-004",
@@ -2011,7 +2061,8 @@
       "z": 0,
       "lat": 28.4112,
       "lon": 122.093,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-005",
@@ -2043,7 +2094,8 @@
       "z": 0,
       "lat": 28.7664,
       "lon": 115.9406,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-FIR-006",
@@ -2074,7 +2126,8 @@
       "z": 0,
       "lat": 30.082,
       "lon": 121.7744,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-007",
@@ -2105,7 +2158,8 @@
       "z": 0,
       "lat": 24.9,
       "lon": 118.6,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-008",
@@ -2136,7 +2190,8 @@
       "z": 0,
       "lat": 26.7261,
       "lon": 119.5986,
-      "resourceGen": 9
+      "resourceGen": 9,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-009",
@@ -2167,7 +2222,8 @@
       "z": 0,
       "lat": 28.005,
       "lon": 122.1662,
-      "resourceGen": 10
+      "resourceGen": 10,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-010",
@@ -2198,7 +2254,8 @@
       "z": 0,
       "lat": 26.578,
       "lon": 118.475,
-      "resourceGen": 10
+      "resourceGen": 10,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-011",
@@ -2229,7 +2286,8 @@
       "z": 0,
       "lat": 28.1297,
       "lon": 117.6939,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-FIR-012",
@@ -2260,7 +2318,8 @@
       "z": 0,
       "lat": 30.0679,
       "lon": 121.5152,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-013",
@@ -2291,7 +2350,8 @@
       "z": 0,
       "lat": 24.6817,
       "lon": 118.0317,
-      "resourceGen": 7
+      "resourceGen": 7,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-014",
@@ -2322,7 +2382,8 @@
       "z": 0,
       "lat": 24.6841,
       "lon": 118.0458,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-015",
@@ -2353,7 +2414,8 @@
       "z": 0,
       "lat": 32.2669,
       "lon": 118.7674,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-016",
@@ -2384,7 +2446,8 @@
       "z": 0,
       "lat": 30.0772,
       "lon": 121.4966,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-FIR-017",
@@ -2415,7 +2478,8 @@
       "z": 0,
       "lat": 26.1645,
       "lon": 119.2845,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-018",
@@ -2446,7 +2510,8 @@
       "z": 12,
       "lat": 32.2364,
       "lon": 118.7343,
-      "resourceGen": 7
+      "resourceGen": 7,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-FIR-019",
@@ -2477,7 +2542,8 @@
       "z": 0,
       "lat": 30.0468,
       "lon": 121.5009,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-FIR-020",
@@ -2508,7 +2574,8 @@
       "z": 0,
       "lat": 24.3419,
       "lon": 118.2067,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-001",
@@ -2541,7 +2608,8 @@
       "z": 0,
       "lat": 24.5,
       "lon": 118,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-002",
@@ -2573,7 +2641,8 @@
       "z": 0,
       "lat": 24.56,
       "lon": 118.1354,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-003",
@@ -2605,7 +2674,8 @@
       "z": 0,
       "lat": 24.5591,
       "lon": 118.1298,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-004",
@@ -2637,7 +2707,8 @@
       "z": 0,
       "lat": 19.0782,
       "lon": 109.5342,
-      "resourceGen": 3
+      "resourceGen": 3,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-ASS-005",
@@ -2668,7 +2739,8 @@
       "z": 0,
       "lat": 26.2731,
       "lon": 119.4088,
-      "resourceGen": 3
+      "resourceGen": 3,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-006",
@@ -2699,7 +2771,8 @@
       "z": 0,
       "lat": 24.6907,
       "lon": 118.0947,
-      "resourceGen": 2
+      "resourceGen": 2,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-007",
@@ -2730,7 +2803,8 @@
       "z": 0,
       "lat": 24.7484,
       "lon": 118.2161,
-      "resourceGen": 2
+      "resourceGen": 2,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-008",
@@ -2762,7 +2836,8 @@
       "z": 0,
       "lat": 26.4967,
       "lon": 119.5132,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-009",
@@ -2794,7 +2869,8 @@
       "z": 0,
       "lat": 23.3503,
       "lon": 113.3547,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-ASS-010",
@@ -2825,7 +2901,8 @@
       "z": 5,
       "lat": 19.2689,
       "lon": 109.3793,
-      "resourceGen": 2
+      "resourceGen": 2,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-ASS-011",
@@ -2856,7 +2933,8 @@
       "z": 5,
       "lat": 26.4662,
       "lon": 119.2679,
-      "resourceGen": 2
+      "resourceGen": 2,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-012",
@@ -2888,7 +2966,8 @@
       "z": 0,
       "lat": 24.6752,
       "lon": 117.9251,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-ASS-013",
@@ -2919,7 +2998,8 @@
       "z": 0,
       "lat": 32.7091,
       "lon": 116.9399,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-ASS-014",
@@ -2950,7 +3030,8 @@
       "z": 0,
       "lat": 32.8077,
       "lon": 116.8251,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-ASS-015",
@@ -2982,7 +3063,8 @@
       "z": 0,
       "lat": 19.2619,
       "lon": 109.3745,
-      "resourceGen": 2
+      "resourceGen": 2,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-ASS-016",
@@ -3013,7 +3095,8 @@
       "z": 0,
       "lat": 24.8767,
       "lon": 117.9491,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-ASS-017",
@@ -3044,7 +3127,8 @@
       "z": 3,
       "lat": 28.0117,
       "lon": 115.6828,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-ASS-018",
@@ -3075,7 +3159,8 @@
       "z": 0,
       "lat": 28.293,
       "lon": 115.9205,
-      "resourceGen": 3
+      "resourceGen": 3,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-BLK-001",
@@ -3108,7 +3193,8 @@
       "z": 0,
       "lat": 29.613,
       "lon": 121.749,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-002",
@@ -3140,7 +3226,8 @@
       "z": 0,
       "lat": 29.6201,
       "lon": 121.7537,
-      "resourceGen": 7
+      "resourceGen": 7,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-003",
@@ -3172,7 +3259,8 @@
       "z": 0,
       "lat": 25.8998,
       "lon": 118.5911,
-      "resourceGen": 8
+      "resourceGen": 8,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-004",
@@ -3203,7 +3291,8 @@
       "z": -300,
       "lat": 22.8856,
       "lon": 113.4968,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-005",
@@ -3234,7 +3323,8 @@
       "z": -350,
       "lat": 22.8832,
       "lon": 113.4827,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-006",
@@ -3265,7 +3355,8 @@
       "z": 0,
       "lat": 22.3153,
       "lon": 122.218,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-007",
@@ -3296,7 +3387,8 @@
       "z": -200,
       "lat": 21.1735,
       "lon": 110.4436,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-008",
@@ -3327,7 +3419,8 @@
       "z": 10,
       "lat": 29.3788,
       "lon": 121.9627,
-      "resourceGen": 6
+      "resourceGen": 6,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-009",
@@ -3375,7 +3468,8 @@
           "ODIN-WEG"
         ],
         "assumption": "This models a reversible theater effect package. It is not an always-available kinetic ASAT unit or a claimed deployment."
-      }
+      },
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-BLK-010",
@@ -3406,7 +3500,8 @@
       "z": 0,
       "lat": 21.0829,
       "lon": 110.3145,
-      "resourceGen": 3
+      "resourceGen": 3,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-BLK-011",
@@ -3437,7 +3532,8 @@
       "z": 0,
       "lat": 21.0852,
       "lon": 110.3286,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-IAK-001",
@@ -3483,7 +3579,8 @@
         ],
         "assumption": "Observed force role represented as an aggregate command service; no offensive capacity is assigned to the headquarters itself."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-002",
@@ -3529,7 +3626,8 @@
         ],
         "assumption": "The mission group and value are analytical aggregates; exact force structure, access, and timing are unknown."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-003",
@@ -3577,7 +3675,8 @@
         ],
         "assumption": "The brigade label and capacity aggregate theater-level spectrum effects rather than identify a verified formation."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-004",
@@ -3625,7 +3724,8 @@
         ],
         "assumption": "ODIN anchors the J-16D equipment class; the mixed group, availability, marker, and capacity are scenario assumptions."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-005",
@@ -3671,7 +3771,8 @@
         ],
         "assumption": "Modeled as an information capability with no generic cyber, EW, or SOF currency."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-006",
@@ -3719,7 +3820,8 @@
         ],
         "assumption": "This is a reversible spectrum-effects aggregate, not a claim of exact unit structure or continuous coverage."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-IAK-007",
@@ -3766,7 +3868,8 @@
         ],
         "assumption": "Capacity and marker are theater-level analytical abstractions."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-008",
@@ -3814,7 +3917,8 @@
         ],
         "assumption": "The battalion name and capacity are game abstractions; effect range and availability are not public facts."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-IAK-009",
@@ -3860,7 +3964,8 @@
         ],
         "assumption": "The source supports persistent-access risk, not guaranteed wartime access, effect, attribution, or timing."
       },
-      "locationPrecision": "theater-aggregate"
+      "locationPrecision": "theater-aggregate",
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-LOG-001",
@@ -3892,7 +3997,8 @@
       "z": 0,
       "lat": 26.0622,
       "lon": 119.1952,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-LOG-002",
@@ -3923,7 +4029,8 @@
       "z": 0,
       "lat": 24.8794,
       "lon": 118.4933,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-LOG-003",
@@ -3954,7 +4061,8 @@
       "z": 0,
       "lat": 24.4603,
       "lon": 117.9889,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-LOG-004",
@@ -3985,7 +4093,8 @@
       "z": 0,
       "lat": 29.8475,
       "lon": 121.447,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-LOG-005",
@@ -4016,7 +4125,8 @@
       "z": 0,
       "lat": 26.4784,
       "lon": 118.3877,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-LOG-006",
@@ -4047,7 +4157,8 @@
       "z": 0,
       "lat": 28.3502,
       "lon": 121.8074,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-LOG-007",
@@ -4078,7 +4189,8 @@
       "z": 0,
       "lat": 19.0196,
       "lon": 109.2627,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-LOG-008",
@@ -4110,7 +4222,8 @@
       "z": 0,
       "lat": 25.5,
       "lon": 119.78,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-LOG-009",
@@ -4141,7 +4254,8 @@
       "z": 0,
       "lat": 30.5697,
       "lon": 114.1653,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-LOG-010",
@@ -4172,7 +4286,8 @@
       "z": 0,
       "lat": 29.8802,
       "lon": 121.735,
-      "resourceGen": 0
+      "resourceGen": 0,
+      "geographyClass": "afloat"
     },
     {
       "id": "PLA-SUP-001",
@@ -4203,7 +4318,8 @@
       "z": 0,
       "lat": 26.0802,
       "lon": 118.5158,
-      "resourceGen": 5
+      "resourceGen": 5,
+      "geographyClass": "prc-mainland"
     },
     {
       "id": "PLA-SUP-002",
@@ -4234,7 +4350,8 @@
       "z": 0,
       "lat": 24.5612,
       "lon": 118.0965,
-      "resourceGen": 4
+      "resourceGen": 4,
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-SUP-003",
@@ -4279,7 +4396,8 @@
         ],
         "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
       },
-      "locationPrecision": "illustrative"
+      "locationPrecision": "illustrative",
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-CMD-016",
@@ -4325,7 +4443,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The exact center is an assessed theater-level aggregation, not a claimed unit or facility."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-CMD-017",
@@ -4371,7 +4490,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The exact element and marker are scenario abstractions."
-      }
+      },
+      "geographyClass": "homeland-interior"
     },
     {
       "id": "PLA-IAK-010",
@@ -4417,7 +4537,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The group and access are assessed scenario abstractions; access can be discovered, denied, or unavailable."
-      }
+      },
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-IAK-011",
@@ -4463,7 +4584,8 @@
           "CISA-VOLT-2024"
         ],
         "assumption": "Public reporting supports target classes, not guaranteed access or on-demand effects."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-012",
@@ -4509,7 +4631,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "The defensive mission grouping and capacity are scenario abstractions."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-013",
@@ -4557,7 +4680,8 @@
           "ODIN-TYPE815G"
         ],
         "assumption": "ODIN anchors equipment classes; the cross-platform group and availability are not claimed real units."
-      }
+      },
+      "geographyClass": "homeland-littoral"
     },
     {
       "id": "PLA-IAK-014",
@@ -4602,7 +4726,8 @@
           "USSF-FOE-2040"
         ],
         "assumption": "AI-assisted distributed EW at this maturity is an explicit 2040 game assumption, not a current capability claim."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-015",
@@ -4647,7 +4772,8 @@
           "USSF-FOE-2040"
         ],
         "assumption": "Automation assists human-authorized recovery; it is not autonomous victory or perfect defense."
-      }
+      },
+      "geographyClass": "cyberspace"
     },
     {
       "id": "PLA-IAK-016",
@@ -4692,7 +4818,8 @@
           "USSF-FOE-2040"
         ],
         "assumption": "A mature proliferated and reconstitutable service is a 2040 scenario assumption; exact architecture is unspecified."
-      }
+      },
+      "geographyClass": "orbital"
     },
     {
       "id": "PLA-IAK-017",
@@ -4737,7 +4864,8 @@
           "DOD-CMPR-2025"
         ],
         "assumption": "This is an external Red enabler, not represented as a PLA formation and not given cyber/EW/SOF currency."
-      }
+      },
+      "geographyClass": "homeland-interior"
     }
   ],
   "links": [
