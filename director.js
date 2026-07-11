@@ -960,7 +960,7 @@ window.DirectorModule = (function () {
     $('dir-wrap').innerHTML =
       '<div class="dir-kicker">COMMIT CARD · BLIND · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
       '<h1 class="dir-h1">What do you believe?</h1>' +
-      '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Forecast before seeing the house. Move each of the three event sliders.</div>' +
+      '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Orders lock blind; Red commits when you execute. Forecast before seeing the house. Move each of the three event sliders.</div>' +
       '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
       '<div class="dir-card"><h3>THREE RESOLVABLE CALLS</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.values.questions[q.id], false); }).join('') + '</div>' +
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.values, false) + standingControl(card, card.values, false) + '</div>' +
