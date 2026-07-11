@@ -400,6 +400,10 @@ window.DirectorModule = (function () {
   function renderBrief() {
     var st = GM.getState();
     if (!st) return;
+    var posture = st.redMind && st.redMind.belief || { attrition: 0.5, decapitation: 0.3, denial: 0.2 };
+    var postureText = 'attrition ' + Math.round((posture.attrition || 0) * 100) +
+      ' / decapitation ' + Math.round((posture.decapitation || 0) * 100) +
+      ' / denial ' + Math.round((posture.denial || 0) * 100);
     var scen = (window.AppState && AppState.active && AppState.active()) || null;
     var ctx = scenarioContext();
     var title = ctx.title || (scen && scen.name) || 'INDO-PACIFIC SCENARIO';
@@ -442,6 +446,7 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Red force</span><b>' + st.alive.red + ' nodes · AP ' + st.ap.red + '</b></div>' +
       '<div class="dir-stat"><span>Blue tempo assets</span><b>' + st.tempo.blue.c2 + ' C2 · ' + st.tempo.blue.logi + ' LOG</b></div>' +
       '<div class="dir-stat"><span>Red tempo assets</span><b>' + st.tempo.red.c2 + ' C2 · ' + st.tempo.red.logi + ' LOG</b></div>' +
+      '<div class="dir-note" style="margin-top:8px"><b>INTEL ASSESSMENT — PLA POSTURE:</b> ' + esc(postureText) + '. This is the disclosed prior, not Red’s hidden draw.</div>' +
       '<div class="dir-note" style="margin-top:8px">Strikes, hardens and repairs each cost one order. A node killed this turn still acts — both sides committed first.</div>' +
       '</div>' +
       '</div>' +
@@ -456,7 +461,7 @@ window.DirectorModule = (function () {
       '<span class="dir-note">Turn budget</span><span class="dir-chips">' +
       [6, 8, 10].map(function (n) { return '<button type="button" class="dir-chip' + (briefOpts.turnLimit === n ? ' on' : '') + '" aria-pressed="' + (briefOpts.turnLimit === n) + '" data-turns="' + n + '">' + n + ' TURNS</button>'; }).join('') +
       '</span><span class="dir-note">Red doctrine strength</span><span class="dir-chips">' +
-      ['easy', 'hard'].map(function (d) { return '<button type="button" class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" aria-pressed="' + (briefOpts.redDiff === d) + '" data-diff="' + d + '">' + (d === 'hard' ? 'CONTESTED' : 'TRAINING') + '</button>'; }).join('') +
+      ['easy', 'hard', 'elite'].map(function (d) { return '<button type="button" class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" aria-pressed="' + (briefOpts.redDiff === d) + '" data-diff="' + d + '">' + (d === 'hard' ? 'CONTESTED' : d === 'elite' ? 'ELITE' : 'TRAINING') + '</button>'; }).join('') +
       '</span></div></div>' +
 
       '<div class="dir-actions"><span class="dir-note">Seed ' + esc(String(GMseed())) + ' — this operation is exactly replayable.</span>' +
@@ -677,18 +682,41 @@ window.DirectorModule = (function () {
   }
 
   // ---- FORECAST (ghost worlds on the real engine) -------------------------------------
+  function ghostBoard(I, snapshot) {
+    var board = I.buildBoard(AppState.activeGraph());
+    for (var id in snapshot.health) {
+      var b = board.nodes[id];
+      if (b) { b.health = snapshot.health[id].h; b.alive = snapshot.health[id].a; }
+    }
+    return board;
+  }
+
+  // Performance-safe Harsanyi forecast cache: six Red rows (two per doctrine) by
+  // eight sampled Blue level-0 columns = 48 resolver calls total, not 200×40.
+  // The cache's only strategic input is the disclosed policy family. It has no hidden
+  // doctrine parameter; each ghost samples a type later from the public belief.
+  function ghostPlanCache(I, snapshot, st) {
+    var base = ghostBoard(I, snapshot);
+    var cache = I.buildBeliefPlanCache(base, st.ap, snapshot.cfg.difficulty.red,
+      snapshot.seed, snapshot.turn, snapshot.cfg);
+    cache.template = base;
+    return cache;
+  }
+
   function ghostForecast(K) {
     var I = GM._internal;
     var s = GM.serialize();
     var st = GM.getState();
+    var belief = window.RedMindModule.normalizeBelief(st.redMind && st.redMind.belief);
+    var planCache = ghostPlanCache(I, s, st);
     var blueOrders = st.orders.blue;
     var objBlue = st.objectiveIds.blue || [];
     var redKills = [], blueKills = [], swing = [], objHitWorlds = 0;
+    var board = I.cloneBoardForAi(planCache.template);
     for (var k = 0; k < K; k++) {
-      var board = I.buildBoard(AppState.activeGraph());
-      for (var id in s.health) { var b = board.nodes[id]; if (b) { b.health = s.health[id].h; b.alive = s.health[id].a; } }
-      var redOrders = I.planOrders(board, 'red', st.ap.red, s.cfg.difficulty.red,
-        I.makeRng(I.hashSeed(s.seed, 'ghost-red', s.turn, k)));
+      I.resetBoardForAi(board, planCache.template);
+      var sampled = I.sampleBeliefPlan(planCache, belief, s.seed, s.turn, k);
+      var redOrders = sampled.orders;
       var rep = I.resolveTurn(board, blueOrders.concat(redOrders), s.cfg,
         I.makeRng(I.hashSeed(s.seed, 'ghost-res', s.turn, k)));
       var rk = 0, bk = 0;
@@ -706,6 +734,8 @@ window.DirectorModule = (function () {
     }
     return {
       K: K, turn: s.turn,
+      belief: belief,
+      planningRollouts: planCache.rollouts,
       redKills: band(redKills), blueKills: band(blueKills),
       objRisk: Math.round(100 * objHitWorlds / K), swing: band(swing)
     };
@@ -718,7 +748,9 @@ window.DirectorModule = (function () {
       '<div class="cell"><b>' + bandStr(f.blueKills) + '</b><span>BLUE NODES LOST</span></div>' +
       '<div class="cell"><b>' + f.objRisk + '%</b><span>WORLDS WHERE A KEY OBJECTIVE FALLS</span></div>' +
       '</div>' +
-      '<div class="honesty">This is a range, not a promise. The world will draw one outcome.</div></div>';
+      '<div class="honesty">Ghost Red types are sampled from your current intel assessment (' +
+      Math.round((f.belief.attrition || 0) * 100) + '/' + Math.round((f.belief.decapitation || 0) * 100) + '/' + Math.round((f.belief.denial || 0) * 100) +
+      '). This is a range, not a promise; one seeded world resolves.</div></div>';
   }
 
   // ---- COMMIT (the ritual) -------------------------------------------------------------

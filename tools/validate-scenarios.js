@@ -205,6 +205,8 @@ function loadGameModule() {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => ({ nodes: [], links: [] }) };
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
   return context.window.GameModule;
 }

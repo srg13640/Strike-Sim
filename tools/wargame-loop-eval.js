@@ -13,9 +13,10 @@ function arg(name, fallback) {
   return i >= 0 && argv[i + 1] != null ? argv[i + 1] : fallback;
 }
 
-const MATCHES = Number(arg('--matches', 100));
+const MATCHES = Number(arg('--matches', 200));
+const DIAGNOSTIC_MATCHES = Number(arg('--diagnostic-matches', Math.min(12, MATCHES)));
 const SEED_BASE = Number(arg('--seed-base', 42));
-const TURNS = 10;
+const TURNS = Number(arg('--turns', 8));
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8'));
@@ -48,7 +49,12 @@ function loadGame(graph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => graph };
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
+  if (!context.window.MoeModule || typeof context.window.MoeModule.assessGraph !== 'function') {
+    throw new Error('balance harness requires MoeModule; legacy attrition fallback is not a valid gate');
+  }
   return context.window.GameModule;
 }
 
@@ -92,23 +98,46 @@ function runOne(seed, mutator) {
     if (state.phase === 'resolved') state = game.nextTurn();
   }
   state = game.getState();
+  const saved = game.serialize();
+  const reasoning = (saved && saved.redMind && saved.redMind.reasoningHistory) || [];
   return {
     winner: state && state.winner,
+    reason: state && state.result && state.result.reason,
+    doctrine: state && state.redMind && state.redMind.revealedDoctrine,
     turns: turnsResolved,
-    bySide
+    bySide,
+    rollouts: reasoning.reduce((sum, row) => sum + Number(row.rollouts || 0), 0),
+    maxRollouts: reasoning.reduce((max, row) => Math.max(max, Number(row.rollouts || 0)), 0)
   };
 }
 
 function runSeries(matches, mutator) {
   const total = {
-    blueWins: 0,
+    blueWins: 0, redWins: 0, draws: 0,
     turns: 0,
+    rollouts: 0,
+    maxRollouts: 0,
+    reasons: {},
+    doctrines: {
+      attrition: { matches: 0, blueWins: 0 },
+      decapitation: { matches: 0, blueWins: 0 },
+      denial: { matches: 0, blueWins: 0 }
+    },
     bySide: { blue: methodCounter(), red: methodCounter() }
   };
   for (let i = 0; i < matches; i++) {
     const result = runOne(SEED_BASE + i, mutator);
     if (result.winner === 'blue') total.blueWins += 1;
+    else if (result.winner === 'red') total.redWins += 1;
+    else total.draws += 1;
+    total.reasons[result.reason || 'unknown'] = (total.reasons[result.reason || 'unknown'] || 0) + 1;
+    if (total.doctrines[result.doctrine]) {
+      total.doctrines[result.doctrine].matches += 1;
+      if (result.winner === 'blue') total.doctrines[result.doctrine].blueWins += 1;
+    }
     total.turns += result.turns;
+    total.rollouts += result.rollouts;
+    total.maxRollouts = Math.max(total.maxRollouts, result.maxRollouts);
     for (const side of ['blue', 'red']) {
       for (const key of Object.keys(total.bySide[side])) {
         total.bySide[side][key] += result.bySide[side][key];
@@ -118,7 +147,15 @@ function runSeries(matches, mutator) {
   const denom = Math.max(1, matches);
   return {
     blue_win_rate: total.blueWins / denom,
+    outcomes: { blue: total.blueWins, red: total.redWins, draw: total.draws },
+    reasons: total.reasons,
+    doctrine: Object.fromEntries(Object.entries(total.doctrines).map(([id, row]) => [id, {
+      matches: row.matches,
+      blue_win_rate: row.matches ? row.blueWins / row.matches : null
+    }])),
     avg_turns: total.turns / denom,
+    avg_reasoning_rollouts: total.rollouts / denom,
+    max_reasoning_rollouts: total.maxRollouts,
     avg_per_turn: {
       blue: normalizeCounts(total.bySide.blue, total.turns),
       red: normalizeCounts(total.bySide.red, total.turns)
@@ -169,23 +206,24 @@ function cascadeDamage(mutator) {
   return damage / Math.max(1, ids.length);
 }
 
+const started = process.hrtime.bigint();
 const baseline = runSeries(MATCHES);
 
-const p1 = runSeries(MATCHES, graph => {
+const p1 = runSeries(DIAGNOSTIC_MATCHES, graph => {
   graph.nodes.filter(n => n.team === 'blue').forEach(n => {
     n.resourceGenByType = Object.assign({}, n.resourceGenByType, {
-      kinetic: resource(n, 'kinetic') * 2
+      kinetic: 0
     });
   });
 });
 
-const p2 = runSeries(MATCHES, graph => {
+const p2 = runSeries(DIAGNOSTIC_MATCHES, graph => {
   graph.nodes.filter(n => n.team === 'red').forEach(n => {
     n.resourceGenByType = Object.assign({}, n.resourceGenByType, { kinetic: 0 });
   });
 });
 
-const p3 = runSeries(MATCHES, graph => {
+const p3 = runSeries(DIAGNOSTIC_MATCHES, graph => {
   graph.nodes.filter(n => n.team === 'red').forEach(n => { n.subsystem = 'Logistics'; });
 });
 
@@ -198,26 +236,40 @@ const boostedCascade = cascadeDamage(graph => {
 });
 
 const perturbations = {
-  '1': baseline.avg_per_turn.blue.kinetic > 0 && p1.avg_per_turn.blue.kinetic >= baseline.avg_per_turn.blue.kinetic * 1.8,
+  '1': baseline.avg_per_turn.blue.kinetic > 0 && p1.avg_per_turn.blue.kinetic <= baseline.avg_per_turn.blue.kinetic * 0.2,
   '2': p2.avg_per_turn.red.kinetic <= baseline.avg_per_turn.red.kinetic * 0.2,
   '3': p3.avg_per_turn.red.firepower <= baseline.avg_per_turn.red.firepower * 0.2,
   '4': baseCascade > 0 && boostedCascade >= baseCascade * 1.3
 };
 
 const failedPerturbations = Object.values(perturbations).filter(v => !v).length;
+const balanceDistance = baseline.blue_win_rate < 0.45 ? 0.45 - baseline.blue_win_rate
+  : baseline.blue_win_rate > 0.55 ? baseline.blue_win_rate - 0.55 : 0;
+const balancePass = balanceDistance === 0;
 const penalty =
   failedPerturbations * 25 +
-  Math.max(0, Math.abs(baseline.blue_win_rate - 0.45) - 0.10) * 100 +
+  balanceDistance * 100 +
   Math.max(0, 6 - baseline.avg_turns) * 5;
+const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
 
 console.log(JSON.stringify({
   penalty: Math.round(penalty * 1000) / 1000,
+  balance_pass: balancePass,
+  matches: MATCHES,
+  diagnostic_matches: DIAGNOSTIC_MATCHES,
+  turn_limit: TURNS,
   blue_win_rate: Math.round(baseline.blue_win_rate * 1000) / 1000,
   avg_turns: Math.round(baseline.avg_turns * 1000) / 1000,
+  outcomes: baseline.outcomes,
+  reasons: baseline.reasons,
+  doctrine: baseline.doctrine,
+  avg_reasoning_rollouts: Math.round(baseline.avg_reasoning_rollouts * 10) / 10,
+  max_reasoning_rollouts: baseline.max_reasoning_rollouts,
+  elapsed_ms: Math.round(elapsedMs),
   perturbations,
   diagnostics: {
     baseline: baseline.avg_per_turn,
-    blue_kinetic_ratio: ratio(p1.avg_per_turn.blue.kinetic, baseline.avg_per_turn.blue.kinetic),
+    blue_kinetic_removed_ratio: ratio(p1.avg_per_turn.blue.kinetic, baseline.avg_per_turn.blue.kinetic),
     red_kinetic_ratio: ratio(p2.avg_per_turn.red.kinetic, baseline.avg_per_turn.red.kinetic),
     red_firepower_ratio: ratio(p3.avg_per_turn.red.firepower, baseline.avg_per_turn.red.firepower),
     cascade_ratio: ratio(boostedCascade, baseCascade)

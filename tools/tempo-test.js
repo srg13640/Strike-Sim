@@ -21,6 +21,8 @@ function loadGame(graph) {
   ctx.window.window = ctx.window;
   ctx.window.AppState = { activeGraph: () => graph };
   vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), ctx, { filename: 'moe.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), ctx, { filename: 'red-mind.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), ctx, { filename: 'game.js' });
   return ctx.window.GameModule;
 }
@@ -53,11 +55,13 @@ const startAp = a.apTrace.blue[0], minAp = Math.min(...a.apTrace.blue);
 ok(startAp >= 3 && startAp <= 6, 'blue starts at base AP (' + startAp + ')');
 ok(minAp >= 2, 'AP never drops below floor of 2 (min ' + minAp + ')');
 
-console.log('\n[3] Explicit AP override disables the economy (gate contract)');
+console.log('\n[3] Explicit AP sets the dynamic base; sandbox explicitly fixes it');
 const game = loadGame(combinedGraph());
 game.init({});
 let s = game.newMatch({ control: { blue: 'human', red: 'ai' }, apBlue: 5, apRed: 5, fog: true, turnLimit: 9, seed: 1234 });
-ok(s.ap.blue === 5 && s.tempo.blue.dynamic === false, 'fixed apBlue=5 honored, economy off for blue');
+ok(s.ap.blue === 5 && s.tempo.blue.dynamic === true, 'apBlue=5 sets the base and preserves the tempo economy');
+s = game.newMatch({ control: { blue: 'human', red: 'ai' }, apBlue: 5, apRed: 5, sandbox: true, fog: true, turnLimit: 9, seed: 1234 });
+ok(s.ap.blue === 5 && s.tempo.blue.dynamic === false, 'sandbox apBlue=5 is fixed and disables the economy');
 
 console.log('\n[4] Decapitation cuts tempo: destroy a side\'s command+logistics -> AP floor');
 // Build a board, kill all blue command/logistics, confirm blue AP collapses vs intact.

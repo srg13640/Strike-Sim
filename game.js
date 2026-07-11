@@ -120,6 +120,14 @@ window.GameModule = (function () {
 
   function resourceGenByType(node) {
     const r = node.resourceGenByType || {};
+    // Board nodes already carry the canonical four-key object. Fast-path it because AI
+    // candidate generation asks this question thousands of times per operation.
+    if (Object.prototype.hasOwnProperty.call(r, 'kinetic') &&
+        Object.prototype.hasOwnProperty.call(r, 'cyber') &&
+        Object.prototype.hasOwnProperty.call(r, 'ew') &&
+        Object.prototype.hasOwnProperty.call(r, 'sof')) {
+      return { kinetic: Number(r.kinetic || 0), cyber: Number(r.cyber || 0), ew: Number(r.ew || 0), sof: Number(r.sof || 0) };
+    }
     const domains = (Array.isArray(node.domain) ? node.domain : [node.domain])
       .map(d => String(d || '').toLowerCase());
     const descriptor = [node.type, node.name].map(v => String(v || '').toLowerCase()).join(' ');
@@ -565,21 +573,49 @@ window.GameModule = (function () {
   }
 
   // ---- AI commander ---------------------------------------------------------------
-  // Deterministic given (board, side, ap, difficulty, rng): identical inputs yield
-  // identical orders, so an AI side stays in sync across networked peers. Strategy:
-  // value-rank enemy targets, choose the method each target is most vulnerable to,
-  // spend ~70% of AP striking and the rest hardening/repairing the most valuable own
-  // nodes that are exposed. 'easy' wastes AP and picks noisier targets.
-  function sourceForMethod(board, side, methodKey, target, rng) {
+  // UNCLASSIFIED // NOTIONAL RESEARCH TOOL
+  //
+  // planOrders is the level-0 policy generator. Its fourth argument is now a named
+  // policy object; legacy difficulty strings still map to the balanced policy. The
+  // bounded level-k wrapper below generates a small restricted plan set and evaluates
+  // it only by cloning the board and calling resolveTurn — never by forking combat.
+  function redMind() {
+    if (!window.RedMindModule) throw new Error('red-mind.js must load before game.js');
+    return window.RedMindModule;
+  }
+
+  function normalizePlanPolicy(input) {
+    const mind = redMind();
+    if (input && typeof input === 'object' && input.target && input.methods) return input;
+    const key = String(input || '').toLowerCase();
+    if (mind.DOCTRINES[key]) return mind.doctrine(key);
+    // Back-compat: easy/hard/elite described reasoning depth, not a doctrine.
+    return mind.BALANCED;
+  }
+
+  const plannerSourcePoolCache = new WeakMap();
+  function plannerSourcePools(board, side) {
+    let cache = plannerSourcePoolCache.get(board);
+    if (!cache) { cache = {}; plannerSourcePoolCache.set(board, cache); }
+    if (!cache[side]) {
+      cache[side] = {};
+      METHOD_KEYS.forEach(k => { cache[side][k] = sourcesForMethod(board, side, k); });
+    }
+    return cache[side];
+  }
+
+  function sourceForMethod(board, side, methodKey, target, rng, pools) {
     // Pick from the SAME validated source pool the availability rule (canStrikeBoard) and
     // resolver use, then weight by affinity to the target so the AI fires from its best
-    // platform. Sharing the pool guarantees the AI never queues a source the rules reject.
-    return sourcesForMethod(board, side, methodKey)
+    // platform. Stable ID tie-breaking replaces cosmetic RNG jitter: candidate diversity
+    // should come from policy, not from which equivalent launcher gets named.
+    return ((pools && pools[methodKey]) || sourcesForMethod(board, side, methodKey))
+      .filter(n => n && n.alive)
       .map(n => ({
         n,
-        score: resourceForMethod(n, methodKey) * affinity(n, target, methodKey) * (0.9 + rng.next() * 0.2)
+        score: resourceForMethod(n, methodKey) * affinity(n, target, methodKey)
       }))
-      .sort((a, b) => b.score - a.score)[0]?.n || null;
+      .sort((a, b) => (b.score - a.score) || String(a.n.id).localeCompare(String(b.n.id)))[0]?.n || null;
   }
 
   function sideStrikeCapacity(board, side) {
@@ -604,46 +640,61 @@ window.GameModule = (function () {
     return clamp(4 + strikeBand + postureBand, Math.max(3, fallback - 1), 6);
   }
 
-  function planOrders(board, side, ap, difficulty, rng) {
+  function planOrders(board, side, ap, policy, rng) {
     const orders = [];
     const foe = enemyOf(side);
-    const easy = difficulty === 'easy';
+    const p = normalizePlanPolicy(policy);
+    const targetW = p.target || {};
+    const methodW = p.methods || {};
+    const sourcePools = plannerSourcePools(board, side);
 
-    // Targeting prizes high force-value AND tempo nodes (C2/logistics) — striking the
-    // enemy's command network throttles their action points, so a smart commander
-    // weighs decapitation against attrition. 'easy' ignores the tempo bonus.
-    const tempoTargetBonus = (n) => easy ? 1 : (1 + tempoWeightOf(n) * 0.2);
+    function subsystemFlag(n, pattern) { return pattern.test(String(n.subsystem || '') + ' ' + String(n.type || '')); }
+    function targetScore(n) {
+      const healthFrac = clamp((n.health || 0) / (n.healthMax || 100), 0, 1);
+      const command = subsystemFlag(n, /command|c2|headquarters/i) ? 1 : 0;
+      const logistics = subsystemFlag(n, /logistics|sustain|lift|sealift|port/i) ? 1 : 0;
+      const fires = subsystemFlag(n, /firepower|fires|strike|missile|air defense|sam/i) ? 1 : 0;
+      const multiplier = 1 +
+        Number(targetW.tempo || 0) * tempoWeightOf(n) +
+        Number(targetW.command || 0) * command +
+        Number(targetW.logistics || 0) * logistics +
+        Number(targetW.fires || 0) * fires +
+        Number(targetW.damaged || 0) * (1 - healthFrac);
+      // Counter-lift is time-critical rather than merely another value multiplier.
+      // An additive policy bonus lets a low-value exposed landing element outrank a
+      // hardened headquarters when the denial clock—not attrition—is decisive.
+      const lodgmentUrgency = Number(targetW.lodgment || 0) * lodgmentWeightOf(n) * 12;
+      return (nodeValue(n) * multiplier + lodgmentUrgency) * diffMult(n.difficulty);
+    }
+
     const enemies = board.rosters[foe]
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
-      .map(n => ({ n, score: nodeValue(n) * diffMult(n.difficulty) * tempoTargetBonus(n) * (0.85 + rng.next() * 0.3) }))
-      .sort((a, b) => b.score - a.score);
+      .map(n => ({ n, score: targetScore(n) }))
+      .sort((a, b) => (b.score - a.score) || String(a.n.id).localeCompare(String(b.n.id)));
 
     const bestMethodFor = (n) => {
-      // Prefer a method the target is vulnerable to; break ties by raw expected damage.
+      // Prefer a doctrine-weighted method the target is vulnerable to; stable method-key
+      // and source-ID tie-breaks make identical inputs byte-for-byte reproducible.
       let best = null, bestEV = -1, bestSource = null;
       for (const k of METHOD_KEYS) {
-        const source = sourceForMethod(board, side, k, n, rng);
+        const source = sourceForMethod(board, side, k, n, rng, sourcePools);
         if (!source) continue;
         const m = METHODS[k];
         const ev = m.baseProb * diffMult(n.difficulty) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2) *
-          Math.sqrt(resourceForMethod(source, k));
-        if (ev > bestEV) { bestEV = ev; best = k; bestSource = source; }
-      }
-      if (easy && rng.next() < 0.4) {
-        const available = METHOD_KEYS.map(k => ({ k, source: sourceForMethod(board, side, k, n, rng) })).filter(x => x.source);
-        const pick = available.length ? rng.pick(available) : null;
-        return pick ? pick : { k: best, source: bestSource };
+          Math.sqrt(resourceForMethod(source, k)) * Number(methodW[k] == null ? 1 : methodW[k]);
+        if (ev > bestEV || (ev === bestEV && String(k).localeCompare(String(best || '')) < 0)) {
+          bestEV = ev; best = k; bestSource = source;
+        }
       }
       return { k: best, source: bestSource };
     };
 
-    const strikeAP = Math.max(1, Math.round(ap * (easy ? 0.85 : 0.7)));
+    const strikeAP = clamp(Math.round(ap * Number(p.strikeShare == null ? 0.7 : p.strikeShare)), 1, ap);
     let used = 0;
     for (const e of enemies) {
       if (used >= strikeAP) break;
-      // Concentrate fire on the very top target to force a kill; spread the rest.
-      const focus = used === 0 && !easy ? 2 : 1;
+      const focus = used === 0 ? clamp(Math.round(Number(p.focusFire || 1)), 1, 3) : 1;
       for (let k = 0; k < focus && used < strikeAP; k++) {
         const method = bestMethodFor(e.n);
         if (!method || !method.k || !method.source) continue;
@@ -657,17 +708,16 @@ window.GameModule = (function () {
     let remaining = ap - used;
     if (remaining > 0) {
       const own = board.rosters[side].map(id => board.nodes[id]).filter(n => n && n.alive);
-      // Protecting C2 / logistics preserves tempo, so weight them up when shoring up.
-      // Red lodgment bias (GAME_DESIGN §10 Increment A, same pattern as tempoTargetBonus):
-      // Red prizes hardening/repairing its Amphibious Lift and Sustainment nodes, so the
-      // lodgment win condition is contested under Blue counter-lift pressure from day one.
-      const lodgmentBonus = (n) => (side === 'red' && !easy) ? 1 + lodgmentWeightOf(n) : 1;
-      const protVal = (n) => nodeValue(n) * (1 + (easy ? 0 : tempoWeightOf(n))) * lodgmentBonus(n);
+      const protectW = p.protect || {};
+      const protVal = (n) => nodeValue(n) * (1 + Number(protectW.tempo || 0) * tempoWeightOf(n)) +
+        (side === 'red' ? Number(protectW.lodgment || 0) * lodgmentWeightOf(n) * 30 * diffMult(n.difficulty) : 0);
       const damaged = own.filter(n => n.health < n.healthMax * 0.8)
-        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)));
-      const healthy = own.slice().sort((a, b) => protVal(b) - protVal(a));
+        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)) || String(a.id).localeCompare(String(b.id)));
+      const healthy = own.slice().sort((a, b) => (protVal(b) - protVal(a)) || String(a.id).localeCompare(String(b.id)));
       while (remaining > 0) {
-        if (damaged.length && (!easy || rng.next() < 0.6)) {
+        const repairValue = damaged.length ? protVal(damaged[0]) * Number(p.repairBias == null ? 0.6 : p.repairBias) : -1;
+        const hardenValue = healthy.length ? protVal(healthy[0]) * (1 - Number(p.repairBias == null ? 0.6 : p.repairBias)) : -1;
+        if (damaged.length && repairValue >= hardenValue) {
           orders.push({ side, kind: 'repair', targetId: damaged.shift().id });
         } else if (healthy.length) {
           orders.push({ side, kind: 'harden', targetId: healthy.shift().id });
@@ -676,6 +726,158 @@ window.GameModule = (function () {
       }
     }
     return orders;
+  }
+
+  function cloneBoardForAi(board) {
+    const nodes = {};
+    for (const id in board.nodes) nodes[id] = Object.assign({}, board.nodes[id]);
+    return { nodes, adj: board.adj, rosters: board.rosters };
+  }
+
+  function resetBoardForAi(target, source) {
+    for (const id in source.nodes) {
+      const dst = target.nodes[id], src = source.nodes[id];
+      if (!dst || !src) continue;
+      dst.health = src.health;
+      dst.alive = src.alive;
+    }
+    return target;
+  }
+
+  function planHeuristic(board, side, orders, policy) {
+    const p = normalizePlanPolicy(policy);
+    return orders.reduce((sum, o) => {
+      const n = board.nodes[o.targetId];
+      if (!n) return sum;
+      if (o.kind === 'strike') {
+        const m = METHODS[o.methodKey] || METHODS.kinetic;
+        return sum + nodeValue(n) * m.baseProb * diffMult(n.difficulty) *
+          Number((p.methods && p.methods[o.methodKey]) || 1);
+      }
+      return sum + nodeValue(n) * (o.kind === 'repair' ? Number(p.repairBias || 0.6) : 1 - Number(p.repairBias || 0.6));
+    }, 0);
+  }
+
+  function scoreAiRollout(board, side, ownPlan, opponentPlan, cfg, policy, rng, includeOperational) {
+    const local = cloneBoardForAi(board);
+    const beforeTempo = { blue: commandTempo(local, 'blue'), red: commandTempo(local, 'red') };
+    const report = resolveTurn(local, ownPlan.concat(opponentPlan), cfg, rng);
+    const p = normalizePlanPolicy(policy);
+    const u = p.utility || {};
+    const enemyLoss = report.scoreDelta[side] || 0;
+    const ownLoss = report.scoreDelta[enemyOf(side)] || 0;
+    const assessment = includeOperational === false ? null : assessDenialOn(local);
+    const throughput = assessment ? Number(assessment.throughput || 0) : 0.5;
+    const tempoDelta = (commandTempo(local, enemyOf(side)) - beforeTempo[enemyOf(side)]) -
+      (commandTempo(local, side) - beforeTempo[side]);
+    const throughputUtility = assessment ? (side === 'red' ? throughput : (1 - throughput)) : 0;
+    const utility =
+      Number(u.enemyLoss == null ? 1 : u.enemyLoss) * enemyLoss -
+      Number(u.ownLoss == null ? 1 : u.ownLoss) * ownLoss +
+      Number(u.throughput == null ? 0.65 : u.throughput) * throughputUtility * 25 -
+      Number(u.tempo == null ? 0.35 : u.tempo) * tempoDelta;
+    return { utility, opponentUtility: -utility };
+  }
+
+  // Bounded level-k / quantal response. Five candidates by eight sampled opponent
+  // plans produce at most 40 one-turn resolver calls. k=2 reweights the SAME payoff
+  // matrix; it never recurses. Separate tags keep thinking draws from combat draws.
+  function planStrategicOrders(board, side, ap, policy, difficulty, opts) {
+    opts = opts || {};
+    const mind = redMind();
+    const seed = opts.seed || 1;
+    const turn = opts.turn || 1;
+    const tag = opts.tag || 'strategic';
+    const diff = mind.difficulty(difficulty);
+    const basePolicy = normalizePlanPolicy(policy);
+    const policies = mind.candidatePolicies(basePolicy, diff.candidates);
+    const candidates = policies.map((candidatePolicy, i) => {
+      const plan = planOrders(board, side, ap, candidatePolicy,
+        makeRng(hashSeed(seed, tag, 'candidate', turn, side, i)));
+      return { plan, policy: candidatePolicy, heuristic: planHeuristic(board, side, plan, candidatePolicy) };
+    });
+
+    const foe = enemyOf(side);
+    const opponentAp = Number(opts.opponentAp == null ? ap : opts.opponentAp);
+    const opponentPolicies = mind.candidatePolicies(mind.BALANCED, 5)
+      .concat(['attrition', 'decapitation', 'denial'].map(id => mind.doctrine(id)));
+    const opponents = diff.opponentSamples ? opponentPolicies.slice(0, diff.opponentSamples).map((oppPolicy, j) => {
+      const plan = planOrders(board, foe, opponentAp, oppPolicy,
+        makeRng(hashSeed(seed, tag, 'opponent', turn, side, j)));
+      return { plan, policy: oppPolicy, heuristic: planHeuristic(board, foe, plan, oppPolicy) };
+    }) : [];
+
+    const choice = mind.boundedChoice({
+      candidates,
+      opponents,
+      difficulty: diff,
+      turn,
+      rng: makeRng(hashSeed(seed, tag, 'plan-select', turn, side)),
+      reasoningRng: makeRng(hashSeed(seed, tag, 'k-drop', turn, side)),
+      evaluator: (candidatePlan, opponentPlan, i, j) => scoreAiRollout(
+        board, side, candidatePlan, opponentPlan, opts.cfg || DEFAULT_CFG, policies[i],
+        makeRng(hashSeed(seed, tag, 'rollout-resolve', turn, side, i, j)))
+    });
+    return { orders: choice.plan, reasoning: choice, doctrine: basePolicy.id };
+  }
+
+  // Forecast planning cache for a player who knows only a belief over Red types.
+  // IMPORTANT A2 BOUNDARY: this function accepts no match and no true-doctrine value.
+  // Six Red rows × eight sampled Blue rows = 48 resolver calls, shared by all K worlds.
+  function buildBeliefPlanCache(board, ap, difficulty, seed, turn, cfg) {
+    const mind = redMind();
+    const doctrineIds = ['attrition', 'decapitation', 'denial'];
+    const preferredVariant = { attrition: 1, decapitation: 3, denial: 2 };
+    const rows = [];
+    doctrineIds.forEach(doctrineId => {
+      const variants = mind.candidatePolicies(mind.doctrine(doctrineId), 5);
+      [0, preferredVariant[doctrineId]].forEach(variantIndex => {
+        const policy = variants[variantIndex];
+        rows.push({
+          doctrine: doctrineId,
+          policy,
+          plan: planOrders(board, 'red', ap.red, policy,
+            makeRng(hashSeed(seed, 'belief-cache-red', turn, doctrineId, variantIndex)))
+        });
+      });
+    });
+    const bluePolicies = mind.candidatePolicies(mind.BALANCED, 5)
+      .concat(doctrineIds.map(id => mind.doctrine(id)));
+    const cols = bluePolicies.slice(0, 8).map((policy, j) => ({
+      policy,
+      plan: planOrders(board, 'blue', ap.blue, policy,
+        makeRng(hashSeed(seed, 'belief-cache-blue', turn, j)))
+    }));
+    const byDoctrine = {};
+    doctrineIds.forEach(id => { byDoctrine[id] = { plans: [], scores: [], probabilities: [] }; });
+    rows.forEach((row, i) => {
+      let score = 0;
+      cols.forEach((col, j) => {
+        score += scoreAiRollout(board, 'red', row.plan, col.plan, cfg || DEFAULT_CFG, row.policy,
+          makeRng(hashSeed(seed, 'belief-cache-resolve', turn, i, j)), false).utility;
+      });
+      byDoctrine[row.doctrine].plans.push(row.plan);
+      byDoctrine[row.doctrine].scores.push(score / Math.max(1, cols.length));
+    });
+    const diff = mind.difficulty(difficulty);
+    const lambda = Math.max(0.15, diff.lambda * (1 - diff.fatigueDecay * Math.max(0, turn - 1)));
+    doctrineIds.forEach(id => {
+      byDoctrine[id].probabilities = mind.quantalDistribution(byDoctrine[id].scores, lambda);
+    });
+    return { byDoctrine, rollouts: rows.length * cols.length };
+  }
+
+  // A ghost world draws its type only from the caller-provided belief. Both the type
+  // and plan draws have dedicated addressable streams. There is deliberately no route
+  // from this pure helper to match.redMind.doctrine.
+  function sampleBeliefPlan(cache, belief, seed, turn, k) {
+    const mind = redMind();
+    const sampledDoctrine = mind.drawDoctrine(belief,
+      makeRng(hashSeed(seed, 'ghost-doctrine', turn, k)));
+    const entry = cache.byDoctrine[sampledDoctrine];
+    const index = mind.sampleIndex(entry.probabilities,
+      makeRng(hashSeed(seed, 'ghost-plan', turn, k)));
+    return { doctrine: sampledDoctrine, orders: entry.plans[Math.max(0, index)] || [] };
   }
 
   // ===================================================================================
@@ -769,6 +971,8 @@ window.GameModule = (function () {
     const startTempo = { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') };
     const objectives = { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') };
     const seed = (cfgOverrides && cfgOverrides.seed) || hashSeed('match', graph.nodes ? graph.nodes.length : 0, Object.keys(board.nodes).join('').length);
+    const doctrinePrior = redMind().normalizeBelief((cfgOverrides && cfgOverrides.doctrinePrior) || redMind().PRIOR);
+    const redDoctrine = redMind().drawDoctrine(doctrinePrior, makeRng(hashSeed(seed, 'doctrine')));
     const fingerprint = computeFingerprint(graph);   // bind this match to the scenario it was built on (C-011)
     match = {
       cfg, board, seed, fingerprint,
@@ -784,6 +988,15 @@ window.GameModule = (function () {
       denialHistory: [],                    // per-resolved-turn { turn, index, throughput, osvi }
       lodgment: { value: 0, history: [] },  // accumulated Red lodgment 0..1, history [{turn, value}]
       result: null,                         // { winner, reason:'halt'|'lodgment'|'horizon', projection } on match end
+      // The Harsanyi type is private match state. serialize() deliberately omits it and
+      // deserialize() re-derives it from (seed,'doctrine'), so Director forecast code
+      // cannot learn the truth by inspecting a save. Only prior/belief are public.
+      redMind: {
+        prior: Object.assign({}, doctrinePrior),
+        belief: Object.assign({}, doctrinePrior),
+        doctrine: redDoctrine,
+        reasoningHistory: []
+      },
       winner: null,
       lastReport: null,
       savedGraphState
@@ -825,6 +1038,12 @@ window.GameModule = (function () {
       tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
       objectives: { blue: objectiveStatus('blue'), red: objectiveStatus('red') },
       objectiveIds: { blue: (match.objectives && match.objectives.blue || []).slice(), red: (match.objectives && match.objectives.red || []).slice() },
+      redMind: {
+        prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
+        belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
+        difficulty: redMind().difficulty(match.cfg.difficulty.red),
+        revealedDoctrine: match.phase === 'over' ? (match.redMind && match.redMind.doctrine || null) : null
+      },
       // Save/resume integrity flags (C-011): the UI can warn when a loaded match is running
       // against a different / unverifiable scenario graph than the one it was created on.
       scenarioMismatch: !!match.scenarioMismatch,
@@ -924,8 +1143,28 @@ window.GameModule = (function () {
   // Fill an AI side's orders for the current turn (deterministic from turn+side).
   function ensureAiOrders(side) {
     if (isHuman(side)) return;
-    const rng = makeRng(hashSeed(match.seed, 'plan', match.turn, side));
-    match.orders[side] = planOrders(match.board, side, apFor(side), match.cfg.difficulty[side], rng);
+    const policy = side === 'red'
+      ? redMind().doctrine(match.redMind && match.redMind.doctrine)
+      : redMind().BALANCED;
+    const planned = planStrategicOrders(match.board, side, apFor(side), policy, match.cfg.difficulty[side], {
+      seed: match.seed,
+      turn: match.turn,
+      tag: 'plan',
+      opponentAp: apFor(enemyOf(side)),
+      cfg: match.cfg
+    });
+    match.orders[side] = planned.orders;
+    if (match.redMind) {
+      match.redMind.reasoningHistory.push({
+        turn: match.turn,
+        side,
+        k: planned.reasoning.k,
+        configuredK: planned.reasoning.configuredK,
+        lambda: Math.round(planned.reasoning.lambda * 1000) / 1000,
+        rollouts: planned.reasoning.rollouts,
+        dropped: !!planned.reasoning.dropped
+      });
+    }
   }
 
   // Commit the turn: gather AI orders, resolve, write back, score, check victory.
@@ -1049,14 +1288,18 @@ window.GameModule = (function () {
     let lodgmentSustained = 0, halted = 0, undecided = 0, thruSum = 0;
     const finalLodg = [];
     for (let t = 0; t < PROJECTION_TRIALS; t++) {
-      const rng = makeRng(hashSeed(match.seed, 'projection', t));
       const board = cloneBoardForProjection(match.board);
       let lodg = match.lodgment ? match.lodgment.value : 0;
       let a = null, outcome = null;
       for (let step = 1; step <= PROJECTION_HORIZON_TURNS; step++) {
-        const orders = planOrders(board, 'blue', apForBoard(board, 'blue'), match.cfg.difficulty.blue || 'hard', rng)
-          .concat(planOrders(board, 'red', apForBoard(board, 'red'), match.cfg.difficulty.red || 'hard', rng));
-        resolveTurn(board, orders, match.cfg, rng);
+        // Planning complexity must never consume the combat RNG stream. Projection uses
+        // independent, addressable plan and resolution tags for every trial/step/side.
+        const blueOrders = planOrders(board, 'blue', apForBoard(board, 'blue'), redMind().BALANCED,
+          makeRng(hashSeed(match.seed, 'projection-plan-blue', t, step)));
+        const redOrders = planOrders(board, 'red', apForBoard(board, 'red'), redMind().doctrine(match.redMind && match.redMind.doctrine),
+          makeRng(hashSeed(match.seed, 'projection-plan-red', t, step)));
+        resolveTurn(board, blueOrders.concat(redOrders), match.cfg,
+          makeRng(hashSeed(match.seed, 'projection-resolve', t, step)));
         a = assessDenialOn(board);
         lodg = clamp(lodg + a.throughput / LODGMENT_REQ_TURNS, 0, 1);
         if (lodg >= 1) { outcome = 'red'; break; }
@@ -1364,6 +1607,12 @@ window.GameModule = (function () {
       denialHistory: (match.denialHistory || []).slice(),
       lodgment: match.lodgment ? { value: match.lodgment.value, history: (match.lodgment.history || []).slice() } : null,
       calendar: match.calendar ? { turnLengthDays: match.calendar.turnLengthDays, dday: match.calendar.dday } : null,
+      redMind: {
+        doctrine: match.redMind && match.redMind.doctrine || null,
+        prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
+        belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
+        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice()
+      },
       turns: match.history.length,
       scoreMargin: round1(match.score.blue - match.score.red),
       scoreByTurn,
@@ -1392,13 +1641,15 @@ window.GameModule = (function () {
   // contained (can restore the scenario on exit and keep its resolved-turn log). v1 saves
   // (no fingerprint) still load, but cannot be integrity-checked — deserialize flags that.
   // v3 saves additionally carry the denial-victory state (calendar / denialHistory /
-  // lodgment / result — Increment A); older saves default those fields on load.
+  // lodgment / result — Increment A). v4 adds the PUBLIC Red-mind prior/belief and
+  // reasoning instrumentation. The hidden doctrine is never serialized; it is derived
+  // from the seed on load. Older saves default all additive fields safely.
   function serialize() {
     if (!match) return null;
     const health = {};
     for (const id in match.board.nodes) { const n = match.board.nodes[id]; health[id] = { h: n.health, a: n.alive }; }
     return {
-      v: 3, seed: match.seed, turn: match.turn, phase: match.phase,
+      v: 4, seed: match.seed, turn: match.turn, phase: match.phase,
       fingerprint: match.fingerprint || null,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
@@ -1409,6 +1660,12 @@ window.GameModule = (function () {
       denialHistory: match.denialHistory || [],
       lodgment: match.lodgment || { value: 0, history: [] },
       result: match.result || null,
+      redMind: {
+        modelVersion: 1,
+        prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
+        belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
+        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice()
+      },
       history: match.history,
       orders: match.orders, winner: match.winner, health,
       lastReport: match.lastReport || null,
@@ -1482,6 +1739,16 @@ window.GameModule = (function () {
         ? { value: clamp(s.lodgment.value, 0, 1), history: Array.isArray(s.lodgment.history) ? s.lodgment.history.slice() : [] }
         : { value: 0, history: [] },
       result: s.result || null,
+      redMind: {
+        prior: redMind().normalizeBelief(s.redMind && s.redMind.prior || redMind().PRIOR),
+        belief: redMind().normalizeBelief(s.redMind && s.redMind.belief || s.redMind && s.redMind.prior || redMind().PRIOR),
+        doctrine: redMind().drawDoctrine(
+          redMind().normalizeBelief(s.redMind && s.redMind.prior || redMind().PRIOR),
+          makeRng(hashSeed(s.seed, 'doctrine'))
+        ),
+        reasoningHistory: Array.isArray(s.redMind && s.redMind.reasoningHistory)
+          ? s.redMind.reasoningHistory.slice() : []
+      },
       // Capture the CURRENT graph state before overwriting it with loaded battle damage, so
       // exiting a loaded match still restores the scenario (even though older saves omitted it).
       savedGraphState: s.savedGraphState || (graph.nodes || []).map(n => ({ id: n.id, health: n.health, status: n.status }))
@@ -1534,7 +1801,9 @@ window.GameModule = (function () {
     // C-011: scenario fingerprint helpers for save/resume integrity.
     fingerprint, fingerprintMatches, scenarioStatus,
     // exposed for headless testing / future reuse
-    _internal: { buildBoard, resolveTurn, planOrders, makeRng, hashSeed, objectiveValue,
+    _internal: { buildBoard, resolveTurn, planOrders, planStrategicOrders, buildBeliefPlanCache,
+      sampleBeliefPlan, planHeuristic,
+      cloneBoardForAi, resetBoardForAi, scoreAiRollout, makeRng, hashSeed, objectiveValue,
       canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch,
       // Increment A additions (denial arbiter plumbing):
       ddayForTurn, moeRedNodes, lodgmentWeightOf }
