@@ -183,7 +183,7 @@ check('P2: comms floor caps its backlog, types with ticks, and captions instantl
   assert.ok(cinSrc.includes('COMMS_MAX'), 'visible-line cap');
   assert.ok(cinSrc.includes('commsQ.splice'), 'backlog cap');
   const pump = cinSrc.slice(cinSrc.indexOf('function pumpComms'), cinSrc.indexOf('function commsVisible'));
-  assert.ok(pump.includes('if (reduceMotion)') && pump.includes('tx.textContent = next.text'), 'reduced motion lands the caption instantly');
+  assert.ok(pump.includes('if (reduceMotion())') && pump.includes('tx.textContent = next.text'), 'reduced motion lands the caption instantly');
 });
 
 check('P2: typewriter restores real markup and stands down when a re-render replaces the DOM', () => {
@@ -254,7 +254,7 @@ check('P3: AAR is a ceremony — verdict stamps first, ledgers deal as cards, ra
   const ac = cinSrc.slice(cinSrc.indexOf('function aarCinematic'), cinSrc.indexOf('function exitCinematic'));
   assert.ok(ac.includes('letterbox(true)') && ac.includes('stamp('), 'the verdict stamps under letterbox');
   assert.ok(ac.includes('stopBed'), 'silence precedes the verdict');
-  assert.ok(ac.includes('if (reduceMotion) return'), 'reduced motion: cards land set, no ceremony');
+  assert.ok(ac.includes('if (reduceMotion()) return'), 'reduced motion: cards land set, no ceremony');
 });
 
 check('P3: the deal is presentation-safe — reduced-motion override, honest rank source, clean class removal', () => {
@@ -268,7 +268,7 @@ check('P3: exit letterboxes back to the title front door', () => {
   assert.ok(directorSrc.includes("cine('exitCinematic')"), 'EXIT TO CONSOLE runs the exit');
   const ex = cinSrc.slice(cinSrc.indexOf('function exitCinematic'));
   assert.ok(ex.includes('openConsole()'), 'the exit lands on the title screen');
-  assert.ok(ex.includes('if (reduceMotion) { openConsole(); return; }'), 'reduced motion goes straight home');
+  assert.ok(ex.includes('if (reduceMotion()) { openConsole(); return; }'), 'reduced motion goes straight home');
 });
 
 check('P3: frame budget holds — pacing floor, bounded per-tick work, FX teardown', () => {
@@ -279,6 +279,74 @@ check('P3: frame budget holds — pacing floor, bounded per-tick work, FX teardo
   // ≤1 stinger, ≤1 comms line — no layout reads in the hot path.
   const pw = fnBody(directorSrc, 'playWatch', 'showOutcome');
   assert.ok(!/getBoundingClientRect|offsetWidth|offsetHeight/.test(pw), 'no forced layout reads inside the playback loop');
+});
+
+// ═══════════════ Phase 4 contracts: W6 settings, forced reduced motion, performance mode ═══════════════
+
+check('P4: W6 settings persist as cosmetic state under their own key — never match state', () => {
+  assert.ok(cinSrc.includes("'strikesim.co006.settings'"), 'settings key');
+  ['reducedMotion', 'perfMode', 'callsign', 'bootFast'].forEach(k =>
+    assert.ok(cinSrc.includes(k + ':'), 'setting field ' + k));
+  assert.ok(cinSrc.includes('localStorage.setItem(SETTINGS_KEY'), 'settings saved');
+  assert.ok(!/localStorage\.setItem\('strikesim\.co005/.test(cinSrc), 'still never writes CO-005 stores');
+});
+
+check('P4: effective reduced motion = system media query OR the operator toggle — one root class, every layer reads it', () => {
+  assert.ok(cinSrc.includes('function reduceMotion()'), 'live helper replaces the load-time snapshot');
+  assert.ok(cinSrc.includes('settings.reducedMotion || (mqRM && mqRM.matches)'), 'toggle can only ADD restraint — the media query always wins on its own');
+  assert.ok(cinSrc.includes("classList.toggle('cin-rm'"), 'cinematics owns the root class');
+  assert.ok(directorSrc.includes("classList.contains('cin-rm')"), 'Director honors the toggle');
+  assert.ok(mapSrc.includes("classList.contains('cin-rm')"), 'map camera + strike FX honor the toggle');
+  assert.ok(shell.includes('html.cin-rm *'), 'shell mirrors its global media-query rule for the class');
+});
+
+check('P4: forced reduced motion silences every CSS family the media query silences', () => {
+  assert.ok(cinSrc.includes('html.cin-rm #cin-lbox .cin-lb{transition:none'), 'letterbox');
+  assert.ok(cinSrc.includes('html.cin-rm #cin-stamp{animation:none'), 'stamp');
+  assert.ok(cinSrc.includes('html.cin-rm #dir-wrap.cin-deal .dir-card{animation:none'), 'AAR deal');
+  assert.ok(directorSrc.includes('html.cin-rm .dir-prior .fill{animation:none'), 'prior bars');
+  assert.ok(directorSrc.includes('html.cin-rm .cin-armed{animation:none'), 'armed pulse');
+  assert.ok(mapSrc.includes('html.cin-rm #map-radar-sweep{animation:none'), 'radar sweep');
+  assert.ok(mapSrc.includes('html.cin-rm .wg-tracer-dot'), 'strike tracers');
+  assert.ok(shell.includes('html.cin-rm #hud-ticker .ht-track{animation:none}'), 'HUD ticker');
+});
+
+check('P4: performance mode is one dial to zero — scanlines consumed then killed, glow tokens out, vignette out', () => {
+  assert.ok(cinSrc.includes('var(--fx-scanline-opacity'), 'the W1 scanline dial is actually consumed by the console frame');
+  assert.ok(cinSrc.includes("classList.toggle('cin-perf'"), 'cinematics owns the perf class');
+  assert.ok(cinSrc.includes('html.cin-perf{--fx-scanline-opacity:0;--fx-grain-opacity:0;'), 'perf zeroes the FX dials');
+  assert.ok(cinSrc.includes('--glow-cyan:none'), 'perf disables the glow tokens');
+  assert.ok(cinSrc.includes('html.cin-perf *{text-shadow:none !important;}'), 'perf strips text-shadow glows');
+  assert.ok(cinSrc.includes('html.cin-perf #fx-vignette{display:none'), 'perf drops the alert vignette');
+});
+
+check('P4: callsign is sanitized at the boundary and the Director reads it over the guarded bridge', () => {
+  const san = cinSrc.slice(cinSrc.indexOf('function sanitizeCallsign'), cinSrc.indexOf('function readSettings'));
+  assert.ok(san.includes('.toUpperCase()') && san.includes('[^A-Z0-9 \\-]') && san.includes('.slice(0, 14)'), 'uppercase, whitelist, length cap');
+  assert.ok(cinSrc.includes('getCallsign: getCallsign'), 'exposed read-only to the render layer');
+  const addr = directorSrc.slice(directorSrc.indexOf('function opAddr()'), directorSrc.indexOf('function pct('));
+  assert.ok(addr.includes('cinApi()') && addr.includes('try {') && addr.includes('catch'), 'guarded bridge — loop survives without the performance layer');
+  assert.ok(directorSrc.includes("opAddr() + 'OPERATION OPEN"), 'operation open addresses the operator');
+  assert.ok(directorSrc.includes("opAddr() + 'PLANNING WINDOW OPEN"), 'planning window addresses the operator');
+  assert.ok(!cinSrc.includes('opAddr'), 'cinematics still authors no comms traffic — addressing is the Director\'s');
+});
+
+check('P4: boot honors the operator — fast path requires the toggle, full POST when refused, reduced motion always instant', () => {
+  assert.ok(cinSrc.includes('settings.bootFast && localStorage.getItem(BOOT_SEEN_KEY)'), 'fast path is seen-flag AND toggle');
+  assert.ok(cinSrc.includes('if (fastPath || reduceMotion()) finishTyping()'), 'reduced motion renders the log at once regardless');
+});
+
+check('P4: settings apply live — root classes reapplied on change, media-query listener wired, AppShell mirrored', () => {
+  assert.ok(cinSrc.includes('function applySettings()'), 'one apply point');
+  assert.ok(cinSrc.includes("mqRM.addEventListener('change'"), 'media-query changes reapply');
+  assert.ok(cinSrc.includes('AppShell.set({ reducedMotion: eff })'), 'shell ambient loops see the effective value');
+  assert.ok(cinSrc.includes('saveSettings(); applySettings();'), 'toggles persist and apply in the same gesture');
+});
+
+check('P4: the settings panel is complete and honest — sliders, mute, motion, effects, boot, callsign', () => {
+  ['cin-set-rm', 'cin-set-perf', 'cin-set-boot', 'cin-set-cs'].forEach(id =>
+    assert.ok(cinSrc.includes("'" + id + "'"), 'control ' + id));
+  assert.ok(!cinSrc.includes('arrive with CO-006 Phase 4'), 'the IOU copy is gone — the features shipped');
 });
 
 console.log('UNCLASSIFIED // NOTIONAL RESEARCH TOOL');

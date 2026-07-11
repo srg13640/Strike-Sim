@@ -36,7 +36,7 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p16"></script>
+  <script src="map.js?v=p17"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p8"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
@@ -54,18 +54,18 @@
   <script src="strategic-state.js?v=co005-p4"></script>
   <script src="game.js?v=co005-p1"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p12"></script>
+  <script src="wargame.js?v=p13"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=co006-p3"></script>
+  <script src="director.js?v=co006-p4"></script>
   <!-- CO-006 performance layer: procedural sound engine + the Console Frame
        (boot ritual → title screen front door). Presentation only — reads public
        state, drives #dir-launch, never touches match state or seeded RNG. -->
-  <script src="audio.js?v=co006-p3"></script>
-  <script src="cinematics.js?v=co006-p3"></script>
+  <script src="audio.js?v=co006-p4"></script>
+  <script src="cinematics.js?v=co006-p4"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
   <script src="inline-datasets.js?v=p9"></script>
@@ -1063,6 +1063,9 @@
        Display: Orbitron · UI: Inter · Data stream: Share Tech Mono
        ══════════════════════════════════════════════════════════════════════ */
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+    /* CO-006 P4 (W6): html.cin-rm is the operator's forced reduced-motion toggle —
+       cinematics.js owns the class; it mirrors the media query rule above exactly. */
+    html.cin-rm *, html.cin-rm *::before, html.cin-rm *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; }
     /* Browser-game lifecycle: ambient chrome sleeps when the tab is hidden or a full
        workflow overlay is covering the play surface. The active overlay keeps its own
        short entrance animation; only the obscured command surface is paused. */
@@ -6328,7 +6331,8 @@
         '#hud-ticker .ht-item{padding:0 4px;color:#bfe0f2}',
         '#hud-ticker .ht-sep{padding:0 12px;color:var(--cyan);opacity:.55}',
         '@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}',
-        '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}'
+        '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}',
+        'html.cin-rm #hud-ticker .ht-track{animation:none}'
       ].join('\n');
       document.head.appendChild(css);
 

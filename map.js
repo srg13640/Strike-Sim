@@ -909,6 +909,9 @@ window.MapModule = (function () {
     opts = opts || {};
     if (!leafletMap || !mapVisible()) return false;
     try {
+      // CO-006 P4: the operator's forced toggle (html.cin-rm) counts as reduced motion too
+      if (typeof document !== 'undefined' && document.documentElement &&
+          document.documentElement.classList.contains('cin-rm')) return false;
       if (typeof window !== 'undefined' && window.matchMedia &&
           window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
     } catch (e) {}
@@ -1113,6 +1116,7 @@ window.MapModule = (function () {
       '@media(prefers-reduced-motion:reduce){',
       '  .mil-blip::after,.mil-blip.mil-selected::after,.mil-blip.mil-hi::after{animation:none;opacity:.35}',
       '}',
+      'html.cin-rm .mil-blip::after,html.cin-rm .mil-blip.mil-selected::after,html.cin-rm .mil-blip.mil-hi::after{animation:none;opacity:.35}',
 
       // ---- Objective marker ------------------------------------------------------
       '@keyframes mapObjPulse{',
@@ -1136,6 +1140,7 @@ window.MapModule = (function () {
       '  --obj-glow:var(--map-alert);',
       '}',
       '@media(prefers-reduced-motion:reduce){.map-obj-marker{animation:none}}',
+      'html.cin-rm .map-obj-marker{animation:none}',
 
       // ---- Radar-sweep FX --------------------------------------------------------
       // A single rotating conic-gradient div in its own pane. Cheap: one element,
@@ -1158,6 +1163,7 @@ window.MapModule = (function () {
       '  mix-blend-mode:screen;',
       '}',
       '@media(prefers-reduced-motion:reduce){#map-radar-sweep{animation:none;display:none}}',
+      'html.cin-rm #map-radar-sweep{animation:none;display:none}',
 
       // ---- Strike FX (existing arc + new cinematic tracer/shockwave) ------------
       '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}',
@@ -1221,6 +1227,9 @@ window.MapModule = (function () {
       '  .wg-shockwave{animation:wgImpact .85s ease-out forwards}',
       '  .wg-shockwave.wg-shock-kill{animation-duration:.95s}',
       '}',
+      'html.cin-rm .wg-tracer-dot,html.cin-rm .wg-tracer-trail{display:none}',
+      'html.cin-rm .wg-shockwave{animation:wgImpact .85s ease-out forwards}',
+      'html.cin-rm .wg-shockwave.wg-shock-kill{animation-duration:.95s}',
     ].join('');
     (document.head || document.documentElement).appendChild(st);
   }
@@ -1329,11 +1338,14 @@ window.MapModule = (function () {
     const color = team === 'blue' ? '#6fe0ff' : '#ff8a4a';
     const isKill = !!opts.kill;
 
-    // Detect reduced-motion preference once per call.
+    // Detect reduced-motion preference once per call — the system media query OR the
+    // operator's W6 forced toggle (html.cin-rm, owned by cinematics; CO-006 P4).
     const reducedMotion = (
-      typeof window !== 'undefined' &&
-      window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      (typeof document !== 'undefined' && document.documentElement &&
+       document.documentElement.classList.contains('cin-rm')) ||
+      (typeof window !== 'undefined' &&
+       window.matchMedia &&
+       window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     );
 
     // Cleanup registry: everything added during this strike, removed on completion.

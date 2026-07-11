@@ -23,8 +23,55 @@ window.CinematicsModule = (function () {
   var GHOST_WORLDS = 200;   // mirror of director.js GHOSTS (display copy only, like OBJ_LOSS_FRAC)
 
   var S = { screen: null, scenarioReady: false, forces: { blue: '—', red: '—' }, bootDone: false };
-  var reduceMotion = false;
-  try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  // ── CO-006 Phase 4 (W6): operator settings — cosmetic, persisted, never match state ──
+  var SETTINGS_KEY = 'strikesim.co006.settings';
+  var DEFAULT_SETTINGS = { reducedMotion: false, perfMode: false, callsign: '', bootFast: true };
+  var mqRM = null;
+  try { mqRM = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null; } catch (e) {}
+  var settings = readSettings();
+
+  function sanitizeCallsign(v) {
+    return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9 \-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 14);
+  }
+  function readSettings() {
+    try {
+      var p = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+      if (!p || typeof p !== 'object') return Object.assign({}, DEFAULT_SETTINGS);
+      return {
+        reducedMotion: !!p.reducedMotion,
+        perfMode: !!p.perfMode,
+        callsign: sanitizeCallsign(p.callsign),
+        bootFast: p.bootFast !== false
+      };
+    } catch (e) { return Object.assign({}, DEFAULT_SETTINGS); }
+  }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+  function getCallsign() { return settings.callsign; }
+
+  // Effective reduced motion = the system media query OR the operator's forced toggle.
+  // The toggle can only ADD restraint — it never disables a system-level preference.
+  function reduceMotion() {
+    return !!(settings.reducedMotion || (mqRM && mqRM.matches));
+  }
+  // One source of truth for every layer: root classes that the shell's, Director's and
+  // map's CSS/JS all read. AppShell mirrors the effective value so ambient loops pause.
+  function applySettings() {
+    var eff = reduceMotion();
+    var root = document.documentElement;
+    if (root) {
+      root.classList.toggle('cin-rm', eff);
+      root.classList.toggle('cin-perf', !!settings.perfMode);
+    }
+    try { if (window.AppShell && window.AppShell.set) window.AppShell.set({ reducedMotion: eff }); } catch (e) {}
+  }
+  try {
+    if (mqRM) {
+      var onMq = function () { applySettings(); };
+      if (mqRM.addEventListener) mqRM.addEventListener('change', onMq);
+      else if (mqRM.addListener) mqRM.addListener(onMq);
+    }
+  } catch (e) {}
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -44,6 +91,10 @@ window.CinematicsModule = (function () {
       '#cin-boot,#cin-title{position:fixed;inset:0;z-index:4000;background:var(--bg,#04080c);color:var(--muted,#8fa6bd);',
       '  font-family:var(--mono);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease;}',
       '#cin-boot.gone,#cin-title.gone{opacity:0;pointer-events:none;}',
+      // W1 dial, consumed: the console frame's scanlines ride --fx-scanline-opacity so
+      // performance mode (and any future taste change) is a one-token adjustment.
+      '#cin-boot::after,#cin-title::after{content:"";position:absolute;inset:0;pointer-events:none;',
+      '  background:repeating-linear-gradient(0deg,rgba(0,0,0,.55) 0 1px,transparent 1px 3px);opacity:var(--fx-scanline-opacity,.16);}',
       '.cin-strap{position:absolute;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.35em;text-transform:uppercase;',
       '  color:var(--muted,#8fa6bd);padding:4px 0;background:rgba(4,8,12,.6);}',
       '.cin-strap.top{top:0;border-bottom:1px solid rgba(143,166,189,.15);}',
@@ -82,6 +133,11 @@ window.CinematicsModule = (function () {
       '.cin-row{display:flex;align-items:center;gap:12px;margin:10px 0;font-size:11px;letter-spacing:.18em;text-transform:uppercase;}',
       '.cin-row label{width:90px;color:var(--muted,#8fa6bd);}',
       '.cin-row input[type=range]{flex:1;accent-color:var(--amber,#ffb000);}',
+      '.cin-row input[type=text]{flex:1;background:rgba(4,10,16,.8);border:1px solid rgba(0,216,255,.3);color:#dff2ff;',
+      '  font-family:var(--mono);font-size:12px;letter-spacing:.14em;padding:7px 10px;text-transform:uppercase;outline:none;}',
+      '.cin-row input[type=text]:focus{border-color:var(--amber,#ffb000);}',
+      '.cin-sep{border-top:1px solid rgba(143,166,189,.15);margin:16px 0 10px;}',
+      '.cin-tog{min-width:150px;text-align:center;}',
       '.cin-back{margin-top:22px;display:inline-block;font-size:11px;letter-spacing:.3em;color:var(--amber,#ffb000);',
       '  border:1px solid rgba(255,176,0,.35);padding:10px 22px;cursor:pointer;text-transform:uppercase;}',
       '.cin-back:hover{background:rgba(255,176,0,.1);}',
@@ -124,14 +180,27 @@ window.CinematicsModule = (function () {
       '  #cin-lbox .cin-lb{transition:none !important;}',
       '  #cin-stamp{animation:none;opacity:1;}',
       '  #dir-wrap.cin-deal .dir-card{animation:none;opacity:1;transform:none;}',
-      '}'
+      '}',
+      // ── CO-006 Phase 4 (W6): html.cin-rm mirrors the media query for the forced toggle —
+      //    identical rules, class-driven, so the operator's choice equals the system's.
+      'html.cin-rm #cin-boot,html.cin-rm #cin-title,html.cin-rm .cin-mitem{transition:none !important;}',
+      'html.cin-rm #cin-bootprompt{animation:none !important;opacity:1;}',
+      'html.cin-rm #cin-lbox .cin-lb{transition:none !important;}',
+      'html.cin-rm #cin-stamp{animation:none;opacity:1;}',
+      'html.cin-rm #dir-wrap.cin-deal .dir-card{animation:none;opacity:1;transform:none;}',
+      'html.cin-rm .cin-typing::after{animation:none;}',
+      // W6 performance mode: one dial to zero — scanlines/grain out, glow tokens out,
+      // text-shadow glows out, the alert vignette out. Structural box-shadows stay.
+      'html.cin-perf{--fx-scanline-opacity:0;--fx-grain-opacity:0;--glow-cyan:none;--glow-amber:none;--glow-alert:none;}',
+      'html.cin-perf *{text-shadow:none !important;}',
+      'html.cin-perf #fx-vignette{display:none !important;}'
     ].join('\n');
     document.head.appendChild(st);
   }
 
   // ---------- boot ----------
   function bootLines() {
-    return [
+    var lines = [
       ['JOC CONSOLE 04 — POWER-ON SELF TEST', 'ok'],
       ['CRYPTO LOADED · KEYMAT CURRENT (NOTIONAL)', 'ok'],
       ['THEATER DATA LINK ......... ' + (S.scenarioReady ? 'SYNCED' : 'ACQUIRING'), S.scenarioReady ? 'ok' : 'warn'],
@@ -140,6 +209,10 @@ window.CinematicsModule = (function () {
       ['FORECAST ENSEMBLE ......... ' + GHOST_WORLDS + ' WORLDS READY', 'ok'],
       ['AUDIO SUBSYSTEM ........... AWAITING OPERATOR', 'warn']
     ];
+    // W6: the operator's callsign on the POST — appended last so the data-link
+    // refresh above keeps its fixed row indexes.
+    if (settings.callsign) lines.push(['OPERATOR OF RECORD ........ ' + settings.callsign, 'ok']);
+    return lines;
   }
 
   function showBoot() {
@@ -178,11 +251,13 @@ window.CinematicsModule = (function () {
       d.className = l[1]; d.textContent = '> ' + l[0];
       var log = $('cin-bootlog');
       if (log) log.appendChild(d);
-      setTimeout(typeNext, reduceMotion ? 0 : 240 + Math.random() * 260);
+      setTimeout(typeNext, reduceMotion() ? 0 : 240 + Math.random() * 260);
     }
+    // W6: the fast path is the operator's to keep or refuse — bootFast off = the
+    // full POST every load; reduced motion always renders the log at once (dignity first).
     var fastPath = false;
-    try { fastPath = localStorage.getItem(BOOT_SEEN_KEY) === 'seen'; } catch (e) {}
-    if (fastPath || reduceMotion) finishTyping(); else setTimeout(typeNext, 400);
+    try { fastPath = settings.bootFast && localStorage.getItem(BOOT_SEEN_KEY) === 'seen'; } catch (e) {}
+    if (fastPath || reduceMotion()) finishTyping(); else setTimeout(typeNext, 400);
 
     function enter() {
       if (!done) { finishTyping(); return; }   // first press skips the typing
@@ -192,7 +267,7 @@ window.CinematicsModule = (function () {
       wrap.classList.add('gone');
       S.bootDone = true;
       window.removeEventListener('keydown', enter);
-      setTimeout(function () { try { wrap.remove(); } catch (e) {} showTitle(); }, reduceMotion ? 0 : 700);
+      setTimeout(function () { try { wrap.remove(); } catch (e) {} showTitle(); }, reduceMotion() ? 0 : 700);
     }
     wrap.addEventListener('click', enter);
     window.addEventListener('keydown', enter);
@@ -304,17 +379,28 @@ window.CinematicsModule = (function () {
     return html;
   }
 
+  function rmToggleLabel() {
+    if (settings.reducedMotion) return 'Reduced (forced)';
+    return (mqRM && mqRM.matches) ? 'Reduced (system)' : 'Full motion';
+  }
   function settingsPanelHtml() {
     var a = sfx();
     var p = a ? a.getPrefs() : { master: 0.55, music: 0.8, sfx: 0.9, comms: 0.85, muted: false };
     function row(bus, label) {
       return '<div class="cin-row"><label>' + label + '</label><input type="range" min="0" max="100" value="' + Math.round(p[bus] * 100) + '" data-bus="' + bus + '"></div>';
     }
+    function tog(id, label, text) {
+      return '<div class="cin-row"><label>' + label + '</label><span class="cin-back cin-tog" id="' + id + '" style="margin-top:0">' + text + '</span></div>';
+    }
     return '<h2>Settings</h2>' +
       row('master', 'Master') + row('music', 'Music') + row('sfx', 'SFX') + row('comms', 'Comms') +
       '<div class="cin-row"><label>Audio</label><span class="cin-back" id="cin-mute" style="margin-top:0">' + (p.muted ? 'Unmute' : 'Mute') + '</span></div>' +
-      '<p>Reduced motion follows your system preference' + (reduceMotion ? ' (active now — transitions and typewriter effects are disabled)' : '') +
-      '. Performance mode and operator callsign arrive with CO-006 Phase 4.</p>';
+      '<div class="cin-sep"></div>' +
+      tog('cin-set-rm', 'Motion', rmToggleLabel()) +
+      tog('cin-set-perf', 'Effects', settings.perfMode ? 'Performance mode' : 'Full FX') +
+      tog('cin-set-boot', 'Boot', settings.bootFast ? 'Fast after first' : 'Full every time') +
+      '<div class="cin-row"><label>Callsign</label><input type="text" id="cin-set-cs" maxlength="14" placeholder="E.G. RAVEN 6" value="' + esc(settings.callsign) + '" spellcheck="false" autocomplete="off"></div>' +
+      '<p>Your callsign appears in comms addressing. Reduced motion honors your system preference; the toggle forces it on this console regardless. Performance mode disables scanlines, grain and glow effects for older hardware. Settings apply immediately and persist on this console.</p>';
   }
   function bindSettings() {
     var panel = $('cin-panel');
@@ -331,6 +417,39 @@ window.CinematicsModule = (function () {
       var a = sfx();
       if (a) { a.unlock(); var m = a.toggleMute(); mute.textContent = m ? 'Unmute' : 'Mute'; }
     });
+    // ── W6: cosmetic toggles — live-apply, persisted, never match state ──
+    var rmT = $('cin-set-rm');
+    if (rmT) rmT.addEventListener('click', function () {
+      settings.reducedMotion = !settings.reducedMotion;
+      saveSettings(); applySettings();
+      rmT.textContent = rmToggleLabel();
+      play('tick', { vol: 0.05 });
+    });
+    var pfT = $('cin-set-perf');
+    if (pfT) pfT.addEventListener('click', function () {
+      settings.perfMode = !settings.perfMode;
+      saveSettings(); applySettings();
+      pfT.textContent = settings.perfMode ? 'Performance mode' : 'Full FX';
+      play('tick', { vol: 0.05 });
+    });
+    var btT = $('cin-set-boot');
+    if (btT) btT.addEventListener('click', function () {
+      settings.bootFast = !settings.bootFast;
+      saveSettings();
+      btT.textContent = settings.bootFast ? 'Fast after first' : 'Full every time';
+      play('tick', { vol: 0.05 });
+    });
+    var cs = $('cin-set-cs');
+    if (cs) {
+      cs.addEventListener('input', function () {
+        settings.callsign = sanitizeCallsign(cs.value);
+        saveSettings();
+      });
+      cs.addEventListener('change', function () {
+        cs.value = settings.callsign;   // show the operator exactly what the net will use
+        if (settings.callsign) play('beep', { freq: 700, vol: 0.05, dur: 0.15 });
+      });
+    }
   }
 
   // ═══════════ CO-006 Phase 2: the cinematic grammar (letterbox · stamp · type · comms) ═══════════
@@ -355,7 +474,7 @@ window.CinematicsModule = (function () {
       lb.innerHTML = '<div class="cin-lb top"></div><div class="cin-lb bot"></div>';
       document.body.appendChild(lb);
     }
-    if (reduceMotion) { lb.classList.remove('on'); return; }   // dignified static path: no bars at all
+    if (reduceMotion()) { lb.classList.remove('on'); return; }   // dignified static path: no bars at all
     var want = !!on;
     requestAnimationFrame(function () { lb.classList.toggle('on', want); });
     play(want ? 'whooshIn' : 'whooshOut');
@@ -371,14 +490,14 @@ window.CinematicsModule = (function () {
     s.id = 'cin-stamp';
     s.setAttribute('role', 'status');
     s.innerHTML = '<div class="cs-main">' + esc(text) + '</div>' + (sub ? '<div class="cs-sub">' + esc(sub) + '</div>' : '');
-    if (reduceMotion) s.classList.add('static');
+    if (reduceMotion()) s.classList.add('static');
     document.body.appendChild(s);
     play('stamp');
     if (stampTimer) clearTimeout(stampTimer);
     stampTimer = setTimeout(function () {
       try { s.classList.add('gone'); } catch (e) {}
       setTimeout(function () { try { s.remove(); } catch (e) {} }, 450);
-    }, reduceMotion ? 1100 : 1600);
+    }, reduceMotion() ? 1100 : 1600);
   }
 
   // ---------- typewriter (2 chars/tick at --type-tick-ms, tick every 6th char) ----------
@@ -386,7 +505,7 @@ window.CinematicsModule = (function () {
     if (!node) return;
     var restoreHtml = node.innerHTML;
     var full = node.textContent || '';
-    if (reduceMotion || full.length < 8) return;   // text is already set — the dignified path
+    if (reduceMotion() || full.length < 8) return;   // text is already set — the dignified path
     var i = 0, tick = typeTickMs(), quiet = !!(opts && opts.quiet);
     node.classList.add('cin-typing');
     node.textContent = '';
@@ -437,7 +556,7 @@ window.CinematicsModule = (function () {
     f.appendChild(line);
     var tx = line.querySelector('.cc-tx');
     play('radio', { vol: 0.035 });
-    if (reduceMotion) {
+    if (reduceMotion()) {
       tx.textContent = next.text;                  // captions land instantly — no typewriter
       commsBusy = false;
       setTimeout(pumpComms, 60);
@@ -460,7 +579,7 @@ window.CinematicsModule = (function () {
     var a = sfx();
     if (a) { a.unlock(); a.startBed('brief'); }
     commsVisible(true);
-    if (reduceMotion) return;
+    if (reduceMotion()) return;
     letterbox(true);
     stamp((opts && opts.title) || 'OPERATION BRIEF', 'operation brief · eyes only');
     setTimeout(function () { letterbox(false); }, 2300);
@@ -481,7 +600,7 @@ window.CinematicsModule = (function () {
     var a = sfx();
     if (a) { a.stopBed(0.6); a.play('thump', { vol: 0.26 }); }   // war is quieter than the menu
     commsVisible(false);                            // WATCH: the resolution feed owns the corner
-    if (reduceMotion) return;
+    if (reduceMotion()) return;
     letterbox(true);
     stamp('ORDERS COMMITTED', 'red commits now · one world resolves');
     setTimeout(function () { letterbox(false); }, 2600);
@@ -492,17 +611,17 @@ window.CinematicsModule = (function () {
   // drones; the film's score is the Director-timed stingers and sparse BDA confirms.
   function watchCinematic() {
     commsVisible(true);              // the floor returns for kill confirmations only
-    if (reduceMotion) return;        // instant path: events land set, no bars
+    if (reduceMotion()) return;        // instant path: events land set, no bars
     letterbox(true);                 // the film begins
   }
   function watchDone() {
-    if (!reduceMotion) letterbox(false);
+    if (!reduceMotion()) letterbox(false);
   }
   function aarCinematic(opts) {
     var a = sfx();
     if (a) a.stopBed(1.2);           // silence before the verdict
     commsVisible(true);
-    if (reduceMotion) return;        // cards land set; the verdict reads without ceremony
+    if (reduceMotion()) return;        // cards land set; the verdict reads without ceremony
     letterbox(true);
     stamp((opts && opts.verdict) || 'OPERATION CLOSED',
       'after-action review · serial ' + ((opts && opts.seed) != null ? opts.seed : '—'));
@@ -514,7 +633,7 @@ window.CinematicsModule = (function () {
     setTimeout(function () { letterbox(false); }, 2400);
   }
   function exitCinematic() {
-    if (reduceMotion) { openConsole(); return; }
+    if (reduceMotion()) { openConsole(); return; }
     letterbox(true);
     setTimeout(function () { openConsole(); letterbox(false); }, 950);
   }
@@ -552,6 +671,7 @@ window.CinematicsModule = (function () {
   });
 
   function boot() {
+    applySettings();   // W6: root classes (cin-rm/cin-perf) land before any first paint of ours
     injectCss();
     showBoot();
     ensureConsoleButton();
@@ -563,6 +683,9 @@ window.CinematicsModule = (function () {
     CLASSIFICATION: CLASSIFICATION,
     openConsole: openConsole,
     hideTitle: hideTitle,
+    // CO-006 Phase 4 (W6): cosmetic reads for the Director's render layer
+    getCallsign: getCallsign,
+    reduceMotion: reduceMotion,
     // CO-006 Phase 2 grammar — consumed by the Director's render layer only
     letterbox: letterbox,
     stamp: stamp,

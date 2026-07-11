@@ -63,6 +63,14 @@ window.DirectorModule = (function () {
   function cinApi() { return window.CinematicsModule || null; }
   function cine(fn, arg) { var c = cinApi(); if (c && typeof c[fn] === 'function') { try { c[fn](arg); } catch (e) {} } }
   function comms(callsign, text, cls) { var c = cinApi(); if (c && c.comms) { try { c.comms(callsign, text, cls); } catch (e) {} } }
+  // CO-006 P4 (W6): the operator's callsign in comms addressing — read over the guarded
+  // bridge (cinematics owns and sanitizes it), applied only to lines addressed TO the
+  // operator. Empty callsign = the pre-P4 lines, verbatim.
+  function opAddr() {
+    var c = cinApi(), cs = '';
+    if (c && typeof c.getCallsign === 'function') { try { cs = String(c.getCallsign() || ''); } catch (e) {} }
+    return cs ? cs + ', ' : '';
+  }
   function sfxA(name, opts) { try { if (window.AudioFXModule) window.AudioFXModule.play(name, opts); } catch (e) {} }
   function pct(sorted, p) {
     if (!sorted.length) return 0;
@@ -133,7 +141,14 @@ window.DirectorModule = (function () {
   }
   function forceMapView() { try { if (typeof window.setView === 'function') window.setView('map'); } catch (e) {} }
   function curSel() { try { return (typeof selectedNode !== 'undefined') ? selectedNode : null; } catch (e) { return null; } }
-  function prefersReducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
+  // CO-006 P4: effective reduced motion = system media query OR the operator's W6
+  // toggle (cinematics owns the toggle and mirrors it as html.cin-rm — one truth).
+  function prefersReducedMotion() {
+    try {
+      if (document.documentElement && document.documentElement.classList.contains('cin-rm')) return true;
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
   function scenarioContext() {
     if (op && op.variantContext) return op.variantContext;   // CO-005 C5: active operation variant
     var scen = (window.AppState && AppState.active && AppState.active()) || null;
@@ -314,6 +329,9 @@ window.DirectorModule = (function () {
       '.cin-armed{animation:dirArmPulse 2.2s ease-in-out infinite;}',
       '@keyframes dirArmPulse{0%,100%{box-shadow:0 0 6px rgba(255,176,0,.22);border-color:#8a6a1f;}50%{box-shadow:0 0 26px rgba(255,176,0,.6);border-color:var(--amber,#ffb000);}}',
       '@media (prefers-reduced-motion: reduce){.dir-prior .fill{animation:none;width:var(--w,50%);}.cin-armed{animation:none;box-shadow:0 0 14px rgba(255,176,0,.4);border-color:var(--amber,#ffb000);}}',
+      // CO-006 P4: html.cin-rm mirrors the media query for the operator's forced toggle
+      'html.cin-rm .dir-prior .fill{animation:none;width:var(--w,50%);}',
+      'html.cin-rm .cin-armed{animation:none;box-shadow:0 0 14px rgba(255,176,0,.4);border-color:var(--amber,#ffb000);}',
       // forecast strip
       '.dir-fc{border:1px solid #234a66;background:rgba(9,22,33,.9);border-radius:10px;padding:12px 14px;margin:12px 0;}',
       '.dir-fc .t{font:700 11px Oswald;letter-spacing:.22em;color:#00d8ff;margin-bottom:8px;}',
@@ -519,7 +537,7 @@ window.DirectorModule = (function () {
     // situation paragraph, brief drone bed. All copy is the real scenario's.
     var opTitle = scenarioContext().title || 'OPERATION BRIEF';
     cine('briefCinematic', { title: String(opTitle).split('—')[0].trim().toUpperCase() });
-    comms('JOC', 'OPERATION OPEN — ' + String(opTitle).toUpperCase() + ' · SEED ' + GMseed());
+    comms('JOC', opAddr() + 'OPERATION OPEN — ' + String(opTitle).toUpperCase() + ' · SEED ' + GMseed());
     evt('Operation started — briefing.');
   }
 
@@ -720,7 +738,7 @@ window.DirectorModule = (function () {
     showObjectiveOverlay();
     var st = GM.getState();
     cine('planCinematic');   // CO-006 P2: plan bed; the comms floor returns from the war film
-    comms('J3', 'PLANNING WINDOW OPEN — TURN ' + st.turn + '/' + st.cfg.turnLimit + ' · AP ' + st.ap.blue);
+    comms('J3', opAddr() + 'PLANNING WINDOW OPEN — TURN ' + st.turn + '/' + st.cfg.turnLimit + ' · AP ' + st.ap.blue);
     evt('Planning phase — turn ' + st.turn + '.');
   }
 
@@ -1945,7 +1963,7 @@ window.DirectorModule = (function () {
     } catch (e) {}
     try { if (window.AudioFXModule) window.AudioFXModule.stopBed(1.2); } catch (e) {}
     cine('aarCinematic', { verdict: verdict.label, seed: op.record ? op.record.seed : '—' });
-    comms('JOC', 'OPERATION CLOSED — AFTER-ACTION REVIEW READY');
+    comms('JOC', opAddr() + 'OPERATION CLOSED — AFTER-ACTION REVIEW READY');
     evt('After-action review opened.');
   }
 
