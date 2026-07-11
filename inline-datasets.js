@@ -86,10 +86,17 @@
 
     var totalNodes = 0;
     var loadedTeams = { red: false, blue: false };
+    // Fetch both force packages concurrently; apply them in the declared order so IDs,
+    // links, and event-log output remain deterministic.
+    var fetched = await Promise.all(BUNDLED_SCENARIOS.map(async function (scenario) {
+      try { return { raw: await fetchScenario(scenario.url), error: null }; }
+      catch (error) { return { raw: null, error: error }; }
+    }));
     for (var i = 0; i < BUNDLED_SCENARIOS.length; i++) {
       var scenario = BUNDLED_SCENARIOS[i];
       try {
-        var raw = await fetchScenario(scenario.url);
+        if (fetched[i].error) throw fetched[i].error;
+        var raw = fetched[i].raw;
         var payload = window.normalizeImportedPayload(raw);
         if (!payload || !payload.nodes || !payload.nodes.length) {
           throw new Error('Unrecognized or empty scenario file');
@@ -142,9 +149,9 @@
     } catch (e) { /* non-fatal */ }
   }
 
-  // The app builds its graph synchronously inside init() (called at the end of the
-  // main script), so by window 'load' the globals exist. Poll briefly as a safety
-  // net in case graph construction is delayed.
+  // The app publishes its import pipeline at the end of the main script. Start as soon
+  // as DOM parsing finishes rather than waiting for every font/map image and optional
+  // visual asset; scenario readiness is gameplay-critical, visualization is not.
   function waitAndLoad() {
     var attempts = 0;
     (function tick() {
@@ -157,9 +164,12 @@
     })();
   }
 
-  if (document.readyState === 'complete') {
+  if (document.readyState !== 'loading') {
     waitAndLoad();
+  } else if (document && typeof document.addEventListener === 'function') {
+    document.addEventListener('DOMContentLoaded', waitAndLoad, { once: true });
   } else {
+    // Minimal VM/legacy-document fallback retained for proof harnesses and embedded shells.
     window.addEventListener('load', waitAndLoad);
   }
 })();

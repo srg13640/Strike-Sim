@@ -333,7 +333,9 @@ window.DirectorModule = (function () {
 
   function setPhase(p) {
     op.phase = p;
+    if (p !== 'plan') stopSelPoll();
     var overlayActive = p === 'brief' || p === 'commit' || p === 'aar';
+    try { if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('director', overlayActive); } catch (e) {}
     renderRail();
     $('dir-overlay').style.display = overlayActive ? 'block' : 'none';
     $('dir-overlay').setAttribute('aria-hidden', overlayActive ? 'false' : 'true');

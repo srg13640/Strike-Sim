@@ -18,6 +18,10 @@ window.EngineModule = (function () {
   'use strict';
 
   let graphInstance = null;
+  const MAX_PIXEL_RATIO = 1.25;
+  let renderPauseTimer = null;
+  let shellUnsubscribe = null;
+  let interactionCleanup = null;
   // Guards the one-time Blue-perspective opening shot: set true after the first engine
   // settle that actually has nodes, so later data changes never re-frame the camera.
   let initialViewDone = false;
@@ -28,6 +32,92 @@ window.EngineModule = (function () {
   // undefined identifier throws — so initUI()/refreshGraph() running before create()
   // would otherwise ReferenceError.
   if (!('graphInstance' in window)) window.graphInstance = null;
+
+  // ForceGraph3D owns a perpetual requestAnimationFrame loop. Left alone, that loop
+  // continues rendering, updating controls, and pointer-picking even when the canvas is
+  // hidden behind Map/Table/Task Org or the browser tab is in the background. Treat the
+  // renderer like an online game's scene: wake it for a short burst while something is
+  // changing, then sleep it until the next interaction.
+  function clearRenderPauseTimer() {
+    if (renderPauseTimer != null) {
+      clearTimeout(renderPauseTimer);
+      renderPauseTimer = null;
+    }
+  }
+
+  function shellAllows3D() {
+    try {
+      const s = window.AppShell && AppShell.state;
+      if (s) return s.view === '3d' && !s.hidden && !s.overlayOpen;
+      return !document.hidden && engineVisible();
+    } catch (e) { return false; }
+  }
+
+  function setRenderActive(active) {
+    clearRenderPauseTimer();
+    if (!graphInstance) return;
+    try {
+      if (active) graphInstance.resumeAnimation();
+      else graphInstance.pauseAnimation();
+      const renderer = graphInstance.renderer && graphInstance.renderer();
+      if (renderer && renderer.domElement) renderer.domElement.dataset.renderState = active ? 'active' : 'paused';
+    } catch (e) { /* lifecycle tuning must never break the game */ }
+  }
+
+  function wake(ms) {
+    if (ms === undefined) ms = 1200;
+    if (!graphInstance || !shellAllows3D()) {
+      setRenderActive(false);
+      return;
+    }
+    setRenderActive(true);
+    renderPauseTimer = setTimeout(function () {
+      renderPauseTimer = null;
+      setRenderActive(false);
+    }, Math.max(120, Number(ms) || 1200));
+  }
+
+  function attachPerformanceLifecycle(inst) {
+    if (!inst) return;
+    try {
+      const renderer = inst.renderer && inst.renderer();
+      if (renderer && renderer.setPixelRatio) {
+        renderer.setPixelRatio(Math.min(MAX_PIXEL_RATIO, window.devicePixelRatio || 1));
+      }
+      const canvas = renderer && renderer.domElement;
+      if (canvas) {
+        const onInteract = function () { wake(1400); };
+        canvas.addEventListener('pointerdown', onInteract, { passive: true });
+        canvas.addEventListener('wheel', onInteract, { passive: true });
+        canvas.addEventListener('touchstart', onInteract, { passive: true });
+        interactionCleanup = function () {
+          canvas.removeEventListener('pointerdown', onInteract);
+          canvas.removeEventListener('wheel', onInteract);
+          canvas.removeEventListener('touchstart', onInteract);
+        };
+      }
+      const controls = inst.controls && inst.controls();
+      if (controls && controls.addEventListener) {
+        controls.addEventListener('start', function () { wake(1800); });
+        controls.addEventListener('change', function () { wake(900); });
+        controls.addEventListener('end', function () { wake(500); });
+      }
+    } catch (e) { /* renderer configuration is best effort */ }
+
+    if (window.AppShell && AppShell.subscribe) {
+      shellUnsubscribe = AppShell.subscribe(function (s) {
+        setRenderActive(s.view === '3d' && !s.hidden && !s.overlayOpen);
+        if (s.view === '3d' && !s.hidden && !s.overlayOpen) wake(1000);
+      });
+      const s = AppShell.state;
+      setRenderActive(s.view === '3d' && !s.hidden && !s.overlayOpen);
+    } else {
+      document.addEventListener('visibilitychange', function () {
+        setRenderActive(!document.hidden && engineVisible());
+        if (!document.hidden && engineVisible()) wake(1000);
+      });
+    }
+  }
 
   // --- Geo mode (globe backdrop + lat/lon layout) ---
   let earthMesh = null;                          // globe backdrop, lazily created
@@ -265,6 +355,7 @@ window.EngineModule = (function () {
   function frameGeo(ms) {
     if (ms === undefined) ms = 800;
     if (!graphInstance) return;
+    wake(ms + 250);
     const gd = graphInstance.graphData();
     const nodes = (gd && gd.nodes) || [];
     let cx = 0, cy = 0, cz = 0, k = 0;
@@ -292,6 +383,7 @@ window.EngineModule = (function () {
   // coordinates are pooled in a ring below the globe. Mutates the passed node objects.
   function applyGeoLayout(nodes) {
     if (!graphInstance) return;
+    wake(1800);
     ensureEarthSphere();
     if (earthMesh) earthMesh.visible = true;
     (nodes || []).forEach(node => {
@@ -320,6 +412,7 @@ window.EngineModule = (function () {
   // Release the pinned positions, restore the default forces, and hide the globe.
   function clearGeoLayout(nodes) {
     if (!graphInstance) return;
+    wake(1800);
     if (earthMesh) earthMesh.visible = false;
     (nodes || []).forEach(node => { delete node.fx; delete node.fy; delete node.fz; });
     graphInstance
@@ -380,9 +473,9 @@ window.EngineModule = (function () {
     // software/SwiftShader fallback eligible. The caller may pass opts.rendererConfig to
     // retry with an even more conservative profile.
     const rendererConfig = opts.rendererConfig || {
-      antialias: true,
+      antialias: false,
       alpha: false,
-      powerPreference: 'default',
+      powerPreference: 'low-power',
       failIfMajorPerformanceCaveat: false,
       preserveDrawingBuffer: false
     };
@@ -398,6 +491,8 @@ window.EngineModule = (function () {
 
     graphInstance = ForceGraph3D({ rendererConfig })(document.getElementById(containerId))
       .graphData({ nodes: [], links: [] }) // Start empty
+      .cooldownTicks(80)
+      .cooldownTime(2600)
       .backgroundColor('#03070b')          // near-black C2 scene background
       .nodeLabel(opts.nodeLabel || (n => `${n.name} (${n.id})`))
       .nodeColor(opts.nodeColor || defaultNodeColor)
@@ -422,8 +517,12 @@ window.EngineModule = (function () {
           initialViewDone = true;
           if (typeof opts.onFirstSettle === 'function') opts.onFirstSettle();
         }
+        // The force layout has settled. Keep a brief tail for any camera tween, then
+        // stop the vendor's perpetual RAF loop until the next graph change/interaction.
+        wake(1500);
       });
     window.graphInstance = graphInstance; // shared handle for orchestration code
+    attachPerformanceLifecycle(graphInstance);
     return graphInstance;
   }
 
@@ -436,6 +535,7 @@ window.EngineModule = (function () {
   function frameBlueToRed(ms) {
     if (ms === undefined) ms = 1200;
     if (!graphInstance) return;
+    wake(ms + 250);
     const gd = graphInstance.graphData();
     const nodes = (gd && gd.nodes) || [];
     if (!nodes.length) return;
@@ -735,6 +835,9 @@ window.EngineModule = (function () {
   // run the lib destructor, force the WebGL context loss to free the GPU slot, and reset
   // all module state including the lazily-built globe so it rebuilds on the new instance.
   function dispose() {
+    clearRenderPauseTimer();
+    if (shellUnsubscribe) { try { shellUnsubscribe(); } catch (e) {} shellUnsubscribe = null; }
+    if (interactionCleanup) { try { interactionCleanup(); } catch (e) {} interactionCleanup = null; }
     try {
       if (graphInstance) {
         const r = graphInstance.renderer && graphInstance.renderer();
@@ -751,5 +854,5 @@ window.EngineModule = (function () {
     earthLightingDone = false;
   }
 
-  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout, playStrikes };
+  return { create, dispose, frameBlueToRed, frameGeo, getGraph, isInitialViewDone, applyGeoLayout, clearGeoLayout, playStrikes, setRenderActive, wake, MAX_PIXEL_RATIO };
 })();

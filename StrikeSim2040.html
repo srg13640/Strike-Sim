@@ -38,10 +38,10 @@
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
   <script src="map.js?v=p15"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p6"></script>
+  <script src="engine.js?v=p8"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p6"></script>
+  <script src="stage.js?v=p7"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js?v=p8"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
@@ -57,10 +57,10 @@
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=p3"></script>
+  <script src="director.js?v=p4"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
-  <script src="inline-datasets.js?v=p8"></script>
+  <script src="inline-datasets.js?v=p9"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -1047,6 +1047,14 @@
        Display: Orbitron · UI: Inter · Data stream: Share Tech Mono
        ══════════════════════════════════════════════════════════════════════ */
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+    /* Browser-game lifecycle: ambient chrome sleeps when the tab is hidden or a full
+       workflow overlay is covering the play surface. The active overlay keeps its own
+       short entrance animation; only the obscured command surface is paused. */
+    body.app-hidden *, body.app-hidden *::before, body.app-hidden *::after,
+    body.app-overlay-open #app *, body.app-overlay-open #app::before,
+    body.app-overlay-open #hud-overlay *, body.app-overlay-open #hud-ticker * {
+      animation-play-state: paused !important;
+    }
 
     body { font-family: var(--ui); background: radial-gradient(1400px 920px at 26% -8%, #0e2030 0%, #07121c 47%, #03070b 100%); }
 
@@ -1297,12 +1305,14 @@
     "use strict";
     var mqMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     var state = {
-      view: '3d',                                  // '3d' | 'map' | 'table' | 'org'
+      view: 'map',                                 // '3d' | 'map' | 'table' | 'org'
       wargameOpen: false,
       hidden: !!document.hidden,
-      reducedMotion: !!(mqMotion && mqMotion.matches)
+      reducedMotion: !!(mqMotion && mqMotion.matches),
+      overlayOpen: false
     };
     var subs = [];
+    var overlaySources = Object.create(null);
     function notify(changed) {
       for (var i = 0; i < subs.length; i++) { try { subs[i](state, changed); } catch (e) {} }
     }
@@ -1310,6 +1320,10 @@
       if (changed.indexOf('wargameOpen') !== -1 && document.body) {
         document.body.classList.toggle('wargame-open', state.wargameOpen);
       }
+      if (!document.body) return;
+      if (changed.indexOf('view') !== -1) document.body.setAttribute('data-app-view', state.view);
+      if (changed.indexOf('hidden') !== -1) document.body.classList.toggle('app-hidden', state.hidden);
+      if (changed.indexOf('overlayOpen') !== -1) document.body.classList.toggle('app-overlay-open', state.overlayOpen);
     }
     function set(patch) {
       var changed = [];
@@ -1321,6 +1335,12 @@
     function subscribe(fn) {
       subs.push(fn);
       return function () { var i = subs.indexOf(fn); if (i !== -1) subs.splice(i, 1); };
+    }
+    function setOverlay(name, active) {
+      name = String(name || 'anonymous');
+      if (active) overlaySources[name] = true;
+      else delete overlaySources[name];
+      set({ overlayOpen: Object.keys(overlaySources).length > 0 });
     }
     // Managed ambient interval: pauses while the tab is hidden, runs once immediately
     // on resume so displays catch up (C-050).
@@ -1340,10 +1360,15 @@
       if (mqMotion.addEventListener) mqMotion.addEventListener('change', onMq);
       else if (mqMotion.addListener) mqMotion.addListener(onMq);
     }
+    if (document.body) {
+      document.body.setAttribute('data-app-view', state.view);
+      document.body.classList.toggle('app-hidden', state.hidden);
+    }
     return {
       state: state,
       set: set,
       subscribe: subscribe,
+      setOverlay: setOverlay,
       every: every,
       prefersReducedMotion: function () { return state.reducedMotion; }
     };
@@ -1386,6 +1411,7 @@
       if (!stack.length) applyInert();
       el.style.display = 'flex';
       stack.push(entry);
+      if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('modal', true);
       var dlg = dialogOf(entry);
       var f = focusablesIn(dlg);
       if (f.length) { try { f[0].focus(); } catch (e) {} }
@@ -1399,7 +1425,10 @@
       if (idx === -1) { if (el) el.style.display = 'none'; return; } // not service-opened: degrade to plain hide
       var entry = stack.splice(idx, 1)[0];
       entry.el.style.display = 'none';
-      if (!stack.length) liftInert();
+      if (!stack.length) {
+        liftInert();
+        if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('modal', false);
+      }
       try { if (entry.prevFocus && document.contains(entry.prevFocus)) entry.prevFocus.focus(); } catch (e) {}
       if (typeof entry.onClose === 'function') { try { entry.onClose(); } catch (e) {} }
     }
@@ -2108,12 +2137,8 @@
     })();
   </script>
 
-  <!-- three.js must load first so window.THREE exists for OrbitControls (which attaches
-       THREE.OrbitControls) and for the standalone WebGLRenderer / minimap that the app
-       builds directly against the global THREE. -->
-  <script src="vendor/three.min.js"></script>
-  <script src="vendor/3d-force-graph.min.js"></script>
-  <script src="vendor/OrbitControls.js"></script>
+  <!-- The WebGL stack is intentionally loaded on demand when the player selects 3D.
+       The guided game and default Map view never pay its parse, memory, or GPU cost. -->
   <script src="vendor/d3.v7.min.js"></script>
   <script src="vendor/leaflet.js"></script>
 
@@ -2627,7 +2652,12 @@
     // Command-bar view switcher: set the app to exactly one view. Reuses the existing
     // toggle functions (which already turn the other views off).
     function setView(v) {
-      if (v === '3d') { if (mapModeEnabled) toggleMapMode(); if (tableModeEnabled) toggleTableMode(); if (orgModeEnabled) toggleOrgMode(); }
+      if (v === '3d') {
+        if (!graphInstance) { open3DOnDemand(); return; }
+        if (mapModeEnabled) toggleMapMode();
+        if (tableModeEnabled) toggleTableMode();
+        if (orgModeEnabled) toggleOrgMode();
+      }
       else if (v === 'map' && !mapModeEnabled) toggleMapMode();
       else if (v === 'table' && !tableModeEnabled) toggleTableMode();
       else if (v === 'org' && !orgModeEnabled) toggleOrgMode();
@@ -2829,6 +2859,7 @@
     function refreshGraph() {
       const { visibleNodes, visibleLinks } = currentVisible();
       if (graphInstance) {
+        if (window.EngineModule?.wake) EngineModule.wake(1800);
         graphInstance.graphData({ nodes: visibleNodes, links: visibleLinks });
         if (geoModeEnabled) {
           EngineModule.applyGeoLayout(visibleNodes);
@@ -3166,6 +3197,7 @@
         Object.keys(simStats).forEach(k => { if (k in snap.simStats) simStats[k] = snap.simStats[k]; });
         initUI();
         if (graphInstance) {
+          if (window.EngineModule?.wake) EngineModule.wake(1800);
           graphInstance.graphData(data);
           if (!geoModeEnabled) graphInstance.d3ReheatSimulation();
         }
@@ -3188,6 +3220,7 @@
     resetApplicationState();
     initUI();
     if (graphInstance) {
+    if (window.EngineModule?.wake) EngineModule.wake(1800);
     graphInstance.graphData(data);
     graphInstance.d3ReheatSimulation();
     }
@@ -3573,9 +3606,9 @@
     if (highlightColor && highlightSet.size > 0) {
     const src = l.source?.id ?? l.source;
     const tgt = l.target?.id ?? l.target;
-    return (highlightSet.has(src) && highlightSet.has(tgt)) ? 2.5 : 1;
+    return (highlightSet.has(src) && highlightSet.has(tgt)) ? 2.5 : 0;
     }
-    return 1;
+    return 0;
     });
     // Also push colors directly onto three.js materials to avoid lighting washing out palette
     try {
@@ -3687,6 +3720,7 @@
     // wireMapModule() so existing call sites keep working.
 
     function toggleMapMode() {
+    if (mapModeEnabled && !graphInstance) { open3DOnDemand(); return; }
     mapModeEnabled = !mapModeEnabled;
     if (mapModeEnabled && orgModeEnabled) {
       orgModeEnabled = false;
@@ -3743,6 +3777,12 @@
       } else {
         if (legendWasVisibleBeforeTable) setLegendVisible(true);
       }
+      if (!tableModeEnabled && !graphInstance) {
+        mapModeEnabled = true;
+        document.getElementById('map').style.display = 'block';
+        const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
+        ensureMap();
+      }
       document.getElementById('table').style.display = tableModeEnabled ? 'block' : 'none';
       document.getElementById('graph').style.display = tableModeEnabled ? 'none' : (mapModeEnabled ? 'none' : 'block');
       const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = tableModeEnabled ? '3D' : 'Table';
@@ -3796,7 +3836,13 @@
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
         if (mapModeEnabled) document.getElementById('map').style.display = 'block';
         else if (tableModeEnabled) document.getElementById('table').style.display = 'block';
-        else document.getElementById('graph').style.display = 'block';
+        else if (graphInstance) document.getElementById('graph').style.display = 'block';
+        else {
+          mapModeEnabled = true;
+          document.getElementById('map').style.display = 'block';
+          const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
+          ensureMap();
+        }
         resetView();
       }
       updateViewStatus();
@@ -4303,6 +4349,38 @@
     }
 
     // ---- Robust 3D engine startup -------------------------------------------------
+    let graph3dDepsPromise = null;
+    let graph3dStartupPromise = null;
+
+    function loadScriptOnce(src, ready) {
+      if (ready && ready()) return Promise.resolve();
+      const existing = Array.from(document.scripts).find(s => s.getAttribute('src') === src);
+      if (existing) {
+        return new Promise((resolve, reject) => {
+          if (ready && ready()) { resolve(); return; }
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', () => reject(new Error('Could not load ' + src)), { once: true });
+        });
+      }
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.addEventListener('load', resolve, { once: true });
+        s.addEventListener('error', () => reject(new Error('Could not load ' + src)), { once: true });
+        document.head.appendChild(s);
+      });
+    }
+
+    function loadGraph3DDependencies() {
+      if (window.THREE && window.ForceGraph3D) return Promise.resolve();
+      if (!graph3dDepsPromise) {
+        graph3dDepsPromise = loadScriptOnce('vendor/three.min.js', () => !!window.THREE)
+          .then(() => loadScriptOnce('vendor/3d-force-graph.min.js', () => !!window.ForceGraph3D));
+      }
+      return graph3dDepsPromise;
+    }
+
     // The render callbacks, reused by the initial attempt and by any retry.
     function graph3dOpts(rendererConfig) {
       const o = {
@@ -4354,6 +4432,62 @@
       return false;
     }
 
+    function set3DButtonsBusy(busy) {
+      document.querySelectorAll('[data-view="3d"], #map-btn').forEach(btn => {
+        btn.disabled = !!busy;
+        if (btn.matches('[data-view="3d"]')) btn.textContent = busy ? '3D LOADING…' : '3D';
+      });
+    }
+
+    // Allocate WebGL only after an explicit player request. This keeps the default Map
+    // and the entire guided operation on the inexpensive 2D path.
+    function open3DOnDemand() {
+      if (graphInstance) {
+        mapModeEnabled = false;
+        tableModeEnabled = false;
+        orgModeEnabled = false;
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('table').style.display = 'none';
+        document.getElementById('org-chart').style.display = 'none';
+        document.getElementById('graph').style.display = 'block';
+        document.getElementById('map-btn').textContent = 'Map';
+        updateViewStatus();
+        refreshGraph();
+        if (window.StageModule?.resize) StageModule.resize();
+        if (window.EngineModule?.wake) EngineModule.wake(1500);
+        return Promise.resolve(true);
+      }
+      if (graph3dStartupPromise) return graph3dStartupPromise;
+      set3DButtonsBusy(true);
+      const loader = document.getElementById('graph-loading');
+      if (loader) { loader.style.display = 'block'; loader.textContent = 'Starting 3D view on demand…'; }
+      graph3dStartupPromise = loadGraph3DDependencies()
+        .then(() => {
+          if (!tryInitGraph3D()) return false;
+          mapModeEnabled = false;
+          tableModeEnabled = false;
+          orgModeEnabled = false;
+          document.getElementById('map').style.display = 'none';
+          document.getElementById('table').style.display = 'none';
+          document.getElementById('org-chart').style.display = 'none';
+          document.getElementById('graph').style.display = 'block';
+          const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
+          document.getElementById('map-btn').textContent = 'Map';
+          updateViewStatus();
+          refreshGraph();
+          EngineModule.frameBlueToRed(900);
+          if (window.StageModule?.resize) StageModule.resize();
+          addEvent({ type: 'View', text: '3D engine loaded on demand; idle rendering sleeps automatically.' });
+          return true;
+        })
+        .catch(err => { handleGraph3DFailure(err); return false; })
+        .finally(() => {
+          set3DButtonsBusy(false);
+          graph3dStartupPromise = null;
+        });
+      return graph3dStartupPromise;
+    }
+
     function handleGraph3DFailure(err) {
       const realMsg = (err && (err.message || String(err))) || 'unknown error';
       // Notify once, calmly — repeated red errors over an environmental limitation are noise.
@@ -4377,8 +4511,8 @@
     // Every step is guarded so one failure can't abort the rest (a degraded Map beats a
     // blank screen), and the "Retry 3D" affordance is shown first so the operator is never
     // stranded without a way back to 3D.
-    function degradeToMap() {
-      showRetry3dButton();
+    function degradeToMap(offer3dRetry) {
+      if (offer3dRetry !== false) showRetry3dButton();
       mapModeEnabled = true;
       try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
       try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
@@ -4428,17 +4562,7 @@
       }
       try { EngineModule.dispose(); } catch (e) {}
       document.getElementById('graph').innerHTML = '';
-      if (!tryInitGraph3D()) return;   // still failing — fallback path already re-messaged
-      const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
-      mapModeEnabled = false;
-      document.getElementById('map').style.display = 'none';
-      document.getElementById('graph').style.display = 'block';
-      const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = 'Map';
-      refreshGraph();
-      EngineModule.frameBlueToRed(1200);
-      if (window.StageModule && StageModule.resize) StageModule.resize();
-      updateViewStatus();
-      showToast('3D view started.', 'success', 3000);
+      open3DOnDemand().then(ok => { if (ok) showToast('3D view started.', 'success', 3000); });
     }
 
     async function init() {
@@ -4447,17 +4571,11 @@
     bindEventListeners();
     initUI();
 
-    // Pick the landing view by capability. If WebGL is available, build the 3D engine
-    // (with its own progressive fallback). If not, don't even attempt it — that only
-    // throws a scary error — go straight to the Map view, which carries the full
-    // operational picture (symbols, threat rings, strikes) and needs no GPU.
-    if (webglAvailable()) {
-      tryInitGraph3D();
-    } else {
-      addEvent({ type: 'View', text: 'WebGL unavailable — opened the Map view (full operational picture).' });
-      showToast('Opened the Map view — your full operational picture (symbols, threat rings, the works). The 3D globe needs browser hardware acceleration; enable it and click "Retry 3D" anytime.', 'warn', 11000);
-      degradeToMap();
-    }
+    // Online-game landing: Map is the lightweight operational surface. Three.js,
+    // ForceGraph3D, a WebGL context, and the Earth texture stay unloaded until the
+    // player explicitly selects 3D.
+    degradeToMap(false);
+    addEvent({ type: 'View', text: 'Performance mode active: Map loaded first; 3D starts only when requested.' });
 
     refreshGraph();
     // Ensure legend button reflects initial state
@@ -4495,6 +4613,7 @@
       const panel = wrap.querySelector('.fr-panel');
       let introIsolation = null;
       const setIntroOpen = (open) => {
+        try { if (window.AppShell?.setOverlay) AppShell.setOverlay('first-run', !!open); } catch (e) {}
         if (open && !introIsolation) {
           introIsolation = [...document.body.children].filter((node) => node !== wrap && node.matches && !node.matches('script,style,link')).map((node) => ({
             node, inert: !!node.inert, ariaHidden: node.getAttribute('aria-hidden')
@@ -5971,7 +6090,7 @@
     // Carlo results could differ by execution path. Deferred so it never competes
     // with first render; silent unless something is actually wrong (the pass/fail
     // lands in the event log either way).
-    setTimeout(function assertSimParity() {
+    function assertSimParity() {
       if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
       try {
         const pw = new Worker('sim-worker.js?v=p8');
@@ -5992,7 +6111,10 @@
         pw.onerror = () => { clearTimeout(bail); try { pw.terminate(); } catch (e) {} };
         pw.postMessage({ type: 'parity', runId: 'parity-boot', seed: 42, n: 64 });
       } catch (e) { /* parity probe must never break boot */ }
-    }, 2500);
+    }
+    // Validation remains automatic, but yields the startup window to the player.
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(assertSimParity, { timeout: 10000 });
+    else setTimeout(assertSimParity, 8000);
   </script>
 
   <!-- ── Stark-HUD overhaul: boot fade, live telemetry clock, readout FX ── -->
@@ -6001,11 +6123,11 @@
     try {
       var lines = [
         '▸ initializing C2 core ............. <span class="ok">OK</span>',
-        '▸ loading force networks (RED/BLUE) . <span class="ok">OK</span>',
+        '▸ preparing force packages (RED/BLUE)  <span class="ok">OK</span>',
         '▸ calibrating MIL-STD-2525 symbology  <span class="ok">OK</span>',
-        '▸ spinning up Monte Carlo engine .... <span class="ok">OK</span>',
-        '▸ establishing geospatial link ..... <span class="ok">OK</span>',
-        '▸ rendering command picture ........ <span class="ok">OK</span>'
+        '▸ readying operational map ......... <span class="ok">OK</span>',
+        '▸ 3D renderer set to on-demand ...... <span class="ok">OK</span>',
+        '▸ performance lifecycle armed ....... <span class="ok">OK</span>'
       ];
       // C-050: cinematic boot is first-run-only and always skippable. Returning
       // operators get a fast branded fade; reduced-motion gets near-instant.
@@ -6013,7 +6135,7 @@
       var bootReduced = window.AppShell ? AppShell.prefersReducedMotion()
         : !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       var bootSeen = false; try { bootSeen = localStorage.getItem('strikesim_boot_seen') === '1'; } catch(e) {}
-      var bootDwell = bootReduced ? 150 : (bootSeen ? 650 : 2300);
+      var bootDwell = bootReduced ? 100 : (bootSeen ? 250 : 900);
       var logEl = document.getElementById('boot-log'), i = 0;
       if (bootReduced || bootSeen) {
         // no typing theater on repeat visits — render the log at once
@@ -6022,7 +6144,7 @@
         (function nextLine(){
           if (!logEl || i >= lines.length) return;
           var d = document.createElement('div'); d.innerHTML = lines[i++];
-          logEl.appendChild(d); setTimeout(nextLine, 300);
+          logEl.appendChild(d); setTimeout(nextLine, 110);
         })();
       }
       function killBoot(){
@@ -6038,8 +6160,8 @@
       window.addEventListener('keydown', killBoot, { once: true });
       var bootStart = Date.now();
       function scheduleKill(){ setTimeout(killBoot, Math.max(0, bootDwell - (Date.now()-bootStart))); }
-      if (document.readyState === 'complete') scheduleKill(); else window.addEventListener('load', scheduleKill);
-      setTimeout(killBoot, 6000); // hard cap — boot never hangs
+      if (document.readyState !== 'loading') scheduleKill(); else document.addEventListener('DOMContentLoaded', scheduleKill, { once: true });
+      setTimeout(killBoot, 2000); // hard cap — the game shell never waits on visual assets
 
       function buildTelemetry(){
         var bar = document.getElementById('cmd-bar');

@@ -152,6 +152,19 @@ window.StageModule = (function () {
     injectButton();
     reparentOverlays();
 
+    // Canonical browser-game render gate. The expensive 3D scene is alive only while
+    // it is the visible, unobstructed foreground surface; EngineModule additionally
+    // idles between interactions after the force layout settles.
+    if (window.AppShell && AppShell.subscribe) {
+      AppShell.subscribe(function (state) {
+        try {
+          if (window.EngineModule && EngineModule.setRenderActive) {
+            EngineModule.setRenderActive(state.view === '3d' && !state.hidden && !state.overlayOpen);
+          }
+        } catch (e) {}
+      });
+    }
+
     if (window.ResizeObserver) {
       ro = new ResizeObserver(schedule);
       // Observing #graph AND #map means we also catch the display:none -> block flip when
