@@ -274,6 +274,12 @@ The following primary scholarship motivates the architecture; none of it supplie
 
 The implementation should be reviewed against `red-mind.js`, `game.js`, `tools/doctrine-proof.js`, and `tools/mind-games-proof.js`. If code and this paper diverge, tested runtime behavior governs until the documentation is corrected.
 
+## Addendum (CO-005 Phase 5): the restricted-Nash player model
+
+Red now carries a versioned frequency model of the **human** player's committed orders — the same `kind|class|method` features the doctrine posterior uses, merged once per resolved turn and persisted across operations by the Director (`strikesim.co005.v1.playerModel`). At each Red planning step, with confidence-capped probability `p = min(0.5, samples/(samples+10))` (exactly 0 below 3 observed turns), a seeded gate (`hashSeed(seed,'rnr-gate',turn)`) swaps the safe mixed choice for a bounded plan generated under an **exploit-tilted policy**: habitually defended target classes are de-prioritized, the least-defended value class is pressed, and subsystems the player habitually hunts are shielded. This is Johanson et al.'s Restricted Nash Response at plan granularity: the cap bounds Red's own exploitability when the model is wrong, and the cold-start gate makes behavior byte-identical to the unmodeled game until real evidence exists (`tools/content-adaptation-proof.js` asserts both).
+
+The AAR's **predictability meter** answers "what did your habits cost?" with an uncertainty band: the exploit probe replays the operation's recorded Blue orders against shared combat seeds, once with Red as played and once with a player-model Red replanned each turn (200-world worker ensemble; Wilson interval). Habit statements are evidence-gated — at least 5 observed turns and a 35% order share — because an unsupported claim about the player's judgment is worse than none.
+
 ---
 
 **UNCLASSIFIED // NOTIONAL RESEARCH TOOL**

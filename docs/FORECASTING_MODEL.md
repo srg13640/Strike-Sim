@@ -133,6 +133,14 @@ The minimum-sample restraint is consistent with Aldous, ["A Prediction Tournamen
 - Entries store the notional operation seed, question ID/category, blind/final/house probability, outcome, and component scores. They do not store personal information.
 - `tools/brier-proof.js` asserts question determinism and automatic resolution, known Brier/Winkler/multicategory cases, house-copy BSS=0, the Murphy identity, folded-score invariance, bootstrap determinism, sample gates, order-lock enforcement, and compiled/live MOE parity.
 
+## 6b. Career audits (CO-005 Phase 5 / B7)
+
+Three gated, career-level readings extend the calibration card:
+
+- **Precision audit** (Friedman et al. 2018): the player's resolved binary calls are re-scored with forecasts rounded to the nearest 10%; the Brier delta states whether the fine digits carried information or noise. Rendered only at N ≥ 20.
+- **Updating style** (Atanasov et al. 2020): blind→final revisions are classified as *Anchor* (rarely revises), *Lurcher* (large swings), or *Increments* (small, frequent, directionally correct — the superforecaster signature). No label below 8 observed revisions.
+- **Outside view** (reference class first): before the house line is revealed, the BLIND commit card shows base rates from the player's own archive of finished operations (`strikesim.co005.v1.operations`), keyed by plan archetype (posture : dominant strike class : dominant method) and gated at 3+ operations of the same archetype. The ordering — reference class, then blind call, then house — is the trained sequence from calibration research and is asserted by `tools/content-adaptation-proof.js`.
+
 ## 7. Interpretation boundary
 
 The machinery can establish whether a player is calibrated **inside this authored game distribution** after enough observations. It cannot establish real-world operational foresight, validate classified assessments, estimate actual PLA intent, or convert notional scenario frequencies into empirical probabilities. Every public export retains the `UNCLASSIFIED // NOTIONAL RESEARCH TOOL` boundary.
