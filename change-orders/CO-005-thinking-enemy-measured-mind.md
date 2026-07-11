@@ -144,4 +144,4 @@ All five phases implemented, all §4 proofs green (doctrine 26, brier 30, mind-g
 
 ## SUCCESSOR-CO TRACKING (ledger continuity)
 
-CO-006 execution ledger lives in `change-orders/CO-006-performance-layer.md` → PLAN OF RECORD → Progress. State as of 2026-07-11: Phase 1 `1e23e6a`, Phase 2 (BRIEF/COMMIT cinematics + comms floor) committed this date; Phase 3 (WATCH war film + AAR ceremony) next. All CO-005 proofs remain green under the performance layer; the balance record above is unchanged (engine untouched by CO-006 by invariant).
+CO-006 execution ledger lives in `change-orders/CO-006-performance-layer.md` → PLAN OF RECORD → Progress. State as of 2026-07-11: Phase 1 `1e23e6a`, Phase 2 `09625f3`, Phase 3 (WATCH war film + AAR ceremony) committed this date; Phase 4 (settings/polish/reduced-motion audit + full §4 sweep) next. All CO-005 proofs remain green under the performance layer; the balance record above is unchanged (engine untouched by CO-006 by invariant).

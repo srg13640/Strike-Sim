@@ -136,6 +136,63 @@ window.AudioFXModule = (function () {
     arm: function () {             // commit goes hot
       VOICES.beep({ freq: 520, vol: 0.09, dur: 0.5 });
       VOICES.thump({ vol: 0.2 });
+    },
+    // ── CO-006 Phase 3: WATCH stingers. The war has no bed (the DEFCON move) — these
+    //    sparse event-class figures ARE its score. Same dark register: low sines,
+    //    filtered noise, descending motion; nothing that would feel wrong at 2 a.m.
+    stingStrike: function () {     // strike away — air leaving the tube, then a dry tick
+      whoosh(900, 180);
+      VOICES.tick({ vol: 0.03 });
+    },
+    stingImpact: function (o) {    // impact flash on the map — body thump + short crack
+      VOICES.thump({ vol: (o && o.vol) || 0.12 });
+      var src = ctx.createBufferSource(); src.buffer = noiseBuffer(0.09);
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 1.4;
+      src.connect(bp);
+      env(bp, buses.sfx, 0.05, 0.002, 0.12);
+      src.start();
+    },
+    stingKill: function () {       // kill confirm — two low notes, falling; grim, not triumphant
+      [[196, 0], [147, 0.16]].forEach(function (n) {
+        var osc = ctx.createOscillator(); osc.type = 'sine';
+        osc.frequency.value = n[0];
+        var g = ctx.createGain(); g.gain.value = 0;
+        osc.connect(g); g.connect(buses.sfx);
+        var t = ctx.currentTime + n[1];
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.09, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        osc.start(t); osc.stop(t + 0.4);
+      });
+      VOICES.thump({ vol: 0.16 });
+    },
+    stingCascade: function () {    // cascade — a crackle stepping DOWN the graph
+      [1400, 900, 520].forEach(function (f, i) {
+        var src = ctx.createBufferSource(); src.buffer = noiseBuffer(0.06);
+        var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 3;
+        src.connect(bp);
+        var g = ctx.createGain(); g.gain.value = 0;
+        bp.connect(g); g.connect(buses.sfx);
+        var t = ctx.currentTime + i * 0.09;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.06, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        src.start(t);
+      });
+      VOICES.thump({ vol: 0.12 });
+    },
+    tempoLoss: function () {       // the tempo-loss motif — a descending two-note figure
+      [[330, 0], [247, 0.28]].forEach(function (n) {
+        var osc = ctx.createOscillator(); osc.type = 'triangle';
+        osc.frequency.value = n[0];
+        var g = ctx.createGain(); g.gain.value = 0;
+        osc.connect(g); g.connect(buses.sfx);
+        var t = ctx.currentTime + n[1];
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.07, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        osc.start(t); osc.stop(t + 0.6);
+      });
     }
   };
   function whoosh(fromHz, toHz) {

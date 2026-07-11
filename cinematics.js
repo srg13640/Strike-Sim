@@ -114,11 +114,16 @@ window.CinematicsModule = (function () {
       '.cc-line.warn{border-left-color:rgba(255,59,59,.5);} .cc-line.warn .cc-cs{color:var(--alert,#ff3b3b);}',
       '.cin-typing::after{content:"▍";color:var(--amber,#ffb000);animation:cinPulse 1s ease-in-out infinite;}',
       '@media (max-width:760px){#cin-comms{display:none;}}',
+      // ── CO-006 Phase 3: the AAR deal — ledgers arrive as dealt cards, staggered ──
+      '#dir-wrap.cin-deal .dir-card{opacity:0;transform:translateY(14px);',
+      '  animation:cinDeal .5s ease forwards;animation-delay:calc(var(--deal-i,0)*.26s);}',
+      '@keyframes cinDeal{to{opacity:1;transform:none;}}',
       '@media (prefers-reduced-motion: reduce){',
       '  #cin-boot,#cin-title,.cin-mitem{transition:none !important;}',
       '  #cin-bootprompt{animation:none !important;opacity:1;}',
       '  #cin-lbox .cin-lb{transition:none !important;}',
       '  #cin-stamp{animation:none;opacity:1;}',
+      '  #dir-wrap.cin-deal .dir-card{animation:none;opacity:1;transform:none;}',
       '}'
     ].join('\n');
     document.head.appendChild(st);
@@ -482,6 +487,38 @@ window.CinematicsModule = (function () {
     setTimeout(function () { letterbox(false); }, 2600);
   }
 
+  // ── CO-006 Phase 3: the war film (WATCH) and the debrief ceremony (AAR) ──
+  // No bed starts here — per the Phase 2 contract the war is SILENT under the menu's
+  // drones; the film's score is the Director-timed stingers and sparse BDA confirms.
+  function watchCinematic() {
+    commsVisible(true);              // the floor returns for kill confirmations only
+    if (reduceMotion) return;        // instant path: events land set, no bars
+    letterbox(true);                 // the film begins
+  }
+  function watchDone() {
+    if (!reduceMotion) letterbox(false);
+  }
+  function aarCinematic(opts) {
+    var a = sfx();
+    if (a) a.stopBed(1.2);           // silence before the verdict
+    commsVisible(true);
+    if (reduceMotion) return;        // cards land set; the verdict reads without ceremony
+    letterbox(true);
+    stamp((opts && opts.verdict) || 'OPERATION CLOSED',
+      'after-action review · serial ' + ((opts && opts.seed) != null ? opts.seed : '—'));
+    // one soft tick per dealt card, paced with the CSS stagger
+    var cards = document.querySelectorAll('#dir-wrap .dir-card');
+    cards.forEach(function (c, i) {
+      setTimeout(function () { if (c.isConnected) play('tick', { vol: 0.03 }); }, 900 + i * 260);
+    });
+    setTimeout(function () { letterbox(false); }, 2400);
+  }
+  function exitCinematic() {
+    if (reduceMotion) { openConsole(); return; }
+    letterbox(true);
+    setTimeout(function () { openConsole(); letterbox(false); }, 950);
+  }
+
   // ---------- command-bar return button ----------
   function ensureConsoleButton() {
     if ($('cin-console-btn')) return;
@@ -535,6 +572,11 @@ window.CinematicsModule = (function () {
     briefCinematic: briefCinematic,
     planCinematic: planCinematic,
     commitCinematic: commitCinematic,
-    executeCinematic: executeCinematic
+    executeCinematic: executeCinematic,
+    // CO-006 Phase 3 grammar — consumed by the Director's render layer only
+    watchCinematic: watchCinematic,
+    watchDone: watchDone,
+    aarCinematic: aarCinematic,
+    exitCinematic: exitCinematic
   });
 })();

@@ -901,6 +901,27 @@ window.MapModule = (function () {
     }
   }
 
+  // CO-006 Phase 3: the war film's camera. A cut is presentation only — it reads the
+  // graph's public lat/lon, respects reduced motion (no camera movement at all), and
+  // no-ops while the map pane is hidden (the WATCH feed remains the record). It never
+  // touches match state; the Director paces and throttles every cut.
+  function flyToNode(nodeId, opts) {
+    opts = opts || {};
+    if (!leafletMap || !mapVisible()) return false;
+    try {
+      if (typeof window !== 'undefined' && window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    } catch (e) {}
+    const n = nodeById(nodeId);
+    if (!n || n.lat == null || n.lon == null) return false;
+    try {
+      leafletMap.flyTo([n.lat, pacLon(n.lon)], Math.max(leafletMap.getZoom(), opts.zoom || 4), {
+        duration: opts.duration || 0.85
+      });
+      return true;
+    } catch (e) { return false; }
+  }
+
   // Called by the main script's mode toggle and window-resize handler.
   function invalidateSize() {
     if (leafletMap) { leafletMap.invalidateSize(); clampMinZoom(); }
@@ -1502,6 +1523,7 @@ window.MapModule = (function () {
     closeMapPopup,
     invalidateSize,
     flashStrike,
+    flyToNode,
     playStrikes,
     replayHiddenStrikes,  // C-020: call from main script on map-mode activation
     getMap,

@@ -191,6 +191,96 @@ check('P2: typewriter restores real markup and stands down when a re-render repl
   assert.ok(cinSrc.includes('restoreHtml'), 'inline markup (bolded initiating event) is restored');
 });
 
+// ═══════════════ Phase 3 contracts: the WATCH war film + the AAR ceremony ═══════════════
+
+const mapSrc = read('map.js');
+
+check('P3: the war film opens at playback and the bars come down with the outcome', () => {
+  const pw = fnBody(directorSrc, 'playWatch', 'showOutcome');
+  assert.ok(pw.includes("cine('watchCinematic')"), 'playWatch opens the film');
+  const so = fnBody(directorSrc, 'showOutcome', 'onFeedClick');
+  assert.ok(so.includes("cine('watchDone')"), 'the outcome closes the letterbox — including via SHOW RESULT NOW');
+  const cw = cinSrc.slice(cinSrc.indexOf('function watchCinematic'), cinSrc.indexOf('function watchDone'));
+  assert.ok(!/startBed/.test(cw), 'WATCH starts no bed — silence is the score (the DEFCON move)');
+});
+
+check('P3: stingers are palette voices in the dark register, routed through the guarded bridge', () => {
+  ['stingStrike', 'stingImpact', 'stingKill', 'stingCascade', 'tempoLoss'].forEach(v =>
+    assert.ok(new RegExp(v + ':\\s*function').test(audioSrc), 'voice ' + v));
+  ["sfxA('stingImpact'", "sfxA('stingKill')", "sfxA('stingCascade')", "sfxA('tempoLoss')"].forEach(c =>
+    assert.ok(directorSrc.includes(c), 'director routes ' + c));
+  assert.ok(!cinSrc.includes('stingKill'), 'cinematics never decides when a kill sounds — the Director does');
+});
+
+check('P3: camera cuts are disciplined — kills/cascades only, throttled, capped, deterministic clock', () => {
+  const pw = fnBody(directorSrc, 'playWatch', 'showOutcome');
+  assert.ok(pw.includes('CUT_SPACING_MS') && pw.includes('MAX_CUTS'), 'discipline constants exist');
+  assert.ok(pw.includes("e.kind === 'kill' || e.kind === 'cascade'"), 'cuts ride kills and cascades only');
+  assert.ok(pw.includes('i * step'), 'throttle runs on the deterministic pacing clock, not wall time');
+  assert.ok(pw.includes('MapModule.flyToNode'), 'cuts use the map camera');
+});
+
+check('P3: flyToNode is a presentation camera — hidden-map no-op, reduced-motion no-op, no engine reach', () => {
+  const start = mapSrc.indexOf('function flyToNode');
+  assert.ok(start > 0, 'flyToNode exists');
+  const body = mapSrc.slice(start, mapSrc.indexOf('function ', start + 20));
+  assert.ok(body.includes('mapVisible()'), 'no-ops while the map pane is hidden');
+  assert.ok(body.includes('prefers-reduced-motion'), 'reduced motion: no camera movement at all');
+  ['GameModule', 'GM.', 'commitTurn', 'makeRng', 'hashSeed'].forEach(sym =>
+    assert.ok(!body.includes(sym), 'flyToNode must not reference ' + sym));
+  assert.ok(mapSrc.includes('flyToNode,'), 'exported to the render layer');
+});
+
+check('P3: kill confirmations ride the floor — Director-authored from resolved events, and sparse', () => {
+  const pw = fnBody(directorSrc, 'playWatch', 'showOutcome');
+  assert.ok(pw.includes("comms('BDA', (e.side === 'blue' ? 'KILL CONFIRMED — ' : 'FRIENDLY UNIT DOWN — ')"), 'the confirm line reads the resolved event');
+  assert.ok(pw.includes('kills < 3'), 'confirms stay sparse — the feed remains the record');
+  assert.ok(!cinSrc.includes('KILL CONFIRMED'), 'cinematics never authors BDA traffic');
+});
+
+check('P3: the tempo-loss motif fires only on a real drop against the previously shown tempo', () => {
+  const so = fnBody(directorSrc, 'showOutcome', 'onFeedClick');
+  assert.ok(so.includes("sfxA('tempoLoss')"), 'the motif is wired');
+  assert.ok(so.includes('op.lastTempoShown != null && tempoNow < op.lastTempoShown'), 'a drop is measured, never invented');
+  assert.ok(directorSrc.includes('op.lastTempoShown = null'), 'tracking resets with each operation');
+});
+
+check('P3: AAR is a ceremony — verdict stamps first, ledgers deal as cards, rank rides the header, serial seed', () => {
+  const aar = fnBody(directorSrc, 'openAar', 'aarMarkdown');
+  assert.ok(aar.includes("cine('aarCinematic'"), 'the ceremony runs');
+  assert.ok(aar.includes("classList.add('cin-deal')") && aar.includes("'--deal-i'"), 'cards deal with a stagger');
+  assert.ok(aar.includes('dir-rankchip') && aar.includes('analystRank'), 'the career rank rides the header');
+  assert.ok(aar.includes('SERIAL') && aar.includes('dir-serial'), 'the seed reads like a serial plate');
+  const ac = cinSrc.slice(cinSrc.indexOf('function aarCinematic'), cinSrc.indexOf('function exitCinematic'));
+  assert.ok(ac.includes('letterbox(true)') && ac.includes('stamp('), 'the verdict stamps under letterbox');
+  assert.ok(ac.includes('stopBed'), 'silence precedes the verdict');
+  assert.ok(ac.includes('if (reduceMotion) return'), 'reduced motion: cards land set, no ceremony');
+});
+
+check('P3: the deal is presentation-safe — reduced-motion override, honest rank source, clean class removal', () => {
+  assert.ok(cinSrc.includes('#dir-wrap.cin-deal .dir-card{animation:none;opacity:1;transform:none;}'), 'reduced-motion CSS lands cards fully visible');
+  assert.ok(directorSrc.includes("classList.remove('cin-deal')"), 'leaving AAR strips the deal class');
+  const aar = fnBody(directorSrc, 'openAar', 'aarMarkdown');
+  assert.ok(aar.includes('bootstrapBss') && aar.includes("'aar-rank-chip'"), 'the header rank uses the same evidence-gated band as the calibration card, seeded');
+});
+
+check('P3: exit letterboxes back to the title front door', () => {
+  assert.ok(directorSrc.includes("cine('exitCinematic')"), 'EXIT TO CONSOLE runs the exit');
+  const ex = cinSrc.slice(cinSrc.indexOf('function exitCinematic'));
+  assert.ok(ex.includes('openConsole()'), 'the exit lands on the title screen');
+  assert.ok(ex.includes('if (reduceMotion) { openConsole(); return; }'), 'reduced motion goes straight home');
+});
+
+check('P3: frame budget holds — pacing floor, bounded per-tick work, FX teardown', () => {
+  assert.ok(directorSrc.includes('Math.max(110,'), 'event pacing never dips below ~110ms per event (≈7 frames of headroom)');
+  assert.ok(mapSrc.includes('function cleanup()'), 'strike FX layers and timers are torn down after each strike');
+  assert.ok(directorSrc.includes('op.watchTimers.forEach(clearTimeout)'), 'skip/replan clears every scheduled camera cut and stinger');
+  // Per event tick the render layer does O(1) work: one DOM insert, ≤1 flash, ≤1 cut,
+  // ≤1 stinger, ≤1 comms line — no layout reads in the hot path.
+  const pw = fnBody(directorSrc, 'playWatch', 'showOutcome');
+  assert.ok(!/getBoundingClientRect|offsetWidth|offsetHeight/.test(pw), 'no forced layout reads inside the playback loop');
+});
+
 console.log('UNCLASSIFIED // NOTIONAL RESEARCH TOOL');
 if (failures.length) {
   console.log('Performance-layer proof: IMPLEMENTATION MISMATCH (' + failures.length + '/' + (passed.length + failures.length) + ' checks failed)');

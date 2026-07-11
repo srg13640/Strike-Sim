@@ -383,6 +383,9 @@ window.DirectorModule = (function () {
       '.dir-cf-result{margin-top:10px;padding:10px;border:1px solid #31536a;border-radius:8px;background:#091923;color:#cce7f4;font-size:12.5px;line-height:1.5;}',
       '.dir-verdict{font:700 26px Oswald;letter-spacing:.08em;margin:2px 0 2px;}',
       '.dir-verdict.win{color:#7be3a1;} .dir-verdict.loss{color:#ff9d94;} .dir-verdict.draw{color:#ffd27b;}',
+      // CO-006 P3: debrief header furniture — the rank chip and the serial-plate seed
+      '.dir-rankchip{font:11px "Share Tech Mono",monospace;letter-spacing:.3em;color:#ffb000;margin:2px 0 6px;text-transform:uppercase;}',
+      '.dir-serial{font-family:"Share Tech Mono",monospace;letter-spacing:.3em;color:#ffd27b;border:1px solid rgba(255,210,123,.35);padding:1px 7px;margin-left:2px;}',
       '.dir-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}',
       '.dir-metric{background:#091923;border:1px solid #19364a;border-radius:8px;padding:9px;text-align:center;}',
       '.dir-metric b{display:block;color:#e8f7ff;font:700 20px Oswald,system-ui;}.dir-metric span{color:#789bb2;font-size:10px;letter-spacing:.08em;}',
@@ -437,6 +440,8 @@ window.DirectorModule = (function () {
   function setPhase(p) {
     op.phase = p;
     if (p !== 'plan') stopSelPoll();
+    // CO-006 P3: the AAR deal class never leaks into other phases' renders.
+    if (p !== 'aar') { try { $('dir-wrap').classList.remove('cin-deal'); } catch (e) {} }
     var overlayActive = p === 'brief' || p === 'commit' || p === 'aar';
     try { if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('director', overlayActive); } catch (e) {}
     renderRail();
@@ -545,6 +550,7 @@ window.DirectorModule = (function () {
     op.record = null; op.aar = null; op.aarExported = false; op.targetId = null;
     op.panelState = null; op.focusMode = true;
     op.lastPostureShown = null;   // CO-006 P2: comms-floor posterior tracking (display only)
+    op.lastTempoShown = null;     // CO-006 P3: tempo-loss motif tracking (display only)
   }
 
   function objList(st, side) {
@@ -1352,6 +1358,9 @@ window.DirectorModule = (function () {
     var feed = $('dir-feed');
     var events = (report.events || []).filter(function (e) { return e.kind !== 'void'; });
     var instant = prefersReducedMotion();
+    // CO-006 P3: the war film — bars in, the comms floor returns for sparse kill
+    // confirms. No bed starts: the war's score is stingers and radio only.
+    cine('watchCinematic');
     feed.innerHTML = '<div class="fl sys">TURN ' + report.turn + ' — EXECUTION · ' + events.length + ' EVENTS' +
       (instant ? ' · REDUCED MOTION' : ' <button class="dir-btn dir-skip" data-act="skip-watch">SHOW RESULT NOW</button>') + '</div>';
     if (instant) {
@@ -1361,12 +1370,34 @@ window.DirectorModule = (function () {
       return;
     }
     var step = events.length > 40 ? Math.max(110, Math.floor(13000 / events.length)) : 330;
+    // CO-006 P3 war-film discipline: cuts breathe (never strobe), confirms stay sparse.
+    var CUT_SPACING_MS = 1400, MAX_CUTS = 8;
+    var lastCut = -CUT_SPACING_MS, cuts = 0, kills = 0;
     events.forEach(function (e, i) {
       op.watchTimers.push(setTimeout(function () {
         feed.insertAdjacentHTML('beforeend', feedLine(e));
         feed.scrollTop = feed.scrollHeight;
+        if (i === 0) sfxA('stingStrike');   // the film opens: strike away
         if ((e.kind === 'hit' || e.kind === 'kill') && window.MapModule) {
           try { MapModule.flashStrike(e.sourceId, e.targetId, { team: e.side, kill: e.kind === 'kill' }); } catch (er) {}
+        }
+        // Stingers per event class — presentation reading the resolved report.
+        if (e.kind === 'hit') sfxA('stingImpact', { vol: 0.1 });
+        else if (e.kind === 'kill') sfxA('stingKill');
+        else if (e.kind === 'cascade') sfxA('stingCascade');
+        else if (e.kind === 'miss') sfxA('tick', { vol: 0.02 });
+        if (e.kind === 'kill' || e.kind === 'cascade') {
+          // Camera cuts ride kills and cascades only, throttled on the deterministic
+          // pacing clock (i * step) and capped per turn.
+          var now = i * step;
+          if (cuts < MAX_CUTS && now - lastCut >= CUT_SPACING_MS && window.MapModule && MapModule.flyToNode) {
+            try { if (MapModule.flyToNode(e.targetId, { zoom: 4, duration: 0.85 })) { lastCut = now; cuts++; } } catch (er) {}
+          }
+          if (e.kind === 'kill' && kills < 3) {
+            kills++;
+            var n = GM.boardNode(e.targetId);
+            comms('BDA', (e.side === 'blue' ? 'KILL CONFIRMED — ' : 'FRIENDLY UNIT DOWN — ') + (n ? n.name : e.targetId), e.side === 'blue' ? 'bda' : 'warn');
+          }
         }
       }, i * step));
     });
@@ -1380,6 +1411,7 @@ window.DirectorModule = (function () {
     var st = GM.getState();
     refreshVisuals();
     showObjectiveOverlay();
+    cine('watchDone');   // CO-006 P3: the film ends with the outcome — bars out (also via SHOW RESULT NOW)
     var f = op.forecasts[report.turn], a = op.actuals[report.turn];
     var honesty = (f && a) ?
       '<div class="dir-note">Forecast said ' + bandStr(f.redKills) + ' Red down — the world drew ' + a.redKills + '.' +
@@ -1408,6 +1440,16 @@ window.DirectorModule = (function () {
     }
     if (report.escalation && Number(report.escalation.delta)) {
       comms('J5', 'ESCALATION E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1), Number(report.escalation.delta) > 0 ? 'warn' : '');
+    }
+    // CO-006 P3: the tempo-loss motif — fires only on a REAL drop vs the previously
+    // shown tempo (presentation reading state; never inventing a downturn).
+    var tempoNow = Number(st.tempo && st.tempo.blue && st.tempo.blue.frac);
+    if (Number.isFinite(tempoNow)) {
+      if (op.lastTempoShown != null && tempoNow < op.lastTempoShown - 0.01) {
+        sfxA('tempoLoss');
+        comms('J3', 'TEMPO SLIPPING — ' + Math.round(op.lastTempoShown * 100) + ' TO ' + Math.round(tempoNow * 100), 'warn');
+      }
+      op.lastTempoShown = tempoNow;
     }
     var escalationLine = report.escalation ? '<br>Escalation <b>E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1) +
       '</b> (Δ ' + (Number(report.escalation.delta) >= 0 ? '+' : '') + Number(report.escalation.delta).toFixed(1) + ')' +
@@ -1847,9 +1889,21 @@ window.DirectorModule = (function () {
       return '<div class="dir-obj"><span>' + esc(t.name) + '</span><span class="v">' + (t.team || '') + ' · val ' + Math.round(t.value) + (t.cascaded ? ' · cascade' : '') + '</span></div>';
     }).join('') || '<div class="dir-note">No nodes neutralized.</div>';
 
+    // CO-006 P3: career rank rides the debrief header (display-only read of the same
+    // archive the calibration card scores; the evidence-gated rank text is Forecasting's).
+    var rankChip = '';
+    try {
+      var Fr = window.ForecastingModule;
+      var careerEntries = readForecastArchive().filter(function (e) { return e && e.player != null && e.house != null && e.outcome != null; });
+      var careerBand = Fr.bootstrapBss(careerEntries, GM._internal.makeRng(GM._internal.hashSeed(op.record ? op.record.seed : 1, 'aar-rank-chip', careerEntries.length)), 500);
+      var crank = Fr.analystRank(careerEntries, careerBand);
+      if (crank) rankChip = '<div class="dir-rankchip">ANALYST TRACK · ' + esc(crank.label).toUpperCase() + ' · ' + careerEntries.length + ' RESOLVED CALLS</div>';
+    } catch (e) {}
+
     $('dir-wrap').innerHTML =
-      '<div class="dir-kicker">AFTER-ACTION REVIEW · ' + (aar.turns || st.turn) + ' TURNS · SEED ' + esc(String(op.record ? op.record.seed : '')) + '</div>' +
+      '<div class="dir-kicker">AFTER-ACTION REVIEW · ' + (aar.turns || st.turn) + ' TURNS · SERIAL <span class="dir-serial">' + esc(String(op.record ? op.record.seed : '')) + '</span></div>' +
       '<div class="dir-verdict ' + verdict.cls + '">' + verdict.label + '</div>' +
+      rankChip +
       '<div class="dir-sub">' + esc(aar.reason || '') + '</div>' +
 
       '<div class="dir-card"><h3>DENIAL / LODGMENT VERDICT</h3>' +
@@ -1882,8 +1936,15 @@ window.DirectorModule = (function () {
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
       '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
     renderCounterfactualCard();
-    // CO-006 P2: the war is over — silence the bed; the AAR ceremony proper is Phase 3.
+    // CO-006 P3: the debrief ceremony — verdict stamps first over silence, then the
+    // ledgers deal in as cards (soft tick each). setPhase removes the deal class on exit.
+    try {
+      var wrap = $('dir-wrap');
+      wrap.classList.add('cin-deal');
+      wrap.querySelectorAll('.dir-card').forEach(function (c, i) { c.style.setProperty('--deal-i', i); });
+    } catch (e) {}
     try { if (window.AudioFXModule) window.AudioFXModule.stopBed(1.2); } catch (e) {}
+    cine('aarCinematic', { verdict: verdict.label, seed: op.record ? op.record.seed : '—' });
     comms('JOC', 'OPERATION CLOSED — AFTER-ACTION REVIEW READY');
     evt('After-action review opened.');
   }
@@ -2078,7 +2139,7 @@ window.DirectorModule = (function () {
     else if (act === 'run-counterfactual') runCounterfactual();
     else if (act === 'run-exploit-probe') runExploitProbe();
     else if (act === 'exit') abortOperation(true);
-    else if (act === 'exit-op') endOperation();
+    else if (act === 'exit-op') { endOperation(); cine('exitCinematic'); }   // CO-006 P3: letterbox back to the title front door
     else if (act === 'new-op') { endOperation(); start(); }
   }
 
