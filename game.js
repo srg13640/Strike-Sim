@@ -980,6 +980,7 @@ window.GameModule = (function () {
       turn: 1,
       phase: 'plan',            // 'plan' | 'resolved' | 'over'
       orders: { blue: [], red: [] },
+      orderLocks: { blue: false, red: false },
       score: { blue: 0, red: 0 },
       startObj: { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: [],
@@ -1017,6 +1018,7 @@ window.GameModule = (function () {
       objNow: { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') },
       startObj: match.startObj,
       orders: { blue: match.orders.blue.slice(), red: match.orders.red.slice() },
+      ordersLocked: { blue: !!(match.orderLocks && match.orderLocks.blue), red: !!(match.orderLocks && match.orderLocks.red) },
       ap: { blue: apFor('blue'), red: apFor('red') },
       apLeft: { blue: apFor('blue') - match.orders.blue.length, red: apFor('red') - match.orders.red.length },
       winner: match.winner,
@@ -1088,6 +1090,7 @@ window.GameModule = (function () {
   // resolved source is stamped onto the order so the resolver/AAR attribute it consistently.
   function queueOrder(side, order) {
     if (!match || match.phase !== 'plan' || !isHuman(side)) return false;
+    if (match.orderLocks && match.orderLocks[side]) return false;
     if (!order || (order.kind !== 'strike' && order.kind !== 'harden' && order.kind !== 'repair')) return false;
     if (match.orders[side].length >= apFor(side)) return false;
     const n = match.board.nodes[order.targetId];
@@ -1123,6 +1126,7 @@ window.GameModule = (function () {
     if (!match || match.phase !== 'plan') return { ok: false, reason: 'not-planning' };
     if (!order) return { ok: false, reason: 'no-order' };
     if (!isHuman(side)) return { ok: false, reason: 'not-human-side' };
+    if (match.orderLocks && match.orderLocks[side]) return { ok: false, reason: 'orders-locked' };
     if (match.orders[side].length >= apFor(side)) return { ok: false, reason: 'no-ap' };
     const n = match.board.nodes[order.targetId];
     if (!n || !n.alive) return { ok: false, reason: n ? 'target-dead' : 'no-target' };
@@ -1135,10 +1139,41 @@ window.GameModule = (function () {
   }
   function removeOrder(side, index) {
     if (!match || match.phase !== 'plan') return;
+    if (match.orderLocks && match.orderLocks[side]) return;
     match.orders[side].splice(index, 1);
     ctx.onState(getState());
   }
-  function clearOrders(side) { if (match && match.phase === 'plan') { match.orders[side] = []; ctx.onState(getState()); } }
+  function clearOrders(side) {
+    if (match && match.phase === 'plan' && !(match.orderLocks && match.orderLocks[side])) {
+      match.orders[side] = []; ctx.onState(getState());
+    }
+  }
+
+  function canonicalOrderBytes(side) {
+    return JSON.stringify((match && match.orders[side] || []).map(o => ({
+      side: o.side, kind: o.kind, methodKey: o.methodKey || null,
+      targetId: o.targetId || null, sourceId: o.sourceId || null
+    })));
+  }
+  function lockOrders(side) {
+    if (!match || match.phase !== 'plan' || !isHuman(side)) return { ok: false, reason: 'not-lockable' };
+    match.orderLocks = match.orderLocks || { blue: false, red: false };
+    match.orderLocks[side] = true;
+    const orderHash = hashSeed(match.seed, 'order-lock', match.turn, side, canonicalOrderBytes(side));
+    ctx.onState(getState());
+    return { ok: true, side, turn: match.turn, orderHash };
+  }
+  function unlockOrders(side) {
+    if (!match || match.phase !== 'plan' || !isHuman(side)) return false;
+    match.orderLocks = match.orderLocks || { blue: false, red: false };
+    match.orderLocks[side] = false;
+    ctx.onState(getState());
+    return true;
+  }
+  function lockedOrderHash(side) {
+    if (!match || !(match.orderLocks && match.orderLocks[side])) return null;
+    return hashSeed(match.seed, 'order-lock', match.turn, side, canonicalOrderBytes(side));
+  }
 
   // Fill an AI side's orders for the current turn (deterministic from turn+side).
   function ensureAiOrders(side) {
@@ -1208,6 +1243,7 @@ window.GameModule = (function () {
     // horizon ending reads D+18.5, not D+22 (result.at.dday is clamped the same way).
     if (match.calendar) match.calendar.dday = ddayForTurn(Math.min(match.turn, match.cfg.turnLimit));
     match.orders = { blue: [], red: [] };
+    match.orderLocks = { blue: false, red: false };
     match.phase = 'plan';
     // HARD clock (GAME_DESIGN §3/P3): no auto-extend, ever. Past the final turn the match
     // ends NOW — an ambiguous ending is resolved inside evaluateVictory by a seeded MC
@@ -1254,10 +1290,10 @@ window.GameModule = (function () {
     return (board.rosters.red || []).map(id => {
       const n = board.nodes[id];
       return {
-        team: 'red', type: n.type, subsystem: n.subsystem,
+        id: n.id, team: 'red', type: n.type, subsystem: n.subsystem,
         importance: n.importance, cascScore: n.casc,
         healthMax: n.healthMax, health: n.alive ? n.health : 0,
-        status: n.alive ? 'Active' : 'Neutralized'
+        alive: !!n.alive, status: n.alive ? 'Active' : 'Neutralized'
       };
     });
   }
@@ -1642,14 +1678,15 @@ window.GameModule = (function () {
   // (no fingerprint) still load, but cannot be integrity-checked — deserialize flags that.
   // v3 saves additionally carry the denial-victory state (calendar / denialHistory /
   // lodgment / result — Increment A). v4 adds the PUBLIC Red-mind prior/belief and
-  // reasoning instrumentation. The hidden doctrine is never serialized; it is derived
-  // from the seed on load. Older saves default all additive fields safely.
+  // reasoning instrumentation; v5 adds engine-enforced per-side order locks. The hidden
+  // doctrine is never serialized; it is derived from the seed on load. Older saves
+  // default all additive fields safely.
   function serialize() {
     if (!match) return null;
     const health = {};
     for (const id in match.board.nodes) { const n = match.board.nodes[id]; health[id] = { h: n.health, a: n.alive }; }
     return {
-      v: 4, seed: match.seed, turn: match.turn, phase: match.phase,
+      v: 5, seed: match.seed, turn: match.turn, phase: match.phase,
       fingerprint: match.fingerprint || null,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
@@ -1667,7 +1704,7 @@ window.GameModule = (function () {
         reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice()
       },
       history: match.history,
-      orders: match.orders, winner: match.winner, health,
+      orders: match.orders, orderLocks: match.orderLocks || { blue: false, red: false }, winner: match.winner, health,
       lastReport: match.lastReport || null,
       savedGraphState: match.savedGraphState || null
     };
@@ -1725,6 +1762,7 @@ window.GameModule = (function () {
       startTempo: s.startTempo || { blue: commandTempo(board, 'blue'), red: commandTempo(board, 'red') },
       objectives: s.objectives || { blue: pickObjectives(board, 'blue'), red: pickObjectives(board, 'red') },
       turn: s.turn, phase: s.phase, orders: s.orders || { blue: [], red: [] },
+      orderLocks: s.orderLocks || { blue: false, red: false },
       score: s.score || { blue: 0, red: 0 }, startObj: s.startObj || { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') },
       history: Array.isArray(s.history) ? s.history.slice() : [], winner: s.winner || null,
       lastReport,
@@ -1802,7 +1840,7 @@ window.GameModule = (function () {
     fingerprint, fingerprintMatches, scenarioStatus,
     // exposed for headless testing / future reuse
     _internal: { buildBoard, resolveTurn, planOrders, planStrategicOrders, buildBeliefPlanCache,
-      sampleBeliefPlan, planHeuristic,
+      sampleBeliefPlan, planHeuristic, lockOrders, unlockOrders, lockedOrderHash,
       cloneBoardForAi, resetBoardForAi, scoreAiRollout, makeRng, hashSeed, objectiveValue,
       canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch,
       // Increment A additions (denial arbiter plumbing):

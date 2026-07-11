@@ -50,6 +50,7 @@
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
   <script src="red-mind.js?v=co005-p1"></script>
+  <script src="forecasting.js?v=co005-p2"></script>
   <script src="game.js?v=co005-p1"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
   <script src="wargame.js?v=p12"></script>
@@ -1980,7 +1981,7 @@
       <div class="results-grid">
         <div class="result-metric">
           <span class="result-value" id="mc-success">—</span>
-          <span class="result-label">Chance of Success</span>
+          <span class="result-label">Model-Trial Threshold Rate</span>
           <span class="result-ci" id="mc-success-ci" style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--muted);margin-top:3px"></span>
         </div>
         <div class="result-metric">
@@ -4264,7 +4265,7 @@
       if (selT) selT.value = rec.target.id;
       if (selM) selM.value = rec.methodKey;
       const p = Math.round(rec.p * 100);
-      if (hint) hint.textContent = `Recommended: ${strikeMethods[rec.methodKey].name} on ${rec.target.name} (${rec.target.id}) · ~${p}% success. ${rec.reason}.`;
+      if (hint) hint.textContent = `Recommended: ${strikeMethods[rec.methodKey].name} on ${rec.target.name} (${rec.target.id}) · ~${p}% modeled per-attempt effect rate. ${rec.reason}.`;
     });
     document.getElementById('coa-add-step-btn').addEventListener('click', () => {
       const selT = document.getElementById('coa-target-select');
@@ -4274,7 +4275,7 @@
       const hint = document.getElementById('coa-step-hint');
       const node = data.nodes.find(n => n.id === selT.value);
       const p = node ? Math.round(strikeProbFor(node, selM.value) * 100) : 0;
-      if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% success.`;
+      if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% modeled per-attempt effect rate.`;
     });
     document.getElementById('coa-clear-btn').addEventListener('click', clearCOAPlan);
     document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => {
@@ -4973,11 +4974,12 @@
         };
       }
       const pct = Math.round(result.successRate * 100);
+      const interval = result.successCiLo == null ? '' : ` (95% model-frequency interval ${Math.round(result.successCiLo * 100)}–${Math.round(result.successCiHi * 100)}%)`;
       const avgBlueLost = mean(result.blueNeutralizedArr || []);
       if (result.cancelled) {
         return {
           tone: 'warn',
-          text: `Partial run only: ${result.trials.toLocaleString()} of ${result.requestedTrials.toLocaleString()} trials completed. Treat the ${pct}% success estimate as directional, not decision-grade.`,
+          text: `Partial run only: ${result.trials.toLocaleString()} of ${result.requestedTrials.toLocaleString()} trials completed. The configured rule was met in ${pct}% of completed model trials${interval}; directional only.`,
           action: 'rerun',
           actionLabel: 'Finish Full Run'
         };
@@ -4985,7 +4987,7 @@
       if (pct >= 75 && avgBlueLost <= 1) {
         return {
           tone: 'good',
-          text: `${pct}% success with ${avgBlueLost.toFixed(1)} average friendly losses. This plan is strong enough to inspect a concrete sample path before briefing.`,
+          text: `The configured rule was met in ${pct}% of model trials${interval}, with ${avgBlueLost.toFixed(1)} average friendly losses. Inspect a concrete sample path before briefing; this is not a real-world probability.`,
           action: 'preview',
           actionLabel: 'Preview Outcome'
         };
@@ -4993,14 +4995,14 @@
       if (pct >= 50) {
         return {
           tone: 'warn',
-          text: `${pct}% success is playable but brittle. Add one recommended step or raise confidence before treating this as the primary COA.`,
+          text: `The configured rule was met in ${pct}% of model trials${interval}; model performance is brittle. Add one recommended step or inspect assumptions before treating this as the primary COA.`,
           action: 'recommend',
           actionLabel: 'Recommend Next Step'
         };
       }
       return {
         tone: 'bad',
-        text: `${pct}% success is too low for a primary COA. Generate a goal plan with more steps or loosen the friendly-loss constraint.`,
+        text: `Only ${pct}% of model trials met the configured rule${interval}. Generate a goal plan with more steps or loosen the friendly-loss constraint.`,
         action: 'goal',
         actionLabel: 'Generate Goal Plan'
       };
@@ -5295,7 +5297,7 @@
           const margin = blueBudget - planCost;
           details.innerHTML = [
             `Plan length: ${actionPlan.length} steps.`,
-            `${Math.round(successRate * 100)}% success (95% CI ${ciText}) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `${Math.round(successRate * 100)}% of model trials met the configured rule (95% frequency interval ${ciText}) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
             `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
             `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
             `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
@@ -5334,8 +5336,8 @@
         const pct = Math.round(successRate * 100);
         const runStatus = cancelled ? `MC canceled after ${effectiveTrials.toLocaleString()} of ${trials.toLocaleString()} trials` : `MC(${effectiveTrials.toLocaleString()}) complete`;
         if (bar && cancelled) bar.textContent = `Canceled at ${Math.round((effectiveTrials / trials) * 100)}%`;
-        addEvent({ type: 'MC', text: `${runStatus}: ${pct}% success, ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
-        showToast(`${runStatus}: ${pct}% success.`, cancelled ? 'warn' : 'success', 5000);
+        addEvent({ type: 'MC', text: `${runStatus}: rule met in ${pct}% of model trials (95% frequency interval ${ciText}), ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
+        showToast(`${runStatus}: rule met in ${pct}% of model trials (95% interval ${ciText}).`, cancelled ? 'warn' : 'success', 5000);
         // Denial MOE breakdown (continuous effect) — shown only in denial mode, after the
         // shared renderer so it isn't overwritten.
         if (successMode === 'denial' && denialDiArr.length) {
@@ -5357,7 +5359,7 @@
                  : 'Partial denial — sustained pressure or a larger plan is needed to force culmination.');
           }
           const noteD = document.getElementById('mc-note');
-          if (noteD) noteD.textContent = 'Denial MOE — “Chance of Success” = P(denial index ≥ 0.5). Continuous effect breakdown shown above.';
+          if (noteD) noteD.textContent = 'Denial MOE — threshold rate = fraction of model trials with denial index ≥ 0.5; continuous effect breakdown shown above.';
           addEvent({ type: 'MC', text: 'Denial MOE: index ' + Math.round(mDI * 100) + '%, throughput ' + Math.round(mTput * 100) + '%, halt ' + haltPct + '%.' });
         }
       } catch (err) {
@@ -5983,7 +5985,7 @@
             <div class="kv-row"><span>Trials</span><strong>${r.trials.toLocaleString()}</strong></div>
             <div class="kv-row"><span>Seed / RNG</span><strong>${r.seed} / ${r.rng}</strong></div>
             <div class="kv-row"><span>Success Rule</span><strong>${r.successMode === 'impact' ? `Impact ≥ ${r.victoryThreshold}` : `Neutralize ${r.successN}`}</strong></div>
-            <div class="kv-row"><span>Chance of Success</span><strong>${Math.round(r.successRate*100)}%</strong></div>
+            <div class="kv-row"><span>Model-Trial Threshold Rate</span><strong>${Math.round(r.successRate*100)}% · 95% interval ${Math.round(r.successCiLo*100)}–${Math.round(r.successCiHi*100)}%</strong></div>
             <div class="kv-row"><span>Avg Steps (wins)</span><strong>${r.avgSteps}</strong></div>
             <div class="kv-row"><span>Avg Impact (wins)</span><strong>${r.expImpact}</strong></div>
             <div class="kv-row"><span>Typical/Strong Impact</span><strong>${r.p50Impact}/${r.p90Impact}</strong></div>

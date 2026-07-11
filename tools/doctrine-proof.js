@@ -33,7 +33,7 @@ function load(activeGraph) {
   for (const file of ['moe.js', 'red-mind.js', 'game.js']) {
     vm.runInContext(read(file), context, { filename: file });
   }
-  return { game: context.window.GameModule, mind: context.window.RedMindModule };
+  return { game: context.window.GameModule, mind: context.window.RedMindModule, moe: context.window.MoeModule };
 }
 
 const results = [];
@@ -60,13 +60,14 @@ function play(seed, difficulty = 'hard') {
 
 function forecastFixture() {
   const g = graph();
-  const { game, mind } = load(g);
+  const { game, mind, moe } = load(g);
   game.init({});
   const state = game.newMatch({ control: { blue: 'human', red: 'ai' }, difficulty: { blue: 'hard', red: 'hard' }, turnLimit: 8, seed: 4242 });
   const I = game._internal;
   const board = I.buildBoard(g);
   const blueOrders = I.planOrders(board, 'blue', state.ap.blue, mind.BALANCED, I.makeRng(I.hashSeed(4242, 'proof-blue')));
   const belief = mind.normalizeBelief(state.redMind.belief);
+  const compiledMoe = moe.compileGraph(I.moeRedNodes(board));
   function run() {
     const started = process.hrtime.bigint();
     const cache = I.buildBeliefPlanCache(board, state.ap, 'hard', 4242, 1, state.cfg);
@@ -77,7 +78,8 @@ function forecastFixture() {
       const sampled = I.sampleBeliefPlan(cache, belief, 4242, 1, k);
       const report = I.resolveTurn(working, blueOrders.concat(sampled.orders), state.cfg,
         I.makeRng(I.hashSeed(4242, 'ghost-res', 1, k)));
-      rows.push({ doctrine: sampled.doctrine, kills: report.kills.slice(), scoreDelta: report.scoreDelta });
+      const denial = moe.assessCompiled(compiledMoe, working.nodes);
+      rows.push({ doctrine: sampled.doctrine, kills: report.kills.slice(), scoreDelta: report.scoreDelta, throughput: denial.throughput });
     }
     return { bytes: JSON.stringify({ cache: { byDoctrine: cache.byDoctrine, rollouts: cache.rollouts }, rows }), ms: Number(process.hrtime.bigint() - started) / 1e6, cache };
   }

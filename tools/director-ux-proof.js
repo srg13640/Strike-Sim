@@ -19,6 +19,7 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const director = read('director.js');
+const game = read('game.js');
 const inline = read('inline-datasets.js');
 const state = read('state.js');
 const shell = read('StrikeSim2040.html');
@@ -90,9 +91,16 @@ function verifyStaticContract() {
     has(director, 'Deliberate pass: Blue will take no action this turn. Red will still act.'));
 
   check('Plan uses Review wording', has(director, 'REVIEW FORECAST →'));
-  check('Commit uses Review and commit wording', has(director, 'Review and commit.'));
-  check('final action is Commit and Execute', has(director, 'COMMIT &amp; EXECUTE ▶'));
-  check('Red timing is described honestly', has(director, 'Red will commit simultaneously when you execute.'));
+  check('Commit uses blind then house then one-final-revision flow',
+    has(director, 'COMMIT CARD · BLIND') && has(director, 'HOUSE REVEALED') &&
+    has(director, 'data-act="submit-blind"') && has(director, 'data-act="submit-final"'));
+  check('engine-enforced order lock wraps the Commit Card',
+    has(director, "GM._internal.lockOrders('blue')") && has(director, "GM._internal.lockedOrderHash('blue')") &&
+    has(game, 'function lockOrders(side)') && has(game, 'orders-locked'));
+  check('three event calls are must-touch before blind submit',
+    has(director, 'card.set.questions.every') && has(director, 'card.touched[beliefId] = true'));
+  check('final action commits forecasts and executes', has(director, 'COMMIT FORECASTS &amp; EXECUTE ▶'));
+  check('Red timing is described honestly', has(director, 'Orders lock blind; Red commits when you execute.'));
   check('obsolete commit wording is absent',
     !has(director, 'FORECAST &amp; COMMIT') && !has(director, 'Red has already committed'));
 

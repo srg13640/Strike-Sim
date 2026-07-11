@@ -31,6 +31,12 @@ window.DirectorModule = (function () {
     targetId: null,
     forecasts: {},        // turn -> forecast summary (honesty ledger)
     actuals: {},          // turn -> actual outcome summary
+    judgments: {},        // turn -> locked blind/final Commit Card record
+    standingForecasts: [],
+    scoredEntries: [],
+    intervalScores: [],
+    commitCard: null,
+    standingCarry: null,
     lastForecast: null,
     record: null,         // GM.serialize() snapshot at match end (for counterfactuals)
     aar: null,
@@ -60,6 +66,23 @@ window.DirectorModule = (function () {
   }
   function bandStr(b, unit) { return b.lo === b.hi ? (b.lo + (unit || '')) : (b.lo + '–' + b.hi + (unit || '')); }
   function nodeVal(b) { return (b.importance || 1) * (b.casc || b.cascScore || 1); }
+  var FORECAST_ARCHIVE_KEY = 'strikesim.co005.v1.forecasts';
+  function readForecastArchive() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(FORECAST_ARCHIVE_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function writeForecastArchive(entries) {
+    try { localStorage.setItem(FORECAST_ARCHIVE_KEY, JSON.stringify((entries || []).slice(-2000))); } catch (e) {}
+  }
+  function appendForecastEntries(entries) {
+    if (!entries || !entries.length) return;
+    var archive = readForecastArchive(), byId = {};
+    archive.forEach(function (entry) { byId[entry.entryId] = entry; });
+    entries.forEach(function (entry) { byId[entry.entryId] = entry; });
+    writeForecastArchive(Object.keys(byId).map(function (id) { return byId[id]; }));
+  }
   function refreshVisuals() {
     try { if (typeof refreshMapMarkers === 'function') refreshMapMarkers(); } catch (e) {}
     try { if (typeof refreshTable === 'function') refreshTable(); } catch (e) {}
@@ -232,6 +255,14 @@ window.DirectorModule = (function () {
       '.dir-fc .cell b{display:block;font:700 20px Oswald;color:#eaf6fd;}',
       '.dir-fc .cell span{font-size:11px;color:#7f9db5;letter-spacing:.06em;}',
       '.dir-fc .honesty{margin-top:9px;font-size:11.5px;color:#6d8ca4;font-style:italic;text-align:center;}',
+      '.dir-belief{padding:11px 0 13px;border-bottom:1px solid #173047;}',
+      '.dir-belief:last-child{border-bottom:0;}',
+      '.dir-belief .head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;}',
+      '.dir-belief .head b{color:#e8f5fc;font-size:13px;}.dir-belief .head output{font:700 18px Oswald;color:#70d9ff;}',
+      '.dir-belief input[type=range]{width:100%;accent-color:#29b9ed;cursor:pointer;margin:8px 0 0;}',
+      '.dir-house{margin-top:7px;padding:7px 9px;border-left:2px solid #5aa9cc;background:#0a1c29;color:#a9cee2;font-size:12px;}',
+      '.dir-lock{display:inline-block;border:1px solid #43677d;border-radius:999px;padding:2px 8px;color:#9fc9dd;font:700 10px Oswald;letter-spacing:.12em;}',
+      '.dir-scoreline{margin-top:7px;color:#c9e5f3;font-size:12px;}',
       // command dock (PLAN)
       '#dir-dock{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:1500;display:none;width:min(960px,94vw);',
       'background:linear-gradient(180deg,rgba(12,22,32,.96),rgba(8,14,20,.97));border:1px solid #1f4058;border-radius:14px;',
@@ -301,6 +332,7 @@ window.DirectorModule = (function () {
     document.body.appendChild(el('<div id="dir-dock" role="region" aria-label="Operation planning controls"></div>'));
     document.body.appendChild(el('<div id="dir-feed" role="log" aria-live="polite" aria-label="Turn resolution" tabindex="-1"></div>'));
     $('dir-overlay').addEventListener('click', onOverlayClick);
+    $('dir-overlay').addEventListener('input', onOverlayInput);
     $('dir-overlay').addEventListener('keydown', onOverlayKeydown);
     $('dir-dock').addEventListener('click', onDockClick);
     $('dir-dock').addEventListener('change', onDockChange);
@@ -374,7 +406,9 @@ window.DirectorModule = (function () {
       control: { blue: 'human', red: 'ai' },
       difficulty: { blue: 'hard', red: briefOpts.redDiff }
     });
-    op.forecasts = {}; op.actuals = {}; op.record = null; op.aar = null; op.aarExported = false; op.targetId = null;
+    op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
+    op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
+    op.record = null; op.aar = null; op.aarExported = false; op.targetId = null;
     op.panelState = null; op.focusMode = true;
   }
 
@@ -700,7 +734,52 @@ window.DirectorModule = (function () {
     var cache = I.buildBeliefPlanCache(base, st.ap, snapshot.cfg.difficulty.red,
       snapshot.seed, snapshot.turn, snapshot.cfg);
     cache.template = base;
+    cache.moeCompiled = window.MoeModule && window.MoeModule.compileGraph
+      ? window.MoeModule.compileGraph(I.moeRedNodes(base)) : null;
     return cache;
+  }
+
+  function canonicalWorldSnapshot(board, report, state, turn, I, focusId, compiledMoe) {
+    var nodes = {}, redDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
+    var focus = board.nodes[focusId] || board.nodes[(board.rosters.red || [])[0]];
+    if (focus) nodes[focus.id] = { team: focus.team, alive: !!focus.alive, healthFrac: Math.max(0, Math.min(1, Number(focus.health || 0) / Number(focus.healthMax || 100))) };
+    var keyIds = {};
+    (state.objectiveIds.blue || []).forEach(function (id) { keyIds[id] = true; });
+    (report.events || []).forEach(function (e) {
+      if (e.kind !== 'kill' && e.kind !== 'cascade') return;
+      var n = board.nodes[e.targetId];
+      if (!n) return;
+      var descriptor = String(n.subsystem || '') + ' ' + String(n.type || '');
+      if (n.team === 'red') {
+        redDown++;
+        if (/sensor|isr|recon|surveillance/i.test(descriptor)) sensorDown++;
+        if (/command|c2|headquarters/i.test(descriptor)) commandDown++;
+      } else if (keyIds[e.targetId]) blueKeyLost++;
+    });
+    var assessment = window.MoeModule && compiledMoe && window.MoeModule.assessCompiled
+      ? window.MoeModule.assessCompiled(compiledMoe, board.nodes)
+      : window.MoeModule && window.MoeModule.assessGraph ? window.MoeModule.assessGraph(I.moeRedNodes(board)) : null;
+    var throughput = assessment ? Number(assessment.throughput || 0) : 0;
+    var startingLodgment = Number(state.lodgment && state.lodgment.value || 0);
+    var endLodgment = Math.min(1, startingLodgment + throughput / 4);
+    var remainingToT5 = Math.max(0, 5 - Number(turn || state.turn || 1));
+    return {
+      nodes: nodes,
+      red: {
+        throughput: throughput,
+        lodgment: endLodgment,
+        projectedLodgmentT5: Math.min(1, endLodgment + throughput * remainingToT5 / 4),
+        nodesDownThisTurn: redDown,
+        sensorNodesDownThisTurn: sensorDown,
+        commandNodesDownThisTurn: commandDown
+      },
+      blue: {
+        keyNodesLostThisTurn: blueKeyLost,
+        alive: (board.rosters.blue || []).filter(function (id) { return board.nodes[id] && board.nodes[id].alive; }).length,
+        tempoFrac: Number(state.tempo && state.tempo.blue && state.tempo.blue.frac || 1)
+      },
+      result: { halt: !!(assessment && assessment.halt), lodgmentComplete: endLodgment >= 1 }
+    };
   }
 
   function ghostForecast(K) {
@@ -710,8 +789,10 @@ window.DirectorModule = (function () {
     var belief = window.RedMindModule.normalizeBelief(st.redMind && st.redMind.belief);
     var planCache = ghostPlanCache(I, s, st);
     var blueOrders = st.orders.blue;
+    var primaryOrder = blueOrders.filter(function (o) { return o.kind === 'strike'; })[0] || null;
+    var primaryId = primaryOrder ? primaryOrder.targetId : ((planCache.template.rosters.red || [])[0] || '');
     var objBlue = st.objectiveIds.blue || [];
-    var redKills = [], blueKills = [], swing = [], objHitWorlds = 0;
+    var redKills = [], blueKills = [], swing = [], objHitWorlds = 0, worlds = [];
     var board = I.cloneBoardForAi(planCache.template);
     for (var k = 0; k < K; k++) {
       I.resetBoardForAi(board, planCache.template);
@@ -731,13 +812,17 @@ window.DirectorModule = (function () {
       if (objDown > 0) objHitWorlds++;
       redKills.push(rk); blueKills.push(bk);
       swing.push(Math.round((rep.scoreDelta.blue - rep.scoreDelta.red) * 10) / 10);
+      worlds.push(canonicalWorldSnapshot(board, rep, st, s.turn, I, primaryId, planCache.moeCompiled));
     }
     return {
       K: K, turn: s.turn,
       belief: belief,
       planningRollouts: planCache.rollouts,
+      worlds: worlds,
       redKills: band(redKills), blueKills: band(blueKills),
-      objRisk: Math.round(100 * objHitWorlds / K), swing: band(swing)
+      objRisk: Math.round(100 * objHitWorlds / K),
+      objRiskInterval: window.ForecastingModule.wilson(objHitWorlds, K),
+      swing: band(swing)
     };
   }
 
@@ -746,7 +831,7 @@ window.DirectorModule = (function () {
       '<div class="rows">' +
       '<div class="cell"><b>' + bandStr(f.redKills) + '</b><span>RED NODES DOWN (10th–90th pct)</span></div>' +
       '<div class="cell"><b>' + bandStr(f.blueKills) + '</b><span>BLUE NODES LOST</span></div>' +
-      '<div class="cell"><b>' + f.objRisk + '%</b><span>WORLDS WHERE A KEY OBJECTIVE FALLS</span></div>' +
+      '<div class="cell"><b>' + f.objRisk + '%</b><span>KEY-OBJECTIVE LOSS · 90% FREQ ' + Math.round(f.objRiskInterval.lo * 100) + '–' + Math.round(f.objRiskInterval.hi * 100) + '%</span></div>' +
       '</div>' +
       '<div class="honesty">Ghost Red types are sampled from your current intel assessment (' +
       Math.round((f.belief.attrition || 0) * 100) + '/' + Math.round((f.belief.decapitation || 0) * 100) + '/' + Math.round((f.belief.denial || 0) * 100) +
@@ -754,30 +839,111 @@ window.DirectorModule = (function () {
   }
 
   // ---- COMMIT (the ritual) -------------------------------------------------------------
-  function openCommit() {
-    var st = GM.getState();
-    if (!st || st.phase !== 'plan') return;   // never forecast/commit a finished match
-    op.lastForecast = ghostForecast(GHOSTS);
-    op.forecasts[st.turn] = op.lastForecast;
-    setPhase('commit');
+  function commitOrderRows(st) {
     var methods = GM.methods();
-    var rows = st.orders.blue.length ? st.orders.blue.map(function (o) {
+    return st.orders.blue.length ? st.orders.blue.map(function (o) {
       var n = GM.boardNode(o.targetId);
       var src = o.sourceId ? GM.boardNode(o.sourceId) : null;
       var what = o.kind === 'strike' ? (methods[o.methodKey] ? methods[o.methodKey].name : 'Strike') : o.kind.charAt(0).toUpperCase() + o.kind.slice(1);
       return '<div class="dir-obj"><span>' + esc(what) + ' → ' + esc(n ? n.name : o.targetId) + '</span><span class="v">' + (src ? 'via ' + esc(src.name) : (n ? esc(n.difficulty || '') : '')) + '</span></div>';
     }).join('') : '<div class="dir-note" style="color:#ffd18a">Deliberate pass: Blue will take no action this turn. Red will still act.</div>';
+  }
 
+  function copyBeliefValues(values) {
+    return { questions: Object.assign({}, values.questions), standing: values.standing, lower: values.lower, upper: values.upper };
+  }
+
+  function primaryQuestionContext(st) {
+    var order = st.orders.blue.filter(function (o) { return o.kind === 'strike'; })[0] || null;
+    var target = order ? GM.boardNode(order.targetId) : null;
+    return {
+      turn: st.turn,
+      primaryTargetId: target ? target.id : (st.objectiveIds.red || [])[0],
+      primaryTargetName: target ? target.name : 'lead Red objective',
+      primaryTarget: target || {}
+    };
+  }
+
+  function cardIsReady(card) {
+    if (!card) return false;
+    var allTouched = card.set.questions.every(function (q) { return !!card.touched[q.id]; });
+    var values = card.step === 'blind' ? card.values : card.final;
+    return allTouched && values && values.lower < values.upper;
+  }
+
+  function beliefControl(q, value, reveal) {
+    var house = reveal ? '<div class="dir-house">House model worlds: <b>' + q.house.hits + '/' + q.house.K + ' · ' + Math.round(q.house.q * 100) + '%</b> (90% frequency interval ' + Math.round(q.house.interval.lo * 100) + '–' + Math.round(q.house.interval.hi * 100) + '%).</div>' : '';
+    return '<div class="dir-belief"><div class="head"><b>' + esc(q.prompt) + '</b><output id="dir-value-' + esc(q.id) + '">' + Math.round(value * 100) + '%</output></div>' +
+      '<input type="range" min="1" max="99" step="1" value="' + Math.round(value * 100) + '" data-belief-id="' + esc(q.id) + '" aria-label="' + esc(q.prompt) + '">' + house + '</div>';
+  }
+
+  function intervalControls(card, values, reveal) {
+    var h = card.set.interval.house;
+    var house = reveal ? '<div class="dir-house">House 10th–90th percentile band: <b>' + Math.round(h.lo * 100) + '–' + Math.round(h.hi * 100) + '%</b> across ' + h.K + ' model worlds.</div>' : '';
+    return '<div class="dir-belief"><div class="head"><b>' + esc(card.set.interval.prompt) + '</b><output id="dir-value-interval">' + Math.round(values.lower * 100) + '–' + Math.round(values.upper * 100) + '%</output></div>' +
+      '<label class="dir-note">LOWER <input type="range" min="0" max="99" step="1" value="' + Math.round(values.lower * 100) + '" data-interval="lower" aria-label="Lower bound for Red throughput"></label>' +
+      '<label class="dir-note">UPPER <input type="range" min="1" max="100" step="1" value="' + Math.round(values.upper * 100) + '" data-interval="upper" aria-label="Upper bound for Red throughput"></label>' + house + '</div>';
+  }
+
+  function standingControl(card, values, reveal) {
+    var q = card.set.standing;
+    var house = reveal ? '<div class="dir-house">House projection: <b>' + q.house.hits + '/' + q.house.K + ' · ' + Math.round(q.house.q * 100) + '%</b> (90% frequency interval ' + Math.round(q.house.interval.lo * 100) + '–' + Math.round(q.house.interval.hi * 100) + '%). ' + esc(q.projectionNote) + '</div>' : '';
+    return '<div class="dir-belief"><div class="head"><b>' + esc(q.prompt) + '</b><output id="dir-value-standing">' + Math.round(values.standing * 100) + '%</output></div>' +
+      '<input type="range" min="1" max="99" step="1" value="' + Math.round(values.standing * 100) + '" data-standing="1" aria-label="' + esc(q.prompt) + '">' + house + '</div>';
+  }
+
+  function renderBlindCommit() {
+    var card = op.commitCard, st = GM.getState();
+    if (!card || !st) return;
     $('dir-wrap').innerHTML =
-      '<div class="dir-kicker">COMMIT · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
-      '<h1 class="dir-h1">Review and commit.</h1>' +
-      '<div class="dir-sub">Red will commit simultaneously when you execute. Resolution is seeded and irreversible.</div>' +
-      '<div class="dir-card"><h3>YOUR ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + rows + '</div>' +
+      '<div class="dir-kicker">COMMIT CARD · BLIND · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
+      '<h1 class="dir-h1">What do you believe?</h1>' +
+      '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Forecast before seeing the house. Move each of the three event sliders.</div>' +
+      '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
+      '<div class="dir-card"><h3>THREE RESOLVABLE CALLS</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.values.questions[q.id], false); }).join('') + '</div>' +
+      '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.values, false) + standingControl(card, card.values, false) + '</div>' +
+      '<div class="dir-note">Your point probabilities are the instrument. The game is not issuing an operation-success probability.</div>' +
+      '<div class="dir-actions"><button class="dir-btn" data-act="unlock-commit">← UNLOCK &amp; REPLAN</button>' +
+      '<button class="dir-btn primary" data-act="submit-blind"' + (cardIsReady(card) ? '' : ' disabled') + '>LOCK BLIND FORECASTS →</button></div>';
+  }
+
+  function renderHybridCommit() {
+    var card = op.commitCard, st = GM.getState();
+    if (!card || !st) return;
+    $('dir-wrap').innerHTML =
+      '<div class="dir-kicker">COMMIT CARD · HOUSE REVEALED · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
+      '<h1 class="dir-h1">Revise once—then live with it.</h1>' +
+      '<div class="dir-sub"><span class="dir-lock">ORDERS REMAIN LOCKED</span> The house line is a model-world frequency with an interval, not a promise.</div>' +
       forecastStrip(op.lastForecast) +
-      '<div class="dir-actions">' +
-      '<span class="dir-note">Seed ' + esc(String(GMseed())) + ' · turn draw is deterministic.</span>' +
-      '<button class="dir-btn" data-act="back">← REVISE</button>' +
-      '<button class="dir-btn primary" data-act="execute">COMMIT &amp; EXECUTE ▶</button></div>';
+      '<div class="dir-card"><h3>HOUSE vs YOU</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.final.questions[q.id], true); }).join('') +
+      '<div class="dir-note">Copying every house value produces Brier Skill Score 0 by construction. Positive skill requires diverging and being right over many resolved calls.</div></div>' +
+      '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.final, true) + standingControl(card, card.final, true) + '</div>' +
+      '<div class="dir-actions"><span class="dir-note">One seeded world will resolve. One outcome cannot validate a probability.</span>' +
+      '<button class="dir-btn primary" data-act="submit-final"' + (card.final.lower < card.final.upper ? '' : ' disabled') + '>COMMIT FORECASTS &amp; EXECUTE ▶</button></div>';
+  }
+
+  function openCommit() {
+    var st = GM.getState();
+    if (!st || st.phase !== 'plan') return;   // never forecast/commit a finished match
+    var lock = GM._internal.lockOrders('blue');
+    if (!lock.ok) return;
+    st = GM.getState();
+    var forecast = ghostForecast(GHOSTS);
+    var questionSet = window.ForecastingModule.generateQuestionSet(forecast.worlds, primaryQuestionContext(st));
+    delete forecast.worlds;
+    forecast.questionSet = questionSet;
+    op.lastForecast = forecast;
+    op.forecasts[st.turn] = forecast;
+    var questions = {};
+    questionSet.questions.forEach(function (q) { questions[q.id] = 0.50; });
+    op.commitCard = {
+      turn: st.turn, lock: lock, step: 'blind', set: questionSet,
+      touched: {},
+      values: { questions: questions, standing: op.standingCarry == null ? 0.50 : op.standingCarry, lower: 0.25, upper: 0.75 },
+      blind: null, final: null
+    };
+    setPhase('commit');
+    renderBlindCommit();
   }
 
   // ---- WATCH (paced playback of the one true draw) --------------------------------------
@@ -785,6 +951,27 @@ window.DirectorModule = (function () {
     var stBefore = GM.getState();
     if (!stBefore || stBefore.phase !== 'plan') return;
     var turn = stBefore.turn;
+    var card = op.commitCard;
+    if (!card || card.turn !== turn || card.step !== 'ready') return;
+    if (GM._internal.lockedOrderHash('blue') !== card.lock.orderHash) {
+      evt('Commit stopped — locked order hash changed.');
+      return;
+    }
+    op.judgments[turn] = {
+      turn: turn,
+      lock: Object.assign({}, card.lock),
+      questionSet: card.set,
+      blind: copyBeliefValues(card.blind),
+      final: copyBeliefValues(card.final),
+      scored: false
+    };
+    op.standingForecasts.push({
+      turn: turn,
+      question: card.set.standing,
+      blind: card.blind.standing,
+      final: card.final.standing
+    });
+    op.commitCard = null;
     var st = GM.commitTurn();
     setPhase('watch');
     forceMapView();
@@ -793,6 +980,7 @@ window.DirectorModule = (function () {
     // so the final state does not spoil its own playback.
     var report = st.lastReport || { events: [] };
     op.actuals[turn] = actualSummary(report);
+    scoreTurnJudgment(st, report);
     playWatch(report, st);
     setTimeout(function () { try { $('dir-feed').focus(); } catch (e) {} }, 0);
     evt('Turn ' + turn + ' executed — watching resolution.');
@@ -807,6 +995,113 @@ window.DirectorModule = (function () {
       if (n.team === 'red') rk++; else if (n.team === 'blue') bk++;
     });
     return { redKills: rk, blueKills: bk };
+  }
+
+  function actualJudgmentSnapshot(st, report, judgment) {
+    var focusQuestion = judgment.questionSet.questions[0];
+    var match = focusQuestion && String(focusQuestion.predicate.path || '').match(/^nodes\.(.+)\.alive$/);
+    var focusId = match ? match[1] : null;
+    var focus = focusId ? GM.boardNode(focusId) : null;
+    var nodes = {};
+    if (focus) nodes[focus.id] = { team: focus.team, alive: !!focus.alive, healthFrac: Math.max(0, Math.min(1, Number(focus.health || 0) / Number(focus.healthMax || 100))) };
+    var keyIds = {}, redDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
+    (st.objectiveIds.blue || []).forEach(function (id) { keyIds[id] = true; });
+    (report.events || []).forEach(function (e) {
+      if (e.kind !== 'kill' && e.kind !== 'cascade') return;
+      var n = GM.boardNode(e.targetId);
+      if (!n) return;
+      var descriptor = String(n.subsystem || '') + ' ' + String(n.type || '');
+      if (n.team === 'red') {
+        redDown++;
+        if (/sensor|isr|recon|surveillance/i.test(descriptor)) sensorDown++;
+        if (/command|c2|headquarters/i.test(descriptor)) commandDown++;
+      } else if (keyIds[e.targetId]) blueKeyLost++;
+    });
+    var denial = (st.denialHistory || []).filter(function (x) { return x.turn === report.turn; })[0] || {};
+    return {
+      nodes: nodes,
+      red: {
+        throughput: Number(denial.throughput || 0),
+        lodgment: Number(st.lodgment && st.lodgment.value || 0),
+        projectedLodgmentT5: Number(st.lodgment && st.lodgment.value || 0),
+        nodesDownThisTurn: redDown,
+        sensorNodesDownThisTurn: sensorDown,
+        commandNodesDownThisTurn: commandDown
+      },
+      blue: { keyNodesLostThisTurn: blueKeyLost, alive: st.alive.blue, tempoFrac: st.tempo.blue.frac },
+      result: { halt: !!(st.result && st.result.reason === 'halt'), lodgmentComplete: !!(st.result && st.result.reason === 'lodgment') }
+    };
+  }
+
+  function scoreTurnJudgment(st, report) {
+    var judgment = op.judgments[report.turn];
+    if (!judgment || judgment.scored) return;
+    var F = window.ForecastingModule;
+    var snapshot = actualJudgmentSnapshot(st, report, judgment);
+    var seed = GMseed(), newEntries = [];
+    judgment.entries = judgment.questionSet.questions.map(function (q) {
+      var actual = F.resolvePredicate(snapshot, q.predicate);
+      if (!actual.resolved) throw new Error('Commit Card question failed to resolve: ' + q.id);
+      var entry = {
+        entryId: String(seed) + ':t' + report.turn + ':' + q.id,
+        questionId: q.id,
+        operationSeed: seed,
+        turn: report.turn,
+        category: q.category,
+        player: judgment.final.questions[q.id],
+        blind: judgment.blind.questions[q.id],
+        house: q.house.q,
+        outcome: actual.outcome,
+        playerBrier: F.brier(judgment.final.questions[q.id], actual.outcome),
+        blindBrier: F.brier(judgment.blind.questions[q.id], actual.outcome),
+        houseBrier: F.brier(q.house.q, actual.outcome)
+      };
+      newEntries.push(entry);
+      return entry;
+    });
+    var throughput = snapshot.red.throughput;
+    judgment.interval = {
+      lower: judgment.final.lower,
+      upper: judgment.final.upper,
+      actual: throughput,
+      score: F.winkler(judgment.final.lower, judgment.final.upper, throughput, 0.2)
+    };
+    op.intervalScores.push(judgment.interval);
+
+    // Resolve every carried T+5 forecast together so updating earns or loses score.
+    if (report.turn >= 5 || st.phase === 'over') {
+      op.standingForecasts.forEach(function (standing) {
+        if (standing.resolved) return;
+        var actual = F.resolvePredicate(snapshot, standing.question.predicate);
+        if (!actual.resolved) return;
+        var entry = {
+          entryId: String(seed) + ':standing:t' + standing.turn,
+          questionId: standing.question.id,
+          operationSeed: seed,
+          turn: standing.turn,
+          resolvedTurn: report.turn,
+          category: standing.question.category,
+          player: standing.final,
+          blind: standing.blind,
+          house: standing.question.house.q,
+          outcome: actual.outcome,
+          playerBrier: F.brier(standing.final, actual.outcome),
+          blindBrier: F.brier(standing.blind, actual.outcome),
+          houseBrier: F.brier(standing.question.house.q, actual.outcome)
+        };
+        standing.resolved = true; standing.entry = entry;
+        newEntries.push(entry);
+      });
+    }
+    judgment.scored = true;
+    op.scoredEntries = op.scoredEntries.concat(newEntries);
+    appendForecastEntries(newEntries);
+    var turnSkill = F.brierSkill(judgment.entries);
+    judgment.summary = {
+      playerMean: turnSkill.n ? turnSkill.player / turnSkill.n : null,
+      houseMean: turnSkill.n ? turnSkill.house / turnSkill.n : null,
+      hybridLift: judgment.entries.length ? judgment.entries.reduce(function (sum, e) { return sum + e.blindBrier - e.playerBrier; }, 0) / judgment.entries.length : null
+    };
   }
 
   function clearWatchTimers() { op.watchTimers.forEach(clearTimeout); op.watchTimers = []; }
@@ -864,6 +1159,10 @@ window.DirectorModule = (function () {
     var honesty = (f && a) ?
       '<div class="dir-note">Forecast said ' + bandStr(f.redKills) + ' Red down — the world drew ' + a.redKills + '.' +
       (a.redKills >= f.redKills.lo && a.redKills <= f.redKills.hi ? ' Inside the band.' : ' Outside the band — note it.') + '</div>' : '';
+    var judgment = op.judgments[report.turn];
+    var judgmentLine = judgment && judgment.summary ? '<div class="dir-scoreline"><b>HOUSE vs YOU · ONE WORLD’S VERDICT:</b> your mean Brier ' + judgment.summary.playerMean.toFixed(3) + ' · house ' + judgment.summary.houseMean.toFixed(3) +
+      ' · blind→hybrid lift ' + (judgment.summary.hybridLift >= 0 ? '+' : '') + judgment.summary.hybridLift.toFixed(3) + '. Lower Brier is better; one turn is noisy.' +
+      (judgment.interval ? ' Your 80% range ' + (judgment.interval.actual >= judgment.interval.lower && judgment.interval.actual <= judgment.interval.upper ? 'covered' : 'missed') + ' this world (interval score ' + judgment.interval.score.toFixed(2) + ').' : '') + '</div>' : '';
     var over = st.phase === 'over';
     var lastTurn = !over && st.turn >= st.cfg.turnLimit;   // turn limit ends the match on advance
     var denial = (st.denialHistory || []).slice(-1)[0] || null;
@@ -871,7 +1170,7 @@ window.DirectorModule = (function () {
     var html = '<div class="outcome"><b>TURN ' + report.turn + ' COMPLETE</b><br>' +
       'Red lost <b>' + (a ? a.redKills : 0) + '</b> · Blue lost <b>' + (a ? a.blueKills : 0) + '</b> · ' +
       'Your objectives <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + '</b> · ' +
-      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + '<br>' + honesty +
+      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + '<br>' + honesty + judgmentLine +
       '<div class="dir-actions" style="margin-top:10px">' +
       (over ? '<button class="dir-btn primary" data-act="aar">AFTER-ACTION REVIEW →</button>'
         : lastTurn ? '<button class="dir-btn primary" data-act="next">END OF OPERATION — AAR →</button>'
@@ -1056,6 +1355,32 @@ window.DirectorModule = (function () {
     return { label: winner.toUpperCase() + ' OPERATIONAL OUTCOME', cls: winner === 'blue' ? 'win' : 'loss' };
   }
 
+  function calibrationCardHtml() {
+    var F = window.ForecastingModule;
+    var entries = readForecastArchive().filter(function (e) { return e && e.player != null && e.house != null && e.outcome != null; });
+    var skill = F.brierSkill(entries);
+    var seed = op.record && op.record.seed || 1;
+    var band = F.bootstrapBss(entries, GM._internal.makeRng(GM._internal.hashSeed(seed, 'calibration-bootstrap', entries.length)), 500);
+    var rank = F.analystRank(entries, band);
+    var decomposition = F.murphy(entries);
+    var buckets = F.foldedBuckets(entries).filter(function (b) { return b.display; });
+    var bucketText = buckets.length ? buckets.map(function (b) {
+      var gap = Math.round((b.forecast - b.observed) * 100);
+      return '<li>On ' + b.n + ' calls where your confidence averaged ' + Math.round(b.forecast * 100) + '%, the selected outcome occurred ' + Math.round(b.observed * 100) + '% of the time' + (gap ? ' — gap ' + (gap > 0 ? '+' : '') + gap + ' points.' : '.') + '</li>';
+    }).join('') : '<li>Confidence-bucket sentences appear only after 10 calls land in a bucket.</li>';
+    var bssText = skill.value == null ? 'undefined (house error is zero)' : (skill.value >= 0 ? '+' : '') + skill.value.toFixed(3);
+    var bandText = band.lo == null ? 'band unavailable' : '90% bootstrap ' + (band.lo >= 0 ? '+' : '') + band.lo.toFixed(3) + ' to ' + (band.hi >= 0 ? '+' : '') + band.hi.toFixed(3);
+    var verdict = rank.verdict ? '<b>' + esc(rank.label) + '</b> — ' + esc(rank.note) : '<b>No calibration verdict yet.</b> ' + esc(rank.note);
+    return '<div class="dir-card"><h3>CALIBRATION CARD — HOUSE vs YOU</h3>' +
+      '<div class="dir-metrics"><div class="dir-metric"><b>' + esc(bssText) + '</b><span>BRIER SKILL vs HOUSE · N=' + entries.length + '</span></div>' +
+      '<div class="dir-metric"><b>' + (decomposition.rel == null ? '—' : decomposition.rel.toFixed(3)) + '</b><span>HONESTY WITH YOURSELF · REL</span></div>' +
+      '<div class="dir-metric"><b>' + (decomposition.res == null ? '—' : decomposition.res.toFixed(3)) + '</b><span>WILLINGNESS TO CALL IT · RES</span></div>' +
+      '<div class="dir-metric"><b>' + esc(rank.label) + '</b><span>ANALYST TRACK · N≥50 GATE</span></div></div>' +
+      '<div class="dir-scoreline">' + verdict + ' ' + esc(bandText) + '</div>' +
+      '<ul class="dir-note" style="font-style:normal">' + bucketText + '</ul>' +
+      '<div class="dir-note">BSS = 1 − your cumulative Brier / house cumulative Brier. Copying the house scores exactly 0 by construction. Per-turn scores are proper but noisy; rank and judgment labels require at least 50 resolved calls and a sustained uncertainty bound.</div></div>';
+  }
+
   function openAar() {
     var st = GM.getState();
     op.record = GM.serialize();
@@ -1098,6 +1423,8 @@ window.DirectorModule = (function () {
       '<table class="dir-ledger"><tr><th>Turn</th><th>Fcst Red down</th><th>Actual</th><th>Fcst Blue lost</th><th>Actual</th><th>Verdict</th></tr>' +
       ledgerRows() + '</table>' +
       '<div class="dir-note" style="margin-top:6px">A good forecast is honest, not lucky: actuals should land inside the band ~80% of the time.</div></div>' +
+
+      calibrationCardHtml() +
 
       '<div class="dir-card"><h3>EXPERIMENTAL ATTRITION SENSITIVITY — SAME DRAW, ONE CHANGED POLICY</h3>' +
       '<div class="dir-note" style="margin-bottom:6px">Directional comparison only: these legacy probes replay objective collapse and attrition score; they do not reproduce the invasion denial/lodgment arbiter above.</div>' +
@@ -1159,6 +1486,17 @@ window.DirectorModule = (function () {
       if (d) lines.push('- Throughput ' + Math.round(d.throughput * 100) + '%; system coherence ' + Math.round(d.osvi * 100) + '%; lodgment ' + Math.round(((l && l.value) || 0) * 100) + '%.');
       lines.push('');
     });
+    var F = window.ForecastingModule;
+    var calibrationEntries = readForecastArchive().filter(function (e) { return e && e.player != null && e.house != null && e.outcome != null; });
+    var skill = F.brierSkill(calibrationEntries);
+    var band = F.bootstrapBss(calibrationEntries, GM._internal.makeRng(GM._internal.hashSeed(rec.seed || 1, 'calibration-export', calibrationEntries.length)), 500);
+    var rank = F.analystRank(calibrationEntries, band);
+    lines.push('## House vs You calibration', '',
+      '- Resolved calls: ' + calibrationEntries.length,
+      '- Brier Skill Score vs house: ' + (skill.value == null ? 'undefined (house error was zero)' : (skill.value >= 0 ? '+' : '') + skill.value.toFixed(3)),
+      '- 90% clustered bootstrap: ' + (band.lo == null ? 'not available' : (band.lo >= 0 ? '+' : '') + band.lo.toFixed(3) + ' to ' + (band.hi >= 0 ? '+' : '') + band.hi.toFixed(3)),
+      '- Analyst track: ' + rank.label + ' — ' + rank.note,
+      '- Copying the house scores BSS 0 by construction; one-world scores are noisy.', '');
     lines.push('## Assumptions and public anchors', '', ctx.boundary || '', '');
     (ctx.sources || []).forEach(function (s) { if (safeHttpUrl(s.url)) lines.push('- [' + s.label + '](' + s.url + ')'); });
     lines.push('', '> Reasoning aid only. Outputs are model-conditioned comparisons, not predictions. Do not enter classified, CUI, client-sensitive, or personal information into the public deployment.', '');
@@ -1184,6 +1522,33 @@ window.DirectorModule = (function () {
     op.aarExported = true;
   }
 
+  function onOverlayInput(ev) {
+    var card = op.commitCard;
+    if (!card || op.phase !== 'commit') return;
+    var values = card.step === 'blind' ? card.values : card.final;
+    if (!values) return;
+    var beliefId = ev.target.getAttribute && ev.target.getAttribute('data-belief-id');
+    if (beliefId) {
+      values.questions[beliefId] = Number(ev.target.value) / 100;
+      if (card.step === 'blind') card.touched[beliefId] = true;
+      var output = $('dir-value-' + beliefId);
+      if (output) output.textContent = Math.round(values.questions[beliefId] * 100) + '%';
+    }
+    if (ev.target.hasAttribute && ev.target.hasAttribute('data-standing')) {
+      values.standing = Number(ev.target.value) / 100;
+      var standing = $('dir-value-standing');
+      if (standing) standing.textContent = Math.round(values.standing * 100) + '%';
+    }
+    var bound = ev.target.getAttribute && ev.target.getAttribute('data-interval');
+    if (bound === 'lower' || bound === 'upper') {
+      values[bound] = Number(ev.target.value) / 100;
+      var interval = $('dir-value-interval');
+      if (interval) interval.textContent = Math.round(values.lower * 100) + '–' + Math.round(values.upper * 100) + '%';
+    }
+    var submit = $('dir-wrap').querySelector('[data-act="' + (card.step === 'blind' ? 'submit-blind' : 'submit-final') + '"]');
+    if (submit) submit.disabled = card.step === 'blind' ? !cardIsReady(card) : !(card.final.lower < card.final.upper);
+  }
+
   // ---- overlay actions / lifecycle -----------------------------------------------------
   function onOverlayClick(ev) {
     var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-probe]');
@@ -1193,8 +1558,27 @@ window.DirectorModule = (function () {
     if (t.hasAttribute('data-probe')) { runProbe(t.getAttribute('data-probe')); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
-    else if (act === 'back') { setPhase('plan'); renderDock(); focusPlanControl(); }
-    else if (act === 'execute') execute();
+    else if (act === 'unlock-commit') {
+      if (op.commitCard && op.commitCard.step === 'blind') {
+        GM._internal.unlockOrders('blue');
+        delete op.forecasts[op.commitCard.turn];
+        op.commitCard = null; op.lastForecast = null;
+        setPhase('plan'); renderDock(); focusPlanControl();
+      }
+    }
+    else if (act === 'submit-blind') {
+      if (!cardIsReady(op.commitCard)) return;
+      op.commitCard.blind = copyBeliefValues(op.commitCard.values);
+      op.commitCard.final = copyBeliefValues(op.commitCard.values);
+      op.commitCard.step = 'hybrid';
+      renderHybridCommit();
+    }
+    else if (act === 'submit-final') {
+      if (!op.commitCard || op.commitCard.step !== 'hybrid' || !(op.commitCard.final.lower < op.commitCard.final.upper)) return;
+      op.commitCard.step = 'ready';
+      op.standingCarry = op.commitCard.final.standing;
+      execute();
+    }
     else if (act === 'copy-aar') copyAar();
     else if (act === 'download-aar') downloadAar();
     else if (act === 'exit') abortOperation(true);
@@ -1212,7 +1596,9 @@ window.DirectorModule = (function () {
     stopSelPoll();
     hideObjectiveOverlay();
     if (GM.isActive()) GM.endMatch();
-    op.forecasts = {}; op.actuals = {}; op.record = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
+    op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
+    op.record = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
     restorePanels();
     setPhase('idle');
     refreshVisuals();
