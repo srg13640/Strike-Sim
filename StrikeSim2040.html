@@ -61,6 +61,11 @@
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
   <script src="director.js?v=p4"></script>
+  <!-- CO-006 performance layer: procedural sound engine + the Console Frame
+       (boot ritual → title screen front door). Presentation only — reads public
+       state, drives #dir-launch, never touches match state or seeded RNG. -->
+  <script src="audio.js?v=co006-p1"></script>
+  <script src="cinematics.js?v=co006-p1"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
   <script src="inline-datasets.js?v=p9"></script>
@@ -96,6 +101,14 @@
     --mono: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
     --display: 'Orbitron', 'Oswald', system-ui, sans-serif;
     --ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* ── CO-006 performance-layer tokens (single source for cinematics/audio UI) ── */
+    --lbox-dur: 1.1s;                          /* letterbox bar travel */
+    --lbox-ease: cubic-bezier(.77,0,.18,1);
+    --stamp-dur: .38s;                         /* operation-name stamp overshoot */
+    --fx-scanline-opacity: 0.16;
+    --fx-grain-opacity: 0.05;
+    --type-tick-ms: 12;                        /* typewriter cadence (JS reads the custom prop) */
 
     /* Coherent z-index scale (was ad-hoc per module) */
     --z-canvas: 1; --z-rail: 30; --z-popup: 40; --z-mapctl: 50; --z-modal: 200;
