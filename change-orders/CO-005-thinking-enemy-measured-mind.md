@@ -141,3 +141,7 @@ Seth authorized Claude to complete CO-005 (and then CO-006/CO-007) after CODEX s
 ## CO-005 STATUS: ✅ COMPLETE (2026-07-11)
 
 All five phases implemented, all §4 proofs green (doctrine 26, brier 30, mind-games 7/7, escalation, content-adaptation 17, director-ux, joint-force, validate-scenarios incl. the new variant + red geography requirement, runtime-performance), balance gate passed at 200 seeds, docs updated. Next per Seth's direction: **CO-006 — performance-layer** (`change-orders/CO-006-performance-layer.md`), then CO-007.
+
+## SUCCESSOR-CO TRACKING (ledger continuity)
+
+CO-006 execution ledger lives in `change-orders/CO-006-performance-layer.md` → PLAN OF RECORD → Progress. State as of 2026-07-11: Phase 1 `1e23e6a`, Phase 2 (BRIEF/COMMIT cinematics + comms floor) committed this date; Phase 3 (WATCH war film + AAR ceremony) next. All CO-005 proofs remain green under the performance layer; the balance record above is unchanged (engine untouched by CO-006 by invariant).

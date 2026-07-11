@@ -57,6 +57,13 @@ window.DirectorModule = (function () {
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
   function evt(text) { try { if (typeof addEvent === 'function') addEvent({ type: 'War', text: text }); } catch (e) {} }
+  // ── CO-006 P2: presentation bridges. The Director is the sole author of comms lines and
+  //    every line is composed from live engine state — the cinematics module only stages them.
+  //    All three guards no-op cleanly when the performance layer is absent (engine unaffected).
+  function cinApi() { return window.CinematicsModule || null; }
+  function cine(fn, arg) { var c = cinApi(); if (c && typeof c[fn] === 'function') { try { c[fn](arg); } catch (e) {} } }
+  function comms(callsign, text, cls) { var c = cinApi(); if (c && c.comms) { try { c.comms(callsign, text, cls); } catch (e) {} } }
+  function sfxA(name, opts) { try { if (window.AudioFXModule) window.AudioFXModule.play(name, opts); } catch (e) {} }
   function pct(sorted, p) {
     if (!sorted.length) return 0;
     var i = Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))));
@@ -291,6 +298,22 @@ window.DirectorModule = (function () {
       '.dir-chip{appearance:none;background:#0b1a26;border:1px solid #1d3a52;color:#8fb2ca;border-radius:7px;padding:5px 11px;cursor:pointer;font:600 12px Inter;}',
       '.dir-chip.on{background:#0e3a55;color:#c9f2ff;border-color:#2f88b8;}',
       '.dir-chip:disabled{opacity:.38;cursor:not-allowed;text-decoration:line-through;}',
+      // CO-006 P2: disclosed-prior bars (1.4s ease-out fills, staggered 350ms — mockup grammar)
+      '.dir-prior{margin-top:8px;}',
+      '.dir-prior .pr{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;letter-spacing:.08em;color:#8fb2ca;}',
+      '.dir-prior .pr span.lbl{width:104px;text-transform:uppercase;}',
+      '.dir-prior .pr b{width:34px;text-align:right;color:#dff2ff;font-weight:600;}',
+      '.dir-prior .track{display:block;flex:1;height:7px;background:#10283a;border-radius:999px;overflow:hidden;}',
+      '.dir-prior .fill{display:block;height:100%;width:0;border-radius:999px;animation:dirPriorFill 1.4s ease-out forwards;}',
+      '.dir-prior .pr:nth-child(2) .fill{animation-delay:.35s;} .dir-prior .pr:nth-child(3) .fill{animation-delay:.7s;}',
+      '.dir-prior .fill.a{background:linear-gradient(90deg,#d06a55,#ff8f75);}',
+      '.dir-prior .fill.d{background:linear-gradient(90deg,#b88a3c,#ffd27b);}',
+      '.dir-prior .fill.n{background:linear-gradient(90deg,#2f88b8,#70d9ff);}',
+      '@keyframes dirPriorFill{from{width:0;}to{width:var(--w,50%);}}',
+      // CO-006 P2: armed EXECUTE pulse — hot only after the house line has rendered
+      '.cin-armed{animation:dirArmPulse 2.2s ease-in-out infinite;}',
+      '@keyframes dirArmPulse{0%,100%{box-shadow:0 0 6px rgba(255,176,0,.22);border-color:#8a6a1f;}50%{box-shadow:0 0 26px rgba(255,176,0,.6);border-color:var(--amber,#ffb000);}}',
+      '@media (prefers-reduced-motion: reduce){.dir-prior .fill{animation:none;width:var(--w,50%);}.cin-armed{animation:none;box-shadow:0 0 14px rgba(255,176,0,.4);border-color:var(--amber,#ffb000);}}',
       // forecast strip
       '.dir-fc{border:1px solid #234a66;background:rgba(9,22,33,.9);border-radius:10px;padding:12px 14px;margin:12px 0;}',
       '.dir-fc .t{font:700 11px Oswald;letter-spacing:.22em;color:#00d8ff;margin-bottom:8px;}',
@@ -487,7 +510,18 @@ window.DirectorModule = (function () {
     newBriefMatch();
     setPhase('brief');
     renderBrief();
+    // CO-006 P2: the brief arrives as a cinematic — letterbox, operation stamp, typed
+    // situation paragraph, brief drone bed. All copy is the real scenario's.
+    var opTitle = scenarioContext().title || 'OPERATION BRIEF';
+    cine('briefCinematic', { title: String(opTitle).split('—')[0].trim().toUpperCase() });
+    comms('JOC', 'OPERATION OPEN — ' + String(opTitle).toUpperCase() + ' · SEED ' + GMseed());
     evt('Operation started — briefing.');
+  }
+
+  function variantLabel(id) {
+    if (!id || id === 'default') return 'CROSS-STRAIT INVASION';
+    var v = variantRegistry()[id];
+    return (v && v.metadata && v.metadata.title ? String(v.metadata.title).split('—')[0].trim() : String(id)).toUpperCase();
   }
 
   function newBriefMatch() {
@@ -510,6 +544,7 @@ window.DirectorModule = (function () {
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
     op.record = null; op.aar = null; op.aarExported = false; op.targetId = null;
     op.panelState = null; op.focusMode = true;
+    op.lastPostureShown = null;   // CO-006 P2: comms-floor posterior tracking (display only)
   }
 
   function objList(st, side) {
@@ -590,6 +625,11 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Blue tempo assets</span><b>' + st.tempo.blue.c2 + ' C2 · ' + st.tempo.blue.logi + ' LOG</b></div>' +
       '<div class="dir-stat"><span>Red tempo assets</span><b>' + st.tempo.red.c2 + ' C2 · ' + st.tempo.red.logi + ' LOG</b></div>' +
       '<div class="dir-note" style="margin-top:8px"><b>INTEL ASSESSMENT — PLA POSTURE:</b> ' + esc(postureText) + '. This is the disclosed prior, not Red’s hidden draw.</div>' +
+      // CO-006 P2: the same disclosed prior, staged as animated doctrine bars (mockup grammar).
+      '<div class="dir-prior" aria-hidden="true">' + [['attrition', 'a'], ['decapitation', 'd'], ['denial', 'n']].map(function (k) {
+        var v = Math.round((posture[k[0]] || 0) * 100);
+        return '<div class="pr"><span class="lbl">' + k[0] + '</span><span class="track"><i class="fill ' + k[1] + '" style="--w:' + v + '%"></i></span><b>' + v + '</b></div>';
+      }).join('') + '</div>' +
       allyThresholds +
       '<div class="dir-note" style="margin-top:8px">Strikes, hardens, repairs, and feints each cost one order; one decoy emission is free. A node killed this turn still acts — both sides committed first.</div>' +
       '</div>' +
@@ -672,7 +712,10 @@ window.DirectorModule = (function () {
     focusPlanControl();
     startSelPoll();
     showObjectiveOverlay();
-    evt('Planning phase — turn ' + GM.getState().turn + '.');
+    var st = GM.getState();
+    cine('planCinematic');   // CO-006 P2: plan bed; the comms floor returns from the war film
+    comms('J3', 'PLANNING WINDOW OPEN — TURN ' + st.turn + '/' + st.cfg.turnLimit + ' · AP ' + st.ap.blue);
+    evt('Planning phase — turn ' + st.turn + '.');
   }
 
   function startSelPoll() {
@@ -828,9 +871,9 @@ window.DirectorModule = (function () {
   function onDockClick(ev) {
     var t = ev.target.closest('[data-kind],[data-method],[data-act],[data-rm]');
     if (!t) return;
-    if (t.hasAttribute('data-kind')) { op.kind = t.getAttribute('data-kind'); op.targetId = null; renderDock(); return; }
-    if (t.hasAttribute('data-method')) { op.methodKey = t.getAttribute('data-method'); renderDock(); return; }
-    if (t.hasAttribute('data-rm')) { GM.removeOrder('blue', Number(t.getAttribute('data-rm'))); renderDock(); return; }
+    if (t.hasAttribute('data-kind')) { op.kind = t.getAttribute('data-kind'); op.targetId = null; renderDock(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-method')) { op.methodKey = t.getAttribute('data-method'); renderDock(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-rm')) { GM.removeOrder('blue', Number(t.getAttribute('data-rm'))); renderDock(); sfxA('tick', { vol: 0.04 }); return; }
     var act = t.getAttribute('data-act');
     if (act === 'queue') {
       var sel = $('dir-target');
@@ -848,6 +891,7 @@ window.DirectorModule = (function () {
       }
       var ok = GM.queueOrder('blue', order);
       if (!ok) evt('Order rejected — the game state changed before it could be queued.');
+      else sfxA('beep', { freq: 640, vol: 0.07, dur: 0.16 });   // CO-006 P2: a designation you can hear
       renderDock();
     } else if (act === 'forecast') {
       openCommit();
@@ -1079,7 +1123,8 @@ window.DirectorModule = (function () {
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.final, true) + standingControl(card, card.final, true) + '</div>' +
       premortemControls(card, card.final, true) +
       '<div class="dir-actions"><span class="dir-note">One seeded world will resolve. One outcome cannot validate a probability.</span>' +
-      '<button class="dir-btn primary" data-act="submit-final"' + (card.final.lower < card.final.upper ? '' : ' disabled') + '>COMMIT FORECASTS &amp; EXECUTE ▶</button></div>';
+      // CO-006 P2: the ARM pulse — hot only now, after the house/forecast reveal (never before).
+      '<button class="dir-btn primary cin-armed" data-act="submit-final"' + (card.final.lower < card.final.upper ? '' : ' disabled') + '>COMMIT FORECASTS &amp; EXECUTE ▶</button></div>';
   }
 
   function openCommit() {
@@ -1107,6 +1152,10 @@ window.DirectorModule = (function () {
     };
     setPhase('commit');
     renderBlindCommit();
+    // CO-006 P2: the forecast just finished across the real ghost ensemble — announce it
+    // with the real numbers, and shift the bed into the ceremony register.
+    cine('commitCinematic');
+    comms('J35', 'FORECAST COMPLETE — ' + forecast.K + ' WORLDS · RED DOWN ' + bandStr(forecast.redKills) + ' · OBJ RISK ' + forecast.objRisk + '%');
   }
 
   // ---- WATCH (paced playback of the one true draw) --------------------------------------
@@ -1135,6 +1184,11 @@ window.DirectorModule = (function () {
       final: card.final.standing
     });
     op.commitCard = null;
+    // CO-006 P2: the irreversible moment — thunk, letterbox, ORDERS COMMITTED stamp; the
+    // bed stops because the war is quieter than the menu. Presentation only: the engine
+    // resolves identically with or without the ceremony.
+    comms('J3', 'EXECUTE — TURN ' + turn + ' · ' + stBefore.orders.blue.length + ' ORDERS COMMITTED · HASH ' + card.lock.orderHash);
+    cine('executeCinematic');
     var st = GM.commitTurn();
     setPhase('watch');
     forceMapView();
@@ -1339,6 +1393,22 @@ window.DirectorModule = (function () {
     var lastTurn = !over && st.turn >= st.cfg.turnLimit;   // turn limit ends the match on advance
     var denial = (st.denialHistory || []).slice(-1)[0] || null;
     var denialLine = denial ? '<br>Red throughput <b>' + Math.round(denial.throughput * 100) + '%</b> (halt &lt;30%) · system coherence <b>' + Math.round(denial.osvi * 100) + '%</b> · lodgment <b>' + Math.round(((st.lodgment && st.lodgment.value) || 0) * 100) + '%</b>' : '';
+    // CO-006 P2 comms: BDA, posterior drift, escalation — every figure below is read from
+    // the resolved report/state (no fictional traffic; credibility is the product).
+    if (a) comms('BDA', 'TURN ' + report.turn + ' — RED −' + a.redKills + ' · BLUE −' + a.blueKills + (denial ? ' · THROUGHPUT ' + Math.round(denial.throughput * 100) + '%' : ''), 'bda');
+    var pb = st.redMind && st.redMind.belief;
+    if (pb) {
+      var prevPb = op.lastPostureShown || null;
+      var topDoc = ['attrition', 'decapitation', 'denial'].sort(function (x, y) { return (pb[y] || 0) - (pb[x] || 0); })[0];
+      var docDelta = prevPb ? Math.round(((pb[topDoc] || 0) - (prevPb[topDoc] || 0)) * 100) : 0;
+      if (!prevPb || Math.abs(docDelta) >= 3) {
+        comms('J2', 'POSTERIOR ' + (prevPb ? 'SHIFTING' : 'BASELINE') + ' — ' + topDoc.toUpperCase() + ' ' + Math.round((pb[topDoc] || 0) * 100) + '%' + (prevPb ? ' (' + (docDelta >= 0 ? '+' : '') + docDelta + ')' : ''), 'j2');
+      }
+      op.lastPostureShown = { attrition: pb.attrition, decapitation: pb.decapitation, denial: pb.denial };
+    }
+    if (report.escalation && Number(report.escalation.delta)) {
+      comms('J5', 'ESCALATION E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1), Number(report.escalation.delta) > 0 ? 'warn' : '');
+    }
     var escalationLine = report.escalation ? '<br>Escalation <b>E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1) +
       '</b> (Δ ' + (Number(report.escalation.delta) >= 0 ? '+' : '') + Number(report.escalation.delta).toFixed(1) + ')' +
       ((report.escalation.allyEvents || []).length ? ' · posture transition pending next turn: <b>' + report.escalation.allyEvents.map(function (event) { return esc(event.actor); }).join(', ') + '</b>' : '') : '';
@@ -1812,6 +1882,9 @@ window.DirectorModule = (function () {
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
       '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
     renderCounterfactualCard();
+    // CO-006 P2: the war is over — silence the bed; the AAR ceremony proper is Phase 3.
+    try { if (window.AudioFXModule) window.AudioFXModule.stopBed(1.2); } catch (e) {}
+    comms('JOC', 'OPERATION CLOSED — AFTER-ACTION REVIEW READY');
     evt('After-action review opened.');
   }
 
@@ -1960,18 +2033,29 @@ window.DirectorModule = (function () {
   function onOverlayClick(ev) {
     var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-roe],[data-variant]');
     if (!t) return;
-    if (t.hasAttribute('data-variant')) { if (selectVariant(t.getAttribute('data-variant'))) { newBriefMatch(); renderBrief(); } return; }
-    if (t.hasAttribute('data-turns')) { briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); return; }
-    if (t.hasAttribute('data-diff')) { briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); return; }
-    if (t.hasAttribute('data-roe')) { briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); return; }
+    if (t.hasAttribute('data-variant')) {
+      var vid = t.getAttribute('data-variant');
+      if (selectVariant(vid)) {
+        newBriefMatch(); renderBrief();
+        sfxA('beep', { freq: 700, vol: 0.06, dur: 0.18 });
+        comms('J35', 'FORCE NETWORKS SWAPPED — ' + variantLabel(vid) + ' · SEED ' + GMseed());
+      }
+      return;
+    }
+    if (t.hasAttribute('data-turns')) { briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-diff')) { briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-roe')) { briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
     else if (act === 'unlock-commit') {
       if (op.commitCard && op.commitCard.step === 'blind') {
+        var unlockTurn = op.commitCard.turn;
         GM._internal.unlockOrders('blue');
-        delete op.forecasts[op.commitCard.turn];
+        delete op.forecasts[unlockTurn];
         op.commitCard = null; op.lastForecast = null;
         setPhase('plan'); renderDock(); focusPlanControl();
+        cine('planCinematic');   // CO-006 P2: back out of the ceremony register
+        comms('J3', 'ORDERS UNLOCKED — REPLANNING TURN ' + unlockTurn);
       }
     }
     else if (act === 'submit-blind') {
@@ -1980,6 +2064,8 @@ window.DirectorModule = (function () {
       op.commitCard.final = copyBeliefValues(op.commitCard.values);
       op.commitCard.step = 'hybrid';
       renderHybridCommit();
+      sfxA('arm');   // CO-006 P2: the board goes hot with the house reveal
+      comms('J35', 'HOUSE LINE REVEALED — TURN ' + op.commitCard.turn + ' · ONE REVISION AUTHORIZED');
     }
     else if (act === 'submit-final') {
       if (!op.commitCard || op.commitCard.step !== 'hybrid' || !(op.commitCard.final.lower < op.commitCard.final.upper)) return;
@@ -2012,6 +2098,8 @@ window.DirectorModule = (function () {
     op.record = null; op.counterfactual = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
     restoreBaseScenario();                     // CO-005 C5: put the boot force networks back
     restorePanels();
+    try { if (window.AudioFXModule) window.AudioFXModule.stopBed(0.8); } catch (e) {}   // CO-006 P2
+    cine('commsVisible', true);                // reset the floor for the next operation
     setPhase('idle');
     refreshVisuals();
     try { (op.returnFocus || $('dir-launch')).focus(); } catch (e) {}

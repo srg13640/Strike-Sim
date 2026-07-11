@@ -89,9 +89,36 @@ window.CinematicsModule = (function () {
       '.cin-stat b{color:#d7e6f4;font-weight:400;}',
       '#cin-console-btn{background:linear-gradient(180deg,#123048,#0c2032);border:1px solid #2b6ea0;color:#bfe8ff;cursor:pointer;}',
       '#cin-console-btn:hover{border-color:var(--amber,#ffb000);color:#fff;}',
+      // ── CO-006 Phase 2: letterbox, stamp, comms floor (shell tokens are the single dial) ──
+      '#cin-lbox{position:fixed;inset:0;pointer-events:none;z-index:5200;}',
+      '#cin-lbox .cin-lb{position:absolute;left:0;right:0;height:9vh;background:#000;transform:translateY(var(--d));',
+      '  transition:transform var(--lbox-dur,1.1s) var(--lbox-ease,cubic-bezier(.77,0,.18,1));}',
+      '#cin-lbox .cin-lb.top{top:0;--d:-101%;}',
+      '#cin-lbox .cin-lb.bot{bottom:0;--d:101%;}',
+      '#cin-lbox.on .cin-lb{transform:translateY(0);}',
+      '#cin-stamp{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:5300;text-align:center;pointer-events:none;',
+      '  font-family:var(--display);color:#eaf6ff;opacity:0;animation:cinStamp var(--stamp-dur,.38s) cubic-bezier(.2,1.6,.35,1) forwards;}',
+      '#cin-stamp .cs-main{font-weight:900;font-size:clamp(30px,4.6vw,58px);letter-spacing:.18em;text-shadow:0 0 26px rgba(0,216,255,.5);}',
+      '#cin-stamp .cs-sub{margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.5em;color:var(--amber,#ffb000);text-transform:uppercase;}',
+      '#cin-stamp.gone{transition:opacity .4s ease;opacity:0 !important;}',
+      '#cin-stamp.static{animation:none;opacity:1;transform:translate(-50%,-50%) scale(1);}',
+      '@keyframes cinStamp{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6);}60%{opacity:1;transform:translate(-50%,-50%) scale(.96);}100%{opacity:1;transform:translate(-50%,-50%) scale(1);}}',
+      '#cin-comms{position:fixed;left:16px;bottom:14px;z-index:5150;width:min(430px,calc(100vw - 32px));pointer-events:none;',
+      '  font-family:var(--mono);font-size:12px;line-height:1.5;color:#bfe0f2;display:flex;flex-direction:column;gap:3px;}',
+      '#cin-comms.hidden{display:none;}',
+      'body:not(.operation-active) #cin-comms{display:none;}',
+      '.cc-line{background:rgba(4,10,16,.72);border-left:2px solid rgba(0,216,255,.4);padding:3px 9px;opacity:.94;}',
+      '.cc-line .cc-cs{color:var(--cyan,#00d8ff);letter-spacing:.12em;}',
+      '.cc-line.j2{border-left-color:rgba(255,176,0,.45);} .cc-line.j2 .cc-cs{color:var(--amber,#ffb000);}',
+      '.cc-line.bda{border-left-color:rgba(81,207,102,.45);} .cc-line.bda .cc-cs{color:var(--success,#51cf66);}',
+      '.cc-line.warn{border-left-color:rgba(255,59,59,.5);} .cc-line.warn .cc-cs{color:var(--alert,#ff3b3b);}',
+      '.cin-typing::after{content:"▍";color:var(--amber,#ffb000);animation:cinPulse 1s ease-in-out infinite;}',
+      '@media (max-width:760px){#cin-comms{display:none;}}',
       '@media (prefers-reduced-motion: reduce){',
       '  #cin-boot,#cin-title,.cin-mitem{transition:none !important;}',
       '  #cin-bootprompt{animation:none !important;opacity:1;}',
+      '  #cin-lbox .cin-lb{transition:none !important;}',
+      '  #cin-stamp{animation:none;opacity:1;}',
       '}'
     ].join('\n');
     document.head.appendChild(st);
@@ -301,6 +328,160 @@ window.CinematicsModule = (function () {
     });
   }
 
+  // ═══════════ CO-006 Phase 2: the cinematic grammar (letterbox · stamp · type · comms) ═══════════
+  // Presentation only. Every function here renders strings and state HANDED TO IT by the
+  // Director's render layer; this module never reads engine internals and never invents
+  // an event. The Director is the sole author of comms traffic (credibility invariant W4).
+
+  function typeTickMs() {
+    var v = 12;
+    try { v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--type-tick-ms')) || 12; } catch (e) {}
+    return Math.max(4, v);
+  }
+
+  // ---------- letterbox (9vh bars, shell --lbox-* tokens) ----------
+  function letterbox(on) {
+    injectCss();
+    var lb = $('cin-lbox');
+    if (!lb) {
+      lb = document.createElement('div');
+      lb.id = 'cin-lbox';
+      lb.setAttribute('aria-hidden', 'true');
+      lb.innerHTML = '<div class="cin-lb top"></div><div class="cin-lb bot"></div>';
+      document.body.appendChild(lb);
+    }
+    if (reduceMotion) { lb.classList.remove('on'); return; }   // dignified static path: no bars at all
+    var want = !!on;
+    requestAnimationFrame(function () { lb.classList.toggle('on', want); });
+    play(want ? 'whooshIn' : 'whooshOut');
+  }
+
+  // ---------- operation stamp (scale 1.6→1.0 overshoot, --stamp-dur) ----------
+  var stampTimer = null;
+  function stamp(text, sub) {
+    injectCss();
+    var s = $('cin-stamp');
+    if (s) { try { s.remove(); } catch (e) {} }
+    s = document.createElement('div');
+    s.id = 'cin-stamp';
+    s.setAttribute('role', 'status');
+    s.innerHTML = '<div class="cs-main">' + esc(text) + '</div>' + (sub ? '<div class="cs-sub">' + esc(sub) + '</div>' : '');
+    if (reduceMotion) s.classList.add('static');
+    document.body.appendChild(s);
+    play('stamp');
+    if (stampTimer) clearTimeout(stampTimer);
+    stampTimer = setTimeout(function () {
+      try { s.classList.add('gone'); } catch (e) {}
+      setTimeout(function () { try { s.remove(); } catch (e) {} }, 450);
+    }, reduceMotion ? 1100 : 1600);
+  }
+
+  // ---------- typewriter (2 chars/tick at --type-tick-ms, tick every 6th char) ----------
+  function typeText(node, opts) {
+    if (!node) return;
+    var restoreHtml = node.innerHTML;
+    var full = node.textContent || '';
+    if (reduceMotion || full.length < 8) return;   // text is already set — the dignified path
+    var i = 0, tick = typeTickMs(), quiet = !!(opts && opts.quiet);
+    node.classList.add('cin-typing');
+    node.textContent = '';
+    (function step() {
+      if (!node.isConnected) return;               // a re-render replaced the DOM — stand down
+      i = Math.min(full.length, i + 2);
+      node.textContent = full.slice(0, i);
+      if (!quiet && i % 6 === 0) play('tick', { vol: 0.018 });
+      if (i < full.length) setTimeout(step, tick);
+      else {
+        node.classList.remove('cin-typing');
+        node.innerHTML = restoreHtml;              // restore inline markup (e.g. the bolded initiating event)
+      }
+    })();
+  }
+
+  // ---------- the comms floor (W4): typed, callsign-colored, caption-first ----------
+  var COMMS_MAX = 6;
+  var commsQ = [], commsBusy = false;
+  function ensureCommsFloor() {
+    injectCss();
+    var f = $('cin-comms');
+    if (!f) {
+      f = document.createElement('div');
+      f.id = 'cin-comms';
+      f.setAttribute('role', 'log');
+      f.setAttribute('aria-live', 'polite');
+      f.setAttribute('aria-label', 'Watch floor comms');
+      document.body.appendChild(f);
+    }
+    return f;
+  }
+  function comms(callsign, text, cls) {
+    commsQ.push({ cs: String(callsign || 'JOC'), text: String(text || ''), cls: String(cls || '') });
+    if (commsQ.length > 24) commsQ.splice(0, commsQ.length - 24);   // backlog cap — never a memory leak
+    pumpComms();
+  }
+  function pumpComms() {
+    if (commsBusy) return;
+    var next = commsQ.shift();
+    if (!next) return;
+    commsBusy = true;
+    var f = ensureCommsFloor();
+    while (f.children.length >= COMMS_MAX) f.removeChild(f.firstChild);
+    var line = document.createElement('div');
+    line.className = 'cc-line' + (next.cls ? ' ' + next.cls : '');
+    line.innerHTML = '<span class="cc-cs">' + esc(next.cs) + ':</span> <span class="cc-tx"></span>';
+    f.appendChild(line);
+    var tx = line.querySelector('.cc-tx');
+    play('radio', { vol: 0.035 });
+    if (reduceMotion) {
+      tx.textContent = next.text;                  // captions land instantly — no typewriter
+      commsBusy = false;
+      setTimeout(pumpComms, 60);
+      return;
+    }
+    var i = 0, txt = next.text, tick = typeTickMs();
+    (function step() {
+      if (!tx.isConnected) { commsBusy = false; pumpComms(); return; }
+      i = Math.min(txt.length, i + 2);
+      tx.textContent = txt.slice(0, i);
+      if (i % 6 === 0) play('tick', { vol: 0.014 });
+      if (i < txt.length) setTimeout(step, tick);
+      else { commsBusy = false; setTimeout(pumpComms, 140); }
+    })();
+  }
+  function commsVisible(v) { ensureCommsFloor().classList.toggle('hidden', !v); }
+
+  // ---------- phase sequences (called by the Director's render layer, guarded) ----------
+  function briefCinematic(opts) {
+    var a = sfx();
+    if (a) { a.unlock(); a.startBed('brief'); }
+    commsVisible(true);
+    if (reduceMotion) return;
+    letterbox(true);
+    stamp((opts && opts.title) || 'OPERATION BRIEF', 'operation brief · eyes only');
+    setTimeout(function () { letterbox(false); }, 2300);
+    setTimeout(function () {
+      typeText(document.querySelector('#dir-wrap .dir-situation'));
+    }, 600);
+  }
+  function planCinematic() {
+    var a = sfx();
+    if (a && a.unlocked()) a.startBed('plan');
+    commsVisible(true);
+  }
+  function commitCinematic() {
+    var a = sfx();
+    if (a && a.unlocked()) a.startBed('brief');    // the ceremony register — same family, calmer filter
+  }
+  function executeCinematic() {
+    var a = sfx();
+    if (a) { a.stopBed(0.6); a.play('thump', { vol: 0.26 }); }   // war is quieter than the menu
+    commsVisible(false);                            // WATCH: the resolution feed owns the corner
+    if (reduceMotion) return;
+    letterbox(true);
+    stamp('ORDERS COMMITTED', 'red commits now · one world resolves');
+    setTimeout(function () { letterbox(false); }, 2600);
+  }
+
   // ---------- command-bar return button ----------
   function ensureConsoleButton() {
     if ($('cin-console-btn')) return;
@@ -344,6 +525,16 @@ window.CinematicsModule = (function () {
   return Object.freeze({
     CLASSIFICATION: CLASSIFICATION,
     openConsole: openConsole,
-    hideTitle: hideTitle
+    hideTitle: hideTitle,
+    // CO-006 Phase 2 grammar — consumed by the Director's render layer only
+    letterbox: letterbox,
+    stamp: stamp,
+    typeText: typeText,
+    comms: comms,
+    commsVisible: commsVisible,
+    briefCinematic: briefCinematic,
+    planCinematic: planCinematic,
+    commitCinematic: commitCinematic,
+    executeCinematic: executeCinematic
   });
 })();

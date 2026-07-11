@@ -22,7 +22,15 @@ const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 const audioSrc = read('audio.js');
 const cinSrc = read('cinematics.js');
+const directorSrc = read('director.js');
 const shell = read('StrikeSim2040.html');
+
+function fnBody(src, name, nextName) {
+  const start = src.indexOf('function ' + name);
+  const end = src.indexOf('function ' + nextName);
+  assert.ok(start >= 0 && end > start, name + ' and ' + nextName + ' must both exist in order');
+  return src.slice(start, end);
+}
 
 const passed = [];
 const failures = [];
@@ -106,6 +114,81 @@ check('career panels read the CO-005 stores read-only', () => {
   assert.ok(cinSrc.includes("'strikesim.co005.v1.forecasts'"), 'forecast archive key mirrored');
   assert.ok(cinSrc.includes("'strikesim.co005.v1.operations'"), 'operations archive key mirrored');
   assert.ok(!/localStorage\.setItem\('strikesim\.co005/.test(cinSrc), 'cinematics never WRITES CO-005 stores');
+});
+
+// ═══════════════ Phase 2 contracts: BRIEF/COMMIT cinematics + the comms floor ═══════════════
+
+check('P2: letterbox, stamp, and typewriter draw from the shell tokens', () => {
+  assert.ok(cinSrc.includes('var(--lbox-dur'), 'letterbox duration token');
+  assert.ok(cinSrc.includes('var(--lbox-ease'), 'letterbox easing token');
+  assert.ok(cinSrc.includes('var(--stamp-dur'), 'stamp duration token');
+  assert.ok(cinSrc.includes("'--type-tick-ms'"), 'typewriter cadence reads the shell custom prop');
+});
+
+check('P2: the Director is the sole author of comms traffic — cinematics stages, never invents', () => {
+  // The cinematics module must not contain callsigns or resolution language of its own.
+  ["'J2'", "'J3'", "'J35'", "'J5'", "'BDA'"].forEach(cs =>
+    assert.ok(!cinSrc.includes(cs), 'cinematics must not hardcode callsign ' + cs));
+  ['FORECAST COMPLETE', 'POSTERIOR', 'ORDERS COMMITTED · HASH', 'PLANNING WINDOW'].forEach(s =>
+    assert.ok(!cinSrc.includes(s), 'cinematics must not author the line "' + s + '"'));
+  // Director comms lines interpolate live engine state, not canned figures.
+  assert.ok(directorSrc.includes("comms('J35', 'FORECAST COMPLETE — ' + forecast.K"), 'forecast line reads the real ensemble');
+  assert.ok(!/comms\('[^']+',\s*'[^']*\d+%[^']*'\s*[,)]/.test(directorSrc), 'no literal percentages in comms lines — figures come from state');
+});
+
+check('P2: armed EXECUTE pulse appears only after the house reveal', () => {
+  const blind = fnBody(directorSrc, 'renderBlindCommit', 'renderHybridCommit');
+  const hybrid = fnBody(directorSrc, 'renderHybridCommit', 'openCommit');
+  assert.ok(!blind.includes('cin-armed'), 'blind card must not pulse');
+  assert.ok(hybrid.includes('cin-armed'), 'hybrid card arms after the forecast/house line renders');
+  assert.ok(directorSrc.includes("sfxA('arm')"), 'the board audibly goes hot on the reveal');
+});
+
+check('P2: EXECUTE is the irreversible ceremony and WATCH goes quiet (the DEFCON move)', () => {
+  const exec = fnBody(directorSrc, 'execute()', 'actualSummary');
+  assert.ok(exec.includes("cine('executeCinematic')"), 'execute() runs the ceremony');
+  const cinExec = cinSrc.slice(cinSrc.indexOf('function executeCinematic'));
+  assert.ok(cinExec.includes('stopBed'), 'the bed stops at execution');
+  assert.ok(cinExec.includes('commsVisible(false)'), 'the comms floor yields to the resolution feed');
+  assert.ok(!/watch:\s*\{/.test(audioSrc), 'no WATCH bed exists — the war is quieter than the menu');
+  assert.ok(!directorSrc.includes("startBed('watch')") && !cinSrc.includes("startBed('watch')"), 'nothing starts a watch bed');
+});
+
+check('P2: beds follow the loop registers (brief → plan → ceremony → silence)', () => {
+  assert.ok(directorSrc.includes("cine('briefCinematic'"), 'brief entry is cinematic');
+  assert.ok(directorSrc.includes("cine('planCinematic')"), 'plan entry sets its register');
+  assert.ok(directorSrc.includes("cine('commitCinematic')"), 'commit enters the ceremony register');
+  assert.ok(cinSrc.includes("a.startBed('brief')"), 'brief bed');
+  assert.ok(cinSrc.includes("a.startBed('plan')"), 'plan bed');
+});
+
+check('P2: presentation bridges are guarded — the loop survives without the performance layer', () => {
+  assert.ok(directorSrc.includes('window.CinematicsModule || null'), 'cinematics access is null-guarded');
+  const commsDef = fnBody(directorSrc, 'comms(callsign', 'sfxA(');
+  assert.ok(commsDef.includes('try {') && commsDef.includes('catch'), 'comms bridge is try/caught');
+  assert.ok(directorSrc.includes('if (window.AudioFXModule)'), 'audio access is guarded');
+});
+
+check('P2: determinism intact — no Math.random anywhere in the Director', () => {
+  assert.ok(!/Math\.random/.test(directorSrc), 'director.js must stay free of unseeded randomness');
+});
+
+check('P2: disclosed-prior bars animate the real posture with a reduced-motion fallback', () => {
+  assert.ok(directorSrc.includes('dir-prior'), 'prior bars markup exists');
+  assert.ok(directorSrc.includes("(posture[k[0]] || 0) * 100"), 'bar widths derive from the disclosed prior');
+  assert.ok(directorSrc.includes('.dir-prior .fill{animation:none;width:var(--w'), 'reduced motion sets widths instantly');
+});
+
+check('P2: comms floor caps its backlog, types with ticks, and captions instantly under reduced motion', () => {
+  assert.ok(cinSrc.includes('COMMS_MAX'), 'visible-line cap');
+  assert.ok(cinSrc.includes('commsQ.splice'), 'backlog cap');
+  const pump = cinSrc.slice(cinSrc.indexOf('function pumpComms'), cinSrc.indexOf('function commsVisible'));
+  assert.ok(pump.includes('if (reduceMotion)') && pump.includes('tx.textContent = next.text'), 'reduced motion lands the caption instantly');
+});
+
+check('P2: typewriter restores real markup and stands down when a re-render replaces the DOM', () => {
+  assert.ok(cinSrc.includes('node.isConnected'), 'typing aborts on disconnected nodes');
+  assert.ok(cinSrc.includes('restoreHtml'), 'inline markup (bolded initiating event) is restored');
 });
 
 console.log('UNCLASSIFIED // NOTIONAL RESEARCH TOOL');
