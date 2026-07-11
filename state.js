@@ -72,8 +72,15 @@
     replaceActiveGraph(graph) {
       const next = graph || { nodes: [], links: [] };
       const s = this.active();
-      if (s) { s.graph = next; return s.graph; }
-      return this.createScenario('Scenario 1', next).graph;
+      if (s) {
+        s.graph = next;
+        s.context = next.scenarioContext || null;
+        s.isBundled = false;
+        s.name = (s.context && s.context.title) ||
+          (next.metadata && next.metadata.scenarioName) || 'Imported Scenario';
+        return s.graph;
+      }
+      return this.createScenario('Taiwan Strait 2040 — Opening Denial Window', next).graph;
     },
 
     /** List scenarios as lightweight summaries (for a future switcher UI). */
@@ -96,7 +103,7 @@
   };
 
   // Seed one default active scenario so the app always has somewhere to load into.
-  AppState.createScenario('Scenario 1', { nodes: [], links: [] });
+  AppState.createScenario('Taiwan Strait 2040 — Opening Denial Window', { nodes: [], links: [] });
 
   global.AppState = AppState;
 })(window);

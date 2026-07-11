@@ -28,7 +28,7 @@
   <script src="ui.js?v=p5"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js?v=p5"></script>
+  <script src="state.js?v=p6"></script>
   <!-- milsymbol.js (MIT) — authoritative MIL-STD-2525C/APP-6 renderer. Exposes global
        `ms`. symbols.js uses it when present and falls back to its built-in renderer if not. -->
   <script src="vendor/milsymbol.js"></script>
@@ -36,12 +36,12 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p13"></script>
+  <script src="map.js?v=p14"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p6"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p5"></script>
+  <script src="stage.js?v=p6"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js?v=p8"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
@@ -57,10 +57,10 @@
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=1"></script>
+  <script src="director.js?v=p2"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
-  <script src="inline-datasets.js?v=p6"></script>
+  <script src="inline-datasets.js?v=p7"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -1014,16 +1014,24 @@
     /* First-run orientation card */
     #first-run-card { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; }
     #first-run-card .fr-backdrop { position: absolute; inset: 0; background: rgba(3,8,14,.72); backdrop-filter: blur(2px); }
-    #first-run-card .fr-panel { position: relative; width: min(540px, 92vw); background: linear-gradient(180deg,#0e2236,#0a1622); border: 1px solid #244d6e; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); color: #cfe0ee; font-family: 'Inter', system-ui, sans-serif; }
+    #first-run-card .fr-panel { position: relative; width: min(540px, 92vw); max-height: 94vh; overflow:auto; background: linear-gradient(180deg,#0e2236,#0a1622); border: 1px solid #244d6e; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); color: #cfe0ee; font-family: 'Inter', system-ui, sans-serif; }
     #first-run-card .fr-title { font-family: 'Oswald','Inter',system-ui,sans-serif; font-weight: 700; letter-spacing: .14em; font-size: 22px; color: #eaf4ff; }
     #first-run-card .fr-sub { color: #8fb4d4; font-size: 13px; margin-top: 2px; }
     #first-run-card .fr-body { font-size: 13.5px; line-height: 1.5; margin: 14px 0; color: #cfe0ee; }
     #first-run-card .fr-steps { display: grid; gap: 7px; margin: 12px 0; }
     #first-run-card .fr-step { display: flex; align-items: center; gap: 10px; background: rgba(20,44,66,.5); border: 1px solid #1d3e59; border-radius: 8px; padding: 9px 12px; font-size: 13px; }
     #first-run-card .fr-n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1d6f3f; color: #eafff0; font-weight: 700; font-size: 12px; flex: 0 0 auto; }
-    #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 16px; line-height: 1.45; }
-    #first-run-card .fr-ok { width: 100%; background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; font: 600 14px 'Inter',system-ui,sans-serif; padding: 11px; border-radius: 8px; cursor: pointer; }
-    #first-run-card .fr-ok:hover { border-color: #46d585; }
+    #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 10px; line-height: 1.45; }
+    #first-run-card .fr-status { min-height: 18px; color: #7fa6c4; font-size: 11.5px; margin: 0 0 10px; }
+    #first-run-card .fr-actions { display: grid; grid-template-columns: 1fr 1.45fr; gap: 9px; }
+    #first-run-card button { min-height: 44px; border-radius: 8px; cursor: pointer; font: 600 13px 'Inter',system-ui,sans-serif; padding: 10px 12px; }
+    #first-run-card .fr-primary { background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; }
+    #first-run-card .fr-primary:hover:not(:disabled) { border-color: #46d585; }
+    #first-run-card .fr-primary:disabled { opacity:.5; cursor:wait; }
+    #first-run-card .fr-secondary { background:#10283b; border:1px solid #285476; color:#b8d8ec; }
+    #first-run-card .fr-secondary:hover { border-color:#4b9bd0; color:#eef9ff; }
+    #first-run-card button:focus-visible { outline:2px solid #63d7ff; outline-offset:2px; }
+    @media (max-width:560px) { #first-run-card .fr-panel { padding:18px; max-height:94vh; overflow:auto; } #first-run-card .fr-actions { grid-template-columns:1fr; } }
     #fr-help-btn { position: fixed; bottom: 16px; left: 16px; z-index: 1450; width: 30px; height: 30px; border-radius: 50%; background: #13314a; color: #bfe4ff; border: 1px solid #2c5f86; font: 700 15px system-ui; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
     #fr-help-btn:hover { border-color: #4bb8ff; color: #fff; }
     /* Active-view "you are here" highlight on the Quick-Action view buttons */
@@ -1241,7 +1249,7 @@
       body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
       #side { width: 330px; }
     }
-    @media (max-width: 1000px) {
+    @media (max-width: 1200px) {
       /* Command bar wraps instead of clipping; --bar-h is re-measured by the shell
          resize handler so dependent offsets (app top, radar, banner) follow. */
       #cmd-bar { flex-wrap: wrap; height: auto; min-height: 56px; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
@@ -3794,11 +3802,36 @@
         if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
       }
       if (leftCollapseBtn) leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      [leftPanel.querySelector(':scope > header'), document.getElementById('left-panel-content')].filter(Boolean).forEach((region) => {
+        region.inert = collapsed;
+        region.setAttribute('aria-hidden', String(collapsed));
+      });
+      if (collapsed && leftPanel.contains(document.activeElement) && document.activeElement !== leftHandle) leftHandle?.focus();
     };
     const setRightCollapsed = (collapsed) => {
       if (!rightPanel) return;
       rightPanel.classList.toggle('collapsed', collapsed);
       document.body.classList.toggle('right-collapsed', collapsed);
+      if (rightHandle) rightHandle.setAttribute('aria-expanded', String(!collapsed));
+      if (rightCollapseBtn) rightCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      [rightPanel.querySelector(':scope > header'), document.getElementById('side-content')].filter(Boolean).forEach((region) => {
+        region.inert = collapsed;
+        region.setAttribute('aria-hidden', String(collapsed));
+      });
+      if (collapsed && rightPanel.contains(document.activeElement) && document.activeElement !== rightHandle) rightHandle?.focus();
+    };
+    // A small public shell contract lets guided experiences temporarily clear the
+    // analytical rails without pretending the expert tools do not exist. These
+    // programmatic changes do not overwrite the user's responsive/manual preference.
+    window.StrikeSimShell = window.StrikeSimShell || {};
+    window.StrikeSimShell.getPanelState = () => ({
+      leftCollapsed: !!(leftPanel && leftPanel.classList.contains('locked-collapsed')),
+      rightCollapsed: !!(rightPanel && rightPanel.classList.contains('collapsed'))
+    });
+    window.StrikeSimShell.setPanels = (next = {}) => {
+      if (typeof next.leftCollapsed === 'boolean') setLeftCollapsed(next.leftCollapsed);
+      if (typeof next.rightCollapsed === 'boolean') setRightCollapsed(next.rightCollapsed);
+      return window.StrikeSimShell.getPanelState();
     };
     if (leftPanel && leftCollapseBtn) {
       setLeftCollapsed(false);
@@ -3845,13 +3878,13 @@
         setLeftCollapsed(narrowLeft ? true : (userLeftCollapsed ?? false));
         wasNarrowLeft = narrowLeft;
       }
-      // The bar wraps below 1000px (CSS, height:auto there); republish its real
+      // The bar wraps below 1200px (CSS, height:auto there); republish its real
       // height so every var(--bar-h) consumer (app top, radar, banner, WG HUD)
       // follows. At full width the bar's height IS var(--bar-h), so measuring
       // would be circular — reset to the stylesheet default instead.
       const bar = document.getElementById('cmd-bar');
       if (bar) {
-        if (w < 1000) {
+        if (w < 1200) {
           const h = Math.max(56, Math.round(bar.getBoundingClientRect().height));
           document.documentElement.style.setProperty('--bar-h', h + 'px');
         } else {
@@ -3862,7 +3895,7 @@
     applyResponsiveShell();
     // The bar's content changes after load (module launch buttons relocate into it),
     // which can change its wrapped height — re-measure whenever the bar resizes.
-    // No feedback loop: below 1000px the bar's height is content-driven (height:auto,
+    // No feedback loop: below 1200px the bar's height is content-driven (height:auto,
     // literal min-height), so writing --bar-h never changes the bar itself.
     try {
       const barEl = document.getElementById('cmd-bar');
@@ -3904,11 +3937,26 @@
     document.getElementById('import-json-btn').addEventListener('click', openImportModal);
     document.getElementById('neutralize-btn-main').addEventListener('click', openStrikeModal);
 
-    const isTypingTarget = (target) => {
-      if (!target || !target.tagName) return false;
-      const tag = target.tagName.toLowerCase();
-      return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable === true;
+    const isInteractiveTarget = (target) => {
+      if (!(target instanceof Element) || typeof target.closest !== 'function') return false;
+      return !!target.closest([
+        'button', 'a[href]', 'input', 'textarea', 'select', 'summary',
+        '[contenteditable]:not([contenteditable="false"])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[role="button"]', '[role="link"]', '[role="checkbox"]', '[role="radio"]',
+        '[role="switch"]', '[role="tab"]', '[role="menuitem"]',
+        '[role="menuitemcheckbox"]', '[role="menuitemradio"]', '[role="option"]',
+        '[role="combobox"]', '[role="textbox"]', '[role="searchbox"]',
+        '[role="spinbutton"]', '[role="slider"]', '[role="treeitem"]'
+      ].join(','));
     };
+    const shortcutLayerIsOpen = () => Array.prototype.some.call(
+      document.querySelectorAll('.modal-backdrop, #first-run-card, #dir-overlay'),
+      (el) => {
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      }
+    );
 
     // Keyboard controls:
     // M = run Monte Carlo (10000 trials)
@@ -3917,9 +3965,9 @@
     // [ and ] = cycle selected target through visible nodes
     // Space = pause/resume sim tick timer
     window.addEventListener('keydown', (e) => {
-      if (isTypingTarget(e.target)) return;
-      // C-027: don't let global shortcuts fire behind an open modal (Escape still passes).
-      if (e.key !== 'Escape' && Array.prototype.some.call(document.querySelectorAll('.modal-backdrop'), m => getComputedStyle(m).display !== 'none')) return;
+      // Preserve native keyboard activation/focus behavior and never let app-wide
+      // shortcuts mutate the console behind a dialog or full-screen workflow layer.
+      if (isInteractiveTarget(e.target) || shortcutLayerIsOpen()) return;
       const key = e.key;
       if (key === 'Escape') {
         selectNode(null);
@@ -4371,25 +4419,78 @@
       wrap.id = 'first-run-card';
       wrap.innerHTML =
         '<div class="fr-backdrop"></div>' +
-        '<div class="fr-panel" role="dialog" aria-label="Welcome to StrikeSim 2040">' +
-          '<div class="fr-title">STRIKESIM 2040</div>' +
-          '<div class="fr-sub">A Blue-vs-Red multi-domain strike-planning wargame.</div>' +
-          '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue operational planner</b>. Each turn asks you to make a bounded plan, inspect an honest range of possible outcomes, commit against a doctrine-driven Red, and learn from what actually happened.</p>' +
-          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Click <b>▶ OPERATION</b> to receive the brief</div>' +
+        '<div class="fr-panel" role="dialog" aria-modal="true" aria-labelledby="fr-title" tabindex="-1">' +
+          '<div class="fr-title" id="fr-title">TAIWAN STRAIT 2040</div>' +
+          '<div class="fr-sub">Opening Denial Window · public-source baseline + explicit 2040 assumptions</div>' +
+          '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue operational planner</b>. Red is trying to preserve enough cross-strait throughput to establish a lodgment. Your job is to break that operating system before the hard horizon closes.</p>' +
+          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Read the situation, roles, assumptions, and victory logic</div>' +
           '<div class="fr-step"><span class="fr-n">2</span> Select targets and queue <b>strike, harden, or repair</b> orders</div>' +
           '<div class="fr-step"><span class="fr-n">3</span> Forecast, commit, watch the turn resolve, then use the <b>AAR</b></div></div>' +
-          '<p class="fr-tip">Tip: start in the <b>Map</b> view for the operational picture. Seeds make the adjudication repeatable; forecast bands are ranges, not predictions. No 3D? Every other view still works.</p>' +
-          '<button class="fr-ok" type="button">Got it</button>' +
+          '<p class="fr-tip">The guided operation clears the expert rails while you play. You can reopen them at any time. Forecast bands are model ranges—not real-world predictions.</p>' +
+          '<p class="fr-status" role="status">Loading the bundled scenario…</p>' +
+          '<div class="fr-actions"><button class="fr-secondary" type="button">Explore console</button>' +
+          '<button class="fr-primary" type="button" disabled>Loading scenario…</button></div>' +
         '</div>';
       document.body.appendChild(wrap);
-      const close = () => { wrap.style.display = 'none'; try { localStorage.setItem('strikesim-intro-seen', '1'); } catch (e) {} };
-      wrap.querySelector('.fr-ok').addEventListener('click', close);
+      const primary = wrap.querySelector('.fr-primary');
+      const secondary = wrap.querySelector('.fr-secondary');
+      const status = wrap.querySelector('.fr-status');
+      const panel = wrap.querySelector('.fr-panel');
+      let introIsolation = null;
+      const setIntroOpen = (open) => {
+        if (open && !introIsolation) {
+          introIsolation = [...document.body.children].filter((node) => node !== wrap && node.matches && !node.matches('script,style,link')).map((node) => ({
+            node, inert: !!node.inert, ariaHidden: node.getAttribute('aria-hidden')
+          }));
+          introIsolation.forEach(({ node }) => { node.inert = true; node.setAttribute('aria-hidden', 'true'); });
+        } else if (!open && introIsolation) {
+          introIsolation.forEach(({ node, inert, ariaHidden }) => {
+            node.inert = inert;
+            if (ariaHidden == null) node.removeAttribute('aria-hidden'); else node.setAttribute('aria-hidden', ariaHidden);
+          });
+          introIsolation = null;
+        }
+        wrap.style.display = open ? 'flex' : 'none';
+        wrap.setAttribute('aria-hidden', String(!open));
+      };
+      wrap._setOpen = setIntroOpen;
+      const scenarioReady = () => {
+        const graph = window.AppState?.activeGraph?.();
+        const scenario = window.AppState?.active?.();
+        return !!(graph?.nodes?.length && (!scenario?.isBundled || window.StrikeSimBundledScenarioReady === true));
+      };
+      const syncReady = () => {
+        const ready = scenarioReady();
+        const loadError = window.StrikeSimBundledScenarioError || '';
+        primary.disabled = !ready;
+        primary.textContent = ready ? 'Start guided operation →' : (loadError ? 'Scenario unavailable' : 'Loading scenario…');
+        status.textContent = ready ? `${window.AppState.activeGraph().nodes.length} capabilities loaded · no account required` : (loadError || 'Loading the bundled scenario…');
+        status.style.color = loadError && !ready ? '#ffab91' : '';
+      };
+      const close = () => { setIntroOpen(false); try { localStorage.setItem('strikesim-intro-seen', '1'); } catch (e) {} };
+      primary.addEventListener('click', () => {
+        if (!scenarioReady()) return;
+        close();
+        if (window.DirectorModule?.start) window.DirectorModule.start();
+      });
+      secondary.addEventListener('click', close);
       wrap.querySelector('.fr-backdrop').addEventListener('click', close);
+      wrap.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+        if (e.key !== 'Tab') return;
+        const focusable = [...panel.querySelectorAll('button:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')];
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      });
+      window.addEventListener('strikesim:scenario-ready', syncReady);
+      syncReady();
       if (!document.getElementById('fr-help-btn')) {
         const help = document.createElement('button');
         help.id = 'fr-help-btn'; help.type = 'button'; help.textContent = '?';
         help.title = 'What is this? (show the intro again)';
-        help.addEventListener('click', () => { wrap.style.display = 'flex'; });
+        help.addEventListener('click', () => { setIntroOpen(true); syncReady(); setTimeout(() => (primary.disabled ? secondary : primary).focus(), 0); });
         document.body.appendChild(help);
       }
     }
@@ -4398,7 +4499,14 @@
       let seen = false;
       try { seen = localStorage.getItem('strikesim-intro-seen') === '1'; } catch (e) {}
       const wrap = document.getElementById('first-run-card');
-      if (wrap) wrap.style.display = seen ? 'none' : 'flex';
+      if (wrap) {
+        if (typeof wrap._setOpen === 'function') wrap._setOpen(!seen); else wrap.style.display = seen ? 'none' : 'flex';
+        if (!seen) setTimeout(() => {
+          const primary = wrap.querySelector('.fr-primary');
+          const secondary = wrap.querySelector('.fr-secondary');
+          (primary && !primary.disabled ? primary : secondary)?.focus();
+        }, 0);
+      }
     }
 
     // --- Monte Carlo Simulation (COA-based) ---

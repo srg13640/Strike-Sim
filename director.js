@@ -33,9 +33,15 @@ window.DirectorModule = (function () {
     actuals: {},          // turn -> actual outcome summary
     lastForecast: null,
     record: null,         // GM.serialize() snapshot at match end (for counterfactuals)
+    aar: null,
+    aarExported: false,
     watchTimers: [],
     selPoll: null,
-    lastSelId: null
+    lastSelId: null,
+    panelState: null,      // shell rails before the guided operation takes focus
+    focusMode: true,
+    modalIsolation: null,
+    returnFocus: null
   };
 
   // ---- tiny utils -----------------------------------------------------------------
@@ -61,6 +67,96 @@ window.DirectorModule = (function () {
   }
   function forceMapView() { try { if (typeof window.setView === 'function') window.setView('map'); } catch (e) {} }
   function curSel() { try { return (typeof selectedNode !== 'undefined') ? selectedNode : null; } catch (e) { return null; } }
+  function prefersReducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
+  function scenarioContext() {
+    var scen = (window.AppState && AppState.active && AppState.active()) || null;
+    var attached = scen && (scen.context || (scen.graph && scen.graph.scenarioContext));
+    if (attached) return attached;
+    return scen && scen.isBundled ? (window.StrikeSimScenario || {}) : {};
+  }
+  function safeHttpUrl(url) { return /^https?:\/\//i.test(String(url || '')) ? String(url) : ''; }
+  function shellApi() { return window.StrikeSimShell || null; }
+  function panelState() {
+    var api = shellApi();
+    try { return api && typeof api.getPanelState === 'function' ? api.getPanelState() : null; } catch (e) { return null; }
+  }
+  function setPanels(next) {
+    var api = shellApi();
+    try { if (api && typeof api.setPanels === 'function') api.setPanels(next); } catch (e) {}
+  }
+  function enterFocusMode() {
+    if (!op.panelState) op.panelState = panelState();
+    op.focusMode = true;
+    setPanels({ leftCollapsed: true, rightCollapsed: true });
+  }
+  function toggleFocusMode() {
+    var now = panelState();
+    var bothCollapsed = !!(now && now.leftCollapsed && now.rightCollapsed);
+    op.focusMode = !bothCollapsed;
+    setPanels({ leftCollapsed: op.focusMode, rightCollapsed: op.focusMode });
+    renderRail();
+  }
+  function restorePanels() {
+    if (op.panelState) setPanels(op.panelState);
+    op.panelState = null;
+    op.focusMode = true;
+  }
+  function startReady() {
+    var graph = window.AppState && AppState.activeGraph ? AppState.activeGraph() : null;
+    var scen = window.AppState && AppState.active ? AppState.active() : null;
+    var dataReady = graph && graph.nodes && graph.nodes.length;
+    return !!(dataReady && (!scen || !scen.isBundled || window.StrikeSimBundledScenarioReady === true));
+  }
+  function explainInvalid(reason) {
+    return ({
+      'no-source': 'No surviving capability can deliver this method.',
+      'source-cannot-fire': 'The selected source cannot deliver this method.',
+      'friendly-target': 'Strike orders require a Red target.',
+      'not-friendly': 'Harden and repair orders require a Blue node.',
+      'target-dead': 'That node is already out of action.',
+      'no-target': 'Choose a target first.',
+      'no-ap': 'No orders remain this turn.',
+      'bad-method': 'Choose a valid delivery method.'
+    })[reason] || 'This order is not available in the current state.';
+  }
+  function isolateForOverlay(active) {
+    if (active && !op.modalIsolation) {
+      op.modalIsolation = [];
+      Array.prototype.forEach.call(document.body.children, function (node) {
+        if (node === $('dir-overlay') || !node.matches || node.matches('script,style,link')) return;
+        op.modalIsolation.push({ node: node, inert: !!node.inert, ariaHidden: node.getAttribute('aria-hidden') });
+        node.inert = true;
+        node.setAttribute('aria-hidden', 'true');
+      });
+    } else if (!active && op.modalIsolation) {
+      op.modalIsolation.forEach(function (saved) {
+        saved.node.inert = saved.inert;
+        if (saved.ariaHidden == null) saved.node.removeAttribute('aria-hidden');
+        else saved.node.setAttribute('aria-hidden', saved.ariaHidden);
+      });
+      op.modalIsolation = null;
+    }
+  }
+  function focusPlanControl() {
+    setTimeout(function () { var target = $('dir-target'); if (target) target.focus(); }, 0);
+  }
+  function onOverlayKeydown(ev) {
+    if ($('dir-overlay').getAttribute('aria-hidden') === 'true') return;
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      if (op.phase === 'commit') { setPhase('plan'); renderDock(); focusPlanControl(); }
+      else if (op.phase === 'brief') abortOperation(true);
+      else if (op.phase === 'aar') endOperation();
+      return;
+    }
+    if (ev.key !== 'Tab') return;
+    var controls = Array.prototype.slice.call($('dir-overlay').querySelectorAll('button:not(:disabled),a[href],summary,input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])'))
+      .filter(function (node) { return node.getClientRects().length > 0; });
+    if (!controls.length) { ev.preventDefault(); $('dir-wrap').focus(); return; }
+    var first = controls[0], last = controls[controls.length - 1];
+    if (ev.shiftKey && (document.activeElement === first || document.activeElement === $('dir-wrap'))) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  }
 
   // ---- CSS --------------------------------------------------------------------------
   function injectCss() {
@@ -75,7 +171,7 @@ window.DirectorModule = (function () {
       'font:700 13px Oswald,system-ui;letter-spacing:.14em;padding:7px 16px;border-radius:8px;cursor:pointer;}',
       '#dir-launch:hover{border-color:#00d8ff;color:#fff;box-shadow:0 0 18px rgba(0,216,255,.35);}',
       // phase rail
-      '#dir-rail{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:1700;display:none;align-items:center;gap:4px;',
+      '#dir-rail{position:fixed;top:calc(var(--bar-h,56px) + 34px);left:50%;transform:translateX(-50%);z-index:1700;display:none;align-items:center;gap:4px;',
       'background:rgba(8,14,20,.92);border:1px solid #1d3a52;border-radius:10px;padding:5px 10px;backdrop-filter:blur(6px);',
       'font:600 11px Inter,system-ui;color:#7f9db5;}',
       '#dir-rail .ph{padding:3px 9px;border-radius:6px;letter-spacing:.12em;}',
@@ -84,6 +180,7 @@ window.DirectorModule = (function () {
       '#dir-rail .sep{color:#27455e;}',
       '#dir-rail .meta{margin-left:10px;color:#9fc2dc;font-weight:700;}',
       '#dir-rail button{background:none;border:none;color:#5c7d96;cursor:pointer;font-size:13px;margin-left:6px;}',
+      '#dir-rail .mode{border-left:1px solid #27455e;padding-left:10px;color:#8fcbe8;font:700 10px Oswald,system-ui;letter-spacing:.11em;}',
       '#dir-rail button:hover{color:#ff8a8a;}',
       // full-screen overlay moments (Brief / Commit / AAR)
       '#dir-overlay{position:fixed;inset:0;z-index:5000;display:none;overflow:auto;',
@@ -92,6 +189,18 @@ window.DirectorModule = (function () {
       '.dir-kicker{font:700 12px Oswald,system-ui;letter-spacing:.34em;color:#00d8ff;margin-bottom:6px;}',
       '.dir-h1{font:700 34px/1.1 Oswald,system-ui;letter-spacing:.06em;color:#f2f8fc;margin:0 0 4px;}',
       '.dir-sub{color:#8fb2ca;margin-bottom:26px;}',
+      '.dir-badges{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0 12px;}',
+      '.dir-badge{border:1px solid #28536f;background:#0a2131;color:#9fdaf2;border-radius:999px;padding:3px 8px;font:700 10px Oswald,system-ui;letter-spacing:.12em;}',
+      '.dir-badge.notional{border-color:#765f2d;color:#ffd791;background:#2a210d;}',
+      '.dir-situation{font-size:14px;line-height:1.65;color:#d4e5f0;margin:0 0 12px;}',
+      '.dir-context{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:12px;}',
+      '.dir-context div{border-top:1px solid #193247;padding-top:8px;}',
+      '.dir-context span{display:block;color:#6fb7d8;font:700 10px Oswald,system-ui;letter-spacing:.15em;margin-bottom:3px;}',
+      '.dir-question{margin-top:14px;border-left:3px solid #00bfe7;background:rgba(8,39,55,.72);padding:11px 13px;color:#e7f7ff;font-weight:600;}',
+      '.dir-sources{margin-top:12px;border-top:1px solid #193247;padding-top:9px;color:#8fb2ca;font-size:12px;}',
+      '.dir-sources summary{cursor:pointer;color:#9fdaf2;font-weight:700;}',
+      '.dir-sources ul{margin:8px 0 4px;padding-left:20px;}.dir-sources li{margin:4px 0;}',
+      '.dir-sources a{color:#70cfff;}.dir-sources a:hover{color:#c7f1ff;}',
       '.dir-card{background:linear-gradient(180deg,rgba(16,28,40,.85),rgba(10,18,26,.85));border:1px solid #1d3a52;',
       'border-radius:12px;padding:16px 18px;margin-bottom:14px;}',
       '.dir-card h3{font:700 12px Oswald,system-ui;letter-spacing:.22em;color:#6fb7d8;margin:0 0 10px;}',
@@ -100,18 +209,22 @@ window.DirectorModule = (function () {
       '.dir-obj .v{color:#7f9db5;white-space:nowrap;}',
       '.dir-stat{display:flex;justify-content:space-between;padding:3px 0;font-size:13px;}',
       '.dir-stat b{color:#e8f4fb;}',
-      '.dir-actions{display:flex;gap:12px;margin-top:22px;justify-content:flex-end;align-items:center;}',
+      '.dir-actions{display:flex;gap:12px;margin-top:22px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}',
+      '#dir-overlay>.wrap>.dir-actions{position:sticky;bottom:0;margin-left:-10px;margin-right:-10px;padding:13px 10px 8px;background:linear-gradient(180deg,rgba(5,10,15,.25),rgba(5,10,15,.98) 28%);z-index:2;}',
       '.dir-btn{background:#0d2233;border:1px solid #24506f;color:#a8cde4;font:700 13px Oswald,system-ui;letter-spacing:.14em;',
       'padding:10px 22px;border-radius:9px;cursor:pointer;}',
       '.dir-btn:hover{border-color:#3f7ea8;color:#e8f6ff;}',
-      '.dir-btn.primary{background:linear-gradient(180deg,#0e4d70,#0a3document);}',
       '.dir-btn.primary{background:linear-gradient(180deg,#0e4d70,#0a3552);border-color:#2f88b8;color:#dff5ff;}',
       '.dir-btn.primary:hover{box-shadow:0 0 22px rgba(0,216,255,.35);}',
+      '.dir-btn:focus-visible,.dir-chip:focus-visible{outline:2px solid #6be1ff;outline-offset:2px;}',
+      '.dir-btn:disabled{opacity:.46;cursor:not-allowed;box-shadow:none;}',
+      '.dir-skip{float:right;min-height:32px;padding:5px 9px;font-size:10px;}',
       '.dir-btn.danger{border-color:#7a2f2f;color:#ffb0a8;}',
       '.dir-note{font-size:12px;color:#6d8ca4;font-style:italic;}',
       '.dir-chips{display:flex;gap:6px;}',
-      '.dir-chip{background:#0b1a26;border:1px solid #1d3a52;color:#8fb2ca;border-radius:7px;padding:5px 11px;cursor:pointer;font:600 12px Inter;}',
+      '.dir-chip{appearance:none;background:#0b1a26;border:1px solid #1d3a52;color:#8fb2ca;border-radius:7px;padding:5px 11px;cursor:pointer;font:600 12px Inter;}',
       '.dir-chip.on{background:#0e3a55;color:#c9f2ff;border-color:#2f88b8;}',
+      '.dir-chip:disabled{opacity:.38;cursor:not-allowed;text-decoration:line-through;}',
       // forecast strip
       '.dir-fc{border:1px solid #234a66;background:rgba(9,22,33,.9);border-radius:10px;padding:12px 14px;margin:12px 0;}',
       '.dir-fc .t{font:700 11px Oswald;letter-spacing:.22em;color:#00d8ff;margin-bottom:8px;}',
@@ -128,11 +241,11 @@ window.DirectorModule = (function () {
       '#dir-dock .stat b{color:#dff2ff;font-size:13px;}',
       '#dir-dock .ap i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;background:#123a55;border:1px solid #2b6ea0;}',
       '#dir-dock .ap i.full{background:#37c4ff;box-shadow:0 0 7px rgba(55,196,255,.7);}',
-      '#dir-dock select{background:#0b1a26;color:#cfe6f5;border:1px solid #1d3a52;border-radius:7px;padding:5px 8px;max-width:330px;font:12px Inter;}',
+      '#dir-dock select{background:#0b1a26;color:#cfe6f5;border:1px solid #1d3a52;border-radius:7px;padding:7px 8px;max-width:390px;min-width:220px;flex:1;font:12px Inter;}',
       '#dir-dock .q{display:flex;gap:6px;flex-wrap:wrap;}',
       '#dir-dock .oq{background:#0e2536;border:1px solid #235273;border-radius:7px;padding:3px 8px;font-size:12px;color:#bfe0f2;display:flex;gap:7px;align-items:center;}',
       '#dir-dock .oq.h{border-color:#2f6e46;} #dir-dock .oq.r{border-color:#6e5a2f;}',
-      '#dir-dock .oq u{cursor:pointer;text-decoration:none;color:#7f9db5;} #dir-dock .oq u:hover{color:#ff9d94;}',
+      '#dir-dock .oq .remove{cursor:pointer;background:none;border:0;padding:0;color:#7f9db5;font:inherit;} #dir-dock .oq .remove:hover{color:#ff9d94;}',
       '#dir-dock .spacer{flex:1;}',
       // objective overlay (map rings on both sides' key terrain)
       '.dir-objring{display:block;width:34px;height:34px;border-radius:50%;box-sizing:border-box;',
@@ -146,7 +259,7 @@ window.DirectorModule = (function () {
       'padding:5px 9px;letter-spacing:.02em;}',
       '.dir-recon b{color:#dff2ff;}',
       // watch feed
-      '#dir-feed{position:fixed;left:16px;bottom:16px;z-index:1500;display:none;width:min(430px,44vw);max-height:52vh;overflow:auto;',
+      '#dir-feed{position:fixed;left:16px;bottom:16px;z-index:1500;display:none;width:min(430px,calc(100vw - 32px));max-height:58vh;overflow:auto;',
       'background:rgba(8,14,20,.94);border:1px solid #1f4058;border-radius:12px;padding:10px 12px;font:12.5px Inter;color:#cfe3f2;backdrop-filter:blur(6px);}',
       '#dir-feed .fl{padding:3px 2px;border-bottom:1px dotted #142534;opacity:0;animation:dirIn .28s ease forwards;}',
       '@keyframes dirIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}',
@@ -167,7 +280,12 @@ window.DirectorModule = (function () {
       '.dir-probe{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dotted #16283a;}',
       '.dir-probe .res{font-size:12.5px;color:#ffd9a8;}',
       '.dir-verdict{font:700 26px Oswald;letter-spacing:.08em;margin:2px 0 2px;}',
-      '.dir-verdict.win{color:#7be3a1;} .dir-verdict.loss{color:#ff9d94;}'
+      '.dir-verdict.win{color:#7be3a1;} .dir-verdict.loss{color:#ff9d94;} .dir-verdict.draw{color:#ffd27b;}',
+      '.dir-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}',
+      '.dir-metric{background:#091923;border:1px solid #19364a;border-radius:8px;padding:9px;text-align:center;}',
+      '.dir-metric b{display:block;color:#e8f7ff;font:700 20px Oswald,system-ui;}.dir-metric span{color:#789bb2;font-size:10px;letter-spacing:.08em;}',
+      '@media(max-width:760px){.dir-grid,.dir-context{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
+      '@media(max-width:520px){#dir-rail .mode{font-size:0}#dir-rail .mode:after{content:"TOOLS";font-size:10px}.dir-btn,.dir-chip{min-height:44px;padding:9px 13px}#dir-dock select{min-width:100%;max-width:100%}}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -178,16 +296,19 @@ window.DirectorModule = (function () {
     var b = el('<button id="dir-launch" title="Start an Operation — Brief · Plan · Commit · Watch · AAR">▶ OPERATION</button>');
     b.addEventListener('click', start);
     document.body.appendChild(b);
-    document.body.appendChild(el('<div id="dir-rail"></div>'));
-    document.body.appendChild(el('<div id="dir-overlay"><div class="wrap" id="dir-wrap"></div></div>'));
-    document.body.appendChild(el('<div id="dir-dock"></div>'));
-    document.body.appendChild(el('<div id="dir-feed"></div>'));
+    document.body.appendChild(el('<div id="dir-rail" role="navigation" aria-label="Operation phases"></div>'));
+    document.body.appendChild(el('<div id="dir-overlay" role="dialog" aria-modal="true" aria-hidden="true"><div class="wrap" id="dir-wrap" tabindex="-1"></div></div>'));
+    document.body.appendChild(el('<div id="dir-dock" role="region" aria-label="Operation planning controls"></div>'));
+    document.body.appendChild(el('<div id="dir-feed" role="log" aria-live="polite" aria-label="Turn resolution" tabindex="-1"></div>'));
     $('dir-overlay').addEventListener('click', onOverlayClick);
+    $('dir-overlay').addEventListener('keydown', onOverlayKeydown);
     $('dir-dock').addEventListener('click', onDockClick);
     $('dir-dock').addEventListener('change', onDockChange);
     $('dir-feed').addEventListener('click', onFeedClick);
     $('dir-rail').addEventListener('click', function (ev) {
-      if (ev.target.getAttribute && ev.target.getAttribute('data-act') === 'abort') abortOperation();
+      var act = ev.target.getAttribute && ev.target.getAttribute('data-act');
+      if (act === 'abort') abortOperation();
+      else if (act === 'panels') toggleFocusMode();
     });
   }
 
@@ -203,17 +324,28 @@ window.DirectorModule = (function () {
       return '<span class="' + cls + '">' + p.toUpperCase() + '</span>' + (i < PHASES.length - 1 ? '<span class="sep">›</span>' : '');
     }).join('');
     var meta = st ? '<span class="meta">TURN ' + st.turn + '/' + st.cfg.turnLimit + '</span>' : '';
-    r.innerHTML = chips + meta + '<button data-act="abort" title="Abort operation">✕</button>';
+    var tools = (op.phase === 'plan' || op.phase === 'watch') ?
+      '<button class="mode" data-act="panels" title="' + (op.focusMode ? 'Open the expert analysis rails' : 'Collapse the analysis rails and focus the map') + '">' +
+      (op.focusMode ? 'ADVANCED ANALYSIS' : 'FOCUS MAP') + '</button>' : '';
+    r.innerHTML = chips + meta + tools + '<button data-act="abort" aria-label="Abort operation" title="Abort operation">✕</button>';
     r.style.display = 'flex';
   }
 
   function setPhase(p) {
     op.phase = p;
+    var overlayActive = p === 'brief' || p === 'commit' || p === 'aar';
     renderRail();
-    $('dir-overlay').style.display = (p === 'brief' || p === 'commit' || p === 'aar') ? 'block' : 'none';
+    $('dir-overlay').style.display = overlayActive ? 'block' : 'none';
+    $('dir-overlay').setAttribute('aria-hidden', overlayActive ? 'false' : 'true');
+    $('dir-overlay').setAttribute('aria-label', p === 'brief' ? 'Operation brief' : p === 'commit' ? 'Review and commit orders' : p === 'aar' ? 'After-action review' : 'Operation');
+    isolateForOverlay(overlayActive);
     $('dir-dock').style.display = p === 'plan' ? 'block' : 'none';
     $('dir-feed').style.display = (p === 'watch') ? 'block' : 'none';
     $('dir-launch').style.display = p === 'idle' ? '' : 'none';
+    document.body.classList.toggle('operation-active', p !== 'idle');
+    if (p === 'brief' || p === 'commit' || p === 'aar') {
+      setTimeout(function () { try { $('dir-wrap').focus(); } catch (e) {} }, 0);
+    }
   }
 
   // ---- BRIEF ------------------------------------------------------------------------
@@ -221,7 +353,12 @@ window.DirectorModule = (function () {
 
   function start() {
     if (!GM) return;
+    if (!startReady()) {
+      try { if (typeof window.showToast === 'function') window.showToast('The bundled scenario is still loading. Try Operation again in a moment.', 'warn', 5000); } catch (e) {}
+      return;
+    }
     if (GM.isActive()) GM.endMatch();
+    op.returnFocus = $('dir-launch');
     GM.init({ onResolved: function () {}, onState: function () {} });   // Director drives; legacy HUD stays dormant
     newBriefMatch();
     setPhase('brief');
@@ -235,7 +372,8 @@ window.DirectorModule = (function () {
       control: { blue: 'human', red: 'ai' },
       difficulty: { blue: 'hard', red: briefOpts.redDiff }
     });
-    op.forecasts = {}; op.actuals = {}; op.record = null; op.targetId = null;
+    op.forecasts = {}; op.actuals = {}; op.record = null; op.aar = null; op.aarExported = false; op.targetId = null;
+    op.panelState = null; op.focusMode = true;
   }
 
   function objList(st, side) {
@@ -249,16 +387,38 @@ window.DirectorModule = (function () {
     var st = GM.getState();
     if (!st) return;
     var scen = (window.AppState && AppState.active && AppState.active()) || null;
+    var ctx = scenarioContext();
+    var title = ctx.title || (scen && scen.name) || 'INDO-PACIFIC SCENARIO';
+    var hasNarrative = !!ctx.title;
+    var turnDays = Number(ctx.turnDurationDays) || 3.5;
+    var horizon = Math.round(st.cfg.turnLimit * turnDays * 10) / 10;
+    var sourceLinks = (ctx.sources || []).map(function (s) {
+      var url = safeHttpUrl(s.url);
+      return url ? '<li><a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.label || url) + '</a></li>' : '';
+    }).join('');
+    var legend = (ctx.evidenceLegend || []).map(function (x) {
+      return '<li><b>' + esc(x.key) + '</b> — ' + esc(x.meaning) + '</li>';
+    }).join('');
     $('dir-wrap').innerHTML =
-      '<div class="dir-kicker">OPERATION BRIEF · ' + esc(scen && scen.name || 'INDO-PACIFIC SCENARIO') + '</div>' +
-      '<h1 class="dir-h1">You are the Blue planner.</h1>' +
-      '<div class="dir-sub">' + st.cfg.turnLimit + ' turns of simultaneous commitment against a doctrine-driven Red. ' +
-      'Both sides lock orders blind; the world resolves once. Forecasts are ranges — never promises.</div>' +
+      '<div class="dir-kicker">OPERATION BRIEF · ' + esc(title) + '</div>' +
+      '<h1 class="dir-h1">Deny the lodgment before the window closes.</h1>' +
+      '<div class="dir-sub">You are the Blue operational planner. ' + st.cfg.turnLimit + ' turns / ' + horizon + ' notional days of simultaneous commitment against a doctrine-driven Red.</div>' +
+
+      '<div class="dir-card">' +
+      '<div class="dir-badges"><span class="dir-badge">' + esc(ctx.classification || 'SCENARIO DATA') + '</span>' +
+      '<span class="dir-badge notional">' + (hasNarrative ? 'OPEN-SOURCE BASELINE + 2040 NOTIONAL' : 'IMPORTED SCENARIO · VERIFY ASSUMPTIONS') + '</span><span class="dir-badge">' + esc(ctx.date || 'DATE NOT PROVIDED') + '</span></div>' +
+      '<p class="dir-situation">' + esc(ctx.background || 'This imported scenario does not include an operation narrative. Review its force data and assumptions before using the adjudication.') + ' <b>' + esc(ctx.initiatingEvent || '') + '</b></p>' +
+      '<div class="dir-context"><div><span>BLUE ROLE</span>' + esc(ctx.blueRole || 'Not supplied by the imported scenario.') + '</div><div><span>RED OBJECTIVE</span>' + esc(ctx.redObjective || 'Not supplied by the imported scenario.') + '</div>' +
+      '<div><span>HARD HORIZON</span>' + horizon + ' notional days at ' + turnDays + ' days per turn.</div><div><span>VICTORY LOGIC</span>' + esc(ctx.victory || 'Not supplied; the default game arbiter will apply.') + '</div></div>' +
+      '<div class="dir-question"><span style="display:block;color:#70c9e9;font:700 10px Oswald;letter-spacing:.16em;margin-bottom:4px">YOUR DECISION</span>' + esc(ctx.decisionQuestion || 'What decision is this imported force network meant to inform?') + '</div>' +
+      '<details class="dir-sources"><summary>Scenario assumptions, evidence legend &amp; public anchors</summary>' +
+      '<p>' + esc(ctx.boundary || '') + '</p><ul>' + legend + sourceLinks + '</ul></details></div>' +
 
       '<div class="dir-grid">' +
       '<div class="dir-card"><h3>COMMANDER’S INTENT</h3>' +
+      '<div class="dir-stat"><span>Halt the crossing</span><b>drive Red throughput below 30%</b></div>' +
+      '<div class="dir-stat"><span>Prevent consolidation</span><b>keep lodgment below 100%</b></div>' +
       '<div class="dir-stat"><span>Hold your key objectives</span><b>lose ≤' + Math.floor((st.objectives.blue.total || 8) * OBJ_LOSS_FRAC) + ' of ' + (st.objectives.blue.total || 8) + '</b></div>' +
-      '<div class="dir-stat"><span>Break Red’s force</span><b>drive Red objective value below ' + Math.round(st.cfg.collapseFrac * 100) + '%</b></div>' +
       '<div class="dir-stat"><span>Guard your tempo</span><b>C2 &amp; logistics feed your AP</b></div>' +
       '<div class="dir-stat"><span>Decision budget</span><b>' + st.ap.blue + ' orders / turn (tempo-driven)</b></div>' +
       '</div>' +
@@ -273,15 +433,15 @@ window.DirectorModule = (function () {
 
       '<div class="dir-grid">' +
       '<div class="dir-card"><h3>YOUR KEY OBJECTIVES (DEFEND)</h3>' + objList(st, 'blue') + '</div>' +
-      '<div class="dir-card"><h3>RED CENTER OF GRAVITY (ATTACK)</h3>' + objList(st, 'red') + '</div>' +
+      '<div class="dir-card"><h3>RED KEY SYSTEMS (DISRUPT)</h3>' + objList(st, 'red') + '</div>' +
       '</div>' +
 
       '<div class="dir-card"><h3>OPERATION PARAMETERS</h3>' +
       '<div class="row" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">' +
       '<span class="dir-note">Turn budget</span><span class="dir-chips">' +
-      [6, 8, 10].map(function (n) { return '<span class="dir-chip' + (briefOpts.turnLimit === n ? ' on' : '') + '" data-turns="' + n + '">' + n + '</span>'; }).join('') +
+      [6, 8, 10].map(function (n) { return '<button type="button" class="dir-chip' + (briefOpts.turnLimit === n ? ' on' : '') + '" aria-pressed="' + (briefOpts.turnLimit === n) + '" data-turns="' + n + '">' + n + ' TURNS</button>'; }).join('') +
       '</span><span class="dir-note">Red doctrine strength</span><span class="dir-chips">' +
-      ['easy', 'hard'].map(function (d) { return '<span class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" data-diff="' + d + '">' + d.toUpperCase() + '</span>'; }).join('') +
+      ['easy', 'hard'].map(function (d) { return '<button type="button" class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" aria-pressed="' + (briefOpts.redDiff === d) + '" data-diff="' + d + '">' + (d === 'hard' ? 'CONTESTED' : 'TRAINING') + '</button>'; }).join('') +
       '</span></div></div>' +
 
       '<div class="dir-actions"><span class="dir-note">Seed ' + esc(String(GMseed())) + ' — this operation is exactly replayable.</span>' +
@@ -329,9 +489,11 @@ window.DirectorModule = (function () {
 
   // ---- PLAN (command dock) -----------------------------------------------------------
   function beginPlanning() {
+    if (!op.panelState) enterFocusMode();
     setPhase('plan');
     forceMapView();
     renderDock();
+    focusPlanControl();
     startSelPoll();
     showObjectiveOverlay();
     evt('Planning phase — turn ' + GM.getState().turn + '.');
@@ -371,7 +533,7 @@ window.DirectorModule = (function () {
     // default the working target to the top of the pool so the select and the recon
     // readout agree from the very first render
     if ((!op.targetId || !pool.some(function (b) { return b.id === op.targetId; })) && pool.length) op.targetId = pool[0].id;
-    return pool.slice(0, 40).map(function (b) {
+    return pool.map(function (b) {
       var tag = objSet[b.id] ? '★ ' : '';
       var extra = op.kind === 'repair' ? (' · ' + Math.round(b.health) + 'hp') : (' · ' + esc(b.difficulty || ''));
       return '<option value="' + esc(b.id) + '"' + (b.id === op.targetId ? ' selected' : '') + '>' + tag + esc(b.name) + ' (val ' + nodeVal(b) + extra + ')</option>';
@@ -408,6 +570,9 @@ window.DirectorModule = (function () {
     var st = GM.getState();
     if (!st) return;
     var apMax = st.ap.blue, apLeft = st.apLeft.blue;
+    var lastDenial = (st.denialHistory || []).slice(-1)[0] || null;
+    var operationalStatus = (lastDenial ? 'RED THR <b>' + Math.round(lastDenial.throughput * 100) + '%</b> · ' : '') +
+      'LODG <b>' + Math.round(((st.lodgment && st.lodgment.value) || 0) * 100) + '%</b>';
     var pips = '';
     for (var i = 0; i < apMax; i++) pips += '<i class="' + (i < apLeft ? 'full' : '') + '"></i>';
     var methods = GM.methods();
@@ -417,13 +582,20 @@ window.DirectorModule = (function () {
       var m = methods[k];
       var vulnHit = tgt && (tgt.vulns || []).indexOf(m.vuln) >= 0;
       var hint = Math.round(m.baseProb * 100) + '%' + (vulnHit ? ' ▲vuln' : '');
-      return '<span class="dir-chip' + (op.methodKey === k ? ' on' : '') + '" data-method="' + k + '" title="Base hit ' + hint + '">' + m.short + ' ' + hint + '</span>';
+      var avail = tgt ? GM.canStrike('blue', tgt.id, k) : { ok: false, reason: 'no-target' };
+      var why = avail.ok ? ('Base hit ' + hint) : explainInvalid(avail.reason);
+      return '<button type="button" class="dir-chip' + (op.methodKey === k ? ' on' : '') + '" aria-pressed="' + (op.methodKey === k) + '" data-method="' + k + '" title="' + esc(why) + '"' + (avail.ok ? '' : ' disabled') + '>' + m.short + ' ' + hint + '</button>';
     }).join('');
+    var proposed = tgt ? { kind: op.kind, targetId: tgt.id } : null;
+    if (proposed && op.kind === 'strike') proposed.methodKey = op.methodKey;
+    var validity = proposed ? GM.validOrder('blue', proposed) : { ok: false, reason: 'no-target' };
+    var validationNote = validity.ok ? '' : '<span class="dir-note" style="color:#e8ad77">' + esc(explainInvalid(validity.reason)) + '</span>';
     var queue = st.orders.blue.map(function (o, i) {
       var n = GM.boardNode(o.targetId);
+      var src = o.sourceId ? GM.boardNode(o.sourceId) : null;
       var cls = o.kind === 'harden' ? 'h' : (o.kind === 'repair' ? 'r' : '');
-      var lbl = o.kind === 'strike' ? (methods[o.methodKey] ? methods[o.methodKey].short : 'KE') + ' → ' : (o.kind.toUpperCase() + ' ');
-      return '<span class="oq ' + cls + '">' + lbl + esc(n ? n.name.slice(0, 34) : o.targetId) + '<u data-rm="' + i + '" title="Remove">✕</u></span>';
+      var lbl = o.kind === 'strike' ? (methods[o.methodKey] ? methods[o.methodKey].short : 'KE') + (src ? ' via ' + esc(src.name.slice(0, 28)) : '') + ' → ' : (o.kind.toUpperCase() + ' ');
+      return '<span class="oq ' + cls + '">' + lbl + esc(n ? n.name.slice(0, 34) : o.targetId) + '<button type="button" class="remove" data-rm="' + i + '" aria-label="Remove order" title="Remove">✕</button></span>';
     }).join('') || '<span class="dir-note">No orders queued — click a node on the map or pick a target below.</span>';
 
     $('dir-dock').innerHTML =
@@ -434,20 +606,21 @@ window.DirectorModule = (function () {
       '<span class="stat">OBJ <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + ' held</b></span>' +
       '<span class="stat">RED OBJ <b>' + st.objectives.red.held + '/' + st.objectives.red.total + ' standing</b></span>' +
       '<span class="spacer"></span>' +
-      '<span class="dir-note">score ' + Math.round(st.score.blue) + ' : ' + Math.round(st.score.red) + '</span>' +
+      '<span class="stat">' + operationalStatus + '</span>' +
       '</div>' +
       '<div class="row">' +
       '<span class="dir-chips">' +
-      ['strike', 'harden', 'repair'].map(function (k) { return '<span class="dir-chip' + (op.kind === k ? ' on' : '') + '" data-kind="' + k + '">' + k.toUpperCase() + '</span>'; }).join('') +
+      ['strike', 'harden', 'repair'].map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + '</button>'; }).join('') +
       '</span>' +
-      '<select id="dir-target">' + (optsHtml || '<option value="">— no valid targets —</option>') + '</select>' +
+      '<label class="stat" for="dir-target">TARGET</label><select id="dir-target" aria-label="Order target">' + (optsHtml || '<option value="">— no valid targets —</option>') + '</select>' +
       (op.kind === 'strike' ? '<span class="dir-chips">' + methodChips + '</span>' : '') +
-      '<button class="dir-btn" data-act="queue" ' + (apLeft <= 0 ? 'disabled style="opacity:.45"' : '') + '>+ QUEUE</button>' +
+      '<button class="dir-btn" data-act="queue"' + (validity.ok ? '' : ' disabled') + '>+ QUEUE ORDER</button>' + validationNote +
       '</div>' +
       reconHtml(tgt) +
       '<div class="row q">' + queue + '</div>' +
-      '<div class="row"><span class="dir-note">Orders lock blind — Red is planning the same turn right now.</span><span class="spacer"></span>' +
-      '<button class="dir-btn primary" data-act="forecast">⚡ FORECAST &amp; COMMIT</button></div>';
+      '<div class="row"><span class="dir-note">Orders lock blind; Red commits when you execute.</span><span class="spacer"></span>' +
+      (st.orders.blue.length ? '<button class="dir-btn primary" data-act="forecast">REVIEW FORECAST →</button>' :
+        '<button class="dir-btn" data-act="pass">PASS TURN</button><button class="dir-btn primary" disabled>QUEUE AN ORDER TO CONTINUE</button>') + '</div>';
     var sel = $('dir-target');
     if (sel && sel.value) op.targetId = sel.value;
     renderRail();
@@ -470,10 +643,20 @@ window.DirectorModule = (function () {
       if (!id) return;
       var order = { kind: op.kind, targetId: id };
       if (op.kind === 'strike') order.methodKey = op.methodKey;
+      var check = GM.validOrder('blue', order);
+      if (!check.ok) {
+        var msg = explainInvalid(check.reason);
+        evt('Order rejected — ' + msg);
+        try { if (typeof window.showToast === 'function') window.showToast(msg, 'warn', 4500); } catch (e) {}
+        renderDock();
+        return;
+      }
       var ok = GM.queueOrder('blue', order);
-      if (!ok) evt('Order rejected (no orders left or invalid target).');
+      if (!ok) evt('Order rejected — the game state changed before it could be queued.');
       renderDock();
     } else if (act === 'forecast') {
+      openCommit();
+    } else if (act === 'pass') {
       openCommit();
     }
   }
@@ -533,20 +716,21 @@ window.DirectorModule = (function () {
     var methods = GM.methods();
     var rows = st.orders.blue.length ? st.orders.blue.map(function (o) {
       var n = GM.boardNode(o.targetId);
+      var src = o.sourceId ? GM.boardNode(o.sourceId) : null;
       var what = o.kind === 'strike' ? (methods[o.methodKey] ? methods[o.methodKey].name : 'Strike') : o.kind.charAt(0).toUpperCase() + o.kind.slice(1);
-      return '<div class="dir-obj"><span>' + esc(what) + ' → ' + esc(n ? n.name : o.targetId) + '</span><span class="v">' + (n ? esc(n.difficulty || '') : '') + '</span></div>';
-    }).join('') : '<div class="dir-note">No orders — you are passing this turn. Red is not.</div>';
+      return '<div class="dir-obj"><span>' + esc(what) + ' → ' + esc(n ? n.name : o.targetId) + '</span><span class="v">' + (src ? 'via ' + esc(src.name) : (n ? esc(n.difficulty || '') : '')) + '</span></div>';
+    }).join('') : '<div class="dir-note" style="color:#ffd18a">Deliberate pass: Blue will take no action this turn. Red will still act.</div>';
 
     $('dir-wrap').innerHTML =
       '<div class="dir-kicker">COMMIT · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
-      '<h1 class="dir-h1">Sign the order.</h1>' +
-      '<div class="dir-sub">Red has already committed. Execution is simultaneous and irreversible.</div>' +
+      '<h1 class="dir-h1">Review and commit.</h1>' +
+      '<div class="dir-sub">Red will commit simultaneously when you execute. Resolution is seeded and irreversible.</div>' +
       '<div class="dir-card"><h3>YOUR ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + rows + '</div>' +
       forecastStrip(op.lastForecast) +
       '<div class="dir-actions">' +
       '<span class="dir-note">Seed ' + esc(String(GMseed())) + ' · turn draw is deterministic.</span>' +
       '<button class="dir-btn" data-act="back">← REVISE</button>' +
-      '<button class="dir-btn primary" data-act="execute">EXECUTE ▶</button></div>';
+      '<button class="dir-btn primary" data-act="execute">COMMIT &amp; EXECUTE ▶</button></div>';
   }
 
   // ---- WATCH (paced playback of the one true draw) --------------------------------------
@@ -557,11 +741,13 @@ window.DirectorModule = (function () {
     var st = GM.commitTurn();
     setPhase('watch');
     forceMapView();
-    refreshVisuals();
-    showObjectiveOverlay();   // re-draw so downed key terrain dims during playback
+    // Keep the pre-turn visual picture in place during paced narration. The engine has
+    // resolved deterministically, but the map/table refresh only when the outcome lands,
+    // so the final state does not spoil its own playback.
     var report = st.lastReport || { events: [] };
     op.actuals[turn] = actualSummary(report);
     playWatch(report, st);
+    setTimeout(function () { try { $('dir-feed').focus(); } catch (e) {} }, 0);
     evt('Turn ' + turn + ' executed — watching resolution.');
   }
 
@@ -580,11 +766,13 @@ window.DirectorModule = (function () {
 
   function feedLine(e) {
     var n = GM.boardNode(e.targetId);
+    var src = e.sourceId ? GM.boardNode(e.sourceId) : null;
     var name = n ? n.name : e.targetId;
     var side = e.side === 'blue' ? 'BLUE' : 'RED';
+    var via = src ? ' via ' + src.name : '';
     var cls = e.side === 'blue' ? 'blue' : 'red', txt;
-    if (e.kind === 'hit') { txt = side + ' ' + (e.method || '').toUpperCase() + ' → ' + name + ' — HIT (−' + Math.round(e.damage || 0) + ')'; }
-    else if (e.kind === 'miss') { cls += ' miss'; txt = side + ' ' + (e.method || '').toUpperCase() + ' → ' + name + ' — MISS'; }
+    if (e.kind === 'hit') { txt = side + ' ' + (e.method || '').toUpperCase() + via + ' → ' + name + ' — HIT (−' + Math.round(e.damage || 0) + ')'; }
+    else if (e.kind === 'miss') { cls += ' miss'; txt = side + ' ' + (e.method || '').toUpperCase() + via + ' → ' + name + ' — MISS'; }
     else if (e.kind === 'kill') { cls += ' kill'; txt = '✖ ' + name + ' NEUTRALIZED'; }
     else if (e.kind === 'cascade') { cls += ' cas'; txt = '⚡ ' + (e.text || ('Cascade hit ' + name)); }
     else if (e.kind === 'repair') { txt = side + ' repaired ' + name + ' (+' + Math.round(e.amount || 0) + ')'; }
@@ -595,8 +783,16 @@ window.DirectorModule = (function () {
   function playWatch(report, st) {
     clearWatchTimers();
     var feed = $('dir-feed');
-    feed.innerHTML = '<div class="fl sys">TURN ' + report.turn + ' — EXECUTION</div>';
     var events = (report.events || []).filter(function (e) { return e.kind !== 'void'; });
+    var instant = prefersReducedMotion();
+    feed.innerHTML = '<div class="fl sys">TURN ' + report.turn + ' — EXECUTION · ' + events.length + ' EVENTS' +
+      (instant ? ' · REDUCED MOTION' : ' <button class="dir-btn dir-skip" data-act="skip-watch">SHOW RESULT NOW</button>') + '</div>';
+    if (instant) {
+      events.forEach(function (e) { feed.insertAdjacentHTML('beforeend', feedLine(e)); });
+      showOutcome(st, report);
+      feed.scrollTop = feed.scrollHeight;
+      return;
+    }
     var step = events.length > 40 ? Math.max(110, Math.floor(13000 / events.length)) : 330;
     events.forEach(function (e, i) {
       op.watchTimers.push(setTimeout(function () {
@@ -611,18 +807,24 @@ window.DirectorModule = (function () {
   }
 
   function showOutcome(stAfterCommit, report) {
+    if ($('dir-feed').querySelector('.outcome')) return;
+    var skip = $('dir-feed').querySelector('[data-act="skip-watch"]');
+    if (skip) skip.remove();
     var st = GM.getState();
     refreshVisuals();
+    showObjectiveOverlay();
     var f = op.forecasts[report.turn], a = op.actuals[report.turn];
     var honesty = (f && a) ?
       '<div class="dir-note">Forecast said ' + bandStr(f.redKills) + ' Red down — the world drew ' + a.redKills + '.' +
       (a.redKills >= f.redKills.lo && a.redKills <= f.redKills.hi ? ' Inside the band.' : ' Outside the band — note it.') + '</div>' : '';
     var over = st.phase === 'over';
     var lastTurn = !over && st.turn >= st.cfg.turnLimit;   // turn limit ends the match on advance
+    var denial = (st.denialHistory || []).slice(-1)[0] || null;
+    var denialLine = denial ? '<br>Red throughput <b>' + Math.round(denial.throughput * 100) + '%</b> (halt &lt;30%) · system coherence <b>' + Math.round(denial.osvi * 100) + '%</b> · lodgment <b>' + Math.round(((st.lodgment && st.lodgment.value) || 0) * 100) + '%</b>' : '';
     var html = '<div class="outcome"><b>TURN ' + report.turn + ' COMPLETE</b><br>' +
       'Red lost <b>' + (a ? a.redKills : 0) + '</b> · Blue lost <b>' + (a ? a.blueKills : 0) + '</b> · ' +
       'Your objectives <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + '</b> · ' +
-      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b><br>' + honesty +
+      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + '<br>' + honesty +
       '<div class="dir-actions" style="margin-top:10px">' +
       (over ? '<button class="dir-btn primary" data-act="aar">AFTER-ACTION REVIEW →</button>'
         : lastTurn ? '<button class="dir-btn primary" data-act="next">END OF OPERATION — AAR →</button>'
@@ -643,6 +845,11 @@ window.DirectorModule = (function () {
       else beginPlanning();
     }
     else if (act === 'aar') openAar();
+    else if (act === 'skip-watch') {
+      clearWatchTimers();
+      var st = GM.getState();
+      showOutcome(st, st && st.lastReport || { turn: st ? st.turn : 0, events: [] });
+    }
   }
 
   // ---- AAR + the Counterfactual Machine --------------------------------------------------
@@ -790,12 +997,30 @@ window.DirectorModule = (function () {
     }).join('') + '</div>';
   }
 
+  function operationalVerdict(aar) {
+    aar = aar || {};
+    var winner = aar.winner, result = aar.result || null;
+    if (result && result.detail === 'legacy-score') return { label: (winner || 'NO').toUpperCase() + ' ADVANTAGE · LEGACY SCORE', cls: winner === 'blue' ? 'win' : winner === 'red' ? 'loss' : 'draw' };
+    if (winner === 'draw') return { label: result && result.reason === 'horizon' ? 'CONTESTED PROJECTION' : 'CONTESTED / UNRESOLVED', cls: 'draw' };
+    if (result && result.reason === 'halt' && winner === 'blue') return { label: 'DENIAL ACHIEVED', cls: 'win' };
+    if (result && result.reason === 'lodgment' && winner === 'red') return { label: 'LODGMENT ESTABLISHED', cls: 'loss' };
+    if (result && result.reason === 'horizon') return { label: winner === 'blue' ? 'BLUE-FAVORED CONTINUATION' : winner === 'red' ? 'RED-FAVORED CONTINUATION' : 'CONTESTED PROJECTION', cls: winner === 'blue' ? 'win' : winner === 'red' ? 'loss' : 'draw' };
+    if (!winner) return { label: 'UNRESOLVED MODEL STATE', cls: 'draw' };
+    return { label: winner.toUpperCase() + ' OPERATIONAL OUTCOME', cls: winner === 'blue' ? 'win' : 'loss' };
+  }
+
   function openAar() {
     var st = GM.getState();
     op.record = GM.serialize();
     setPhase('aar');
     var aar = st.aar || {};
-    var win = aar.winner === 'blue';
+    op.aar = aar;
+    var verdict = operationalVerdict(aar);
+    var lastDenial = (aar.denialHistory || []).slice(-1)[0] || {};
+    var lodgment = aar.lodgment ? Number(aar.lodgment.value || 0) : 0;
+    var result = aar.result || {};
+    var projection = result.projection || null;
+    var projectionLine = projection ? '<div class="dir-note" style="margin-top:8px">Hard-horizon projection: lodgment sustained in <b>' + projection.lodgmentSustainedPct + '%</b> of seeded continuations; halt in <b>' + projection.haltPct + '%</b>. This is a model distribution, not a real-world probability.</div>' : '';
     var probes = Object.keys(PROBES).map(function (k) {
       var p = PROBES[k];
       return '<div class="dir-probe"><div><b>' + esc(p.title) + '</b><div class="dir-note">' + esc(p.desc) + '</div>' +
@@ -808,11 +1033,17 @@ window.DirectorModule = (function () {
 
     $('dir-wrap').innerHTML =
       '<div class="dir-kicker">AFTER-ACTION REVIEW · ' + (aar.turns || st.turn) + ' TURNS · SEED ' + esc(String(op.record ? op.record.seed : '')) + '</div>' +
-      '<div class="dir-verdict ' + (win ? 'win' : 'loss') + '">' + (win ? 'OPERATION SUCCESSFUL' : 'OPERATION FAILED') + '</div>' +
-      '<div class="dir-sub">' + esc(aar.reason || '') + ' · score margin ' + (aar.scoreMargin > 0 ? '+' : '') + (aar.scoreMargin || 0) + '</div>' +
+      '<div class="dir-verdict ' + verdict.cls + '">' + verdict.label + '</div>' +
+      '<div class="dir-sub">' + esc(aar.reason || '') + '</div>' +
+
+      '<div class="dir-card"><h3>DENIAL / LODGMENT VERDICT</h3>' +
+      '<div class="dir-metrics"><div class="dir-metric"><b>' + (lastDenial.throughput == null ? '—' : Math.round(lastDenial.throughput * 100) + '%') + '</b><span>RED THROUGHPUT · HALT &lt;30%</span></div>' +
+      '<div class="dir-metric"><b>' + (lastDenial.osvi == null ? '—' : Math.round(lastDenial.osvi * 100) + '%') + '</b><span>RED SYSTEM COHERENCE</span></div>' +
+      '<div class="dir-metric"><b>' + Math.round(lodgment * 100) + '%</b><span>LODGMENT ACCUMULATED</span></div>' +
+      '<div class="dir-metric"><b>' + esc(result.at && result.at.dday != null ? 'D+' + result.at.dday : '—') + '</b><span>DECISION POINT</span></div></div>' + projectionLine + '</div>' +
 
       '<div class="dir-grid">' +
-      '<div class="dir-card"><h3>SCORE TRAJECTORY</h3>' + scoreBars(aar) + '</div>' +
+      '<div class="dir-card"><h3>SECONDARY ATTRITION LEDGER</h3>' + scoreBars(aar) + '<div class="dir-note">Score is descriptive; the denial/lodgment arbiter above decides the operation.</div></div>' +
       '<div class="dir-card"><h3>WHAT FELL</h3>' + top + '</div>' +
       '</div>' +
 
@@ -821,11 +1052,13 @@ window.DirectorModule = (function () {
       ledgerRows() + '</table>' +
       '<div class="dir-note" style="margin-top:6px">A good forecast is honest, not lucky: actuals should land inside the band ~80% of the time.</div></div>' +
 
-      '<div class="dir-card"><h3>THE COUNTERFACTUAL MACHINE — SAME WORLD, ONE CHANGED POLICY</h3>' +
-      '<div class="dir-note" style="margin-bottom:6px">Re-runs this exact seeded operation with one Blue policy changed. Red replays its recorded orders.</div>' +
+      '<div class="dir-card"><h3>EXPERIMENTAL ATTRITION SENSITIVITY — SAME DRAW, ONE CHANGED POLICY</h3>' +
+      '<div class="dir-note" style="margin-bottom:6px">Directional comparison only: these legacy probes replay objective collapse and attrition score; they do not reproduce the invasion denial/lodgment arbiter above.</div>' +
       probes + '</div>' +
 
       '<div class="dir-actions">' +
+      '<button class="dir-btn" data-act="copy-aar">COPY AAR</button>' +
+      '<button class="dir-btn" data-act="download-aar">DOWNLOAD .MD</button>' +
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
       '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
     evt('After-action review opened.');
@@ -838,10 +1071,70 @@ window.DirectorModule = (function () {
     var box = $('dir-probe-' + key);
     if (!r || !box) return;
     var youWin = r.winner === 'blue';
-    box.innerHTML = 'Same world: <b>' + (youWin ? 'BLUE WINS' : 'BLUE LOSES') + '</b> ' +
+    box.innerHTML = 'Attrition lens: <b>' + (youWin ? 'BLUE AHEAD' : 'RED AHEAD') + '</b> ' +
       (r.byScore ? 'on score' : 'by collapse') + ' at T' + r.endedTurn +
       ' · objectives held ' + r.heldBlue.h + '/' + r.heldBlue.t +
       ' · Red objectives standing ' + r.heldRed.h + '/' + r.heldRed.t;
+  }
+
+  function aarMarkdown() {
+    var ctx = scenarioContext(), aar = op.aar || {}, rec = op.record || {};
+    var last = (aar.denialHistory || []).slice(-1)[0] || {};
+    var lines = [
+      '# StrikeSim After-Action Review', '',
+      '**Scenario:** ' + (ctx.title || 'Taiwan Strait 2040'),
+      '**Boundary:** ' + (ctx.classification || 'UNCLASSIFIED // NOTIONAL') + ' · Public-source baseline with explicit 2040 assumptions',
+      '**Seed:** ' + (rec.seed || '—'),
+      '**Turns:** ' + (aar.turns || rec.turn || '—'),
+      '**Verdict:** ' + operationalVerdict(aar).label,
+      '**Reason:** ' + (aar.reason || '—'), '',
+      '## Decision frame', '',
+      ctx.decisionQuestion || '', '',
+      '## Final operational measures', '',
+      '- Red throughput: ' + (last.throughput == null ? '—' : Math.round(last.throughput * 100) + '%') + ' (model halt threshold: below 30%)',
+      '- Red system coherence: ' + (last.osvi == null ? '—' : Math.round(last.osvi * 100) + '%'),
+      '- Lodgment accumulated: ' + Math.round(((aar.lodgment && aar.lodgment.value) || 0) * 100) + '%', '',
+      '## Turn record', ''
+    ];
+    (rec.history || []).forEach(function (h) {
+      lines.push('### Turn ' + h.turn, '');
+      var orders = (h.orders && h.orders.blue) || [];
+      if (!orders.length) lines.push('- Blue passed.');
+      orders.forEach(function (o) {
+        var tgt = GM.boardNode(o.targetId), src = o.sourceId ? GM.boardNode(o.sourceId) : null;
+        lines.push('- ' + (o.kind || 'order').toUpperCase() + (o.methodKey ? ' / ' + o.methodKey.toUpperCase() : '') +
+          (src ? ' via ' + src.name : '') + ' → ' + (tgt ? tgt.name : o.targetId));
+      });
+      var f = op.forecasts[h.turn], a = op.actuals[h.turn];
+      if (f && a) lines.push('- Forecast Red down: ' + bandStr(f.redKills) + '; actual: ' + a.redKills + '. Forecast Blue lost: ' + bandStr(f.blueKills) + '; actual: ' + a.blueKills + '.');
+      var d = (aar.denialHistory || []).filter(function (x) { return x.turn === h.turn; })[0];
+      var l = (aar.lodgment && aar.lodgment.history || []).filter(function (x) { return x.turn === h.turn; })[0];
+      if (d) lines.push('- Throughput ' + Math.round(d.throughput * 100) + '%; system coherence ' + Math.round(d.osvi * 100) + '%; lodgment ' + Math.round(((l && l.value) || 0) * 100) + '%.');
+      lines.push('');
+    });
+    lines.push('## Assumptions and public anchors', '', ctx.boundary || '', '');
+    (ctx.sources || []).forEach(function (s) { if (safeHttpUrl(s.url)) lines.push('- [' + s.label + '](' + s.url + ')'); });
+    lines.push('', '> Reasoning aid only. Outputs are model-conditioned comparisons, not predictions. Do not enter classified, CUI, client-sensitive, or personal information into the public deployment.', '');
+    return lines.join('\n');
+  }
+
+  function copyAar() {
+    var md = aarMarkdown();
+    function ok() { op.aarExported = true; try { if (typeof window.showToast === 'function') window.showToast('AAR copied to the clipboard.', 'success'); } catch (e) {} }
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = md; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); ok(); } catch (e) {} ta.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(md).then(ok).catch(fallback); return; }
+    fallback();
+  }
+
+  function downloadAar() {
+    var blob = new Blob([aarMarkdown()], { type: 'text/markdown;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'strikesim-aar-' + String(op.record && op.record.seed || 'operation').replace(/[^a-z0-9_-]+/gi, '-') + '.md';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 0);
+    op.aarExported = true;
   }
 
   // ---- overlay actions / lifecycle -----------------------------------------------------
@@ -853,8 +1146,10 @@ window.DirectorModule = (function () {
     if (t.hasAttribute('data-probe')) { runProbe(t.getAttribute('data-probe')); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
-    else if (act === 'back') { setPhase('plan'); renderDock(); }
+    else if (act === 'back') { setPhase('plan'); renderDock(); focusPlanControl(); }
     else if (act === 'execute') execute();
+    else if (act === 'copy-aar') copyAar();
+    else if (act === 'download-aar') downloadAar();
     else if (act === 'exit') abortOperation(true);
     else if (act === 'exit-op') endOperation();
     else if (act === 'new-op') { endOperation(); start(); }
@@ -870,9 +1165,12 @@ window.DirectorModule = (function () {
     stopSelPoll();
     hideObjectiveOverlay();
     if (GM.isActive()) GM.endMatch();
-    op.forecasts = {}; op.actuals = {}; op.record = null; op.lastForecast = null;
+    op.forecasts = {}; op.actuals = {}; op.record = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    restorePanels();
     setPhase('idle');
     refreshVisuals();
+    try { (op.returnFocus || $('dir-launch')).focus(); } catch (e) {}
+    op.returnFocus = null;
     evt('Operation closed — scenario restored.');
   }
 

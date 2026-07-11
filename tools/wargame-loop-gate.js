@@ -21,8 +21,13 @@ const EXPECTED_API = [
   'boardNode',
   'methods',
   'methodKeys',
+  'canStrike',
+  'validOrder',
   'serialize',
   'deserialize',
+  'fingerprint',
+  'fingerprintMatches',
+  'scenarioStatus',
   '_internal'
 ];
 
