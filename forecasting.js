@@ -35,7 +35,7 @@
   // No arbitrary property walking: only these canonical end-of-turn fields may become
   // forecast questions. Node IDs are data, but the terminal field remains allowlisted.
   function allowedPath(path) {
-    return /^(red\.(throughput|lodgment|projectedLodgmentT5|nodesDownThisTurn|sensorNodesDownThisTurn|commandNodesDownThisTurn)|blue\.(keyNodesLostThisTurn|alive|tempoFrac)|result\.(halt|lodgmentComplete)|nodes\.[A-Za-z0-9_.:-]+\.(alive|healthFrac))$/.test(String(path || ''));
+    return /^(red\.(throughput|lodgment|projectedLodgmentT5|nodesDownThisTurn|sensorNodesDownThisTurn|commandNodesDownThisTurn)|blue\.(keyNodesLostThisTurn|nodesLostThisTurn|alive|tempoFrac)|result\.(halt|lodgmentComplete)|nodes\.[A-Za-z0-9_.:-]+\.(alive|healthFrac))$/.test(String(path || ''));
   }
 
   function pathValue(snapshot, path) {
@@ -221,6 +221,37 @@
     }, 0);
   }
 
+  var FAILURE_CAUSES = Object.freeze([
+    { id: 'sam-attrition', label: 'Strike package attrition / air-defense pressure' },
+    { id: 'lift-intact', label: 'Amphibious lift and sustainment remained intact' },
+    { id: 'tempo-collapse', label: 'Blue C2 / tempo collapsed' },
+    { id: 'objective-timeout', label: 'Objective clock outran denial effects' }
+  ]);
+
+  function classifyFailure(snapshot) {
+    snapshot = snapshot || { red: {}, blue: {} };
+    if (Number(snapshot.blue && snapshot.blue.nodesLostThisTurn || 0) >= 2) return { failed: true, cause: 'sam-attrition' };
+    if (Number(snapshot.red && snapshot.red.throughput || 0) >= 0.65) return { failed: true, cause: 'lift-intact' };
+    if (Number(snapshot.blue && snapshot.blue.keyNodesLostThisTurn || 0) > 0 || Number(snapshot.blue && snapshot.blue.tempoFrac == null ? 1 : snapshot.blue.tempoFrac) < 0.80) return { failed: true, cause: 'tempo-collapse' };
+    if (Number(snapshot.red && snapshot.red.projectedLodgmentT5 || 0) >= 0.50) return { failed: true, cause: 'objective-timeout' };
+    return { failed: false, cause: null };
+  }
+
+  function failureCauseSet(worlds) {
+    var counts = Object.fromEntries(FAILURE_CAUSES.map(function (c) { return [c.id, 0]; }));
+    var failed = 0;
+    (worlds || []).forEach(function (world) {
+      var result = classifyFailure(world);
+      if (!result.failed) return;
+      failed++;
+      counts[result.cause]++;
+    });
+    var categories = FAILURE_CAUSES.map(function (cause) {
+      return { id: cause.id, label: cause.label, count: counts[cause.id], q: failed ? counts[cause.id] / failed : 0.25 };
+    }).sort(function (a, b) { return b.count - a.count || a.id.localeCompare(b.id); });
+    return { categories: categories, failedWorlds: failed, K: (worlds || []).length };
+  }
+
   function murphy(entries) {
     var valid = (entries || []).filter(function (e) { return e && e.player != null && e.outcome != null; });
     var N = valid.length;
@@ -312,6 +343,9 @@
     brierSkill: brierSkill,
     winkler: winkler,
     multicategoryBrier: multicategoryBrier,
+    FAILURE_CAUSES: FAILURE_CAUSES,
+    classifyFailure: classifyFailure,
+    failureCauseSet: failureCauseSet,
     murphy: murphy,
     foldedBuckets: foldedBuckets,
     bootstrapBss: bootstrapBss,

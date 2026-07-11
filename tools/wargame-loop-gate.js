@@ -14,6 +14,7 @@ const EXPECTED_API = [
   'queueOrder',
   'removeOrder',
   'clearOrders',
+  'preparePlan',
   'commitTurn',
   'nextTurn',
   'endMatch',
@@ -22,6 +23,7 @@ const EXPECTED_API = [
   'boardNode',
   'methods',
   'methodKeys',
+  'strategicOptions',
   'canStrike',
   'validOrder',
   'serialize',
@@ -68,6 +70,7 @@ function loadGame(graph) {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'strategic-state.js'), 'utf8'), context, { filename: 'strategic-state.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
   if (errors.length) throw new Error(errors.join('\n'));
   return context.window.GameModule;

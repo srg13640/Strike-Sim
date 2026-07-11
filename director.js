@@ -39,6 +39,8 @@ window.DirectorModule = (function () {
     standingCarry: null,
     lastForecast: null,
     record: null,         // GM.serialize() snapshot at match end (for counterfactuals)
+    counterfactual: null,
+    counterfactualWorker: null,
     aar: null,
     aarExported: false,
     watchTimers: [],
@@ -137,9 +139,15 @@ window.DirectorModule = (function () {
       'friendly-target': 'Strike orders require a Red target.',
       'not-friendly': 'Harden and repair orders require a Blue node.',
       'target-dead': 'That node is already out of action.',
+      'target-inactive': 'That capability is outside the active posture.',
       'no-target': 'Choose a target first.',
       'no-ap': 'No orders remain this turn.',
-      'bad-method': 'Choose a valid delivery method.'
+      'bad-method': 'Choose a valid delivery method.',
+      'roe-min-escalation': 'Your declared ROE has not unlocked this target yet.',
+      'roe-denied': 'Your declared ROE prohibits this target.',
+      'roe-default-deny': 'Your declared ROE does not authorize this target.',
+      'signal-needs-enemy-axis': 'Choose a Red system to define the deception axis.',
+      'decoy-quota': 'Only one zero-cost decoy is allowed per turn.'
     })[reason] || 'This order is not available in the current state.';
   }
   function isolateForOverlay(active) {
@@ -263,6 +271,9 @@ window.DirectorModule = (function () {
       '.dir-house{margin-top:7px;padding:7px 9px;border-left:2px solid #5aa9cc;background:#0a1c29;color:#a9cee2;font-size:12px;}',
       '.dir-lock{display:inline-block;border:1px solid #43677d;border-radius:999px;padding:2px 8px;color:#9fc9dd;font:700 10px Oswald;letter-spacing:.12em;}',
       '.dir-scoreline{margin-top:7px;color:#c9e5f3;font-size:12px;}',
+      '.dir-intel{display:flex;align-items:center;gap:8px;width:100%;font-size:11px;color:#8fb2ca;}',
+      '.dir-intel .track{display:flex;height:8px;flex:1;border-radius:999px;overflow:hidden;background:#10283a;}',
+      '.dir-intel .a{background:#d06a55}.dir-intel .d{background:#b88a3c}.dir-intel .n{background:#4ba3c7}',
       // command dock (PLAN)
       '#dir-dock{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:1500;display:none;width:min(960px,94vw);',
       'background:linear-gradient(180deg,rgba(12,22,32,.96),rgba(8,14,20,.97));border:1px solid #1f4058;border-radius:14px;',
@@ -308,14 +319,16 @@ window.DirectorModule = (function () {
       '.dir-bars .b{background:#2f88b8;border-radius:2px 2px 0 0;min-height:2px;}',
       '.dir-bars .r{background:#b8564f;}',
       '.dir-bars .tl{font-size:10px;color:#5c7d96;}',
-      '.dir-probe{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dotted #16283a;}',
-      '.dir-probe .res{font-size:12.5px;color:#ffd9a8;}',
+      '.dir-colosseum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}',
+      '.dir-colosseum label{display:flex;flex-direction:column;gap:4px;color:#789bb2;font:700 10px Oswald;letter-spacing:.09em;}',
+      '.dir-colosseum select{background:#091923;color:#d9edf8;border:1px solid #294a60;border-radius:7px;padding:8px;min-width:0;}',
+      '.dir-cf-result{margin-top:10px;padding:10px;border:1px solid #31536a;border-radius:8px;background:#091923;color:#cce7f4;font-size:12.5px;line-height:1.5;}',
       '.dir-verdict{font:700 26px Oswald;letter-spacing:.08em;margin:2px 0 2px;}',
       '.dir-verdict.win{color:#7be3a1;} .dir-verdict.loss{color:#ff9d94;} .dir-verdict.draw{color:#ffd27b;}',
       '.dir-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}',
       '.dir-metric{background:#091923;border:1px solid #19364a;border-radius:8px;padding:9px;text-align:center;}',
       '.dir-metric b{display:block;color:#e8f7ff;font:700 20px Oswald,system-ui;}.dir-metric span{color:#789bb2;font-size:10px;letter-spacing:.08em;}',
-      '@media(max-width:760px){.dir-grid,.dir-context{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
+      '@media(max-width:760px){.dir-grid,.dir-context,.dir-colosseum{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
       '@media(max-width:520px){#dir-rail .mode{font-size:0}#dir-rail .mode:after{content:"TOOLS";font-size:10px}.dir-btn,.dir-chip{min-height:44px;padding:9px 13px}#dir-dock select{min-width:100%;max-width:100%}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -383,7 +396,7 @@ window.DirectorModule = (function () {
   }
 
   // ---- BRIEF ------------------------------------------------------------------------
-  var briefOpts = { turnLimit: 8, redDiff: 'hard' };
+  var briefOpts = { turnLimit: 8, redDiff: 'hard', roeId: 'denial' };
 
   function start() {
     if (!GM) return;
@@ -404,7 +417,8 @@ window.DirectorModule = (function () {
     GM.newMatch({
       turnLimit: briefOpts.turnLimit,
       control: { blue: 'human', red: 'ai' },
-      difficulty: { blue: 'hard', red: briefOpts.redDiff }
+      difficulty: { blue: 'hard', red: briefOpts.redDiff },
+      roeId: briefOpts.roeId
     });
     op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
@@ -438,6 +452,14 @@ window.DirectorModule = (function () {
     var postureText = 'attrition ' + Math.round((posture.attrition || 0) * 100) +
       ' / decapitation ' + Math.round((posture.decapitation || 0) * 100) +
       ' / denial ' + Math.round((posture.denial || 0) * 100);
+    var strategic = st.strategic || { escalation: { value: 0 }, allies: {}, allyRules: {}, roe: {} };
+    var strategicOptions = GM.strategicOptions();
+    var roeOptions = strategicOptions.roe || {};
+    var allyThresholds = Object.keys(strategic.allyRules || {}).map(function (id) {
+      var rule = strategic.allyRules[id], track = strategic.allies[id] || {};
+      return '<div class="dir-stat"><span>' + esc(rule.id || id) + ' posture</span><b>' + (track.active ? 'ACTIVE' : 'WITHHELD') +
+        ' · entry E' + Number(rule.entryThreshold).toFixed(1) + ' (' + Math.round(Number(rule.entryProbability || 0) * 100) + '% crossing draw)</b></div>';
+    }).join('');
     var scen = (window.AppState && AppState.active && AppState.active()) || null;
     var ctx = scenarioContext();
     var title = ctx.title || (scen && scen.name) || 'INDO-PACIFIC SCENARIO';
@@ -473,6 +495,7 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Hold your key objectives</span><b>lose ≤' + Math.floor((st.objectives.blue.total || 8) * OBJ_LOSS_FRAC) + ' of ' + (st.objectives.blue.total || 8) + '</b></div>' +
       '<div class="dir-stat"><span>Guard your tempo</span><b>C2 &amp; logistics feed your AP</b></div>' +
       '<div class="dir-stat"><span>Decision budget</span><b>' + st.ap.blue + ' orders / turn (tempo-driven)</b></div>' +
+      '<div class="dir-stat"><span>Escalation ladder</span><b>E ' + Number(strategic.escalation.value || 0).toFixed(1) + ' / 10 · horizontal + vertical impulses explicit</b></div>' +
       '</div>' +
       '<div class="dir-card"><h3>FORCE BALANCE</h3>' +
       '<div class="dir-stat"><span>Blue Joint Force</span><b>' + st.alive.blue + ' enabled nodes · AP ' + st.ap.blue + '</b></div>' +
@@ -481,7 +504,8 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Blue tempo assets</span><b>' + st.tempo.blue.c2 + ' C2 · ' + st.tempo.blue.logi + ' LOG</b></div>' +
       '<div class="dir-stat"><span>Red tempo assets</span><b>' + st.tempo.red.c2 + ' C2 · ' + st.tempo.red.logi + ' LOG</b></div>' +
       '<div class="dir-note" style="margin-top:8px"><b>INTEL ASSESSMENT — PLA POSTURE:</b> ' + esc(postureText) + '. This is the disclosed prior, not Red’s hidden draw.</div>' +
-      '<div class="dir-note" style="margin-top:8px">Strikes, hardens and repairs each cost one order. A node killed this turn still acts — both sides committed first.</div>' +
+      allyThresholds +
+      '<div class="dir-note" style="margin-top:8px">Strikes, hardens, repairs, and feints each cost one order; one decoy emission is free. A node killed this turn still acts — both sides committed first.</div>' +
       '</div>' +
       '</div>' +
 
@@ -496,7 +520,9 @@ window.DirectorModule = (function () {
       [6, 8, 10].map(function (n) { return '<button type="button" class="dir-chip' + (briefOpts.turnLimit === n ? ' on' : '') + '" aria-pressed="' + (briefOpts.turnLimit === n) + '" data-turns="' + n + '">' + n + ' TURNS</button>'; }).join('') +
       '</span><span class="dir-note">Red doctrine strength</span><span class="dir-chips">' +
       ['easy', 'hard', 'elite'].map(function (d) { return '<button type="button" class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" aria-pressed="' + (briefOpts.redDiff === d) + '" data-diff="' + d + '">' + (d === 'hard' ? 'CONTESTED' : d === 'elite' ? 'ELITE' : 'TRAINING') + '</button>'; }).join('') +
-      '</span></div></div>' +
+      '</span></div><div class="row" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px"><span class="dir-note">Declared ROE commitment</span><span class="dir-chips">' +
+      Object.keys(roeOptions).map(function (id) { var roe = roeOptions[id]; return '<button type="button" class="dir-chip' + (briefOpts.roeId === id ? ' on' : '') + '" aria-pressed="' + (briefOpts.roeId === id) + '" data-roe="' + esc(id) + '" title="' + esc(roe.description) + '">' + esc(roe.label) + '</button>'; }).join('') +
+      '</span><div class="dir-note">Enforced in the UI, Red planner, every ghost world, and the resolver. Red knows the commitment.</div></div></div>' +
 
       '<div class="dir-actions"><span class="dir-note">Seed ' + esc(String(GMseed())) + ' — this operation is exactly replayable.</span>' +
       '<button class="dir-btn" data-act="exit">EXIT</button>' +
@@ -544,6 +570,7 @@ window.DirectorModule = (function () {
   // ---- PLAN (command dock) -----------------------------------------------------------
   function beginPlanning() {
     if (!op.panelState) enterFocusMode();
+    GM.preparePlan();
     setPhase('plan');
     forceMapView();
     renderDock();
@@ -562,7 +589,7 @@ window.DirectorModule = (function () {
       if (!id || id === op.lastSelId) return;
       op.lastSelId = id;
       var b = GM.boardNode(id);
-      if (!b || !b.alive) return;
+      if (!b || !b.alive || b.active === false) return;
       if (b.team === 'red') { op.kind = 'strike'; op.targetId = id; }
       else if (b.team === 'blue') { op.kind = (b.health < (b.healthMax || 100)) ? 'repair' : 'harden'; op.targetId = id; }
       renderDock();
@@ -575,8 +602,8 @@ window.DirectorModule = (function () {
     var s = GM.serialize();
     var ids = [];
     for (var id in s.health) if (s.health[id].a) ids.push(id);
-    var pool = ids.map(function (id) { return GM.boardNode(id); }).filter(Boolean);
-    if (op.kind === 'strike') pool = pool.filter(function (b) { return b.team === 'red'; }).sort(function (a, b) { return nodeVal(b) - nodeVal(a); });
+    var pool = ids.map(function (id) { return GM.boardNode(id); }).filter(function (b) { return b && b.active !== false; });
+    if (op.kind === 'strike' || op.kind === 'feint' || op.kind === 'decoy') pool = pool.filter(function (b) { return b.team === 'red'; }).sort(function (a, b) { return nodeVal(b) - nodeVal(a); });
     else {
       pool = pool.filter(function (b) { return b.team === 'blue'; });
       if (op.kind === 'repair') pool = pool.filter(function (b) { return b.health < (b.healthMax || 100); }).sort(function (a, b) { return a.health - b.health; });
@@ -620,12 +647,29 @@ window.DirectorModule = (function () {
     return '<div class="row dir-recon">RECON · ' + esc(tgt.name.slice(0, 40)) + ' — ' + bits.join(' · ') + '</div>';
   }
 
+  function intelAssessmentHtml(st) {
+    var b = st.redMind && st.redMind.belief || { attrition: 0.5, decapitation: 0.3, denial: 0.2 };
+    var a = Math.round((b.attrition || 0) * 100), d = Math.round((b.decapitation || 0) * 100), n = 100 - a - d;
+    return '<div class="row"><div class="dir-intel"><b>INTEL ASSESSMENT</b>' +
+      '<div class="track" aria-label="Red doctrine posterior"><span class="a" style="width:' + a + '%"></span><span class="d" style="width:' + d + '%"></span><span class="n" style="width:' + n + '%"></span></div>' +
+      '<span>ATTR ' + a + ' · DECAP ' + d + ' · DENIAL ' + n + '</span><span class="dir-note">posterior, never truth</span></div></div>';
+  }
+
+  function indicatorChannelHtml(st) {
+    var lines = st.strategic && st.strategic.indicators && st.strategic.indicators.current || [];
+    if (!lines.length) return '<div class="row"><span class="dir-note"><b>INDICATORS:</b> reporting unresolved.</span></div>';
+    return '<div class="row" style="align-items:flex-start"><span class="stat">INDICATORS</span><span class="dir-note">' + lines.map(function (line) {
+      return (line.assessedDeceptive ? '⚠ ASSESSED DECEPTIVE · ' : '• ') + esc(line.text);
+    }).join('<br>') + '</span></div>';
+  }
+
   function renderDock() {
     var st = GM.getState();
     if (!st) return;
     var apMax = st.ap.blue, apLeft = st.apLeft.blue;
     var lastDenial = (st.denialHistory || []).slice(-1)[0] || null;
-    var operationalStatus = (lastDenial ? 'RED THR <b>' + Math.round(lastDenial.throughput * 100) + '%</b> · ' : '') +
+    var escalation = st.strategic && st.strategic.escalation ? Number(st.strategic.escalation.value || 0) : 0;
+    var operationalStatus = 'E <b>' + escalation.toFixed(1) + '</b> · ' + (lastDenial ? 'RED THR <b>' + Math.round(lastDenial.throughput * 100) + '%</b> · ' : '') +
       'LODG <b>' + Math.round(((st.lodgment && st.lodgment.value) || 0) * 100) + '%</b>';
     var pips = '';
     for (var i = 0; i < apMax; i++) pips += '<i class="' + (i < apLeft ? 'full' : '') + '"></i>';
@@ -662,9 +706,11 @@ window.DirectorModule = (function () {
       '<span class="spacer"></span>' +
       '<span class="stat">' + operationalStatus + '</span>' +
       '</div>' +
+      intelAssessmentHtml(st) +
+      indicatorChannelHtml(st) +
       '<div class="row">' +
       '<span class="dir-chips">' +
-      ['strike', 'harden', 'repair'].map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + '</button>'; }).join('') +
+      ['strike', 'harden', 'repair', 'feint', 'decoy'].map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + (k === 'decoy' ? ' · 0 AP' : '') + '</button>'; }).join('') +
       '</span>' +
       '<label class="stat" for="dir-target">TARGET</label><select id="dir-target" aria-label="Order target">' + (optsHtml || '<option value="">— no valid targets —</option>') + '</select>' +
       (op.kind === 'strike' ? '<span class="dir-chips">' + methodChips + '</span>' : '') +
@@ -672,7 +718,7 @@ window.DirectorModule = (function () {
       '</div>' +
       reconHtml(tgt) +
       '<div class="row q">' + queue + '</div>' +
-      '<div class="row"><span class="dir-note">Orders lock blind; Red commits when you execute.</span><span class="spacer"></span>' +
+      '<div class="row"><span class="dir-note">Red committed before these indicators rendered. Feints cost combat power; uncaught decoys remain ambiguous.</span><span class="spacer"></span>' +
       (st.orders.blue.length ? '<button class="dir-btn primary" data-act="forecast">REVIEW FORECAST →</button>' :
         '<button class="dir-btn" data-act="pass">PASS TURN</button><button class="dir-btn primary" disabled>QUEUE AN ORDER TO CONTINUE</button>') + '</div>';
     var sel = $('dir-target');
@@ -718,6 +764,10 @@ window.DirectorModule = (function () {
   // ---- FORECAST (ghost worlds on the real engine) -------------------------------------
   function ghostBoard(I, snapshot) {
     var board = I.buildBoard(AppState.activeGraph());
+    if (snapshot.strategic) {
+      board.strategic = JSON.parse(JSON.stringify(snapshot.strategic));
+      I.syncActivationRosters(board, board.strategic.activation);
+    }
     for (var id in snapshot.health) {
       var b = board.nodes[id];
       if (b) { b.health = snapshot.health[id].h; b.alive = snapshot.health[id].a; }
@@ -734,13 +784,13 @@ window.DirectorModule = (function () {
     var cache = I.buildBeliefPlanCache(base, st.ap, snapshot.cfg.difficulty.red,
       snapshot.seed, snapshot.turn, snapshot.cfg);
     cache.template = base;
-    cache.moeCompiled = window.MoeModule && window.MoeModule.compileGraph
-      ? window.MoeModule.compileGraph(I.moeRedNodes(base)) : null;
+    cache.moeCompiled = cache.moeCompiled || ((window.MoeModule && window.MoeModule.compileGraph)
+      ? window.MoeModule.compileGraph(I.moeRedNodes(base)) : null);
     return cache;
   }
 
   function canonicalWorldSnapshot(board, report, state, turn, I, focusId, compiledMoe) {
-    var nodes = {}, redDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
+    var nodes = {}, redDown = 0, blueDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
     var focus = board.nodes[focusId] || board.nodes[(board.rosters.red || [])[0]];
     if (focus) nodes[focus.id] = { team: focus.team, alive: !!focus.alive, healthFrac: Math.max(0, Math.min(1, Number(focus.health || 0) / Number(focus.healthMax || 100))) };
     var keyIds = {};
@@ -754,7 +804,7 @@ window.DirectorModule = (function () {
         redDown++;
         if (/sensor|isr|recon|surveillance/i.test(descriptor)) sensorDown++;
         if (/command|c2|headquarters/i.test(descriptor)) commandDown++;
-      } else if (keyIds[e.targetId]) blueKeyLost++;
+      } else { blueDown++; if (keyIds[e.targetId]) blueKeyLost++; }
     });
     var assessment = window.MoeModule && compiledMoe && window.MoeModule.assessCompiled
       ? window.MoeModule.assessCompiled(compiledMoe, board.nodes)
@@ -775,6 +825,7 @@ window.DirectorModule = (function () {
       },
       blue: {
         keyNodesLostThisTurn: blueKeyLost,
+        nodesLostThisTurn: blueDown,
         alive: (board.rosters.blue || []).filter(function (id) { return board.nodes[id] && board.nodes[id].alive; }).length,
         tempoFrac: Number(state.tempo && state.tempo.blue && state.tempo.blue.frac || 1)
       },
@@ -850,7 +901,7 @@ window.DirectorModule = (function () {
   }
 
   function copyBeliefValues(values) {
-    return { questions: Object.assign({}, values.questions), standing: values.standing, lower: values.lower, upper: values.upper };
+    return { questions: Object.assign({}, values.questions), standing: values.standing, lower: values.lower, upper: values.upper, premortem: Object.assign({}, values.premortem || {}) };
   }
 
   function primaryQuestionContext(st) {
@@ -868,7 +919,7 @@ window.DirectorModule = (function () {
     if (!card) return false;
     var allTouched = card.set.questions.every(function (q) { return !!card.touched[q.id]; });
     var values = card.step === 'blind' ? card.values : card.final;
-    return allTouched && values && values.lower < values.upper;
+    return allTouched && !!card.touched.premortem && values && values.lower < values.upper;
   }
 
   function beliefControl(q, value, reveal) {
@@ -892,6 +943,17 @@ window.DirectorModule = (function () {
       '<input type="range" min="1" max="99" step="1" value="' + Math.round(values.standing * 100) + '" data-standing="1" aria-label="' + esc(q.prompt) + '">' + house + '</div>';
   }
 
+  function premortemControls(card, values, reveal) {
+    var set = card.set.premortem;
+    var controls = set.categories.map(function (cause) {
+      var value = Number(values.premortem[cause.id] || 0);
+      var house = reveal ? '<div class="dir-house">Failed model worlds attributed here: <b>' + cause.count + '/' + set.failedWorlds + ' · ' + Math.round(cause.q * 100) + '%</b>.</div>' : '';
+      return '<div class="dir-belief"><div class="head"><b>' + esc(cause.label) + '</b><output id="dir-value-pm-' + esc(cause.id) + '">' + Math.round(value * 100) + '%</output></div>' +
+        '<input type="range" min="0" max="100" step="1" value="' + Math.round(value * 100) + '" data-premortem="' + esc(cause.id) + '" aria-label="Premortem probability: ' + esc(cause.label) + '">' + house + '</div>';
+    }).join('');
+    return '<div class="dir-card"><h3>PRE-MORTEM PICK · IT FAILED—WHY?</h3><div class="dir-note">Move one cause. The other three rebalance automatically so your distribution stays at 100%.</div>' + controls + '</div>';
+  }
+
   function renderBlindCommit() {
     var card = op.commitCard, st = GM.getState();
     if (!card || !st) return;
@@ -902,6 +964,7 @@ window.DirectorModule = (function () {
       '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
       '<div class="dir-card"><h3>THREE RESOLVABLE CALLS</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.values.questions[q.id], false); }).join('') + '</div>' +
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.values, false) + standingControl(card, card.values, false) + '</div>' +
+      premortemControls(card, card.values, false) +
       '<div class="dir-note">Your point probabilities are the instrument. The game is not issuing an operation-success probability.</div>' +
       '<div class="dir-actions"><button class="dir-btn" data-act="unlock-commit">← UNLOCK &amp; REPLAN</button>' +
       '<button class="dir-btn primary" data-act="submit-blind"' + (cardIsReady(card) ? '' : ' disabled') + '>LOCK BLIND FORECASTS →</button></div>';
@@ -918,6 +981,7 @@ window.DirectorModule = (function () {
       '<div class="dir-card"><h3>HOUSE vs YOU</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.final.questions[q.id], true); }).join('') +
       '<div class="dir-note">Copying every house value produces Brier Skill Score 0 by construction. Positive skill requires diverging and being right over many resolved calls.</div></div>' +
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.final, true) + standingControl(card, card.final, true) + '</div>' +
+      premortemControls(card, card.final, true) +
       '<div class="dir-actions"><span class="dir-note">One seeded world will resolve. One outcome cannot validate a probability.</span>' +
       '<button class="dir-btn primary" data-act="submit-final"' + (card.final.lower < card.final.upper ? '' : ' disabled') + '>COMMIT FORECASTS &amp; EXECUTE ▶</button></div>';
   }
@@ -930,16 +994,19 @@ window.DirectorModule = (function () {
     st = GM.getState();
     var forecast = ghostForecast(GHOSTS);
     var questionSet = window.ForecastingModule.generateQuestionSet(forecast.worlds, primaryQuestionContext(st));
+    questionSet.premortem = window.ForecastingModule.failureCauseSet(forecast.worlds);
     delete forecast.worlds;
     forecast.questionSet = questionSet;
     op.lastForecast = forecast;
     op.forecasts[st.turn] = forecast;
     var questions = {};
     questionSet.questions.forEach(function (q) { questions[q.id] = 0.50; });
+    var premortem = {};
+    questionSet.premortem.categories.forEach(function (cause) { premortem[cause.id] = 0.25; });
     op.commitCard = {
       turn: st.turn, lock: lock, step: 'blind', set: questionSet,
       touched: {},
-      values: { questions: questions, standing: op.standingCarry == null ? 0.50 : op.standingCarry, lower: 0.25, upper: 0.75 },
+      values: { questions: questions, standing: op.standingCarry == null ? 0.50 : op.standingCarry, lower: 0.25, upper: 0.75, premortem: premortem },
       blind: null, final: null
     };
     setPhase('commit');
@@ -1004,7 +1071,7 @@ window.DirectorModule = (function () {
     var focus = focusId ? GM.boardNode(focusId) : null;
     var nodes = {};
     if (focus) nodes[focus.id] = { team: focus.team, alive: !!focus.alive, healthFrac: Math.max(0, Math.min(1, Number(focus.health || 0) / Number(focus.healthMax || 100))) };
-    var keyIds = {}, redDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
+    var keyIds = {}, redDown = 0, blueDown = 0, sensorDown = 0, commandDown = 0, blueKeyLost = 0;
     (st.objectiveIds.blue || []).forEach(function (id) { keyIds[id] = true; });
     (report.events || []).forEach(function (e) {
       if (e.kind !== 'kill' && e.kind !== 'cascade') return;
@@ -1015,7 +1082,7 @@ window.DirectorModule = (function () {
         redDown++;
         if (/sensor|isr|recon|surveillance/i.test(descriptor)) sensorDown++;
         if (/command|c2|headquarters/i.test(descriptor)) commandDown++;
-      } else if (keyIds[e.targetId]) blueKeyLost++;
+      } else { blueDown++; if (keyIds[e.targetId]) blueKeyLost++; }
     });
     var denial = (st.denialHistory || []).filter(function (x) { return x.turn === report.turn; })[0] || {};
     return {
@@ -1028,7 +1095,7 @@ window.DirectorModule = (function () {
         sensorNodesDownThisTurn: sensorDown,
         commandNodesDownThisTurn: commandDown
       },
-      blue: { keyNodesLostThisTurn: blueKeyLost, alive: st.alive.blue, tempoFrac: st.tempo.blue.frac },
+      blue: { keyNodesLostThisTurn: blueKeyLost, nodesLostThisTurn: blueDown, alive: st.alive.blue, tempoFrac: st.tempo.blue.frac },
       result: { halt: !!(st.result && st.result.reason === 'halt'), lodgmentComplete: !!(st.result && st.result.reason === 'lodgment') }
     };
   }
@@ -1067,6 +1134,14 @@ window.DirectorModule = (function () {
       score: F.winkler(judgment.final.lower, judgment.final.upper, throughput, 0.2)
     };
     op.intervalScores.push(judgment.interval);
+    var failure = F.classifyFailure(snapshot);
+    var causes = judgment.questionSet.premortem && judgment.questionSet.premortem.categories || [];
+    judgment.premortem = { resolved: true, applicable: !!failure.failed, actualCause: failure.cause, score: null };
+    if (failure.failed) {
+      var outcomeIndex = causes.findIndex(function (cause) { return cause.id === failure.cause; });
+      var spread = causes.map(function (cause) { return Number(judgment.final.premortem[cause.id] || 0); });
+      judgment.premortem.score = F.multicategoryBrier(spread, outcomeIndex);
+    }
 
     // Resolve every carried T+5 forecast together so updating earns or loses score.
     if (report.turn >= 5 || st.phase === 'over') {
@@ -1162,15 +1237,19 @@ window.DirectorModule = (function () {
     var judgment = op.judgments[report.turn];
     var judgmentLine = judgment && judgment.summary ? '<div class="dir-scoreline"><b>HOUSE vs YOU · ONE WORLD’S VERDICT:</b> your mean Brier ' + judgment.summary.playerMean.toFixed(3) + ' · house ' + judgment.summary.houseMean.toFixed(3) +
       ' · blind→hybrid lift ' + (judgment.summary.hybridLift >= 0 ? '+' : '') + judgment.summary.hybridLift.toFixed(3) + '. Lower Brier is better; one turn is noisy.' +
-      (judgment.interval ? ' Your 80% range ' + (judgment.interval.actual >= judgment.interval.lower && judgment.interval.actual <= judgment.interval.upper ? 'covered' : 'missed') + ' this world (interval score ' + judgment.interval.score.toFixed(2) + ').' : '') + '</div>' : '';
+      (judgment.interval ? ' Your 80% range ' + (judgment.interval.actual >= judgment.interval.lower && judgment.interval.actual <= judgment.interval.upper ? 'covered' : 'missed') + ' this world (interval score ' + judgment.interval.score.toFixed(2) + ').' : '') +
+      (judgment.premortem && judgment.premortem.applicable ? ' Premortem cause <b>' + esc(judgment.premortem.actualCause) + '</b> (multicategory Brier ' + judgment.premortem.score.toFixed(2) + '; one case).' : ' Premortem not scored because this turn did not meet a failure condition.') + '</div>' : '';
     var over = st.phase === 'over';
     var lastTurn = !over && st.turn >= st.cfg.turnLimit;   // turn limit ends the match on advance
     var denial = (st.denialHistory || []).slice(-1)[0] || null;
     var denialLine = denial ? '<br>Red throughput <b>' + Math.round(denial.throughput * 100) + '%</b> (halt &lt;30%) · system coherence <b>' + Math.round(denial.osvi * 100) + '%</b> · lodgment <b>' + Math.round(((st.lodgment && st.lodgment.value) || 0) * 100) + '%</b>' : '';
+    var escalationLine = report.escalation ? '<br>Escalation <b>E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1) +
+      '</b> (Δ ' + (Number(report.escalation.delta) >= 0 ? '+' : '') + Number(report.escalation.delta).toFixed(1) + ')' +
+      ((report.escalation.allyEvents || []).length ? ' · posture transition pending next turn: <b>' + report.escalation.allyEvents.map(function (event) { return esc(event.actor); }).join(', ') + '</b>' : '') : '';
     var html = '<div class="outcome"><b>TURN ' + report.turn + ' COMPLETE</b><br>' +
       'Red lost <b>' + (a ? a.redKills : 0) + '</b> · Blue lost <b>' + (a ? a.blueKills : 0) + '</b> · ' +
       'Your objectives <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + '</b> · ' +
-      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + '<br>' + honesty + judgmentLine +
+      'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + escalationLine + '<br>' + honesty + judgmentLine +
       '<div class="dir-actions" style="margin-top:10px">' +
       (over ? '<button class="dir-btn primary" data-act="aar">AFTER-ACTION REVIEW →</button>'
         : lastTurn ? '<button class="dir-btn primary" data-act="next">END OF OPERATION — AAR →</button>'
@@ -1199,123 +1278,169 @@ window.DirectorModule = (function () {
   }
 
   // ---- AAR + the Counterfactual Machine --------------------------------------------------
-  function freshBoard() {
-    var I = GM._internal;
-    var board = I.buildBoard(AppState.activeGraph());
-    for (var id in board.nodes) { var b = board.nodes[id]; b.health = b.healthMax || 100; b.alive = true; }
-    return board;
+  function counterfactualGraphSnapshot() {
+    var graph = AppState.activeGraph() || { nodes: [], links: [] };
+    var nodes = (graph.nodes || []).map(function (node) {
+      return {
+        id: node.id, name: node.name, team: node.team, originalTeam: node.originalTeam,
+        difficulty: node.difficulty, vulnerabilities: (node.vulnerabilities || []).slice(),
+        cascScore: node.cascScore, importance: node.importance, subsystem: node.subsystem,
+        tempoRole: node.tempoRole, nation: node.nation, serviceOwner: node.serviceOwner,
+        component: node.component, jointFunction: node.jointFunction, operationalRole: node.operationalRole,
+        availability: node.availability, capabilityProfile: node.capabilityProfile ? JSON.parse(JSON.stringify(node.capabilityProfile)) : null,
+        scenarioEnabled: node.scenarioEnabled, resourceGenByType: Object.assign({}, node.resourceGenByType || {}),
+        domain: Array.isArray(node.domain) ? node.domain.slice() : node.domain,
+        type: node.type, healthMax: node.healthMax || 100, health: node.healthMax || 100, status: 'Active'
+      };
+    });
+    var links = (graph.links || []).map(function (link) {
+      return {
+        source: link.source && link.source.id != null ? link.source.id : link.source,
+        target: link.target && link.target.id != null ? link.target.id : link.target
+      };
+    });
+    return { nodes: nodes, links: links };
   }
 
-  function outcomeCheck(board, rec, score) {
-    var I = GM._internal;
-    var objB = I.objectiveValue(board, 'blue'), objR = I.objectiveValue(board, 'red');
-    function held(side) {
-      var ids = rec.objectives[side] || [];
-      var h = 0; ids.forEach(function (id) { var n = board.nodes[id]; if (n && n.alive) h++; });
-      return { h: h, t: ids.length };
-    }
-    var hb = held('blue'), hr = held('red');
-    var bDown = (objB <= rec.startObj.blue * rec.cfg.collapseFrac) || (hb.t > 0 && hb.h / hb.t <= OBJ_LOSS_FRAC);
-    var rDown = (objR <= rec.startObj.red * rec.cfg.collapseFrac) || (hr.t > 0 && hr.h / hr.t <= OBJ_LOSS_FRAC);
-    var winner = null;
-    if (bDown && rDown) winner = objB >= objR ? 'blue' : 'red';
-    else if (rDown) winner = 'blue';
-    else if (bDown) winner = 'red';
-    return { winner: winner, heldBlue: hb, heldRed: hr, objB: objB, objR: objR, score: score };
+  function nodeName(id) {
+    var node = GM.boardNode(id);
+    return node ? node.name : id || 'no target';
   }
 
-  // Replay the recorded operation in the SAME seeded world, with blue's orders passed
-  // through `policy(turnRec, board, blueOrders) -> blueOrders'`. Red replays its recorded
-  // orders (invalid ones void naturally). Returns the alternate outcome.
-  function replayWith(policy, label) {
-    var I = GM._internal;
-    var rec = op.record;
-    if (!rec) return null;
-    var board = freshBoard();
-    var score = { blue: 0, red: 0 };
-    var result = null;
-    for (var i = 0; i < rec.history.length; i++) {
-      var h = rec.history[i];
-      var blue = (h.orders.blue || []).map(function (o) { return Object.assign({}, o); });
-      if (policy) blue = policy(h, board, blue) || blue;
-      var orders = blue.concat(h.orders.red || []);
-      var rep = I.resolveTurn(board, orders, rec.cfg, I.makeRng(I.hashSeed(rec.seed, 'resolve', h.turn)));
-      score.blue += rep.scoreDelta.blue; score.red += rep.scoreDelta.red;
-      result = outcomeCheck(board, rec, score);
-      if (result.winner) { result.endedTurn = h.turn; break; }
-    }
-    if (result && !result.winner) {
-      result.winner = score.blue !== score.red ? (score.blue > score.red ? 'blue' : 'red')
-        : (result.objB >= result.objR ? 'blue' : 'red');
-      result.endedTurn = rec.history.length;
-      result.byScore = true;
-    }
-    if (result) result.label = label;
-    return result;
+  function orderLabel(order, index) {
+    order = order || {};
+    return (index + 1) + '. ' + String(order.kind || 'order').toUpperCase() +
+      (order.methodKey ? ' / ' + String(order.methodKey).toUpperCase() : '') + ' → ' + nodeName(order.targetId);
   }
 
-  function bestRedTempoTarget(board) {
-    var best = null, bv = -1;
-    for (var id in board.nodes) {
-      var b = board.nodes[id];
-      if (!b.alive || b.team !== 'red') continue;
-      var isTempo = /command|c2|logistic|relay|comm/i.test((b.type || '') + ' ' + (b.subsystem || ''));
-      if (!isTempo) continue;
-      var v = nodeVal(b);
-      if (v > bv) { bv = v; best = b; }
-    }
-    return best;
-  }
-  function bestRedTarget(board) {
-    var best = null, bv = -1;
-    for (var id in board.nodes) {
-      var b = board.nodes[id];
-      if (b.alive && b.team === 'red' && nodeVal(b) > bv) { bv = nodeVal(b); best = b; }
-    }
-    return best;
-  }
-  function ownObjectiveAlive(board, rec) {
-    var ids = rec.objectives.blue || [];
-    for (var i = 0; i < ids.length; i++) { var b = board.nodes[ids[i]]; if (b && b.alive) return b; }
-    return null;
+  function eligibleCounterfactualTurns() {
+    return (op.record && op.record.history || []).filter(function (row) {
+      return row.orders && row.orders.blue && row.orders.blue.length;
+    });
   }
 
-  var PROBES = {
-    decap: {
-      title: 'Decapitation-first',
-      desc: 'Every Blue strike retargets the highest-value living Red C2 / logistics node instead.',
-      policy: function (h, board, blue) {
-        return blue.map(function (o) {
-          if (o.kind !== 'strike') return o;
-          var t = bestRedTempoTarget(board) || bestRedTarget(board);
-          if (t) o.targetId = t.id;
-          return o;
-        });
+  function initCounterfactual() {
+    var rows = eligibleCounterfactualTurns();
+    if (!rows.length) { op.counterfactual = { unavailable: true }; return; }
+    op.counterfactual = {
+      turn: Number(rows[0].turn), orderIndex: 0, action: 'remove', methodKey: 'kinetic',
+      targetId: null, authoredForecast: 0.50, status: 'idle', progress: 0,
+      result: null, error: null, runId: null
+    };
+  }
+
+  function counterfactualTargets(action) {
+    var team = action === 'strike' ? 'red' : 'blue';
+    return Object.keys((GM._internal.buildBoard(AppState.activeGraph()) || { nodes: {} }).nodes).map(function (id) {
+      return GM.boardNode(id);
+    }).filter(function (node) { return node && node.team === team; }).sort(function (a, b) {
+      return nodeVal(b) - nodeVal(a) || String(a.id).localeCompare(String(b.id));
+    });
+  }
+
+  function counterfactualResultHtml(result) {
+    if (!result) return '';
+    function outcome(branch) {
+      return branch.halt ? 'HALT' : branch.lodgmentComplete ? 'LODGMENT' : 'OPEN AT HORIZON';
+    }
+    function percent(value) { return Math.round(Number(value || 0) * 100); }
+    var e = result.ensemble, cf = e.counterfactual, original = e.original, dv = e.decisionValue;
+    return '<div class="dir-cf-result"><b>SAME-SEED MATCHED PAIR · ONE WORLD:</b> recorded order path <b>' + outcome(result.matched.original) +
+      '</b>; edited path <b>' + outcome(result.matched.counterfactual) + '</b>. One seeded world is dramatic evidence, not probability validation.<br>' +
+      '<b>STATISTICAL REVEAL:</b> the edited path halted Red in <b>' + cf.hits + '/' + e.K + ' model worlds</b> — frequency ' + percent(cf.q) +
+      '%, 90% Monte Carlo interval ' + percent(cf.interval.lo) + '–' + percent(cf.interval.hi) + '%. The recorded path was ' + original.hits + '/' + e.K +
+      ' — ' + percent(original.q) + '%, interval ' + percent(original.interval.lo) + '–' + percent(original.interval.hi) + '%.<br>' +
+      '<b>DECISION VALUE:</b> ' + (dv.mean >= 0 ? '+' : '') + percent(dv.mean) + ' points, paired 90% interval ' + (dv.interval.lo >= 0 ? '+' : '') +
+      percent(dv.interval.lo) + ' to ' + (dv.interval.hi >= 0 ? '+' : '') + percent(dv.interval.hi) + '; improved ' + dv.improvedWorlds + ', harmed ' +
+      dv.harmedWorlds + ', unchanged ' + dv.unchangedWorlds + '.<br>' +
+      '<b>YOUR BLIND CALL:</b> ' + percent(result.authoredForecast) + '%. Brier against the model-world frequency <b>' + result.score.toFixed(3) +
+      '</b>, MC-induced band ' + result.scoreInterval.lo.toFixed(3) + '–' + result.scoreInterval.hi.toFixed(3) + '. Lower is better; this scores a model comparison, not a real-world prediction.</div>';
+  }
+
+  function renderCounterfactualCard() {
+    var box = $('dir-colosseum');
+    if (!box) return;
+    if (!op.counterfactual) initCounterfactual();
+    var cf = op.counterfactual;
+    if (cf.unavailable) { box.innerHTML = '<div class="dir-note">No authored Blue order is available to edit.</div>'; return; }
+    var rows = eligibleCounterfactualTurns();
+    var row = rows.filter(function (item) { return Number(item.turn) === Number(cf.turn); })[0] || rows[0];
+    cf.turn = Number(row.turn);
+    var orders = row.orders.blue || [];
+    cf.orderIndex = Math.max(0, Math.min(orders.length - 1, Number(cf.orderIndex) || 0));
+    var targets = cf.action === 'remove' ? [] : counterfactualTargets(cf.action);
+    if (targets.length && !targets.some(function (node) { return node.id === cf.targetId; })) cf.targetId = targets[0].id;
+    var disabled = cf.status === 'running' ? ' disabled' : '';
+    var targetControl = cf.action === 'remove' ? '' : '<label>NEW TARGET<select data-cf="target"' + disabled + '>' + targets.map(function (node) {
+      return '<option value="' + esc(node.id) + '"' + (node.id === cf.targetId ? ' selected' : '') + '>' + esc(node.name) + '</option>';
+    }).join('') + '</select></label>';
+    var methodControl = cf.action === 'strike' ? '<label>METHOD<select data-cf="method"' + disabled + '>' + ['kinetic', 'cyber', 'ew', 'sof'].map(function (method) {
+      return '<option value="' + method + '"' + (method === cf.methodKey ? ' selected' : '') + '>' + method.toUpperCase() + '</option>';
+    }).join('') + '</select></label>' : '';
+    var status = cf.status === 'running' ? '<div class="dir-cf-result" id="dir-cf-status">Worker ensemble: ' + cf.progress + '/200 worlds complete…</div>'
+      : cf.error ? '<div class="dir-cf-result">Unable to resolve: ' + esc(cf.error) + '</div>' : counterfactualResultHtml(cf.result);
+    box.innerHTML = '<div class="dir-note">Author exactly one order change, state your belief blind, then reveal one same-seed replay and a 200-world matched ensemble. Combat uses <code>resolveTurn</code>; the verdict uses the denial/lodgment arbiter.</div>' +
+      '<div class="dir-colosseum"><label>TURN<select data-cf="turn"' + disabled + '>' + rows.map(function (item) {
+        return '<option value="' + item.turn + '"' + (Number(item.turn) === cf.turn ? ' selected' : '') + '>TURN ' + item.turn + '</option>';
+      }).join('') + '</select></label><label>DECISION TO CHANGE<select data-cf="order"' + disabled + '>' + orders.map(function (order, index) {
+        return '<option value="' + index + '"' + (index === cf.orderIndex ? ' selected' : '') + '>' + esc(orderLabel(order, index)) + '</option>';
+      }).join('') + '</select></label><label>ONE EDIT<select data-cf="action"' + disabled + '>' +
+      [['remove', 'Remove this order'], ['strike', 'Replace with strike'], ['harden', 'Replace with harden'], ['repair', 'Replace with repair']].map(function (choice) {
+        return '<option value="' + choice[0] + '"' + (choice[0] === cf.action ? ' selected' : '') + '>' + choice[1] + '</option>';
+      }).join('') + '</select></label>' + targetControl + methodControl +
+      '<label>BLIND HALT FREQUENCY · <output id="dir-cf-probability">' + Math.round(cf.authoredForecast * 100) + '%</output><input type="range" min="1" max="99" step="1" value="' +
+      Math.round(cf.authoredForecast * 100) + '" data-cf="probability"' + disabled + '></label></div>' +
+      '<div class="dir-actions"><span class="dir-note">Red types are sampled from the belief available at each PLAN. Future unrecorded actions use bounded, belief-respecting policies.</span>' +
+      '<button class="dir-btn primary" data-act="run-counterfactual"' + disabled + '>RUN 200-WORLD REVEAL ▶</button></div>' + status;
+  }
+
+  function counterfactualEdit() {
+    var cf = op.counterfactual, replacement = null;
+    if (cf.action !== 'remove') {
+      replacement = { side: 'blue', kind: cf.action, targetId: cf.targetId };
+      if (cf.action === 'strike') replacement.methodKey = cf.methodKey;
+    }
+    return { turn: cf.turn, orderIndex: cf.orderIndex, replacement: replacement };
+  }
+
+  function stopCounterfactualWorker() {
+    if (op.counterfactualWorker) { try { op.counterfactualWorker.terminate(); } catch (e) {} }
+    op.counterfactualWorker = null;
+  }
+
+  function runCounterfactual() {
+    if (!op.counterfactual || op.counterfactual.status === 'running' || !window.Worker) {
+      if (op.counterfactual && !window.Worker) { op.counterfactual.error = 'Web Workers are unavailable in this browser.'; renderCounterfactualCard(); }
+      return;
+    }
+    stopCounterfactualWorker();
+    var cf = op.counterfactual;
+    cf.status = 'running'; cf.progress = 0; cf.error = null; cf.result = null;
+    cf.runId = String(GM._internal.hashSeed(op.record.seed, 'counterfactual-ui', cf.turn, cf.orderIndex, cf.action, cf.targetId, cf.methodKey, cf.authoredForecast));
+    renderCounterfactualCard();
+    var worker = new Worker('counterfactual-worker.js');
+    op.counterfactualWorker = worker;
+    worker.onmessage = function (event) {
+      var message = event.data || {};
+      if (!op.counterfactual || message.runId !== op.counterfactual.runId) return;
+      if (message.type === 'progress') {
+        cf.progress = Number(message.completed || 0);
+        var status = $('dir-cf-status');
+        if (status) status.textContent = 'Worker ensemble: ' + cf.progress + '/200 worlds complete…';
+      } else if (message.type === 'done') {
+        cf.status = 'done'; cf.result = message.result; stopCounterfactualWorker(); renderCounterfactualCard();
+      } else if (message.type === 'error') {
+        cf.status = 'error'; cf.error = message.message || 'Unknown worker error'; stopCounterfactualWorker(); renderCounterfactualCard();
       }
-    },
-    offense: {
-      title: 'All-in offense',
-      desc: 'Every Blue harden / repair becomes another kinetic strike on Red’s best target.',
-      policy: function (h, board, blue) {
-        return blue.map(function (o) {
-          if (o.kind === 'strike') return o;
-          var t = bestRedTarget(board);
-          return t ? { side: 'blue', kind: 'strike', methodKey: 'kinetic', targetId: t.id } : o;
-        });
-      }
-    },
-    turtle: {
-      title: 'Pure defense',
-      desc: 'Every Blue strike becomes a harden on your own key objectives instead.',
-      policy: function (h, board, blue) {
-        return blue.map(function (o) {
-          if (o.kind !== 'strike') return o;
-          var t = ownObjectiveAlive(board, op.record);
-          return t ? { side: 'blue', kind: 'harden', targetId: t.id } : o;
-        });
-      }
-    }
-  };
+    };
+    worker.onerror = function (event) {
+      cf.status = 'error'; cf.error = event.message || 'Worker failed to load'; stopCounterfactualWorker(); renderCounterfactualCard();
+    };
+    worker.postMessage({ type: 'run', runId: cf.runId, payload: {
+      record: op.record, graph: counterfactualGraphSnapshot(), edit: counterfactualEdit(),
+      authoredForecast: cf.authoredForecast, K: 200, chunk: 5
+    } });
+  }
 
   function ledgerRows() {
     var rows = '';
@@ -1381,9 +1506,45 @@ window.DirectorModule = (function () {
       '<div class="dir-note">BSS = 1 − your cumulative Brier / house cumulative Brier. Copying the house scores exactly 0 by construction. Per-turn scores are proper but noisy; rank and judgment labels require at least 50 resolved calls and a sustained uncertainty bound.</div></div>';
   }
 
+  function doctrineTrajectoryHtml(redMindRecord) {
+    redMindRecord = redMindRecord || {};
+    var trajectory = redMindRecord.trajectory || [];
+    if (!trajectory.length) return '';
+    var truth = redMindRecord.doctrine || 'unrevealed';
+    var rows = trajectory.map(function (row) {
+      var b = row.belief || {}, a = Math.round((b.attrition || 0) * 100), d = Math.round((b.decapitation || 0) * 100), n = 100 - a - d;
+      return '<div class="dir-obj"><span>' + (row.turn ? 'After T' + row.turn : 'Brief prior') + '</span><span class="v">ATTR ' + a + ' · DECAP ' + d + ' · DENIAL ' + n + '</span></div>';
+    }).join('');
+    var diagnostic = trajectory[Math.min(3, trajectory.length - 1)] || trajectory[trajectory.length - 1];
+    var belief = diagnostic.belief || {};
+    var assessed = Math.round(Number(belief[truth] || 0) * 100);
+    return '<div class="dir-card"><h3>RED MIND — POSTERIOR vs TRUTH</h3>' + rows +
+      '<div class="dir-scoreline">At ' + (diagnostic.turn ? 'T' + diagnostic.turn : 'the brief') + ', you assigned the true ' + esc(truth) + ' type <b>' + assessed + '%</b>. The hidden draw is revealed only now; the PLAN bar showed this posterior throughout.</div></div>';
+  }
+
+  function strategicAarHtml(strategic) {
+    if (!strategic) return '';
+    var history = strategic.escalation && strategic.escalation.history || [];
+    var rows = history.map(function (row) {
+      var horizontal = row.breakdown && row.breakdown.horizontal ? Number(row.breakdown.horizontal.adjusted || 0) : 0;
+      var vertical = row.breakdown && row.breakdown.vertical ? Number(row.breakdown.vertical.adjusted || 0) : 0;
+      return '<div class="dir-obj"><span>T' + row.turn + ' · horizontal +' + horizontal.toFixed(1) + ' / vertical +' + vertical.toFixed(1) + '</span><span class="v">E ' + Number(row.before).toFixed(1) + ' → ' + Number(row.after).toFixed(1) + '</span></div>';
+    }).join('') || '<div class="dir-note">No escalation transitions recorded.</div>';
+    var allies = Object.keys(strategic.allies || {}).map(function (id) {
+      var track = strategic.allies[id];
+      return '<span class="dir-badge">' + esc(id) + ': ' + (track.active ? 'ACTIVE' : 'WITHHELD') + '</span>';
+    }).join('');
+    var signals = (strategic.signalHistory || []).reduce(function (sum, row) { return sum + (row.red || []).length + (row.blue || []).length; }, 0);
+    return '<div class="dir-card"><h3>ESCALATION LADDER — EXPLICIT COMMITMENTS</h3>' + rows +
+      '<div class="dir-badges" style="margin-top:8px"><span class="dir-badge notional">FINAL E ' + Number(strategic.escalation && strategic.escalation.value || 0).toFixed(1) + ' / 10</span>' + allies + '</div>' +
+      '<div class="dir-scoreline">Declared ROE: <b>' + esc(strategic.roe && strategic.roe.label || 'not recorded') + '</b> · ' + signals + ' costly/free deception emissions recorded. Escalation weights and thresholds are notional sensitivity settings.</div></div>';
+  }
+
   function openAar() {
     var st = GM.getState();
     op.record = GM.serialize();
+    stopCounterfactualWorker();
+    initCounterfactual();
     setPhase('aar');
     var aar = st.aar || {};
     op.aar = aar;
@@ -1393,12 +1554,6 @@ window.DirectorModule = (function () {
     var result = aar.result || {};
     var projection = result.projection || null;
     var projectionLine = projection ? '<div class="dir-note" style="margin-top:8px">Hard-horizon projection: lodgment sustained in <b>' + projection.lodgmentSustainedPct + '%</b> of seeded continuations; halt in <b>' + projection.haltPct + '%</b>. This is a model distribution, not a real-world probability.</div>' : '';
-    var probes = Object.keys(PROBES).map(function (k) {
-      var p = PROBES[k];
-      return '<div class="dir-probe"><div><b>' + esc(p.title) + '</b><div class="dir-note">' + esc(p.desc) + '</div>' +
-        '<div class="res" id="dir-probe-' + k + '"></div></div>' +
-        '<button class="dir-btn" data-probe="' + k + '">RUN</button></div>';
-    }).join('');
     var top = (aar.topNeutralized || []).slice(0, 5).map(function (t) {
       return '<div class="dir-obj"><span>' + esc(t.name) + '</span><span class="v">' + (t.team || '') + ' · val ' + Math.round(t.value) + (t.cascaded ? ' · cascade' : '') + '</span></div>';
     }).join('') || '<div class="dir-note">No nodes neutralized.</div>';
@@ -1414,6 +1569,9 @@ window.DirectorModule = (function () {
       '<div class="dir-metric"><b>' + Math.round(lodgment * 100) + '%</b><span>LODGMENT ACCUMULATED</span></div>' +
       '<div class="dir-metric"><b>' + esc(result.at && result.at.dday != null ? 'D+' + result.at.dday : '—') + '</b><span>DECISION POINT</span></div></div>' + projectionLine + '</div>' +
 
+      doctrineTrajectoryHtml(aar.redMind) +
+      strategicAarHtml(aar.strategic) +
+
       '<div class="dir-grid">' +
       '<div class="dir-card"><h3>SECONDARY ATTRITION LEDGER</h3>' + scoreBars(aar) + '<div class="dir-note">Score is descriptive; the denial/lodgment arbiter above decides the operation.</div></div>' +
       '<div class="dir-card"><h3>WHAT FELL</h3>' + top + '</div>' +
@@ -1426,29 +1584,15 @@ window.DirectorModule = (function () {
 
       calibrationCardHtml() +
 
-      '<div class="dir-card"><h3>EXPERIMENTAL ATTRITION SENSITIVITY — SAME DRAW, ONE CHANGED POLICY</h3>' +
-      '<div class="dir-note" style="margin-bottom:6px">Directional comparison only: these legacy probes replay objective collapse and attrition score; they do not reproduce the invasion denial/lodgment arbiter above.</div>' +
-      probes + '</div>' +
+      '<div class="dir-card"><h3>COUNTERFACTUAL COLOSSEUM — ONE DECISION, TWO WORLDS</h3><div id="dir-colosseum"></div></div>' +
 
       '<div class="dir-actions">' +
       '<button class="dir-btn" data-act="copy-aar">COPY AAR</button>' +
       '<button class="dir-btn" data-act="download-aar">DOWNLOAD .MD</button>' +
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
       '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
+    renderCounterfactualCard();
     evt('After-action review opened.');
-  }
-
-  function runProbe(key) {
-    var p = PROBES[key];
-    if (!p) return;
-    var r = replayWith(p.policy, p.title);
-    var box = $('dir-probe-' + key);
-    if (!r || !box) return;
-    var youWin = r.winner === 'blue';
-    box.innerHTML = 'Attrition lens: <b>' + (youWin ? 'BLUE AHEAD' : 'RED AHEAD') + '</b> ' +
-      (r.byScore ? 'on score' : 'by collapse') + ' at T' + r.endedTurn +
-      ' · objectives held ' + r.heldBlue.h + '/' + r.heldBlue.t +
-      ' · Red objectives standing ' + r.heldRed.h + '/' + r.heldRed.t;
   }
 
   function aarMarkdown() {
@@ -1497,6 +1641,15 @@ window.DirectorModule = (function () {
       '- 90% clustered bootstrap: ' + (band.lo == null ? 'not available' : (band.lo >= 0 ? '+' : '') + band.lo.toFixed(3) + ' to ' + (band.hi >= 0 ? '+' : '') + band.hi.toFixed(3)),
       '- Analyst track: ' + rank.label + ' — ' + rank.note,
       '- Copying the house scores BSS 0 by construction; one-world scores are noisy.', '');
+    if (op.counterfactual && op.counterfactual.result) {
+      var cf = op.counterfactual.result, ensemble = cf.ensemble, alternate = ensemble.counterfactual, value = ensemble.decisionValue;
+      lines.push('## Counterfactual Colosseum', '',
+        '- Authored blind halt frequency: ' + Math.round(cf.authoredForecast * 100) + '%.',
+        '- Edited-order model worlds meeting the halt predicate: ' + alternate.hits + '/' + ensemble.K + ' (' + Math.round(alternate.q * 100) + '%; 90% Monte Carlo interval ' + Math.round(alternate.interval.lo * 100) + '–' + Math.round(alternate.interval.hi * 100) + '%).',
+        '- Paired decision value: ' + (value.mean >= 0 ? '+' : '') + Math.round(value.mean * 100) + ' points (90% interval ' + Math.round(value.interval.lo * 100) + ' to ' + Math.round(value.interval.hi * 100) + ').',
+        '- Brier against the counterfactual ensemble frequency: ' + cf.score.toFixed(3) + ' (MC-induced band ' + cf.scoreInterval.lo.toFixed(3) + '–' + cf.scoreInterval.hi.toFixed(3) + ').',
+        '- One same-seed replay is a dramatic matched world; the 200-world distribution is the statistical comparison.', '');
+    }
     lines.push('## Assumptions and public anchors', '', ctx.boundary || '', '');
     (ctx.sources || []).forEach(function (s) { if (safeHttpUrl(s.url)) lines.push('- [' + s.label + '](' + s.url + ')'); });
     lines.push('', '> Reasoning aid only. Outputs are model-conditioned comparisons, not predictions. Do not enter classified, CUI, client-sensitive, or personal information into the public deployment.', '');
@@ -1523,6 +1676,23 @@ window.DirectorModule = (function () {
   }
 
   function onOverlayInput(ev) {
+    var cfField = ev.target.getAttribute && ev.target.getAttribute('data-cf');
+    if (cfField && op.phase === 'aar' && op.counterfactual && op.counterfactual.status !== 'running') {
+      var cf = op.counterfactual;
+      if (cfField === 'turn') { cf.turn = Number(ev.target.value); cf.orderIndex = 0; }
+      else if (cfField === 'order') cf.orderIndex = Number(ev.target.value);
+      else if (cfField === 'action') cf.action = ev.target.value;
+      else if (cfField === 'target') cf.targetId = ev.target.value;
+      else if (cfField === 'method') cf.methodKey = ev.target.value;
+      else if (cfField === 'probability') {
+        cf.authoredForecast = Number(ev.target.value) / 100;
+        var probability = $('dir-cf-probability');
+        if (probability) probability.textContent = Math.round(cf.authoredForecast * 100) + '%';
+      }
+      cf.result = null; cf.error = null; cf.status = 'idle';
+      if (cfField !== 'probability' && cfField !== 'target' && cfField !== 'method') renderCounterfactualCard();
+      return;
+    }
     var card = op.commitCard;
     if (!card || op.phase !== 'commit') return;
     var values = card.step === 'blind' ? card.values : card.final;
@@ -1539,6 +1709,23 @@ window.DirectorModule = (function () {
       var standing = $('dir-value-standing');
       if (standing) standing.textContent = Math.round(values.standing * 100) + '%';
     }
+    var causeId = ev.target.getAttribute && ev.target.getAttribute('data-premortem');
+    if (causeId) {
+      var next = Number(ev.target.value) / 100;
+      var ids = Object.keys(values.premortem || {}), others = ids.filter(function (id) { return id !== causeId; });
+      var oldOtherTotal = others.reduce(function (sum, id) { return sum + Number(values.premortem[id] || 0); }, 0);
+      values.premortem[causeId] = next;
+      others.forEach(function (id) {
+        values.premortem[id] = oldOtherTotal > 0 ? Number(values.premortem[id] || 0) / oldOtherTotal * (1 - next) : (1 - next) / Math.max(1, others.length);
+      });
+      card.touched.premortem = true;
+      ids.forEach(function (id) {
+        var slider = $('dir-wrap').querySelector('[data-premortem="' + id + '"]');
+        var outputPm = $('dir-value-pm-' + id);
+        if (slider && id !== causeId) slider.value = Math.round(values.premortem[id] * 100);
+        if (outputPm) outputPm.textContent = Math.round(values.premortem[id] * 100) + '%';
+      });
+    }
     var bound = ev.target.getAttribute && ev.target.getAttribute('data-interval');
     if (bound === 'lower' || bound === 'upper') {
       values[bound] = Number(ev.target.value) / 100;
@@ -1551,11 +1738,11 @@ window.DirectorModule = (function () {
 
   // ---- overlay actions / lifecycle -----------------------------------------------------
   function onOverlayClick(ev) {
-    var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-probe]');
+    var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-roe]');
     if (!t) return;
     if (t.hasAttribute('data-turns')) { briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); return; }
     if (t.hasAttribute('data-diff')) { briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); return; }
-    if (t.hasAttribute('data-probe')) { runProbe(t.getAttribute('data-probe')); return; }
+    if (t.hasAttribute('data-roe')) { briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
     else if (act === 'unlock-commit') {
@@ -1581,6 +1768,7 @@ window.DirectorModule = (function () {
     }
     else if (act === 'copy-aar') copyAar();
     else if (act === 'download-aar') downloadAar();
+    else if (act === 'run-counterfactual') runCounterfactual();
     else if (act === 'exit') abortOperation(true);
     else if (act === 'exit-op') endOperation();
     else if (act === 'new-op') { endOperation(); start(); }
@@ -1593,12 +1781,13 @@ window.DirectorModule = (function () {
 
   function endOperation() {
     clearWatchTimers();
+    stopCounterfactualWorker();
     stopSelPoll();
     hideObjectiveOverlay();
     if (GM.isActive()) GM.endMatch();
     op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
-    op.record = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    op.record = null; op.counterfactual = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
     restorePanels();
     setPhase('idle');
     refreshVisuals();

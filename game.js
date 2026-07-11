@@ -82,6 +82,41 @@ window.GameModule = (function () {
     difficulty: { blue: 'hard', red: 'hard' },   // AI strength when a side is 'ai'
     fog: false
   };
+  // C1–C3 configuration. Values are explicit NOTIONAL game assumptions; strategic-state.js
+  // owns transition math. Scenarios may override this object without changing the resolver.
+  const ROE_OPTIONS = Object.freeze({
+    denial: Object.freeze({
+      id: 'denial', label: 'Denial / no mainland strikes before E6',
+      description: 'Contest the crossing first. PRC-mainland strikes unlock at escalation 6; orbital strikes at 7.',
+      defaultDecision: 'allow',
+      rules: [
+        { id: 'no-mainland-before-e6', appliesTo: { sides: ['blue'], actionKinds: ['strike'], targetTagsAny: ['prc-mainland'] }, require: { minEscalation: 6 }, message: 'Declared ROE withholds PRC-mainland strikes until E ≥ 6.' },
+        { id: 'no-space-before-e7', appliesTo: { sides: ['blue'], actionKinds: ['strike'], targetTagsAny: ['space-asset'] }, require: { minEscalation: 7 }, message: 'Declared ROE withholds attacks on orbital systems until E ≥ 7.' }
+      ]
+    }),
+    measured: Object.freeze({
+      id: 'measured', label: 'Measured response / mainland at E4',
+      description: 'Broader punishment authority: PRC-mainland strikes unlock at 4; orbital strikes at 6.',
+      defaultDecision: 'allow',
+      rules: [
+        { id: 'mainland-at-e4', appliesTo: { sides: ['blue'], actionKinds: ['strike'], targetTagsAny: ['prc-mainland'] }, require: { minEscalation: 4 }, message: 'Declared ROE withholds PRC-mainland strikes until E ≥ 4.' },
+        { id: 'space-at-e6', appliesTo: { sides: ['blue'], actionKinds: ['strike'], targetTagsAny: ['space-asset'] }, require: { minEscalation: 6 }, message: 'Declared ROE withholds attacks on orbital systems until E ≥ 6.' }
+      ]
+    }),
+    unrestricted: Object.freeze({
+      id: 'unrestricted', label: 'Unrestricted conventional response',
+      description: 'All modeled conventional targets are authorized; escalation costs still apply.',
+      defaultDecision: 'allow', rules: []
+    })
+  });
+  const STRATEGIC_DEFAULTS = Object.freeze({
+    escalation: { initial: 1.5, min: 0, max: 10 },
+    activationGroups: { base: true, 'japan-entry': false, 'us-enablers': false },
+    allies: {
+      japan: { id: 'Japan', entryThreshold: 4.5, exitThreshold: 2.5, entryResetThreshold: 3.0, exitResetThreshold: 5.0, entryProbability: 0.68, exitProbability: 0.30, activateGroups: ['japan-entry'] },
+      usEnablers: { id: 'US enablers', entryThreshold: 3.0, exitThreshold: 1.5, entryResetThreshold: 2.0, exitResetThreshold: 3.5, entryProbability: 0.82, exitProbability: 0.20, activateGroups: ['us-enablers'] }
+    }
+  });
   const METHOD_RESOURCE_KEYS = {
     kinetic: ['kinetic'],
     cyber: ['cyber'],
@@ -117,6 +152,36 @@ window.GameModule = (function () {
 
   // ---- Combat helpers (copies of the live sim's, kept self-contained) -------------
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+  function strategicModule() {
+    if (!window.StrategicStateModule) throw new Error('StrategicStateModule is required for escalation, ROE, and indicators.');
+    return window.StrategicStateModule;
+  }
+
+  function strategicConfig(overrides) {
+    overrides = overrides || {};
+    const escalation = Object.assign({}, STRATEGIC_DEFAULTS.escalation, overrides.escalation || {});
+    const activationGroups = Object.assign({}, STRATEGIC_DEFAULTS.activationGroups, overrides.activationGroups || {});
+    const allies = {};
+    Object.keys(STRATEGIC_DEFAULTS.allies).forEach(id => {
+      allies[id] = Object.assign({}, STRATEGIC_DEFAULTS.allies[id], overrides.allies && overrides.allies[id] || {});
+    });
+    Object.keys(overrides.allies || {}).forEach(id => {
+      if (!allies[id]) allies[id] = Object.assign({}, overrides.allies[id]);
+    });
+    return { escalation, activationGroups, allies, indicators: Object.assign({}, overrides.indicators || {}), signals: Object.assign({}, overrides.signals || {}) };
+  }
+
+  function selectedRoe(value) {
+    if (value && typeof value === 'object') return JSON.parse(JSON.stringify(value));
+    return JSON.parse(JSON.stringify(ROE_OPTIONS[String(value || 'denial')] || ROE_OPTIONS.denial));
+  }
+
+  function orderCost(order) {
+    if (!order) return 0;
+    if (order.kind === 'decoy') return 0;
+    return 1;
+  }
 
   function resourceGenByType(node) {
     const r = node.resourceGenByType || {};
@@ -167,7 +232,7 @@ window.GameModule = (function () {
   function canSourceStrikeWith(node, methodKey, aliveFn) {
     if (!node) return false;
     const live = aliveFn ? aliveFn(node) : node.alive;
-    if (!live) return false;
+    if (!live || node.active === false) return false;
     const subsystem = String(node.subsystem || '').toLowerCase();
     if (subsystem.includes('logistics') || subsystem.includes('sustainment')) return false;
     return resourceForMethod(node, methodKey) > 0;
@@ -195,6 +260,17 @@ window.GameModule = (function () {
   // `opts.aliveFn` overrides the liveness test (resolver passes start-of-turn liveness).
   // Returns a structured {ok, reason, sourceId} so callers can surface *why* an order is
   // illegal and learn which source was assigned to a source-less (human) order.
+  function authorizeOrderBoard(board, order) {
+    if (!board || !board.strategic || !window.StrategicStateModule) return { ok: true, reason: 'ok' };
+    const target = board.nodes[order && order.targetId];
+    return strategicModule().authorizeOrder(order, {
+      side: order && order.side,
+      target,
+      escalation: board.strategic.escalation && board.strategic.escalation.value,
+      activation: board.strategic.activation
+    }, board.strategic.roe);
+  }
+
   function canStrikeBoard(board, side, targetId, methodKey, sourceId, opts) {
     const aliveFn = opts && opts.aliveFn;
     const tgtLive = (n) => aliveFn ? aliveFn(n) : n.alive;
@@ -203,8 +279,11 @@ window.GameModule = (function () {
     if (!METHODS[methodKey]) return { ok: false, reason: 'bad-method' };
     const tgt = board.nodes[targetId];
     if (!tgt) return { ok: false, reason: 'no-target' };
+    if (tgt.active === false) return { ok: false, reason: 'target-inactive' };
     if (!tgtLive(tgt)) return { ok: false, reason: 'target-dead' };
     if (tgt.team === side) return { ok: false, reason: 'friendly-target' };
+    const roe = authorizeOrderBoard(board, { side, kind: 'strike', methodKey, targetId, sourceId: sourceId || null });
+    if (!roe.ok) return { ok: false, reason: roe.reason, ruleId: roe.ruleId, message: roe.message };
     if (sourceId != null) {
       const src = board.nodes[sourceId];
       if (!src || src.team !== side) return { ok: false, reason: 'source-not-friendly' };
@@ -230,10 +309,14 @@ window.GameModule = (function () {
   // Human-readable reason for a voided strike, for the resolved-turn event log.
   const VOID_TEXT = {
     'bad-method': 'unknown strike method', 'no-target': 'target not found',
-    'target-dead': 'target already down', 'friendly-target': 'cannot strike own forces',
+    'target-dead': 'target already down', 'target-inactive': 'target is outside the active posture', 'friendly-target': 'cannot strike own forces',
     'source-not-friendly': 'firing source is not a surviving friendly unit',
     'source-cannot-fire': 'firing source cannot deliver this method',
-    'no-source': 'no surviving unit can deliver this strike'
+    'no-source': 'no surviving unit can deliver this strike',
+    'roe-min-escalation': 'declared ROE threshold has not been crossed',
+    'roe-max-escalation': 'declared ROE ceiling would be exceeded',
+    'roe-denied': 'declared ROE prohibits this strike',
+    'roe-default-deny': 'declared ROE does not authorize this strike'
   };
   function voidText(reason) { return VOID_TEXT[reason] || 'invalid order'; }
 
@@ -352,11 +435,13 @@ window.GameModule = (function () {
         const dom = Array.isArray(n.domain) ? n.domain.slice().sort() : (n.domain ? [n.domain] : []);
         const vuln = Array.isArray(n.vulnerabilities) ? n.vulnerabilities.slice().sort() : [];
         const rg = resourceGenByType(n);
+        const escalationTags = Array.isArray(n.escalationTags) ? n.escalationTags.slice().sort() : [];
         return [
           n.id, team, (n.type || ''), (n.subsystem || ''), (n.difficulty || 'Medium'),
           Number(n.importance || 5), Math.max(1, Number(n.cascScore || 1)), Number(n.healthMax || 100),
           n.scenarioEnabled === false ? 0 : 1, dom.join('|'), vuln.join('|'),
-          rg.kinetic, rg.cyber, rg.ew, rg.sof
+          rg.kinetic, rg.cyber, rg.ew, rg.sof, n.nation || '', n.geographyClass || '',
+          escalationTags.join('|'), n.activationGroup || 'base'
         ].join(',');
       })
       .sort();   // order-independent across node array ordering
@@ -388,11 +473,12 @@ window.GameModule = (function () {
     graph = graph || { nodes: [], links: [] };
     const nodes = {};
     const rosters = { blue: [], red: [] };
+    const reserves = { blue: [], red: [] };
     (graph.nodes || []).forEach(n => {
       const team = n.team || (n.originalTeam || null);
       if (team !== 'blue' && team !== 'red') return;   // only the two combatant sides play
-      if (n.scenarioEnabled === false) return;          // dormant partner/commercial packages stay inspectable, not playable
       const healthMax = n.healthMax || 100;
+      const active = n.scenarioEnabled !== false;
       nodes[n.id] = {
         id: n.id,
         name: n.name || n.id,
@@ -409,15 +495,24 @@ window.GameModule = (function () {
         jointFunction: n.jointFunction || '',
         operationalRole: n.operationalRole || '',
         availability: n.capabilityProfile && n.capabilityProfile.availability || n.availability || 'scenario-active',
-        scenarioEnabled: n.scenarioEnabled !== false,
+        scenarioEnabled: active,
+        active,
+        activationGroup: n.activationGroup || (active ? 'base' : 'reserve'),
+        geographyClass: n.geographyClass || '',
+        escalationTags: Array.isArray(n.escalationTags) ? n.escalationTags.slice() : [],
+        indicatorTags: Object.assign({}, n.indicatorTags || {}),
         resourceGenByType: resourceGenByType(n),
+        baseResourceGenByType: resourceGenByType(n),
+        potentialResourceGenByType: resourceGenByType(n.capabilityProfile && n.capabilityProfile.potentialResourceGenByType
+          ? { resourceGenByType: n.capabilityProfile.potentialResourceGenByType, domain: n.domain, type: n.type, name: n.name }
+          : n),
         domain: Array.isArray(n.domain) ? n.domain.slice() : (n.domain ? [n.domain] : []),
         type: n.type || '',
         healthMax,
         health: n.status === 'Neutralized' ? 0 : (n.health == null ? healthMax : n.health),
         alive: n.status !== 'Neutralized'
       };
-      rosters[team].push(n.id);
+      (active ? rosters : reserves)[team].push(n.id);
     });
     const adj = {};
     (graph.links || []).forEach(l => {
@@ -427,7 +522,7 @@ window.GameModule = (function () {
       (adj[s] = adj[s] || []).push(t);
       (adj[t] = adj[t] || []).push(s);
     });
-    return { nodes, adj, rosters };
+    return { nodes, adj, rosters, reserves };
   }
 
   // Effective combat power of a side = sum of each living node's force value WEIGHTED BY its
@@ -463,12 +558,21 @@ window.GameModule = (function () {
     const objBefore = { blue: objectiveValue(board, 'blue'), red: objectiveValue(board, 'red') };
 
     // Stable, machine-independent order so the RNG sequence is reproducible.
-    const rank = { harden: 0, repair: 1, strike: 2 };
+    const rank = { feint: -2, decoy: -1, harden: 0, repair: 1, strike: 2 };
     const sorted = orders.slice().sort((a, b) =>
       (rank[a.kind] - rank[b.kind]) ||
       String(a.side).localeCompare(String(b.side)) ||
       String(a.targetId).localeCompare(String(b.targetId)) ||
       String(a.methodKey || '').localeCompare(String(b.methodKey || '')));
+
+    // Signal orders are costly declarations but have no board effect. They remain in the
+    // stable resolver sequence and AAR rather than being processed by a shadow engine.
+    for (const o of sorted) {
+      if (o.kind !== 'feint' && o.kind !== 'decoy') continue;
+      events.push({ side: o.side, kind: 'signal', signalKind: o.kind, targetId: o.targetId || null,
+        assessedDeceptive: !!o.assessedDeceptive, axis: o.axis || null, targetClass: o.targetClass || null,
+        text: `${o.side.toUpperCase()} emitted a ${o.kind} toward ${o.axis || 'an unresolved axis'} (${o.targetClass || 'key systems'}).` });
+    }
 
     // Pass 1: defensive declarations (read against start-of-turn state).
     const hardened = new Set();
@@ -731,7 +835,12 @@ window.GameModule = (function () {
   function cloneBoardForAi(board) {
     const nodes = {};
     for (const id in board.nodes) nodes[id] = Object.assign({}, board.nodes[id]);
-    return { nodes, adj: board.adj, rosters: board.rosters };
+    return {
+      nodes, adj: board.adj,
+      rosters: { blue: (board.rosters.blue || []).slice(), red: (board.rosters.red || []).slice() },
+      reserves: { blue: (board.reserves && board.reserves.blue || []).slice(), red: (board.reserves && board.reserves.red || []).slice() },
+      strategic: board.strategic || null
+    };
   }
 
   function resetBoardForAi(target, source) {
@@ -758,7 +867,7 @@ window.GameModule = (function () {
     }, 0);
   }
 
-  function scoreAiRollout(board, side, ownPlan, opponentPlan, cfg, policy, rng, includeOperational) {
+  function scoreAiRollout(board, side, ownPlan, opponentPlan, cfg, policy, rng, operational) {
     const local = cloneBoardForAi(board);
     const beforeTempo = { blue: commandTempo(local, 'blue'), red: commandTempo(local, 'red') };
     const report = resolveTurn(local, ownPlan.concat(opponentPlan), cfg, rng);
@@ -766,7 +875,10 @@ window.GameModule = (function () {
     const u = p.utility || {};
     const enemyLoss = report.scoreDelta[side] || 0;
     const ownLoss = report.scoreDelta[enemyOf(side)] || 0;
-    const assessment = includeOperational === false ? null : assessDenialOn(local);
+    const assessment = operational === false ? null
+      : operational && operational.units && window.MoeModule && window.MoeModule.assessCompiled
+        ? window.MoeModule.assessCompiled(operational, local.nodes)
+        : assessDenialOn(local);
     const throughput = assessment ? Number(assessment.throughput || 0) : 0.5;
     const tempoDelta = (commandTempo(local, enemyOf(side)) - beforeTempo[enemyOf(side)]) -
       (commandTempo(local, side) - beforeTempo[side]);
@@ -814,6 +926,8 @@ window.GameModule = (function () {
       turn,
       rng: makeRng(hashSeed(seed, tag, 'plan-select', turn, side)),
       reasoningRng: makeRng(hashSeed(seed, tag, 'k-drop', turn, side)),
+      regretMix: side === 'red',
+      regretIterations: 100,
       evaluator: (candidatePlan, opponentPlan, i, j) => scoreAiRollout(
         board, side, candidatePlan, opponentPlan, opts.cfg || DEFAULT_CFG, policies[i],
         makeRng(hashSeed(seed, tag, 'rollout-resolve', turn, side, i, j)))
@@ -829,6 +943,8 @@ window.GameModule = (function () {
     const doctrineIds = ['attrition', 'decapitation', 'denial'];
     const preferredVariant = { attrition: 1, decapitation: 3, denial: 2 };
     const rows = [];
+    const compiledMoe = moeAvailable() && window.MoeModule.compileGraph
+      ? window.MoeModule.compileGraph(moeRedNodes(board)) : null;
     doctrineIds.forEach(doctrineId => {
       const variants = mind.candidatePolicies(mind.doctrine(doctrineId), 5);
       [0, preferredVariant[doctrineId]].forEach(variantIndex => {
@@ -849,22 +965,28 @@ window.GameModule = (function () {
         makeRng(hashSeed(seed, 'belief-cache-blue', turn, j)))
     }));
     const byDoctrine = {};
-    doctrineIds.forEach(id => { byDoctrine[id] = { plans: [], scores: [], probabilities: [] }; });
+    doctrineIds.forEach(id => { byDoctrine[id] = { plans: [], scores: [], probabilities: [], payoffs: [] }; });
     rows.forEach((row, i) => {
       let score = 0;
+      const payoffs = [];
       cols.forEach((col, j) => {
-        score += scoreAiRollout(board, 'red', row.plan, col.plan, cfg || DEFAULT_CFG, row.policy,
-          makeRng(hashSeed(seed, 'belief-cache-resolve', turn, i, j)), false).utility;
+        const utility = scoreAiRollout(board, 'red', row.plan, col.plan, cfg || DEFAULT_CFG, row.policy,
+          makeRng(hashSeed(seed, 'belief-cache-resolve', turn, i, j)), compiledMoe || undefined).utility;
+        payoffs.push(utility);
+        score += utility;
       });
       byDoctrine[row.doctrine].plans.push(row.plan);
       byDoctrine[row.doctrine].scores.push(score / Math.max(1, cols.length));
+      byDoctrine[row.doctrine].payoffs.push(payoffs);
     });
     const diff = mind.difficulty(difficulty);
     const lambda = Math.max(0.15, diff.lambda * (1 - diff.fatigueDecay * Math.max(0, turn - 1)));
     doctrineIds.forEach(id => {
-      byDoctrine[id].probabilities = mind.quantalDistribution(byDoctrine[id].scores, lambda);
+      const safe = mind.regretMatching(byDoctrine[id].payoffs, 100);
+      byDoctrine[id].probabilities = safe.row.length ? safe.row : mind.quantalDistribution(byDoctrine[id].scores, lambda);
+      byDoctrine[id].mixing = safe.row.length ? 'regret-matching' : 'quantal-response';
     });
-    return { byDoctrine, rollouts: rows.length * cols.length };
+    return { byDoctrine, rollouts: rows.length * cols.length, moeCompiled: compiledMoe };
   }
 
   // A ghost world draws its type only from the caller-provided belief. Both the type
@@ -879,6 +1001,48 @@ window.GameModule = (function () {
       makeRng(hashSeed(seed, 'ghost-plan', turn, k)));
     return { doctrine: sampledDoctrine, orders: entry.plans[Math.max(0, index)] || [] };
   }
+
+  function updateDoctrineBelief(board, observedOrders, ap, difficulty, seed, turn, cfg, prior) {
+    const mind = redMind();
+    const opponentPolicies = mind.candidatePolicies(mind.BALANCED, 4);
+    const opponents = opponentPolicies.map((policy, j) => planOrders(
+      board, 'blue', ap.blue, policy,
+      makeRng(hashSeed(seed, 'belief-likelihood-opponent', turn, j))
+    ));
+    const compiledMoe = moeAvailable() && window.MoeModule.compileGraph
+      ? window.MoeModule.compileGraph(moeRedNodes(board)) : null;
+    const models = {};
+    Object.keys(mind.PRIOR).forEach(id => {
+      const policies = mind.candidatePolicies(mind.doctrine(id), 5);
+      const plans = policies.map((policy, i) => planOrders(
+        board, 'red', ap.red, policy,
+        makeRng(hashSeed(seed, 'belief-likelihood-plan', turn, id, i))
+      ));
+      const matrix = plans.map((plan, i) => opponents.map((opponent, j) => scoreAiRollout(
+        board, 'red', plan, opponent, cfg || DEFAULT_CFG, policies[i],
+        makeRng(hashSeed(seed, 'belief-likelihood-resolve', turn, id, i, j)), compiledMoe || undefined
+      ).utility));
+      const probabilities = mind.regretMatching(matrix, 100).row;
+      const counts = {};
+      let total = 0;
+      plans.forEach((plan, i) => {
+        const weight = Number(probabilities[i] || 0);
+        const features = mind.featureCounts(plan, targetId => board.nodes[targetId]);
+        Object.keys(features).forEach(key => { counts[key] = (counts[key] || 0) + weight * features[key]; });
+        total += weight * plan.length;
+      });
+      models[id] = { counts, total };
+    });
+    const observed = mind.featureCounts(observedOrders, targetId => board.nodes[targetId]);
+    return {
+      belief: mind.updatePosterior(prior, observed, models, 2.0),
+      observed,
+      models,
+      planningRollouts: Object.keys(mind.PRIOR).length * plansPerDoctrineForBelief() * opponents.length
+    };
+  }
+
+  function plansPerDoctrineForBelief() { return 5; }
 
   // ===================================================================================
   // Match controller — holds the live match, drives the turn loop, writes board state
@@ -902,15 +1066,67 @@ window.GameModule = (function () {
   // Same tempo-economy rule over an arbitrary board snapshot, so the horizon projection
   // (§3.5) can run the AP economy on cloned continuation boards without touching the
   // live match board.
-  function apForBoard(board, side) {
-    const fixed = side === 'blue' ? match.cfg.apBlue : match.cfg.apRed;
-    if (!match.dynamicAp || !match.dynamicAp[side]) return fixed;
-    const base = (match.baseAp && match.baseAp[side]) || fixed;
+  function apForBoard(board, side, state) {
+    // `state` makes the AP economy reusable in a counterfactual worker where there is
+    // deliberately no live module-global match. Live callers omit it and retain the exact
+    // historical behavior; worker callers pass the serialized cfg/economy fields.
+    state = state || match;
+    const cfg = state && state.cfg || DEFAULT_CFG;
+    const fixed = side === 'blue' ? cfg.apBlue : cfg.apRed;
+    if (!state || !state.dynamicAp || !state.dynamicAp[side]) return fixed;
+    const base = (state.baseAp && state.baseAp[side]) || fixed;
     const floor = Math.min(TEMPO_FLOOR_AP, base);   // never let the floor exceed a tiny base
-    const start = (match.startTempo && match.startTempo[side]) || 0;
+    const start = (state.startTempo && state.startTempo[side]) || 0;
     if (start <= 0) return base;
     const frac = clamp(commandTempo(board, side) / start, 0, 1);
     return clamp(Math.round(floor + (base - floor) * frac), floor, base);
+  }
+
+  function syncActivationRosters(board, activation) {
+    activation = activation || { groups: {} };
+    const groups = activation.groups || activation;
+    ['blue', 'red'].forEach(side => {
+      board.rosters[side] = [];
+      board.reserves[side] = [];
+    });
+    Object.keys(board.nodes).sort().forEach(id => {
+      const node = board.nodes[id];
+      const group = node.activationGroup || (node.scenarioEnabled ? 'base' : 'reserve');
+      const configured = Object.prototype.hasOwnProperty.call(groups, group);
+      const active = configured ? groups[group] === true : node.scenarioEnabled !== false;
+      node.active = active;
+      node.resourceGenByType = Object.assign({}, active && node.scenarioEnabled === false
+        ? node.potentialResourceGenByType : node.baseResourceGenByType);
+      (active ? board.rosters : board.reserves)[node.team].push(id);
+    });
+    return board;
+  }
+
+  function makeStrategicState(cfgOverrides, board) {
+    const config = strategicConfig(cfgOverrides && cfgOverrides.strategic);
+    const roe = selectedRoe(cfgOverrides && (cfgOverrides.roe || cfgOverrides.roeId));
+    const state = strategicModule().createStrategicState({
+      escalation: config.escalation,
+      activationGroups: config.activationGroups,
+      roe
+    });
+    state.config = config;
+    state.roe = roe;
+    state.allies = {};
+    Object.keys(config.allies).forEach(id => {
+      const ally = config.allies[id];
+      const active = (ally.activateGroups || []).some(group => state.activation.groups[group] === true);
+      state.allies[id] = strategicModule().createAllyTrack(ally, {
+        active,
+        lastEscalation: state.escalation.value
+      });
+    });
+    state.pendingActivations = [];
+    state.blueIndicatorsNext = [];
+    state.signalHistory = [];
+    board.strategic = state;
+    syncActivationRosters(board, state.activation);
+    return state;
   }
 
   function newMatch(cfgOverrides) {
@@ -931,6 +1147,9 @@ window.GameModule = (function () {
       });
     }
     const board = buildBoard(graph);
+    const strategic = makeStrategicState(cfgOverrides || {}, board);
+    cfg.strategic = strategic.config;
+    cfg.roeId = strategic.roe.id;
     // Command-tempo economy setup (C-012). By default a side's BASE action points come from
     // its surviving C2/logistics and AP floats per-turn (see apFor) so decapitation degrades
     // tempo. Campaign handoff / callers shape the START posture WITHOUT killing that economy:
@@ -996,8 +1215,11 @@ window.GameModule = (function () {
         prior: Object.assign({}, doctrinePrior),
         belief: Object.assign({}, doctrinePrior),
         doctrine: redDoctrine,
-        reasoningHistory: []
+        reasoningHistory: [],
+        trajectory: [{ turn: 0, belief: Object.assign({}, doctrinePrior), evidence: {} }]
       },
+      strategic,
+      aiCommitted: { blue: false, red: false },
       winner: null,
       lastReport: null,
       savedGraphState
@@ -1008,6 +1230,10 @@ window.GameModule = (function () {
   }
 
   // Public, serializable view of the match for the UI.
+  function spentAp(side) {
+    return (match && match.orders[side] || []).reduce((sum, order) => sum + orderCost(order), 0);
+  }
+
   function getState() {
     if (!match) return null;
     return {
@@ -1017,10 +1243,15 @@ window.GameModule = (function () {
       score: { blue: match.score.blue, red: match.score.red },
       objNow: { blue: objectiveValue(match.board, 'blue'), red: objectiveValue(match.board, 'red') },
       startObj: match.startObj,
-      orders: { blue: match.orders.blue.slice(), red: match.orders.red.slice() },
+      orders: {
+        blue: match.orders.blue.slice(),
+        // AI Red is committed before Blue plans so indicators can exist, but the order
+        // bundle remains hidden until WATCH. The public state exposes belief, not truth.
+        red: (match.phase === 'plan' && !isHuman('red')) ? [] : match.orders.red.slice()
+      },
       ordersLocked: { blue: !!(match.orderLocks && match.orderLocks.blue), red: !!(match.orderLocks && match.orderLocks.red) },
       ap: { blue: apFor('blue'), red: apFor('red') },
-      apLeft: { blue: apFor('blue') - match.orders.blue.length, red: apFor('red') - match.orders.red.length },
+      apLeft: { blue: apFor('blue') - spentAp('blue'), red: apFor('red') - spentAp('red') },
       winner: match.winner,
       lastReport: match.lastReport,
       // Denial-victory surface (GAME_DESIGN §6, Increment A; wargame.js consumes read-only):
@@ -1033,6 +1264,7 @@ window.GameModule = (function () {
         : { value: 0, history: [] },
       result: match.result || null,
       rosters: { blue: match.board.rosters.blue.length, red: match.board.rosters.red.length },
+      reserves: { blue: match.board.reserves.blue.length, red: match.board.reserves.red.length },
       alive: {
         blue: match.board.rosters.blue.filter(id => match.board.nodes[id].alive).length,
         red: match.board.rosters.red.filter(id => match.board.nodes[id].alive).length
@@ -1044,8 +1276,24 @@ window.GameModule = (function () {
         prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
         belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
         difficulty: redMind().difficulty(match.cfg.difficulty.red),
+        trajectory: (match.redMind && match.redMind.trajectory || []).map(row => ({
+          turn: row.turn, belief: Object.assign({}, row.belief), evidence: Object.assign({}, row.evidence || {})
+        })),
         revealedDoctrine: match.phase === 'over' ? (match.redMind && match.redMind.doctrine || null) : null
       },
+      strategic: match.strategic ? {
+        classification: match.strategic.classification,
+        escalation: {
+          value: match.strategic.escalation.value,
+          history: (match.strategic.escalation.history || []).slice()
+        },
+        roe: JSON.parse(JSON.stringify(match.strategic.roe)),
+        allies: JSON.parse(JSON.stringify(match.strategic.allies || {})),
+        allyRules: JSON.parse(JSON.stringify(match.strategic.config && match.strategic.config.allies || {})),
+        activation: JSON.parse(JSON.stringify(match.strategic.activation || { groups: {}, history: [] })),
+        indicators: JSON.parse(JSON.stringify(match.strategic.indicators || { current: [], history: [] })),
+        pendingActivations: (match.strategic.pendingActivations || []).slice()
+      } : null,
       // Save/resume integrity flags (C-011): the UI can warn when a loaded match is running
       // against a different / unverifiable scenario graph than the one it was created on.
       scenarioMismatch: !!match.scenarioMismatch,
@@ -1083,6 +1331,13 @@ window.GameModule = (function () {
   function boardNode(id) { return match && match.board.nodes[id]; }
   function methods() { return METHODS; }
   function methodKeys() { return METHOD_KEYS.slice(); }
+  function strategicOptions() {
+    return {
+      classification: 'UNCLASSIFIED // NOTIONAL RESEARCH TOOL',
+      roe: JSON.parse(JSON.stringify(ROE_OPTIONS)),
+      allies: JSON.parse(JSON.stringify(STRATEGIC_DEFAULTS.allies))
+    };
+  }
 
   // Add / remove a human order during the plan phase (AP-bounded). Strikes are gated by the
   // authoritative availability rule (C-003): an order is only accepted if the side fields a
@@ -1091,14 +1346,33 @@ window.GameModule = (function () {
   function queueOrder(side, order) {
     if (!match || match.phase !== 'plan' || !isHuman(side)) return false;
     if (match.orderLocks && match.orderLocks[side]) return false;
-    if (!order || (order.kind !== 'strike' && order.kind !== 'harden' && order.kind !== 'repair')) return false;
-    if (match.orders[side].length >= apFor(side)) return false;
+    if (!order || !['strike', 'harden', 'repair', 'feint', 'decoy'].includes(order.kind)) return false;
+    if (spentAp(side) + orderCost(order) > apFor(side)) return false;
     const n = match.board.nodes[order.targetId];
     if (!n || !n.alive) return false;
     if (order.kind === 'strike') {
       const avail = canStrikeBoard(match.board, side, order.targetId, order.methodKey, order.sourceId);
       if (!avail.ok) return false;   // invalid strike (friendly target / no valid source / bad method) — reject, never silently resolve
       match.orders[side].push(Object.assign({ side }, order, { sourceId: order.sourceId || avail.sourceId }));
+      ctx.onState(getState());
+      return true;
+    }
+    if (order.kind === 'feint' || order.kind === 'decoy') {
+      if (n.team === side || n.active === false) return false;
+      if (order.kind === 'decoy' && match.orders[side].some(o => o.kind === 'decoy')) return false;
+      const tags = n.indicatorTags || {};
+      const spec = {
+        id: [side, order.kind, match.turn, match.orders[side].length].join(':'),
+        side, turn: match.turn,
+        axis: order.axis || tags.axis || n.geographyClass || 'theater-wide',
+        targetClass: order.targetClass || tags.targetClass || n.type || n.subsystem || 'key systems',
+        methodKey: order.methodKey || null
+      };
+      const signal = order.kind === 'feint'
+        ? strategicModule().createFeintOrder(spec, match.strategic.config)
+        : strategicModule().createDecoySignal(spec, match.strategic.config);
+      signal.targetId = n.id;
+      match.orders[side].push(signal);
       ctx.onState(getState());
       return true;
     }
@@ -1127,10 +1401,15 @@ window.GameModule = (function () {
     if (!order) return { ok: false, reason: 'no-order' };
     if (!isHuman(side)) return { ok: false, reason: 'not-human-side' };
     if (match.orderLocks && match.orderLocks[side]) return { ok: false, reason: 'orders-locked' };
-    if (match.orders[side].length >= apFor(side)) return { ok: false, reason: 'no-ap' };
+    if (spentAp(side) + orderCost(order) > apFor(side)) return { ok: false, reason: 'no-ap' };
     const n = match.board.nodes[order.targetId];
     if (!n || !n.alive) return { ok: false, reason: n ? 'target-dead' : 'no-target' };
     if (order.kind === 'strike') return canStrikeBoard(match.board, side, order.targetId, order.methodKey, order.sourceId);
+    if (order.kind === 'feint' || order.kind === 'decoy') {
+      if (n.team === side || n.active === false) return { ok: false, reason: 'signal-needs-enemy-axis' };
+      if (order.kind === 'decoy' && match.orders[side].some(o => o.kind === 'decoy')) return { ok: false, reason: 'decoy-quota' };
+      return { ok: true, reason: 'ok' };
+    }
     if (order.kind === 'harden' || order.kind === 'repair') {
       if (n.team !== side) return { ok: false, reason: 'not-friendly' };
       return { ok: true, reason: 'ok' };
@@ -1152,7 +1431,8 @@ window.GameModule = (function () {
   function canonicalOrderBytes(side) {
     return JSON.stringify((match && match.orders[side] || []).map(o => ({
       side: o.side, kind: o.kind, methodKey: o.methodKey || null,
-      targetId: o.targetId || null, sourceId: o.sourceId || null
+      targetId: o.targetId || null, sourceId: o.sourceId || null,
+      axis: o.axis || null, targetClass: o.targetClass || null
     })));
   }
   function lockOrders(side) {
@@ -1175,9 +1455,74 @@ window.GameModule = (function () {
     return hashSeed(match.seed, 'order-lock', match.turn, side, canonicalOrderBytes(side));
   }
 
+  function resolveSignalOrders(side, orders) {
+    return (orders || []).map((order, index) => {
+      if ((order.kind !== 'feint' && order.kind !== 'decoy') || order.leak) return order;
+      return strategicModule().resolveSignalLeak(order, match.strategic.config,
+        makeRng(hashSeed(match.seed, 'signal-leak', match.turn, side, index, order.kind)));
+    });
+  }
+
+  function addAiSignals(side, orders, policy) {
+    const p = normalizePlanPolicy(policy);
+    const rate = clamp(Number(p.deceptionRate || 0), 0, 0.8);
+    const enemy = enemyOf(side);
+    const targets = (match.board.rosters[enemy] || []).map(id => match.board.nodes[id])
+      .filter(n => n && n.alive && n.active !== false)
+      .sort((a, b) => nodeValue(b) - nodeValue(a) || String(a.id).localeCompare(String(b.id)));
+    if (!targets.length || rate <= 0) return orders;
+    const out = orders.slice();
+    const target = targets[Math.floor(makeRng(hashSeed(match.seed, 'deception-target', match.turn, side)).next() * targets.length)];
+    const tags = target.indicatorTags || {};
+    const spec = {
+      side, turn: match.turn,
+      axis: tags.axis || target.geographyClass || 'theater-wide',
+      targetClass: tags.targetClass || target.type || 'key systems'
+    };
+    if (out.length && makeRng(hashSeed(match.seed, 'deception-feint', match.turn, side)).next() < rate) {
+      const feint = strategicModule().createFeintOrder(Object.assign({ id: [side, 'feint', match.turn].join(':') }, spec), match.strategic.config);
+      feint.targetId = target.id;
+      // Replace one paid combat order: deception has a real opportunity cost.
+      out[out.length - 1] = feint;
+    }
+    if (makeRng(hashSeed(match.seed, 'deception-decoy', match.turn, side)).next() < rate * 0.55) {
+      const decoy = strategicModule().createDecoySignal(Object.assign({ id: [side, 'decoy', match.turn].join(':') }, spec), match.strategic.config);
+      decoy.targetId = target.id;
+      out.push(decoy);
+    }
+    return resolveSignalOrders(side, out);
+  }
+
+  function reactToBlueIndicators(orders, difficulty) {
+    const diff = redMind().difficulty(difficulty);
+    const lines = match.strategic.blueIndicatorsNext || [];
+    if (diff.k < 1 || !lines.length) return orders;
+    const assessed = lines.filter(line => !line.assessedDeceptive && line.targetClass);
+    if (!assessed.length) return orders;
+    const targetClass = assessed[0].targetClass;
+    const candidates = (match.board.rosters.red || []).map(id => match.board.nodes[id]).filter(node => {
+      const tags = node && node.indicatorTags || {};
+      return node && node.alive && tags.targetClass === targetClass;
+    }).sort((a, b) => nodeValue(b) - nodeValue(a) || String(a.id).localeCompare(String(b.id)));
+    if (!candidates.length || !orders.length) return orders;
+    const out = orders.slice();
+    out[out.length - 1] = { side: 'red', kind: 'harden', targetId: candidates[0].id, indicatorResponse: targetClass };
+    return out;
+  }
+
+  function generateIndicatorChannel(side, orders, tag) {
+    return strategicModule().generateIndicators(orders, {
+      nodesById: match.board.nodes,
+      config: match.strategic.config,
+      rng: makeRng(hashSeed(match.seed, tag || 'indicators', match.turn, side))
+    });
+  }
+
   // Fill an AI side's orders for the current turn (deterministic from turn+side).
   function ensureAiOrders(side) {
     if (isHuman(side)) return;
+    match.aiCommitted = match.aiCommitted || { blue: false, red: false };
+    if (match.aiCommitted[side]) return;
     const policy = side === 'red'
       ? redMind().doctrine(match.redMind && match.redMind.doctrine)
       : redMind().BALANCED;
@@ -1188,7 +1533,11 @@ window.GameModule = (function () {
       opponentAp: apFor(enemyOf(side)),
       cfg: match.cfg
     });
-    match.orders[side] = planned.orders;
+    let aiOrders = planned.orders;
+    if (side === 'red') aiOrders = reactToBlueIndicators(aiOrders, match.cfg.difficulty.red);
+    aiOrders = addAiSignals(side, aiOrders, policy);
+    match.orders[side] = aiOrders;
+    match.aiCommitted[side] = true;
     if (match.redMind) {
       match.redMind.reasoningHistory.push({
         turn: match.turn,
@@ -1202,22 +1551,146 @@ window.GameModule = (function () {
     }
   }
 
+  function preparePlan() {
+    if (!match || match.phase !== 'plan') return getState();
+    ensureAiOrders('red');
+    if (!match.strategic.indicators || match.strategic.indicators.turn !== match.turn) {
+      const lines = generateIndicatorChannel('red', match.orders.red, 'red-indicators');
+      match.strategic.indicators = match.strategic.indicators || { current: [], history: [] };
+      match.strategic.indicators.turn = match.turn;
+      match.strategic.indicators.current = lines;
+      match.strategic.indicators.history = (match.strategic.indicators.history || []).concat([{ turn: match.turn, side: 'red', lines }]);
+    }
+    ctx.onState(getState());
+    return getState();
+  }
+
+  function escalationEventsForOrders(board, orders, report) {
+    const events = report && report.events || [];
+    const used = new Set();
+    const killed = new Set(events.filter(e => e.kind === 'kill').map(e => [e.side, e.targetId].join('|')));
+    return (orders || []).filter(order => order.kind === 'strike').map((order, index) => {
+      let outcome = 'attempt';
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i];
+        if (used.has(i) || !['hit', 'miss', 'void'].includes(event.kind)) continue;
+        if (event.side !== order.side || event.targetId !== order.targetId) continue;
+        if (event.method && event.method !== order.methodKey) continue;
+        used.add(i);
+        outcome = event.kind;
+        break;
+      }
+      if (outcome === 'hit' && killed.has([order.side, order.targetId].join('|'))) outcome = 'kill';
+      return {
+        orderId: [match.turn, order.side, index].join(':'),
+        methodKey: order.methodKey,
+        outcome,
+        target: board.nodes[order.targetId] || { id: order.targetId }
+      };
+    });
+  }
+
+  function advanceStrategicState(preResolutionBoard, allOrders, report) {
+    if (!match.strategic) return null;
+    const S = strategicModule();
+    const strategicEvents = escalationEventsForOrders(preResolutionBoard, allOrders, report);
+    const transition = S.updateEscalation(match.strategic.escalation.value, strategicEvents, match.strategic.config);
+    match.strategic.escalation.value = transition.after;
+    match.strategic.escalation.history.push({
+      turn: match.turn, before: transition.before, after: transition.after,
+      delta: transition.delta, breakdown: transition.breakdown, impulses: transition.impulses
+    });
+    const allyEvents = [];
+    Object.keys(match.strategic.config.allies || {}).sort().forEach(id => {
+      const config = match.strategic.config.allies[id];
+      const advanced = S.advanceAllyTrack(match.strategic.allies[id], transition.after, config,
+        makeRng(hashSeed(match.seed, 'ally-entry', id, match.turn)), { turn: match.turn, actor: config.id || id });
+      match.strategic.allies[id] = advanced.track;
+      if (advanced.transition) {
+        const pending = Object.assign({ applyTurn: match.turn + 1 }, advanced.transition);
+        match.strategic.pendingActivations.push(pending);
+        allyEvents.push(pending);
+      }
+    });
+    return { transition, allyEvents };
+  }
+
+  function applyPendingActivations() {
+    if (!match || !match.strategic) return [];
+    const remaining = [], applied = [];
+    (match.strategic.pendingActivations || []).forEach(transition => {
+      if (Number(transition.applyTurn) > match.turn) { remaining.push(transition); return; }
+      const result = strategicModule().applyActivationTransition(match.strategic.activation, transition);
+      match.strategic.activation = result.state;
+      applied.push.apply(applied, result.changed.map(change => Object.assign({ actor: transition.actor }, change)));
+    });
+    match.strategic.pendingActivations = remaining;
+    if (applied.length) syncActivationRosters(match.board, match.strategic.activation);
+    match.board.strategic = match.strategic;
+    return applied;
+  }
+
   // Commit the turn: gather AI orders, resolve, write back, score, check victory.
   function commitTurn() {
     if (!match || match.phase !== 'plan') return getState();
     ensureAiOrders('blue');
     ensureAiOrders('red');
+    match.orders.blue = resolveSignalOrders('blue', match.orders.blue);
+    const preResolutionBoard = cloneBoardForAi(match.board);
+    const beliefUpdate = updateDoctrineBelief(
+      preResolutionBoard,
+      match.orders.red,
+      { blue: apFor('blue'), red: apFor('red') },
+      match.cfg.difficulty.red,
+      match.seed,
+      match.turn,
+      match.cfg,
+      match.redMind && match.redMind.belief
+    );
     const allOrders = match.orders.blue.concat(match.orders.red);
     const rng = makeRng(hashSeed(match.seed, 'resolve', match.turn));
     const report = resolveTurn(match.board, allOrders, match.cfg, rng);
+    const strategicReport = advanceStrategicState(preResolutionBoard, allOrders, report);
     match.score.blue += report.scoreDelta.blue;
     match.score.red += report.scoreDelta.red;
     match.history.push({ turn: match.turn, orders: { blue: match.orders.blue.slice(), red: match.orders.red.slice() }, report });
     match.lastReport = { turn: match.turn, events: report.events, scoreDelta: report.scoreDelta };
+    if (match.redMind) {
+      const caughtSignals = match.orders.red.filter(order => (order.kind === 'feint' || order.kind === 'decoy') && order.assessedDeceptive).length;
+      const updatedBelief = caughtSignals
+        ? redMind().updateDeceptionPosterior(beliefUpdate.belief, caughtSignals, caughtSignals)
+        : beliefUpdate.belief;
+      match.redMind.belief = Object.assign({}, updatedBelief);
+      match.redMind.trajectory.push({
+        turn: match.turn,
+        belief: Object.assign({}, updatedBelief),
+        evidence: Object.assign({ caughtDeception: caughtSignals }, beliefUpdate.observed)
+      });
+      match.lastReport.intelAssessment = {
+        belief: Object.assign({}, updatedBelief),
+        planningRollouts: beliefUpdate.planningRollouts
+      };
+    }
+    const blueIndicators = generateIndicatorChannel('blue', match.orders.blue, 'blue-indicators');
+    match.strategic.blueIndicatorsNext = blueIndicators;
+    match.strategic.signalHistory.push({
+      turn: match.turn,
+      red: match.orders.red.filter(order => order.kind === 'feint' || order.kind === 'decoy').map(order => Object.assign({}, order)),
+      blue: match.orders.blue.filter(order => order.kind === 'feint' || order.kind === 'decoy').map(order => Object.assign({}, order))
+    });
+    if (strategicReport) {
+      match.lastReport.escalation = {
+        before: strategicReport.transition.before, after: strategicReport.transition.after,
+        delta: strategicReport.transition.delta, allyEvents: strategicReport.allyEvents
+      };
+    }
     syncBoardToGraph();
     // Denial assessment over the LIVE Red roster after every turn resolution (§6):
     // append the denial-trend row and integrate Red's lodgment before judging victory.
-    const assessment = assessDenialOn(match.board);
+    const advancedDenial = advanceDenialState(match.board, match.lodgment && match.lodgment.value, {
+      requiredTurns: match.cfg.lodgmentRequiredTurns || LODGMENT_REQ_TURNS
+    });
+    const assessment = advancedDenial.assessment;
     if (assessment) {
       match.denialHistory.push({
         turn: match.turn,
@@ -1225,7 +1698,7 @@ window.GameModule = (function () {
         throughput: assessment.throughput,
         osvi: assessment.osviRed
       });
-      match.lodgment.value = clamp(match.lodgment.value + assessment.throughput / LODGMENT_REQ_TURNS, 0, 1);
+      match.lodgment.value = advancedDenial.lodgment;
       match.lodgment.history.push({ turn: match.turn, value: match.lodgment.value });
     }
     evaluateVictory(false, assessment);
@@ -1243,8 +1716,15 @@ window.GameModule = (function () {
     // horizon ending reads D+18.5, not D+22 (result.at.dday is clamped the same way).
     if (match.calendar) match.calendar.dday = ddayForTurn(Math.min(match.turn, match.cfg.turnLimit));
     match.orders = { blue: [], red: [] };
+    match.aiCommitted = { blue: false, red: false };
     match.orderLocks = { blue: false, red: false };
     match.phase = 'plan';
+    const activated = applyPendingActivations();
+    if (activated.length) match.lastReport.activationsApplied = activated;
+    if (match.strategic && match.strategic.indicators) {
+      match.strategic.indicators.turn = null;
+      match.strategic.indicators.current = [];
+    }
     // HARD clock (GAME_DESIGN §3/P3): no auto-extend, ever. Past the final turn the match
     // ends NOW — an ambiguous ending is resolved inside evaluateVictory by a seeded MC
     // projection of the continuation, never by playing extra turns.
@@ -1302,6 +1782,18 @@ window.GameModule = (function () {
     return window.MoeModule.assessGraph(moeRedNodes(board));
   }
 
+  function advanceDenialState(board, currentLodgment, opts) {
+    opts = opts || {};
+    const assessment = assessDenialOn(board);
+    if (!assessment) return { assessment: null, lodgment: clamp(Number(currentLodgment || 0), 0, 1), outcome: null };
+    const requiredTurns = Math.max(0.5, Number(opts.requiredTurns || LODGMENT_REQ_TURNS));
+    const lodgment = clamp(Number(currentLodgment || 0) + assessment.throughput / requiredTurns, 0, 1);
+    // Same ordering as evaluateVictory: a completed lodgment cannot be un-landed by a
+    // simultaneous halt; otherwise throughput below tMin is a Blue halt.
+    const outcome = lodgment >= 1 ? 'red' : assessment.halt ? 'blue' : null;
+    return { assessment, lodgment, outcome, requiredTurns };
+  }
+
   // ---- Horizon projection (GAME_DESIGN §3.5 / §6) -----------------------------------
   // The clock is HARD (P3): if the fait-accompli window expires with neither a halt nor
   // a completed lodgment, we never extend play. Instead the engine MC-projects the
@@ -1316,7 +1808,12 @@ window.GameModule = (function () {
     // snapshot for continuation trials.
     const nodes = {};
     for (const id in board.nodes) nodes[id] = Object.assign({}, board.nodes[id]);
-    return { nodes, adj: board.adj, rosters: board.rosters };
+    return {
+      nodes, adj: board.adj,
+      rosters: { blue: (board.rosters.blue || []).slice(), red: (board.rosters.red || []).slice() },
+      reserves: { blue: (board.reserves && board.reserves.blue || []).slice(), red: (board.reserves && board.reserves.red || []).slice() },
+      strategic: board.strategic || null
+    };
   }
   function projectContinuation() {
     if (!moeAvailable()) return null;
@@ -1336,10 +1833,10 @@ window.GameModule = (function () {
           makeRng(hashSeed(match.seed, 'projection-plan-red', t, step)));
         resolveTurn(board, blueOrders.concat(redOrders), match.cfg,
           makeRng(hashSeed(match.seed, 'projection-resolve', t, step)));
-        a = assessDenialOn(board);
-        lodg = clamp(lodg + a.throughput / LODGMENT_REQ_TURNS, 0, 1);
-        if (lodg >= 1) { outcome = 'red'; break; }
-        if (a.halt) { outcome = 'blue'; break; }
+        const advanced = advanceDenialState(board, lodg, { requiredTurns: match.cfg.lodgmentRequiredTurns || LODGMENT_REQ_TURNS });
+        a = advanced.assessment;
+        lodg = advanced.lodgment;
+        if (advanced.outcome) { outcome = advanced.outcome; break; }
       }
       // Trials still open at the projection horizon score by the halt criterion: not
       // halted means the crossing remains viable — lodgment sustained [CSIS-FB Ch.5].
@@ -1647,8 +2144,17 @@ window.GameModule = (function () {
         doctrine: match.redMind && match.redMind.doctrine || null,
         prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
         belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
-        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice()
+        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice(),
+        trajectory: (match.redMind && match.redMind.trajectory || []).map(row => ({ turn: row.turn, belief: Object.assign({}, row.belief), evidence: Object.assign({}, row.evidence || {}) }))
       },
+      strategic: match.strategic ? JSON.parse(JSON.stringify({
+        escalation: match.strategic.escalation,
+        roe: match.strategic.roe,
+        allies: match.strategic.allies,
+        activation: match.strategic.activation,
+        indicators: match.strategic.indicators,
+        signalHistory: match.strategic.signalHistory
+      })) : null,
       turns: match.history.length,
       scoreMargin: round1(match.score.blue - match.score.red),
       scoreByTurn,
@@ -1678,7 +2184,8 @@ window.GameModule = (function () {
   // (no fingerprint) still load, but cannot be integrity-checked — deserialize flags that.
   // v3 saves additionally carry the denial-victory state (calendar / denialHistory /
   // lodgment / result — Increment A). v4 adds the PUBLIC Red-mind prior/belief and
-  // reasoning instrumentation; v5 adds engine-enforced per-side order locks. The hidden
+  // reasoning instrumentation; v5 adds engine-enforced per-side order locks; v6 adds
+  // escalation, ROE, indicators, ally posture, activation groups, and AI precommit state. The hidden
   // doctrine is never serialized; it is derived from the seed on load. Older saves
   // default all additive fields safely.
   function serialize() {
@@ -1686,7 +2193,7 @@ window.GameModule = (function () {
     const health = {};
     for (const id in match.board.nodes) { const n = match.board.nodes[id]; health[id] = { h: n.health, a: n.alive }; }
     return {
-      v: 5, seed: match.seed, turn: match.turn, phase: match.phase,
+      v: 6, seed: match.seed, turn: match.turn, phase: match.phase,
       fingerprint: match.fingerprint || null,
       cfg: match.cfg, score: match.score, startObj: match.startObj,
       baseAp: match.baseAp, dynamicAp: match.dynamicAp, startTempo: match.startTempo,
@@ -1701,8 +2208,11 @@ window.GameModule = (function () {
         modelVersion: 1,
         prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
         belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
-        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice()
+        reasoningHistory: (match.redMind && match.redMind.reasoningHistory || []).slice(),
+        trajectory: (match.redMind && match.redMind.trajectory || []).map(row => ({ turn: row.turn, belief: Object.assign({}, row.belief), evidence: Object.assign({}, row.evidence || {}) }))
       },
+      strategic: JSON.parse(JSON.stringify(match.strategic || null)),
+      aiCommitted: Object.assign({}, match.aiCommitted || { blue: false, red: false }),
       history: match.history,
       orders: match.orders, orderLocks: match.orderLocks || { blue: false, red: false }, winner: match.winner, health,
       lastReport: match.lastReport || null,
@@ -1747,6 +2257,16 @@ window.GameModule = (function () {
     const board = buildBoard(graph);
     if (s.health) for (const id in s.health) { if (board.nodes[id]) { board.nodes[id].health = s.health[id].h; board.nodes[id].alive = s.health[id].a; } }
     const dcfg = Object.assign({}, DEFAULT_CFG, s.cfg);
+    const fallbackStrategic = makeStrategicState({ strategic: dcfg.strategic, roeId: dcfg.roeId }, board);
+    const strategic = s.strategic ? JSON.parse(JSON.stringify(s.strategic)) : fallbackStrategic;
+    strategic.config = strategic.config || strategicConfig(dcfg.strategic);
+    strategic.roe = strategic.roe || selectedRoe(dcfg.roeId);
+    strategic.pendingActivations = Array.isArray(strategic.pendingActivations) ? strategic.pendingActivations : [];
+    strategic.blueIndicatorsNext = Array.isArray(strategic.blueIndicatorsNext) ? strategic.blueIndicatorsNext : [];
+    strategic.signalHistory = Array.isArray(strategic.signalHistory) ? strategic.signalHistory : [];
+    strategic.indicators = strategic.indicators || { current: [], history: [] };
+    board.strategic = strategic;
+    syncActivationRosters(board, strategic.activation);
     // Rehydrate lastReport (saved in v2; else derive from the last history entry) so resuming
     // a resolved phase keeps its turn log / AAR context.
     let lastReport = s.lastReport || null;
@@ -1777,6 +2297,8 @@ window.GameModule = (function () {
         ? { value: clamp(s.lodgment.value, 0, 1), history: Array.isArray(s.lodgment.history) ? s.lodgment.history.slice() : [] }
         : { value: 0, history: [] },
       result: s.result || null,
+      strategic,
+      aiCommitted: Object.assign({ blue: false, red: false }, s.aiCommitted || {}),
       redMind: {
         prior: redMind().normalizeBelief(s.redMind && s.redMind.prior || redMind().PRIOR),
         belief: redMind().normalizeBelief(s.redMind && s.redMind.belief || s.redMind && s.redMind.prior || redMind().PRIOR),
@@ -1785,7 +2307,10 @@ window.GameModule = (function () {
           makeRng(hashSeed(s.seed, 'doctrine'))
         ),
         reasoningHistory: Array.isArray(s.redMind && s.redMind.reasoningHistory)
-          ? s.redMind.reasoningHistory.slice() : []
+          ? s.redMind.reasoningHistory.slice() : [],
+        trajectory: Array.isArray(s.redMind && s.redMind.trajectory)
+          ? s.redMind.trajectory.map(row => ({ turn: row.turn, belief: redMind().normalizeBelief(row.belief), evidence: Object.assign({}, row.evidence || {}) }))
+          : [{ turn: 0, belief: redMind().normalizeBelief(s.redMind && s.redMind.prior || redMind().PRIOR), evidence: {} }]
       },
       // Capture the CURRENT graph state before overwriting it with loaded battle damage, so
       // exiting a loaded match still restores the scenario (even though older saves omitted it).
@@ -1830,9 +2355,9 @@ window.GameModule = (function () {
   }
 
   return {
-    init, newMatch, getState, queueOrder, removeOrder, clearOrders,
+    init, newMatch, getState, queueOrder, removeOrder, clearOrders, preparePlan,
     commitTurn, nextTurn, endMatch, isActive, isHuman,
-    boardNode, methods, methodKeys, serialize, deserialize,
+    boardNode, methods, methodKeys, strategicOptions, serialize, deserialize,
     // C-003: authoritative strike-availability helpers so the UI can gate buttons with the
     // exact rule the engine enforces.
     canStrike, validOrder,
@@ -1840,10 +2365,11 @@ window.GameModule = (function () {
     fingerprint, fingerprintMatches, scenarioStatus,
     // exposed for headless testing / future reuse
     _internal: { buildBoard, resolveTurn, planOrders, planStrategicOrders, buildBeliefPlanCache,
-      sampleBeliefPlan, planHeuristic, lockOrders, unlockOrders, lockedOrderHash,
+      sampleBeliefPlan, updateDoctrineBelief, planHeuristic, lockOrders, unlockOrders, lockedOrderHash,
       cloneBoardForAi, resetBoardForAi, scoreAiRollout, makeRng, hashSeed, objectiveValue,
-      canStrikeBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch,
+      canStrikeBoard, authorizeOrderBoard, sourcesForMethod, computeFingerprint, fingerprintsMatch,
+      orderCost, spentAp, syncActivationRosters, escalationEventsForOrders, advanceStrategicState,
       // Increment A additions (denial arbiter plumbing):
-      ddayForTurn, moeRedNodes, lodgmentWeightOf }
+      ddayForTurn, moeRedNodes, lodgmentWeightOf, advanceDenialState, apForBoard }
   };
 })();

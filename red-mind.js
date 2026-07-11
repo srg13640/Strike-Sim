@@ -23,11 +23,11 @@
   var DOCTRINES = Object.freeze({
     attrition: Object.freeze({
       id: 'attrition', label: 'Attrition',
-      strikeShare: 0.60, focusFire: 3, repairBias: 0.40,
+      strikeShare: 0.65, focusFire: 2, repairBias: 0.45,
       target: Object.freeze({ tempo: 0.18, command: 0.12, logistics: 0.14, lodgment: 0.18, fires: 0.32, damaged: 0.28 }),
       protect: Object.freeze({ tempo: 0.48, lodgment: 0.05 }),
       methods: Object.freeze({ kinetic: 1.30, cyber: 2.40, ew: 3.00, sof: 1.20 }),
-      utility: Object.freeze({ enemyLoss: 1.08, ownLoss: 0.92, throughput: 0.20, tempo: 0.18 }),
+      utility: Object.freeze({ enemyLoss: 1.20, ownLoss: 0.88, throughput: 0.30, tempo: 0.20 }),
       escalationAppetite: 0.64,
       deceptionRate: 0.16
     }),
@@ -43,7 +43,7 @@
     }),
     denial: Object.freeze({
       id: 'denial', label: 'Denial / Fait Accompli',
-      strikeShare: 0.40, focusFire: 1, repairBias: 0.82,
+      strikeShare: 0.50, focusFire: 1, repairBias: 0.82,
       target: Object.freeze({ tempo: 0.42, command: 0.28, logistics: 0.48, lodgment: 0.12, fires: 0.58, damaged: 0.08 }),
       protect: Object.freeze({ tempo: 0.72, lodgment: 4.00 }),
       methods: Object.freeze({ kinetic: 1.00, cyber: 3.00, ew: 4.20, sof: 1.20 }),
@@ -185,6 +185,114 @@
     return probabilities.length - 1;
   }
 
+  function targetClass(node) {
+    var text = String(node && node.subsystem || '').toLowerCase() + ' ' + String(node && node.type || '').toLowerCase();
+    if (/assault|amphib|lift|sealift|airlift/.test(text)) return 'lift';
+    if (/command|c2|headquarters|comms|relay/.test(text)) return 'command';
+    if (/logistics|sustain|port|supply/.test(text)) return 'logistics';
+    if (/sensor|isr|recon|surveillance/.test(text)) return 'sensor';
+    if (/fire|strike|missile|air defense|sam/.test(text)) return 'fires';
+    return 'other';
+  }
+
+  function orderFeature(order, target) {
+    var method = order && order.kind === 'strike' ? String(order.methodKey || 'kinetic') : String(order && order.kind || 'unknown');
+    return String(order && order.kind || 'unknown') + '|' + targetClass(target) + '|' + method;
+  }
+
+  function featureCounts(orders, nodeLookup) {
+    var counts = {};
+    (orders || []).forEach(function (order) {
+      var target = typeof nodeLookup === 'function' ? nodeLookup(order.targetId) : nodeLookup && nodeLookup[order.targetId];
+      var key = orderFeature(order, target);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }
+
+  // Multinomial Bayes update with Laplace smoothing and log normalization. `models`
+  // maps doctrine -> {counts,total}; a feature can never permanently zero a type.
+  function updatePosterior(prior, observed, models, alpha) {
+    alpha = Number(alpha == null ? 0.5 : alpha);
+    var p = normalizeBelief(prior), vocabulary = {};
+    Object.keys(observed || {}).forEach(function (key) { vocabulary[key] = true; });
+    Object.keys(models || {}).forEach(function (id) {
+      Object.keys(models[id].counts || {}).forEach(function (key) { vocabulary[key] = true; });
+    });
+    var V = Math.max(1, Object.keys(vocabulary).length), logs = {}, maxLog = -Infinity;
+    Object.keys(PRIOR).forEach(function (id) {
+      var model = models && models[id] || { counts: {}, total: 0 };
+      var logp = Math.log(Math.max(1e-12, p[id]));
+      Object.keys(observed || {}).forEach(function (key) {
+        var theta = (Number(model.counts && model.counts[key] || 0) + alpha) /
+          (Number(model.total || 0) + alpha * V);
+        logp += Number(observed[key] || 0) * Math.log(Math.max(1e-12, theta));
+      });
+      logs[id] = logp;
+      maxLog = Math.max(maxLog, logp);
+    });
+    var out = {}, total = 0;
+    Object.keys(PRIOR).forEach(function (id) { out[id] = Math.exp(logs[id] - maxLog); total += out[id]; });
+    Object.keys(PRIOR).forEach(function (id) { out[id] /= total || 1; });
+    return out;
+  }
+
+  // A caught costly signal is additional doctrine evidence. Denial/fait-accompli Red
+  // authors more deception in the notional policy, so Bayes' rule shifts belief without
+  // ever revealing the hidden type. `notCaught` remains weak evidence because silence can
+  // reflect either honesty or an uncaught signal.
+  function updateDeceptionPosterior(prior, caughtCount, observedSignalCount) {
+    var p = normalizeBelief(prior), out = {}, total = 0;
+    caughtCount = Math.max(0, Number(caughtCount || 0));
+    observedSignalCount = Math.max(caughtCount, Number(observedSignalCount || caughtCount));
+    Object.keys(PRIOR).forEach(function (id) {
+      var rate = clamp(Number(doctrine(id).deceptionRate || 0.01), 0.01, 0.99);
+      var likelihood = Math.pow(rate, caughtCount) * Math.pow(1 - rate, Math.max(0, observedSignalCount - caughtCount));
+      out[id] = p[id] * likelihood;
+      total += out[id];
+    });
+    if (!(total > 0)) return p;
+    Object.keys(out).forEach(function (id) { out[id] /= total; });
+    return out;
+  }
+
+  // Hart–Mas-Colell-style external regret matching on a small zero-sum matrix.
+  // Rows maximize payoff; columns minimize it. Returned strategies are time averages.
+  function regretMatching(matrix, iterations) {
+    var rows = matrix.length, cols = rows ? matrix[0].length : 0;
+    if (!rows || !cols) return { row: [], column: [], iterations: 0 };
+    iterations = Math.max(1, Math.round(iterations || 100));
+    var rowRegret = Array(rows).fill(0), colRegret = Array(cols).fill(0);
+    var rowSum = Array(rows).fill(0), colSum = Array(cols).fill(0);
+    function strategy(regret) {
+      var positive = regret.map(function (r) { return Math.max(0, r); });
+      var total = positive.reduce(function (a, b) { return a + b; }, 0);
+      return total > 1e-12 ? positive.map(function (r) { return r / total; }) : positive.map(function () { return 1 / positive.length; });
+    }
+    for (var t = 0; t < iterations; t++) {
+      var rMix = strategy(rowRegret), cMix = strategy(colRegret);
+      for (var i = 0; i < rows; i++) rowSum[i] += rMix[i];
+      for (var j = 0; j < cols; j++) colSum[j] += cMix[j];
+      var value = 0;
+      for (var ri = 0; ri < rows; ri++) for (var cj = 0; cj < cols; cj++) value += rMix[ri] * cMix[cj] * Number(matrix[ri][cj] || 0);
+      for (var r = 0; r < rows; r++) {
+        var pureRow = 0;
+        for (var c = 0; c < cols; c++) pureRow += cMix[c] * Number(matrix[r][c] || 0);
+        rowRegret[r] += pureRow - value;
+      }
+      for (var c2 = 0; c2 < cols; c2++) {
+        var pureCol = 0;
+        for (var r2 = 0; r2 < rows; r2++) pureCol += rMix[r2] * Number(matrix[r2][c2] || 0);
+        colRegret[c2] += value - pureCol;
+      }
+    }
+    return {
+      row: rowSum.map(function (x) { return x / iterations; }),
+      column: colSum.map(function (x) { return x / iterations; }),
+      iterations: iterations
+    };
+  }
+
   function reasoningState(diff, turn, rng) {
     var d = difficulty(diff);
     var fatigueTurns = Math.max(0, Number(turn || 1) - 1);
@@ -206,10 +314,10 @@
     if (!candidates.length || !rng) return { index: -1, plan: [], probabilities: [], scores: [], rollouts: 0, k: 0, lambda: 0, dropped: false };
     var state = reasoningState(options.difficulty, options.turn, options.reasoningRng || rng);
     var heuristic = candidates.map(function (c) { return Number(c.heuristic || 0); });
-    var scores = heuristic.slice(), rollouts = 0;
+    var scores = heuristic.slice(), rollouts = 0, matrix = null;
 
     if (state.k > 0 && opponents.length && typeof options.evaluator === 'function') {
-      var matrix = candidates.map(function () { return []; });
+      matrix = candidates.map(function () { return []; });
       var oppUtility = opponents.map(function () { return 0; });
       for (var i = 0; i < candidates.length; i++) {
         for (var j = 0; j < opponents.length; j++) {
@@ -230,6 +338,11 @@
     }
 
     var probabilities = quantalDistribution(scores, state.lambda);
+    var safeMix = null;
+    if (state.k > 0 && options.regretMix && matrix) {
+      safeMix = regretMatching(matrix, options.regretIterations || 100);
+      probabilities = safeMix.row;
+    }
     var index = sampleIndex(probabilities, rng);
     return {
       index: index,
@@ -240,7 +353,10 @@
       k: state.k,
       configuredK: state.configuredK,
       lambda: state.lambda,
-      dropped: state.drop
+      dropped: state.drop,
+      mixing: safeMix ? 'regret-matching' : 'quantal-response',
+      safeMix: safeMix,
+      payoffMatrix: matrix
     };
   }
 
@@ -264,6 +380,12 @@
     candidatePolicies: candidatePolicies,
     quantalDistribution: quantalDistribution,
     sampleIndex: sampleIndex,
+    targetClass: targetClass,
+    orderFeature: orderFeature,
+    featureCounts: featureCounts,
+    updatePosterior: updatePosterior,
+    updateDeceptionPosterior: updateDeceptionPosterior,
+    regretMatching: regretMatching,
     reasoningState: reasoningState,
     boundedChoice: boundedChoice,
     priorText: priorText
