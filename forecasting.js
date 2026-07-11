@@ -328,6 +328,124 @@
     return { label: 'Watch Officer', verdict: true, note: 'The uncertainty band does not yet clear the house baseline.' };
   }
 
+  // ---------------------------------------------------------------------------
+  // CO-005 B7 — precision audit, update-style classification, outside view (pure).
+  // ---------------------------------------------------------------------------
+  var UPDATE_STYLE_MIN_N = 8;      // revisions needed before any style label
+  var OUTSIDE_VIEW_MIN_OPS = 3;    // operations of an archetype before base rates render
+
+  /**
+   * Friedman et al. (2018): does the player's granularity carry information?
+   * Re-scores resolved binary entries [{f, o}] with forecasts rounded to `step`
+   * (default 0.10). Positive delta = precision earned Brier; ~zero = the last
+   * digit is noise. Gated by MIN_VERDICT_N-style evidence via the returned n.
+   */
+  function precisionAudit(entries, step) {
+    var s = Number(step) || 0.10;
+    var rows = (entries || []).filter(function (e) {
+      return e && Number.isFinite(Number(e.f)) && (e.o === 0 || e.o === 1);
+    });
+    if (!rows.length) return { n: 0, brierActual: null, brierRounded: null, delta: null };
+    var actual = 0, rounded = 0;
+    rows.forEach(function (e) {
+      var f = probability(e.f);
+      var fr = clamp(Math.round(f / s) * s, 0.01, 0.99);
+      actual += Math.pow(f - e.o, 2);
+      rounded += Math.pow(fr - e.o, 2);
+    });
+    var n = rows.length;
+    return {
+      n: n,
+      brierActual: round(actual / n),
+      brierRounded: round(rounded / n),
+      delta: round(rounded / n - actual / n)   // >0: precision helped; ≤0: rounding equal/better
+    };
+  }
+
+  /**
+   * Atanasov et al. (2020): small frequent directionally-correct updates are the
+   * superforecaster signature. Entries: [{fBlind, fFinal, o}] where the player could
+   * revise once after seeing the house. Returns null (no label) below the evidence
+   * gate — the AAR must never characterize an updating style it has not observed.
+   */
+  function classifyUpdateStyle(entries, minN) {
+    var gate = minN == null ? UPDATE_STYLE_MIN_N : minN;
+    var rows = (entries || []).filter(function (e) {
+      return e && Number.isFinite(Number(e.fBlind)) && Number.isFinite(Number(e.fFinal)) && (e.o === 0 || e.o === 1);
+    });
+    if (!rows.length) return null;
+    var revised = rows.filter(function (e) { return Math.abs(e.fFinal - e.fBlind) > 1e-9; });
+    var updateRate = revised.length / rows.length;
+    if (revised.length < gate) return null;
+    var meanAbs = revised.reduce(function (a, e) { return a + Math.abs(e.fFinal - e.fBlind); }, 0) / revised.length;
+    var toward = revised.filter(function (e) {
+      return (e.o === 1 && e.fFinal > e.fBlind) || (e.o === 0 && e.fFinal < e.fBlind);
+    }).length / revised.length;
+    var label = updateRate < 0.15 ? 'Anchor'
+      : meanAbs > 0.25 ? 'Lurcher'
+      : toward > 0.55 ? 'Increments'
+      : 'Mixed';
+    return {
+      label: label,
+      n: revised.length,
+      updateRate: round(updateRate),
+      meanAbsDelta: round(meanAbs),
+      towardRate: round(toward),
+      note: label === 'Increments'
+        ? 'Small, frequent, directionally-correct revisions — the superforecaster signature.'
+        : label === 'Lurcher' ? 'Large swings after seeing the house; consider smaller steps.'
+        : label === 'Anchor' ? 'You almost never revise; the house line is information too.'
+        : 'No dominant updating pattern yet.'
+    };
+  }
+
+  /**
+   * Coarse plan archetype for reference-class lookups: posture + dominant strike
+   * class + dominant method. `classify(order)` maps an order to a target class
+   * (callers pass RedMindModule.targetClass over the live board); pure fallback
+   * reads a pre-annotated `cls` field.
+   */
+  function planArchetype(orders, classify) {
+    var strikes = {}, methods = {}, defends = 0, total = 0;
+    (orders || []).forEach(function (o) {
+      if (!o || !o.kind) return;
+      total++;
+      if (o.kind === 'strike') {
+        var cls = typeof classify === 'function' ? (classify(o) || 'other') : (o.cls || 'other');
+        strikes[cls] = (strikes[cls] || 0) + 1;
+        methods[o.methodKey || 'kinetic'] = (methods[o.methodKey || 'kinetic'] || 0) + 1;
+      } else if (o.kind === 'harden' || o.kind === 'repair') defends++;
+    });
+    var topOf = function (obj, fallback) {
+      var best = fallback;
+      Object.keys(obj).forEach(function (k) { if (best === fallback || obj[k] > obj[best]) best = k; });
+      return best;
+    };
+    if (!total) return 'idle';
+    var posture = defends / total > 0.5 ? 'defensive' : 'strike';
+    return posture + ':' + topOf(strikes, 'none') + ':' + topOf(methods, 'none');
+  }
+
+  /**
+   * Outside view (CHAMPS KNOW "Comparison classes first"): base rates from the
+   * player's own archive of finished operations, gated so a single lucky op can
+   * never masquerade as a reference class.
+   */
+  function outsideViewStats(records, archetype, minOps) {
+    var gate = minOps == null ? OUTSIDE_VIEW_MIN_OPS : minOps;
+    var rows = (records || []).filter(function (r) { return r && r.archetype === archetype; });
+    if (rows.length < gate) return null;
+    var halts = rows.filter(function (r) { return !!r.halted; }).length;
+    var thr = rows.map(function (r) { return Number(r.throughputEnd); })
+      .filter(Number.isFinite).sort(function (a, b) { return a - b; });
+    return {
+      archetype: archetype,
+      ops: rows.length,
+      haltRate: round(halts / rows.length),
+      medianEndThroughput: thr.length ? round(thr[Math.floor(thr.length / 2)]) : null
+    };
+  }
+
   return Object.freeze({
     CLASSIFICATION: 'UNCLASSIFIED // NOTIONAL RESEARCH TOOL',
     ALPHA: ALPHA,
@@ -352,6 +470,12 @@
     analystRank: analystRank,
     hash: fnv1a,
     probability: probability,
-    round: round
+    round: round,
+    UPDATE_STYLE_MIN_N: UPDATE_STYLE_MIN_N,
+    OUTSIDE_VIEW_MIN_OPS: OUTSIDE_VIEW_MIN_OPS,
+    precisionAudit: precisionAudit,
+    classifyUpdateStyle: classifyUpdateStyle,
+    planArchetype: planArchetype,
+    outsideViewStats: outsideViewStats
   });
 });

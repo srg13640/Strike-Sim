@@ -1218,6 +1218,10 @@ window.GameModule = (function () {
         reasoningHistory: [],
         trajectory: [{ turn: 0, belief: Object.assign({}, doctrinePrior), evidence: {} }]
       },
+      // CO-005 A6: Red's frequency model of the HUMAN player's habits (Blue's own
+      // data — public and serializable, unlike the hidden doctrine). Injected from
+      // the career archive by the Director; cold start is a fresh empty model.
+      playerModel: redMind().normalizePlayerModel(cfgOverrides && cfgOverrides.playerModel),
       strategic,
       aiCommitted: { blue: false, red: false },
       winner: null,
@@ -1272,6 +1276,7 @@ window.GameModule = (function () {
       tempo: { blue: tempoInfo('blue'), red: tempoInfo('red') },
       objectives: { blue: objectiveStatus('blue'), red: objectiveStatus('red') },
       objectiveIds: { blue: (match.objectives && match.objectives.blue || []).slice(), red: (match.objectives && match.objectives.red || []).slice() },
+      playerModel: JSON.parse(JSON.stringify(match.playerModel || redMind().emptyPlayerModel())),
       redMind: {
         prior: Object.assign({}, match.redMind && match.redMind.prior || redMind().PRIOR),
         belief: Object.assign({}, match.redMind && match.redMind.belief || redMind().PRIOR),
@@ -1533,7 +1538,27 @@ window.GameModule = (function () {
       opponentAp: apFor(enemyOf(side)),
       cfg: match.cfg
     });
-    let aiOrders = planned.orders;
+    // CO-005 A6: restricted-Nash exploitation. With confidence-capped, seeded
+    // probability p ≤ 0.5, Red swaps the safe mixed choice for a bounded plan tilted
+    // against the observed player model (Johanson et al.). Cold start (< 3 observed
+    // turns) keeps p = 0, so behavior is byte-identical until real evidence exists.
+    let chosen = planned;
+    let adaptive = false;
+    if (side === 'red' && isHuman('blue')) {
+      const rnrP = redMind().modelConfidence(match.playerModel);
+      if (rnrP > 0 && makeRng(hashSeed(match.seed, 'rnr-gate', match.turn)).next() < rnrP) {
+        chosen = planStrategicOrders(match.board, 'red', apFor('red'),
+          redMind().exploitPolicy(policy, match.playerModel), match.cfg.difficulty.red, {
+            seed: match.seed,
+            turn: match.turn,
+            tag: 'rnr-exploit',
+            opponentAp: apFor('blue'),
+            cfg: match.cfg
+          });
+        adaptive = true;
+      }
+    }
+    let aiOrders = chosen.orders;
     if (side === 'red') aiOrders = reactToBlueIndicators(aiOrders, match.cfg.difficulty.red);
     aiOrders = addAiSignals(side, aiOrders, policy);
     match.orders[side] = aiOrders;
@@ -1542,11 +1567,12 @@ window.GameModule = (function () {
       match.redMind.reasoningHistory.push({
         turn: match.turn,
         side,
-        k: planned.reasoning.k,
-        configuredK: planned.reasoning.configuredK,
-        lambda: Math.round(planned.reasoning.lambda * 1000) / 1000,
-        rollouts: planned.reasoning.rollouts,
-        dropped: !!planned.reasoning.dropped
+        k: chosen.reasoning.k,
+        configuredK: chosen.reasoning.configuredK,
+        lambda: Math.round(chosen.reasoning.lambda * 1000) / 1000,
+        rollouts: chosen.reasoning.rollouts,
+        dropped: !!chosen.reasoning.dropped,
+        adaptive
       });
     }
   }
@@ -1654,6 +1680,15 @@ window.GameModule = (function () {
     match.score.blue += report.scoreDelta.blue;
     match.score.red += report.scoreDelta.red;
     match.history.push({ turn: match.turn, orders: { blue: match.orders.blue.slice(), red: match.orders.red.slice() }, report });
+    // CO-005 A6: observe the HUMAN player's committed orders into Red's frequency model
+    // (one merged sample per resolved turn; the Director persists it across operations).
+    if (isHuman('blue') && match.playerModel) {
+      match.playerModel = redMind().mergePlayerModel(
+        match.playerModel,
+        redMind().featureCounts(match.orders.blue, id => match.board.nodes[id]),
+        match.orders.blue.length
+      );
+    }
     match.lastReport = { turn: match.turn, events: report.events, scoreDelta: report.scoreDelta };
     if (match.redMind) {
       const caughtSignals = match.orders.red.filter(order => (order.kind === 'feint' || order.kind === 'decoy') && order.assessedDeceptive).length;
@@ -2213,6 +2248,9 @@ window.GameModule = (function () {
       },
       strategic: JSON.parse(JSON.stringify(match.strategic || null)),
       aiCommitted: Object.assign({}, match.aiCommitted || { blue: false, red: false }),
+      // CO-005 A6 (additive): the public player-habit model. Contains only the
+      // human player's own order statistics — never the hidden doctrine.
+      playerModel: JSON.parse(JSON.stringify(match.playerModel || redMind().emptyPlayerModel())),
       history: match.history,
       orders: match.orders, orderLocks: match.orderLocks || { blue: false, red: false }, winner: match.winner, health,
       lastReport: match.lastReport || null,
@@ -2299,6 +2337,8 @@ window.GameModule = (function () {
       result: s.result || null,
       strategic,
       aiCommitted: Object.assign({ blue: false, red: false }, s.aiCommitted || {}),
+      // CO-005 A6: version-guarded restore — unknown/older shapes fall back to a fresh model.
+      playerModel: redMind().normalizePlayerModel(s.playerModel),
       redMind: {
         prior: redMind().normalizeBelief(s.redMind && s.redMind.prior || redMind().PRIOR),
         belief: redMind().normalizeBelief(s.redMind && s.redMind.belief || s.redMind && s.redMind.prior || redMind().PRIOR),

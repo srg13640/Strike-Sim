@@ -367,6 +367,129 @@
     }).join(' / ');
   }
 
+  // ---------------------------------------------------------------------------
+  // CO-005 A6/A7 — restricted-Nash player model (pure).
+  //
+  // Red keeps frequency statistics of the HUMAN player's committed orders (the
+  // same kind|class|method features the doctrine posterior uses) and, with a
+  // confidence-capped probability, plays a best response to those habits instead
+  // of the safe mixed choice (Johanson et al., Restricted Nash Response). The cap
+  // guarantees a wrong model can never make Red more than 50% exploitable, and
+  // the cold-start gate guarantees zero behavior change until real evidence
+  // exists. All draws are caller-seeded; this module still owns no RNG.
+  // ---------------------------------------------------------------------------
+  var PLAYER_MODEL_VERSION = 1;
+  var MODEL_MIN_SAMPLES = 3;    // observed turns before any exploitation
+  var MODEL_HALF_SAT = 10;      // samples at which confidence reaches half its cap
+  var MODEL_CAP = 0.5;          // RNR blend ceiling
+  var HABIT_MIN_TURNS = 5;      // A7: no habit claim below this evidence gate
+  var HABIT_MIN_SHARE = 0.35;   // ...or below this share of the player's orders
+
+  function emptyPlayerModel() {
+    return { version: PLAYER_MODEL_VERSION, samples: 0, orders: 0, counts: {} };
+  }
+
+  /** Cold-start and migration safety: anything unrecognized becomes a fresh model. */
+  function normalizePlayerModel(model) {
+    if (!model || typeof model !== 'object' || model.version !== PLAYER_MODEL_VERSION) return emptyPlayerModel();
+    var out = emptyPlayerModel();
+    out.samples = Math.max(0, Math.round(Number(model.samples) || 0));
+    out.orders = Math.max(0, Math.round(Number(model.orders) || 0));
+    Object.keys(model.counts || {}).forEach(function (key) {
+      var v = Number(model.counts[key]);
+      if (Number.isFinite(v) && v > 0) out.counts[key] = v;
+    });
+    return out;
+  }
+
+  /** One observed turn of the player's committed orders. Returns a NEW model. */
+  function mergePlayerModel(model, features, orderCount) {
+    var out = normalizePlayerModel(model);
+    var next = { version: out.version, samples: out.samples + 1, orders: out.orders + Math.max(0, Math.round(Number(orderCount) || 0)), counts: {} };
+    Object.keys(out.counts).forEach(function (k) { next.counts[k] = out.counts[k]; });
+    Object.keys(features || {}).forEach(function (k) {
+      next.counts[k] = (next.counts[k] || 0) + (Number(features[k]) || 0);
+    });
+    return next;
+  }
+
+  /** RNR blend weight: 0 until MODEL_MIN_SAMPLES, then samples/(samples+HALF_SAT), hard-capped. */
+  function modelConfidence(model) {
+    var m = normalizePlayerModel(model);
+    if (m.samples < MODEL_MIN_SAMPLES) return 0;
+    return Math.min(MODEL_CAP, m.samples / (m.samples + MODEL_HALF_SAT));
+  }
+
+  function modelShare(model, prefix, cls) {
+    var m = normalizePlayerModel(model);
+    if (!m.orders) return 0;
+    var total = 0;
+    Object.keys(m.counts).forEach(function (key) {
+      var parts = key.split('|');
+      if (parts[0] === prefix && (cls == null || parts[1] === cls)) total += m.counts[key];
+    });
+    return Math.min(1, total / m.orders);
+  }
+
+  /**
+   * Best-response tilt: de-prioritize striking what the player habitually hardens,
+   * press the least-defended value class, and shield what the player habitually hunts.
+   * Returns a NEW policy; never mutates the base.
+   */
+  function exploitPolicy(base, model) {
+    var p = JSON.parse(JSON.stringify(base || BALANCED));
+    var m = normalizePlayerModel(model);
+    if (!m.samples) return p;
+    var defend = {
+      command: modelShare(m, 'harden', 'command') + modelShare(m, 'repair', 'command'),
+      logistics: modelShare(m, 'harden', 'logistics') + modelShare(m, 'repair', 'logistics'),
+      fires: modelShare(m, 'harden', 'fires') + modelShare(m, 'repair', 'fires')
+    };
+    ['command', 'logistics', 'fires'].forEach(function (cls) {
+      if (p.target && p.target[cls] != null) {
+        p.target[cls] = p.target[cls] * (1 - 0.45 * Math.min(1, defend[cls]));
+      }
+    });
+    var least = ['command', 'logistics', 'fires'].sort(function (a, b) { return defend[a] - defend[b]; })[0];
+    if (p.target && p.target[least] != null) p.target[least] = p.target[least] * 1.25;
+    var huntsLift = modelShare(m, 'strike', 'lift');
+    var huntsCommand = modelShare(m, 'strike', 'command');
+    if (p.protect) {
+      if (p.protect.lodgment != null) p.protect.lodgment = p.protect.lodgment * (1 + Math.min(1, huntsLift));
+      if (p.protect.tempo != null) p.protect.tempo = p.protect.tempo * (1 + 0.6 * Math.min(1, huntsCommand));
+    }
+    p.id = String(base && base.id || 'balanced') + '-exploit';
+    p.label = String(base && base.label || 'Balanced') + ' (adaptive)';
+    return p;
+  }
+
+  /**
+   * A7 evidence-gated habit claim. Returns null unless the player has shown a
+   * dominant, repeatedly-observed pattern — the proof forbids unsupported claims.
+   */
+  function topHabit(model, minTurns) {
+    var m = normalizePlayerModel(model);
+    var gate = minTurns == null ? HABIT_MIN_TURNS : minTurns;
+    if (m.samples < gate || !m.orders) return null;
+    var best = null;
+    Object.keys(m.counts).forEach(function (key) {
+      var share = m.counts[key] / m.orders;
+      var parts = key.split('|');
+      // Defensive habits are weighted up: they are the most directly exploitable.
+      var weight = share * (parts[0] === 'harden' || parts[0] === 'repair' ? 1.25 : 1);
+      if (share >= HABIT_MIN_SHARE && (!best || weight > best.weight)) {
+        best = { key: key, kind: parts[0], cls: parts[1], method: parts[2], share: share, weight: weight };
+      }
+    });
+    if (!best) return null;
+    var verb = best.kind === 'harden' ? 'hardened' : best.kind === 'repair' ? 'repaired' : 'struck';
+    return {
+      key: best.key, kind: best.kind, cls: best.cls, share: best.share, turns: m.samples,
+      text: 'You ' + verb + ' ' + best.cls + ' assets in ' + Math.round(best.share * 100) +
+        '% of your orders across ' + m.samples + ' observed turns.'
+    };
+  }
+
   return Object.freeze({
     CLASSIFICATION: 'UNCLASSIFIED // NOTIONAL RESEARCH TOOL',
     PRIOR: PRIOR,
@@ -388,6 +511,13 @@
     regretMatching: regretMatching,
     reasoningState: reasoningState,
     boundedChoice: boundedChoice,
-    priorText: priorText
+    priorText: priorText,
+    PLAYER_MODEL_VERSION: PLAYER_MODEL_VERSION,
+    emptyPlayerModel: emptyPlayerModel,
+    normalizePlayerModel: normalizePlayerModel,
+    mergePlayerModel: mergePlayerModel,
+    modelConfidence: modelConfidence,
+    exploitPolicy: exploitPolicy,
+    topHabit: topHabit
   });
 });

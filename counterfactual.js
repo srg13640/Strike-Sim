@@ -140,6 +140,46 @@ window.CounterfactualModule = (function () {
   }
 
   /*
+   * CO-005 A7 — the exploit probe: "same worlds, Red plays a best response to your
+   * habits." Both branches replay the player's RECORDED Blue orders against shared
+   * combat seeds; the original branch replays recorded Red, the exploit branch
+   * replans Red each turn with the player-model-tilted policy. The halt-rate delta,
+   * with its Wilson band, is the predictability meter — an uncertainty-banded answer
+   * to "how much did your habits cost you?".
+   */
+  function runExploitPair(payload, trial) {
+    var I = engine(), mind = window.RedMindModule, record = payload.record, cfg = record.cfg || {};
+    var model = mind.normalizePlayerModel(payload.playerModel);
+    var original = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var exploit = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var rows = historyByTurn(record), maxTurn = Math.max(1, Number(cfg.turnLimit || record.history.length || 1));
+
+    for (var turn = 1; turn <= maxTurn; turn++) {
+      var row = rows[turn];
+      var blueOrders = row
+        ? cloneOrders(row.orders && row.orders.blue)
+        : plannedOrders(record, original.board, 'blue', turn, trial, 'exploit-blue');
+      var originalRed = row
+        ? cloneOrders(row.orders && row.orders.red)
+        : plannedOrders(record, original.board, 'red', turn, trial, 'exploit-baseline');
+      var belief = beliefForTurn(record, turn);
+      var doctrineId = mind.drawDoctrine(belief,
+        I.makeRng(I.hashSeed(record.seed, 'exploit-doctrine', trial, turn)));
+      var exploitPolicy = mind.exploitPolicy(mind.doctrine(doctrineId), model);
+      var exploitRed = I.planOrders(exploit.board, 'red', apFor(exploit.board, 'red', cfg, record), exploitPolicy,
+        I.makeRng(I.hashSeed(record.seed, 'exploit-plan', trial, turn)));
+      var seed = I.hashSeed(record.seed, 'exploit-resolve', trial, turn);
+      advanceBranch(original, blueOrders.concat(originalRed), cfg, I.makeRng(seed), turn);
+      advanceBranch(exploit, cloneOrders(blueOrders).concat(exploitRed), cfg, I.makeRng(seed), turn);
+      if (original.outcome && exploit.outcome) break;
+    }
+    return {
+      original: summarizeBranch(original, maxTurn),
+      counterfactual: summarizeBranch(exploit, maxTurn)
+    };
+  }
+
+  /*
    * mode='matched' replays every recorded order and the live resolver seed. The original
    * branch therefore reproduces the operation byte-for-byte through the selected turn.
    * mode='ensemble' samples Red types from the belief available at that PLAN and varies
@@ -250,6 +290,7 @@ window.CounterfactualModule = (function () {
     validateEdit: validateEdit,
     applyEdit: applyEdit,
     runPair: runPair,
+    runExploitPair: runExploitPair,
     newAggregate: newAggregate,
     addPair: addPair,
     summarize: summarize,

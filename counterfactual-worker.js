@@ -13,10 +13,16 @@ function startRun(runId, payload) {
   var CF = self.CounterfactualModule;
   var trials = Math.max(1, Math.round(Number(payload.K || 200)));
   var chunk = Math.max(1, Math.min(20, Math.round(Number(payload.chunk || 5))));
-  var checked = CF.validateEdit(payload.record, payload.graph, payload.edit);
-  if (!checked.ok) throw new Error('Invalid counterfactual edit: ' + checked.reason);
-  payload.edit = checked;
-  var matched = CF.runPair(payload, 0, 'matched');
+  // CO-005 A7: the exploit probe replays recorded Blue orders against a player-model
+  // best-response Red — no order edit exists, so the edit gate does not apply.
+  var exploitProbe = payload.probe === 'exploit-player-model';
+  var matched = null;
+  if (!exploitProbe) {
+    var checked = CF.validateEdit(payload.record, payload.graph, payload.edit);
+    if (!checked.ok) throw new Error('Invalid counterfactual edit: ' + checked.reason);
+    payload.edit = checked;
+    matched = CF.runPair(payload, 0, 'matched');
+  }
   var aggregate = CF.newAggregate(trials);
   activeRun = { runId: runId, cancelled: false };
 
@@ -26,7 +32,7 @@ function startRun(runId, payload) {
       var end = Math.min(trials, aggregate.completed + chunk);
       while (aggregate.completed < end && !activeRun.cancelled) {
         var trial = aggregate.completed + 1;
-        CF.addPair(aggregate, CF.runPair(payload, trial, 'ensemble'));
+        CF.addPair(aggregate, exploitProbe ? CF.runExploitPair(payload, trial) : CF.runPair(payload, trial, 'ensemble'));
       }
       self.postMessage({ type: 'progress', runId: runId, completed: aggregate.completed, requested: trials });
       if (activeRun.cancelled) {

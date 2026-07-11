@@ -21,6 +21,7 @@ const ROOT = path.resolve(__dirname, '..');
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const RedMind = require(path.join(ROOT, 'red-mind.js'));
 const StrategicState = require(path.join(ROOT, 'strategic-state.js'));
+const Forecasting = require(path.join(ROOT, 'forecasting.js'));
 
 const VARIANT_FILE = 'scenarios/small-island-fait-accompli.json';
 const scenario = JSON.parse(read(VARIANT_FILE));
@@ -143,6 +144,97 @@ check('loader registers variants non-fatally', () => {
   assert.ok(loader.includes('StrikeSimVariants'), 'variant registry');
   assert.ok(loader.includes('small-island-fait-accompli.json'), 'bundled variant fetch');
   assert.ok(/must never depend on a variant loading/.test(loader), 'non-fatal contract documented');
+});
+
+// ---------- 5. A6 — restricted-Nash player model (pure contracts) ----------
+check('A6 cold start is inert and the blend is hard-capped at 0.5', () => {
+  const empty = RedMind.emptyPlayerModel();
+  assert.strictEqual(RedMind.modelConfidence(empty), 0, 'no model, no exploitation');
+  assert.strictEqual(RedMind.modelConfidence(RedMind.mergePlayerModel(empty, { 'harden|command|harden': 2 }, 3)), 0,
+    'below 3 observed turns stays inert');
+  let m = empty;
+  for (let i = 0; i < 500; i++) m = RedMind.mergePlayerModel(m, { 'harden|command|harden': 2 }, 2);
+  assert.ok(RedMind.modelConfidence(m) <= 0.5 + 1e-12, 'cap holds at any sample size');
+});
+
+check('A6 merge is pure and migration resets unknown versions', () => {
+  const base = RedMind.mergePlayerModel(RedMind.emptyPlayerModel(), { 'strike|lift|kinetic': 1 }, 1);
+  const before = JSON.stringify(base);
+  RedMind.mergePlayerModel(base, { 'strike|lift|kinetic': 5 }, 5);
+  assert.strictEqual(JSON.stringify(base), before, 'merge never mutates its input');
+  assert.strictEqual(RedMind.normalizePlayerModel({ version: 999, samples: 40, counts: {} }).samples, 0,
+    'unknown version → fresh model');
+  assert.strictEqual(RedMind.normalizePlayerModel(null).samples, 0, 'null → fresh model');
+});
+
+check('A6 exploit policy answers the observed habits', () => {
+  let m = RedMind.emptyPlayerModel();
+  for (let i = 0; i < 12; i++) m = RedMind.mergePlayerModel(m, { 'harden|command|harden': 2, 'strike|lift|kinetic': 1 }, 3);
+  const base = RedMind.doctrine('denial');
+  const tilted = RedMind.exploitPolicy(base, m);
+  assert.ok(tilted.target.command < base.target.command, 'habitually defended class is de-prioritized');
+  assert.ok(tilted.protect.lodgment > base.protect.lodgment, 'habitually hunted lift is shielded');
+  assert.ok(/exploit/.test(tilted.id), 'exploit policy is labeled');
+  const again = RedMind.exploitPolicy(base, m);
+  assert.strictEqual(JSON.stringify(tilted), JSON.stringify(again), 'deterministic tilt');
+});
+
+check('A6 is wired into the engine behind the seeded gate and the human check', () => {
+  const game = read('game.js');
+  assert.ok(game.includes("hashSeed(match.seed, 'rnr-gate', match.turn)"), 'seeded RNR gate');
+  assert.ok(game.includes("isHuman('blue')"), 'model observes/exploits only a human player');
+  assert.ok(game.includes('normalizePlayerModel(cfgOverrides && cfgOverrides.playerModel)'), 'career model injected at newMatch');
+  assert.ok(game.includes("tag: 'rnr-exploit'"), 'exploit replan has its own addressable stream');
+});
+
+// ---------- 6. A7 — exploitability meter (evidence gates) ----------
+check('A7 habit claims are evidence-gated', () => {
+  let thin = RedMind.mergePlayerModel(RedMind.emptyPlayerModel(), { 'harden|command|harden': 3 }, 3);
+  thin = RedMind.mergePlayerModel(thin, { 'harden|command|harden': 3 }, 3);
+  assert.strictEqual(RedMind.topHabit(thin), null, 'no claim below 5 observed turns');
+  let strong = RedMind.emptyPlayerModel();
+  for (let i = 0; i < 9; i++) strong = RedMind.mergePlayerModel(strong, { 'harden|command|harden': 2 }, 3);
+  const habit = RedMind.topHabit(strong);
+  assert.ok(habit && habit.cls === 'command' && /observed turns/.test(habit.text), 'supported claim renders with its evidence');
+});
+
+check('A7 exploit probe exists end-to-end (module, worker, director)', () => {
+  assert.ok(read('counterfactual.js').includes('function runExploitPair'), 'counterfactual exploit pair');
+  assert.ok(read('counterfactual-worker.js').includes("probe === 'exploit-player-model'"), 'worker probe branch');
+  const director = read('director.js');
+  assert.ok(director.includes('PREDICTABILITY — WHAT AN ADAPTIVE RED SEES'), 'AAR predictability card');
+  assert.ok(director.includes("act === 'run-exploit-probe'"), 'probe action wired');
+  assert.ok(director.includes('modelConfidence(model) > 0'), 'probe disabled below the evidence gate');
+});
+
+// ---------- 7. B7 — precision audit, updating style, outside view ----------
+check('B7 precision audit math matches the rounding experiment', () => {
+  const audit = Forecasting.precisionAudit([{ f: 0.63, o: 1 }, { f: 0.63, o: 1 }], 0.10);
+  // 0.63 → Brier 0.1369; rounded to 0.60 → 0.16; delta must be +0.0231 per entry.
+  assert.ok(Math.abs(audit.delta - 0.0231) < 1e-9, 'delta ' + audit.delta);
+  assert.strictEqual(audit.n, 2, 'counts only resolved binary entries');
+});
+
+check('B7 updating style and outside view are gated below evidence thresholds', () => {
+  assert.strictEqual(Forecasting.classifyUpdateStyle([{ fBlind: 0.5, fFinal: 0.6, o: 1 }]), null, 'style gated');
+  const rows = [];
+  for (let i = 0; i < 12; i++) rows.push({ fBlind: 0.5, fFinal: 0.58, o: 1 });
+  assert.strictEqual(Forecasting.classifyUpdateStyle(rows).label, 'Increments', 'superforecaster signature detected');
+  assert.strictEqual(Forecasting.outsideViewStats([{ archetype: 'strike:lift:kinetic', halted: true }], 'strike:lift:kinetic'), null,
+    'outside view needs 3+ operations');
+  const ops = [1, 2, 3].map(() => ({ archetype: 'strike:lift:kinetic', halted: true, throughputEnd: 0.2 }));
+  assert.strictEqual(Forecasting.outsideViewStats(ops, 'strike:lift:kinetic').haltRate, 1, 'base rate computed');
+});
+
+check('B7 outside view renders BEFORE the house line and the calibration card gains the audit', () => {
+  const director = read('director.js');
+  const blindIdx = director.indexOf('COMMIT CARD · BLIND');
+  const outsideIdx = director.indexOf('outsideViewHtml(st) +');
+  const callsIdx = director.indexOf('THREE RESOLVABLE CALLS');
+  assert.ok(blindIdx > 0 && outsideIdx > blindIdx && callsIdx > outsideIdx,
+    'outside view sits inside the BLIND card, before elicitation and any house reveal');
+  assert.ok(director.includes('precisionStyleHtml(entries)'), 'calibration card carries the precision/style audit');
+  assert.ok(director.includes('The house line arrives only after your blind call'), 'ordering contract stated to the player');
 });
 
 // ---------- report ----------

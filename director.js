@@ -85,6 +85,40 @@ window.DirectorModule = (function () {
     entries.forEach(function (entry) { byId[entry.entryId] = entry; });
     writeForecastArchive(Object.keys(byId).map(function (id) { return byId[id]; }));
   }
+  // CO-005 A6/B7 career stores: the player-habit model Red adapts to across
+  // operations, and the finished-operation records behind the outside-view strip.
+  var PLAYER_MODEL_KEY = 'strikesim.co005.v1.playerModel';
+  var OPS_ARCHIVE_KEY = 'strikesim.co005.v1.operations';
+  function readPlayerModel() {
+    try { return window.RedMindModule.normalizePlayerModel(JSON.parse(localStorage.getItem(PLAYER_MODEL_KEY) || 'null')); }
+    catch (e) { return window.RedMindModule.normalizePlayerModel(null); }
+  }
+  function writePlayerModel(model) {
+    try { localStorage.setItem(PLAYER_MODEL_KEY, JSON.stringify(window.RedMindModule.normalizePlayerModel(model))); } catch (e) {}
+  }
+  function readOpsArchive() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(OPS_ARCHIVE_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function appendOpsArchive(record) {
+    if (!record) return;
+    try { localStorage.setItem(OPS_ARCHIVE_KEY, JSON.stringify(readOpsArchive().concat([record]).slice(-400))); } catch (e) {}
+  }
+  function blueOrderClassifier() {
+    return function (order) {
+      var node = GM.boardNode ? GM.boardNode(order.targetId) : null;
+      return window.RedMindModule.targetClass(node);
+    };
+  }
+  function operationArchetype(record) {
+    var all = [];
+    ((record && record.history) || []).forEach(function (row) {
+      all = all.concat((row.orders && row.orders.blue) || []);
+    });
+    return window.ForecastingModule.planArchetype(all, blueOrderClassifier());
+  }
   function refreshVisuals() {
     try { if (typeof refreshMapMarkers === 'function') refreshMapMarkers(); } catch (e) {}
     try { if (typeof refreshTable === 'function') refreshTable(); } catch (e) {}
@@ -466,6 +500,8 @@ window.DirectorModule = (function () {
       lodgmentRequiredTurns: mc.lodgmentRequiredTurns,
       doctrinePrior: mc.doctrinePrior,
       strategic: mc.strategic,
+      // CO-005 A6: Red carries the player's career habit model into the new match.
+      playerModel: readPlayerModel(),
       control: { blue: 'human', red: 'ai' },
       difficulty: { blue: 'hard', red: briefOpts.redDiff },
       roeId: briefOpts.roeId
@@ -1021,6 +1057,7 @@ window.DirectorModule = (function () {
       '<h1 class="dir-h1">What do you believe?</h1>' +
       '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Orders lock blind; Red commits when you execute. Forecast before seeing the house. Move each of the three event sliders.</div>' +
       '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
+      outsideViewHtml(st) +
       '<div class="dir-card"><h3>THREE RESOLVABLE CALLS</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.values.questions[q.id], false); }).join('') + '</div>' +
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.values, false) + standingControl(card, card.values, false) + '</div>' +
       premortemControls(card, card.values, false) +
@@ -1562,7 +1599,113 @@ window.DirectorModule = (function () {
       '<div class="dir-metric"><b>' + esc(rank.label) + '</b><span>ANALYST TRACK · N≥50 GATE</span></div></div>' +
       '<div class="dir-scoreline">' + verdict + ' ' + esc(bandText) + '</div>' +
       '<ul class="dir-note" style="font-style:normal">' + bucketText + '</ul>' +
+      precisionStyleHtml(entries) +
       '<div class="dir-note">BSS = 1 − your cumulative Brier / house cumulative Brier. Copying the house scores exactly 0 by construction. Per-turn scores are proper but noisy; rank and judgment labels require at least 50 resolved calls and a sustained uncertainty bound.</div></div>';
+  }
+
+  // ---- CO-005 A7: predictability meter + exploit probe --------------------------------
+  function predictabilityInner(st) {
+    var mind = window.RedMindModule;
+    var model = st && st.playerModel;
+    var habit = mind.topHabit(model);
+    var habitLine = habit
+      ? '<div class="dir-scoreline"><b>' + esc(habit.text) + '</b> Habits this strong are exactly what an adaptive Red exploits.</div>'
+      : '<div class="dir-note">No habit claim yet — habit statements require at least 5 observed turns and a 35% order share. That gate is deliberate: unsupported claims are worse than none.</div>';
+    var pr = op.exploitProbe, result = '';
+    if (pr && pr.status === 'running') {
+      result = '<div class="dir-note" id="dir-exploit-status">Worker ensemble running…</div>';
+    } else if (pr && pr.status === 'error') {
+      result = '<div class="dir-note">Probe failed: ' + esc(pr.error || 'unknown') + '</div>';
+    } else if (pr && pr.status === 'done' && pr.result && pr.result.ensemble) {
+      var e = pr.result.ensemble;
+      var base = Math.round(e.original.q * 100), adapt = Math.round(e.counterfactual.q * 100);
+      var delta = adapt - base, band = e.counterfactual.interval;
+      result = '<div class="dir-metrics">' +
+        '<div class="dir-metric"><b>' + base + '%</b><span>HALT RATE · RED AS PLAYED</span></div>' +
+        '<div class="dir-metric"><b>' + adapt + '%</b><span>HALT RATE · RED EXPLOITS YOUR HABITS · 90% ' + Math.round(band.lo * 100) + '–' + Math.round(band.hi * 100) + '%</span></div>' +
+        '<div class="dir-metric"><b>' + (delta > 0 ? '+' : '') + delta + ' pts</b><span>PREDICTABILITY SWING</span></div></div>' +
+        '<div class="dir-note">Same recorded Blue orders, same combat seeds — only Red\'s knowledge of your habits changed. A large negative swing means your patterns are exploitable; deliberate self-randomization is a skill this game scores.</div>';
+    } else {
+      var ready = mind.modelConfidence(model) > 0;
+      result = '<div class="dir-actions"><button class="dir-btn" data-act="run-exploit-probe"' + (ready ? '' : ' disabled') + '>RUN EXPLOIT PROBE — SAME WORLD, ADAPTIVE RED</button>' +
+        (ready ? '<span class="dir-note">200-world ensemble in a worker; the AAR stays responsive.</span>' : '<span class="dir-note">Needs at least 3 observed turns of your orders.</span>') + '</div>';
+    }
+    return '<h3>PREDICTABILITY — WHAT AN ADAPTIVE RED SEES</h3>' + habitLine + result;
+  }
+  function predictabilityCardHtml(st) {
+    return '<div class="dir-card" id="dir-predict-card">' + predictabilityInner(st) + '</div>';
+  }
+  function refreshPredictCard() {
+    var el = $('dir-predict-card');
+    if (el) el.innerHTML = predictabilityInner(GM.getState());
+  }
+  function stopExploitWorker() {
+    try { if (op.exploitWorker) op.exploitWorker.terminate(); } catch (e) {}
+    op.exploitWorker = null;
+  }
+  function runExploitProbe() {
+    if (!op.record || !window.Worker) return;
+    if (op.exploitProbe && op.exploitProbe.status === 'running') return;
+    var st = GM.getState();
+    op.exploitProbe = {
+      status: 'running', result: null, error: null,
+      runId: String(GM._internal.hashSeed(op.record.seed, 'exploit-probe-ui'))
+    };
+    refreshPredictCard();
+    var worker = new Worker('counterfactual-worker.js');
+    op.exploitWorker = worker;
+    worker.onmessage = function (event) {
+      var m = event.data || {};
+      if (!op.exploitProbe || m.runId !== op.exploitProbe.runId) return;
+      if (m.type === 'progress') {
+        var el = $('dir-exploit-status');
+        if (el) el.textContent = 'Worker ensemble: ' + m.completed + '/200 worlds…';
+      } else if (m.type === 'done') {
+        op.exploitProbe.status = 'done'; op.exploitProbe.result = m.result;
+        stopExploitWorker(); refreshPredictCard();
+      } else if (m.type === 'error') {
+        op.exploitProbe.status = 'error'; op.exploitProbe.error = m.message;
+        stopExploitWorker(); refreshPredictCard();
+      }
+    };
+    worker.onerror = function (event) {
+      op.exploitProbe.status = 'error'; op.exploitProbe.error = event.message || 'Worker failed to load';
+      stopExploitWorker(); refreshPredictCard();
+    };
+    worker.postMessage({ type: 'run', runId: op.exploitProbe.runId, payload: {
+      record: op.record, graph: counterfactualGraphSnapshot(),
+      probe: 'exploit-player-model', playerModel: st && st.playerModel, K: 200, chunk: 5
+    } });
+  }
+
+  // ---- CO-005 B7: precision audit + updating style (career archive, gated) ------------
+  function precisionStyleHtml(entries) {
+    var F = window.ForecastingModule;
+    var audit = F.precisionAudit(entries.map(function (e) { return { f: e.player, o: e.outcome }; }));
+    var style = F.classifyUpdateStyle(entries.map(function (e) { return { fBlind: e.blind, fFinal: e.player, o: e.outcome }; }));
+    var lines = [];
+    if (audit.n >= 20 && audit.delta != null) {
+      lines.push(audit.delta > 0.002
+        ? 'Precision audit: your fine-grained probabilities earned <b>' + audit.delta.toFixed(4) + '</b> Brier vs 10% rounding — the granularity carries real information (N=' + audit.n + ').'
+        : 'Precision audit: rounding every forecast to the nearest 10% would have cost you nothing (Δ ' + audit.delta.toFixed(4) + ', N=' + audit.n + ') — your last digit is noise so far.');
+    }
+    if (style) {
+      lines.push('Updating style: <b>' + esc(style.label) + '</b> — ' + esc(style.note) +
+        ' (' + style.n + ' revisions; mean step ' + Math.round(style.meanAbsDelta * 100) + ' pts; ' + Math.round(style.towardRate * 100) + '% moved toward the outcome.)');
+    }
+    if (!lines.length) return '';
+    return '<ul class="dir-note" style="font-style:normal">' + lines.map(function (l) { return '<li>' + l + '</li>'; }).join('') + '</ul>';
+  }
+
+  // ---- CO-005 B7: outside view — reference class BEFORE the house line -----------------
+  function outsideViewHtml(st) {
+    var F = window.ForecastingModule;
+    var stats = F.outsideViewStats(readOpsArchive(), F.planArchetype(st.orders.blue, blueOrderClassifier()));
+    if (!stats) return '';
+    return '<div class="dir-card"><h3>OUTSIDE VIEW — PLANS LIKE THIS ONE</h3>' +
+      '<div class="dir-note" style="font-style:normal">Across your last <b>' + stats.ops + '</b> operations of archetype <b>' + esc(stats.archetype) + '</b>: halt achieved <b>' + Math.round(stats.haltRate * 100) + '%</b> of the time' +
+      (stats.medianEndThroughput != null ? '; median end throughput <b>' + Math.round(stats.medianEndThroughput * 100) + '%</b>' : '') +
+      '. Anchor on the reference class first, then adjust for what makes this plan different. The house line arrives only after your blind call.</div></div>';
   }
 
   function doctrineTrajectoryHtml(redMindRecord) {
@@ -1602,6 +1745,23 @@ window.DirectorModule = (function () {
   function openAar() {
     var st = GM.getState();
     op.record = GM.serialize();
+    // CO-005 A6/B7: persist the habit model Red will face next operation, and the
+    // finished-operation record behind the outside-view reference class.
+    try {
+      if (st && st.playerModel) writePlayerModel(st.playerModel);
+      var aarResult = (st && st.aar && st.aar.result) || {};
+      var lastDenialRow = ((st && st.aar && st.aar.denialHistory) || []).slice(-1)[0] || {};
+      appendOpsArchive({
+        ts: Date.now(),
+        seed: op.record ? op.record.seed : null,
+        variantId: briefOpts.variantId || 'default',
+        archetype: operationArchetype(op.record),
+        winner: (st && st.aar && st.aar.winner) || st.winner || null,
+        halted: aarResult.reason === 'halt',
+        throughputEnd: lastDenialRow.throughput != null ? lastDenialRow.throughput : null,
+        turns: (st && st.aar && st.aar.turns) || st.turn
+      });
+    } catch (e) { /* career stores are best-effort; the AAR itself never depends on them */ }
     stopCounterfactualWorker();
     initCounterfactual();
     setPhase('aar');
@@ -1628,6 +1788,7 @@ window.DirectorModule = (function () {
       '<div class="dir-metric"><b>' + Math.round(lodgment * 100) + '%</b><span>LODGMENT ACCUMULATED</span></div>' +
       '<div class="dir-metric"><b>' + esc(result.at && result.at.dday != null ? 'D+' + result.at.dday : '—') + '</b><span>DECISION POINT</span></div></div>' + projectionLine + '</div>' +
 
+      predictabilityCardHtml(st) +
       doctrineTrajectoryHtml(aar.redMind) +
       strategicAarHtml(aar.strategic) +
 
@@ -1829,6 +1990,7 @@ window.DirectorModule = (function () {
     else if (act === 'copy-aar') copyAar();
     else if (act === 'download-aar') downloadAar();
     else if (act === 'run-counterfactual') runCounterfactual();
+    else if (act === 'run-exploit-probe') runExploitProbe();
     else if (act === 'exit') abortOperation(true);
     else if (act === 'exit-op') endOperation();
     else if (act === 'new-op') { endOperation(); start(); }
