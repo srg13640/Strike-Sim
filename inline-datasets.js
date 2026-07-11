@@ -18,8 +18,8 @@
   'use strict';
 
   var BUNDLED_SCENARIOS = [
-    { url: './grok150red.json', team: 'red',  label: 'Red (PLA) 150' },
-    { url: './grokblue90.json', team: 'blue', label: 'Blue (US/Allied) 90' }
+    { url: './grok150red.json', team: 'red',  label: 'Red (PLA) — 2040 notional' },
+    { url: './grokblue90.json', team: 'blue', label: 'Blue (Taiwan / U.S. / conditional partners) — 2040 notional' }
   ];
 
   var loaded = false;

@@ -43,13 +43,13 @@
        Owns sizing the active surface and surviving GPU context drops. -->
   <script src="stage.js?v=p5"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p7"></script>
+  <script src="sim.js?v=p8"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
        the COA generator and the Monte Carlo 'denial' success mode. See docs/METHODOLOGY.md. -->
   <script src="moe.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p11"></script>
+  <script src="game.js?v=p12"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
   <script src="wargame.js?v=p12"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
@@ -60,7 +60,7 @@
   <script src="director.js?v=1"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
-  <script src="inline-datasets.js?v=p5"></script>
+  <script src="inline-datasets.js?v=p6"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -303,6 +303,9 @@
     #node-popup h4 { margin: 0 0 6px; font-size: 14px; color: var(--text); }
     #node-popup .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     #node-popup .kv { font-size: 12px; margin: 2px 0; }
+    #node-popup .capability-profile { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(148,163,184,.24); }
+    #node-popup .capability-profile a { color: var(--accent); text-decoration: none; }
+    #node-popup .capability-profile a:hover { text-decoration: underline; }
     #node-popup .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 
     html, body {
@@ -1788,7 +1791,8 @@
     </div>
 
     <div class="panel" aria-labelledby="team-resources-title">
-    <h2 id="team-resources-title">Team Resources</h2>
+    <h2 id="team-resources-title">Mission Capacity</h2>
+    <p class="hint mt4">Abstract capacity points per turn from active scenario nodes — not personnel, platform, or weapon counts.</p>
     <div id="team-resources" class="team-summary-grid">
       <div class="team-summary-item">
         <div class="team-name"><span class="swatch" style="background: var(--team-blue)"></span> Blue</div>
@@ -2211,7 +2215,7 @@
     sof:    { name: 'SOF Mission',   cost: 1, baseProb: 0.90, baseDamage: [60, 90], vulnerability: 'SOF' }
     };
 
-    // Resources removed for now; future: red/blue from imported libraries
+    // Strike methods draw on the active scenario's canonical mission-capacity model.
 
     let simTime = 0;
     let playing = false;
@@ -2231,7 +2235,37 @@
     let highlightSet = new Set();
     let geoModeEnabled = false; // app-level mode flag; geo 3D layout lives in EngineModule
     let importCounter = 0;
-    let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, ew:0, jam:0, sof:0 }, redTypes: { ke:0, ew:0, jam:0, sof:0 } };
+    let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, cyber:0, ew:0, sof:0 }, redTypes: { ke:0, cyber:0, ew:0, sof:0 } };
+
+    // Canonical resource contract (resource-model-v2). Values are relative mission-capacity
+    // points per turn, not literal teams, systems, munitions, or effects. The old jam field
+    // is accepted only as an import alias: Cyber-domain nodes map it to cyber; EW-domain
+    // nodes map it to ew. New exports serialize only kinetic/cyber/ew/sof.
+    function canonicalResourceGen(node) {
+      const r = node?.resourceGenByType || {};
+      const domains = (Array.isArray(node?.domain) ? node.domain : [node?.domain])
+        .map(value => String(value || '').toLowerCase());
+      const descriptor = [node?.type, node?.name].map(value => String(value || '').toLowerCase()).join(' ');
+      const cyberRole = domains.includes('cyber') || descriptor.includes('cyber') || descriptor.includes('network operations');
+      const ewRole = domains.includes('ew') || descriptor.includes('electronic') || descriptor.includes('spectrum');
+      const hasCanonical = Object.prototype.hasOwnProperty.call(r, 'cyber');
+      const legacyJam = Number(r.jam ?? r.jamming ?? 0);
+      if (!node?.resourceGenByType) {
+        const total = Math.max(0, Number(node?.resourceGen || 0));
+        if (cyberRole) return { kinetic:0, cyber:total, ew:0, sof:0 };
+        if (ewRole) return { kinetic:0, cyber:0, ew:total, sof:0 };
+        if (descriptor.includes('sof') || descriptor.includes('special operations')) return { kinetic:0, cyber:0, ew:0, sof:total };
+        return { kinetic:total, cyber:0, ew:0, sof:0 };
+      }
+      return {
+        kinetic: Math.max(0, Number(r.kinetic || 0)),
+        cyber: Math.max(0, Number(hasCanonical ? r.cyber : (cyberRole ? legacyJam : 0))),
+        ew: Math.max(0, Number(hasCanonical
+          ? (r.ew ?? r.jam ?? r.jamming ?? 0)
+          : (ewRole ? Math.max(Number(r.ew || 0), legacyJam) : Number(r.ew || 0)))),
+        sof: Math.max(0, Number(r.sof || 0))
+      };
+    }
 
     // Map state. The map *mode* flag stays here (app-level orchestration); the Leaflet
     // instance, layers, and marker index now live in MapModule (see map.js).
@@ -2297,6 +2331,9 @@
       counters: r.counters || r.Counters || null,
       signature: r.signature || r.Signature || null,
       ngc2: r.ngc2 || r.NGC2 || null,
+      capabilityProfile: r.capabilityProfile || r.Capability_Profile || null,
+      sourceRefs: r.sourceRefs || r.Source_Refs || [],
+      locationPrecision: r.locationPrecision || r.Location_Precision || null,
       threeObj: r.__threeObj || null,
     };
     });
@@ -2324,20 +2361,50 @@
       const warnings = [];
       const idSet = new Set();
       const dupes = new Set();
+      const sourceIds = new Set((data.sources || []).map(source => source?.id).filter(Boolean));
+      const canonicalKeys = ['cyber', 'ew', 'kinetic', 'sof'];
       (data.nodes||[]).forEach(n => {
         if (!n?.id) warnings.push('Node without id');
         else if (idSet.has(n.id)) dupes.add(n.id); else idSet.add(n.id);
         if (n?.lat != null && (isNaN(n.lat) || n.lat < -90 || n.lat > 90)) warnings.push(`Node ${n.id} has invalid latitude: ${n.lat}`);
         if (n?.lon != null && (isNaN(n.lon) || n.lon < -180 || n.lon > 180)) warnings.push(`Node ${n.id} has invalid longitude: ${n.lon}`);
+        const rawResources = n?.resourceGenByType;
+        if (!rawResources || typeof rawResources !== 'object' || Array.isArray(rawResources)) {
+          warnings.push(`Node ${n?.id || '?'} is missing typed mission capacity`);
+        } else {
+          const keys = Object.keys(rawResources).sort();
+          if (keys.includes('jam') || keys.includes('jamming')) warnings.push(`Node ${n.id} uses legacy jam capacity`);
+          if (canonicalKeys.some(key => !keys.includes(key))) warnings.push(`Node ${n.id} is missing a canonical capacity field`);
+          const extraKeys = keys.filter(key => !canonicalKeys.includes(key));
+          if (extraKeys.length) warnings.push(`Node ${n.id} has unsupported capacity fields: ${extraKeys.join(', ')}`);
+          keys.forEach(key => {
+            const value = Number(rawResources[key]);
+            if (!Number.isInteger(value) || value < 0 || value > 10) warnings.push(`Node ${n.id} has invalid ${key} capacity: ${rawResources[key]}`);
+          });
+        }
+        const profileRefs = Array.isArray(n?.capabilityProfile?.sourceRefs)
+          ? n.capabilityProfile.sourceRefs
+          : (Array.isArray(n?.sourceRefs) ? n.sourceRefs : []);
+        profileRefs.forEach(ref => {
+          if (!sourceIds.has(ref)) warnings.push(`Node ${n.id} cites missing source ${ref}`);
+        });
       });
       if (dupes.size) warnings.push(`Duplicate node ids: ${Array.from(dupes).slice(0,5).join(', ')}${dupes.size>5?'…':''}`);
       const badLinks = [];
+      const duplicateLinks = [];
+      const linkKeys = new Set();
       (data.links||[]).forEach(l => {
         const s = l?.source?.id ?? l?.source;
         const t = l?.target?.id ?? l?.target;
         if (!idSet.has(s) || !idSet.has(t)) badLinks.push(`${s||'?'}→${t||'?'}`);
+        if (s && t) {
+          const key = String(s) < String(t) ? `${s}__${t}` : `${t}__${s}`;
+          if (linkKeys.has(key)) duplicateLinks.push(`${s}↔${t}`);
+          linkKeys.add(key);
+        }
       });
       if (badLinks.length) warnings.push(`Links to missing nodes: ${badLinks.slice(0,5).join(', ')}${badLinks.length>5?'…':''}`);
+      if (duplicateLinks.length) warnings.push(`Duplicate links: ${duplicateLinks.slice(0,5).join(', ')}${duplicateLinks.length>5?'…':''}`);
       return warnings;
     }
 
@@ -2378,7 +2445,37 @@
       const healthColor = healthPercent > 70 ? 'var(--success)' : healthPercent > 40 ? 'var(--warning)' : 'var(--danger)';
       const teamName = (node.team || '3rd_party').replace('_', ' ');
       const coords = (node.lat != null && node.lon != null) ? `${Number(node.lat).toFixed(2)}, ${Number(node.lon).toFixed(2)}` : '—';
-      const rgt = node.resourceGenByType || { kinetic: node.resourceGen || 0, cyber: 0, ew: 0, jam: 0, sof: 0 };
+      const rgt = canonicalResourceGen(node);
+      const profile = node.capabilityProfile || null;
+      const sourceCatalog = new Map((data.sources || []).map(source => [source.id, source]));
+      const htmlText = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[ch]);
+      const sourceRefs = Array.isArray(profile?.sourceRefs) ? profile.sourceRefs : (node.sourceRefs || []);
+      const potential = profile?.potentialResourceGenByType;
+      const potentialText = potential
+        ? `Kinetic ${Number(potential.kinetic || 0)} · Cyber ${Number(potential.cyber || 0)} · EW ${Number(potential.ew || 0)} · SOF ${Number(potential.sof || 0)}`
+        : '';
+      const sourceHtml = sourceRefs.map(id => {
+        const source = sourceCatalog.get(id);
+        const sourceUrl = /^https?:\/\//i.test(String(source?.url || '')) ? htmlText(source.url) : '';
+        const sourceLabel = source
+          ? `${source.publisher || source.title || id}${source.year ? ` (${source.year})` : ''}`
+          : id;
+        return source && sourceUrl
+          ? '<a href="' + sourceUrl + '" target="_blank" rel="noreferrer">' + htmlText(sourceLabel) + '</a>'
+          : htmlText(id);
+      }).join(' · ');
+      const capabilityHtml = profile ? [
+        '<div class="kv"><strong>Capability evidence</strong></div>',
+        '<div class="kv">Class: ' + htmlText(profile.evidenceClass || 'not stated') + ' · confidence ' + htmlText(profile.confidence || 'not stated') + '</div>',
+        '<div class="kv">Availability: ' + htmlText(profile.availability || 'scenario active') + '</div>',
+        '<div class="kv">Role: ' + htmlText(profile.category || 'not stated') + '</div>',
+        '<div class="kv">Functions: ' + htmlText((profile.functions || []).join(', ') || 'None listed') + '</div>',
+        potentialText ? '<div class="kv">Conditional capacity: ' + htmlText(potentialText) + '</div>' : '',
+        profile.assumption ? '<div class="kv">Assumption: ' + htmlText(profile.assumption) + '</div>' : '',
+        sourceHtml ? '<div class="kv">Sources: ' + sourceHtml + '</div>' : ''
+      ].filter(Boolean).join('') : '';
       pop.innerHTML = `
         <h4>${node.name} <span class="meta">(${node.id})</span></h4>
         <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${teamName}</strong> · ${node.domain?.join(', ') || '—'}</div>
@@ -2390,7 +2487,7 @@
         <div class="kv"><strong>Resources (per type)</strong></div>
         <div class="kv"><label>Kinetic <input id="popup-kinetic" type="number" min="0" value="${rgt.kinetic ?? 0}" style="width:80px;"></label></div>
         <div class="kv"><label>Cyber <input id="popup-cyber" type="number" min="0" value="${rgt.cyber ?? 0}" style="width:80px;"></label></div>
-        <div class="kv"><label>Jamming/EW <input id="popup-jam" type="number" min="0" value="${(rgt.jam ?? rgt.jamming ?? rgt.ew) ?? 0}" style="width:80px;"></label></div>
+        <div class="kv"><label>Electronic Warfare <input id="popup-ew" type="number" min="0" value="${rgt.ew ?? 0}" style="width:80px;"></label></div>
         <div class="kv"><label>SOF <input id="popup-sof" type="number" min="0" value="${rgt.sof ?? 0}" style="width:80px;"></label></div>
         <div class="actions">
           <button id="popup-strike-btn" class="warn" type="button" ${node.status === 'Neutralized' ? 'disabled' : ''}>Strike</button>
@@ -2398,6 +2495,13 @@
           <button id="popup-close-btn" class="secondary" type="button">Close</button>
         </div>
       `;
+      if (capabilityHtml) {
+        const details = document.createElement('div');
+        details.className = 'capability-profile';
+        details.innerHTML = capabilityHtml;
+        const actions = pop.querySelector('.actions');
+        pop.insertBefore(details, actions);
+      }
       pop.style.display = 'block';
       updateNodePopupPosition(node);
       const strikeBtn = document.getElementById('popup-strike-btn');
@@ -2412,10 +2516,9 @@
         const updated = {
           kinetic: num('popup-kinetic'),
           cyber: num('popup-cyber'),
-          jam: num('popup-jam'),
+          ew: num('popup-ew'),
           sof: num('popup-sof')
         };
-        updated.ew = updated.jam; // mirror EW into jam bucket for legacy fields
         node.resourceGenByType = updated;
         node.resourceGen = Object.values(updated).reduce((a,b)=>a+b,0);
         recalcTeamResources();
@@ -3125,11 +3228,18 @@
       if (Array.isArray(payload)) return transformPla(payload);
       return {
         nodes: Array.isArray(payload.nodes) ? payload.nodes : (payload.nodes ?? []),
-        links: Array.isArray(payload.links) ? payload.links : []
+        links: Array.isArray(payload.links) ? payload.links : [],
+        sources: Array.isArray(payload.sources) ? payload.sources : [],
+        metadata: payload.metadata || null
       };
     }
     if (importedRaw.nodes) {
-      return { nodes: importedRaw.nodes, links: importedRaw.links || [] };
+      return {
+        nodes: importedRaw.nodes,
+        links: importedRaw.links || [],
+        sources: Array.isArray(importedRaw.sources) ? importedRaw.sources : [],
+        metadata: importedRaw.metadata || null
+      };
     }
     if (Array.isArray(importedRaw)) {
       return transformPla(importedRaw);
@@ -3179,6 +3289,14 @@
     }).filter(Boolean);
     data.nodes.push(...clonedNodes);
     data.links.push(...newLinks);
+    if (Array.isArray(importedData.sources) && importedData.sources.length) {
+      const sourceMap = new Map((data.sources || []).map(source => [source.id, source]));
+      importedData.sources.forEach(source => { if (source?.id) sourceMap.set(source.id, source); });
+      data.sources = Array.from(sourceMap.values());
+    }
+    if (importedData.metadata) {
+      data.metadata = Object.assign({}, data.metadata || {}, importedData.metadata);
+    }
     if (options.recordLastImport !== false) {
       lastImportIds = new Set(clonedNodes.map(n => n.id));
       lastImportMode = 'add';
@@ -3476,42 +3594,27 @@
 
     // --- Team resources ---
     function recalcTeamResources() {
-    const initTypes = () => ({ ke:0, cyber:0, jam:0, sof:0 });
-    const sumTypes = (acc, src) => { acc.ke+=(src.ke||0); acc.cyber+=(src.cyber||0); acc.jam+=(src.jam||0); acc.sof+=(src.sof||0); return acc; };
-    // Treat EW as part of jamming, cyber as its own bucket
-    const mapRgt = (rgt) => ({
-      ke: Number(rgt.kinetic||0),
-      cyber: Number(rgt.cyber||0),
-      jam: Number(rgt.jam ?? rgt.jamming ?? rgt.ew ?? 0),
-      sof: Number(rgt.sof||0)
-    });
-    function classifyCategory(n) {
-      const d = (n.domain||[]).map(s=>String(s).toLowerCase());
-      const t = String(n.type||'').toLowerCase();
-      const vulns = (n.vulnerabilities||[]).map(v=>String(v).toLowerCase());
-      if (t.includes('sof') || t.includes('special')) return 'sof';
-      if (d.includes('cyber') || t.includes('cyber')) return 'cyber';
-      if (d.includes('ew') || t.includes('ew') || vulns.some(v=>v.includes('jam'))) return 'jam';
-      return 'ke';
-    }
+    const initTypes = () => ({ ke:0, cyber:0, ew:0, sof:0 });
+    const sumNode = (acc, node) => {
+      const resources = canonicalResourceGen(node);
+      acc.ke += resources.kinetic;
+      acc.cyber += resources.cyber;
+      acc.ew += resources.ew;
+      acc.sof += resources.sof;
+      return acc;
+    };
     const blueNodes = data.nodes.filter(n => (n.team === 'blue') && n.status !== 'Neutralized');
     const redNodes  = data.nodes.filter(n => (n.team === 'red')  && n.status !== 'Neutralized');
-    const blueTypes = blueNodes.reduce((acc,n)=>{
-      if (n.resourceGenByType) return sumTypes(acc, mapRgt(n.resourceGenByType));
-      const cat = classifyCategory(n); acc[cat]+= (Number(n.resourceGen)||0); return acc;
-    }, initTypes());
-    const redTypes  = redNodes.reduce((acc,n)=>{
-      if (n.resourceGenByType) return sumTypes(acc, mapRgt(n.resourceGenByType));
-      const cat = classifyCategory(n); acc[cat]+= (Number(n.resourceGen)||0); return acc;
-    }, initTypes());
+    const blueTypes = blueNodes.reduce(sumNode, initTypes());
+    const redTypes  = redNodes.reduce(sumNode, initTypes());
     const blue = Object.values(blueTypes).reduce((a,b)=>a+b,0);
     const red  = Object.values(redTypes).reduce((a,b)=>a+b,0);
     teamResources.blue = blue; teamResources.red = red;
     teamResources.blueTypes = blueTypes; teamResources.redTypes = redTypes;
     const rb = document.getElementById('res-blue'); if (rb) rb.textContent = String(blue);
     const rr = document.getElementById('res-red'); if (rr) rr.textContent = String(red);
-    const rbb = document.getElementById('res-blue-types'); if (rbb) rbb.textContent = `(KE:${blueTypes.ke} Cyber:${blueTypes.cyber} JAM:${blueTypes.jam} SOF:${blueTypes.sof})`;
-    const rrb = document.getElementById('res-red-types'); if (rrb) rrb.textContent = `(KE:${redTypes.ke} Cyber:${redTypes.cyber} JAM:${redTypes.jam} SOF:${redTypes.sof})`;
+    const rbb = document.getElementById('res-blue-types'); if (rbb) rbb.textContent = `(Kinetic ${blueTypes.ke} · Cyber ${blueTypes.cyber} · EW ${blueTypes.ew} · SOF ${blueTypes.sof})`;
+    const rrb = document.getElementById('res-red-types'); if (rrb) rrb.textContent = `(Kinetic ${redTypes.ke} · Cyber ${redTypes.cyber} · EW ${redTypes.ew} · SOF ${redTypes.sof})`;
     }
 
     // --- MAP HELPERS ---
@@ -4488,7 +4591,7 @@
       const runId = ++mcWorkerRunId;
       mcWorkerActiveRunId = runId;
       try {
-        mcWorker = new Worker('sim-worker.js?v=p7');
+        mcWorker = new Worker('sim-worker.js?v=p8');
       } catch (err) {
         clearMonteCarloWorker();
         return Promise.resolve(null);
@@ -5210,12 +5313,11 @@
     }
 
     function useBlueResourceMixForWizard() {
-      const t = teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 };
+      const t = teamResources?.blueTypes || { ke:0, cyber:0, ew:0, sof:0 };
       const mapToMethods = {
         kinetic: t.ke || 0,
-        // Treat cyber as the EW bucket in resources naming from recalc; best effort mapping
-        cyber: (t.ew || 0),
-        ew: (t.jam || 0),
+        cyber: t.cyber || 0,
+        ew: t.ew || 0,
         sof: (t.sof || 0)
       };
       const total = Object.values(mapToMethods).reduce((a,b)=>a+b,0) || 1;
@@ -5707,7 +5809,7 @@
     setTimeout(function assertSimParity() {
       if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
       try {
-        const pw = new Worker('sim-worker.js?v=p7');
+        const pw = new Worker('sim-worker.js?v=p8');
         const bail = setTimeout(() => { try { pw.terminate(); } catch (e) {} }, 5000);
         pw.onmessage = (ev) => {
           const m = ev.data || {};

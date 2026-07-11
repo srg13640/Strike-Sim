@@ -84,8 +84,8 @@ window.GameModule = (function () {
   };
   const METHOD_RESOURCE_KEYS = {
     kinetic: ['kinetic'],
-    cyber: ['jam', 'ew'],
-    ew: ['ew', 'jam'],
+    cyber: ['cyber'],
+    ew: ['ew'],
     sof: ['sof']
   };
   const VULN_ALIASES = {
@@ -120,17 +120,26 @@ window.GameModule = (function () {
 
   function resourceGenByType(node) {
     const r = node.resourceGenByType || {};
+    const domains = (Array.isArray(node.domain) ? node.domain : [node.domain])
+      .map(d => String(d || '').toLowerCase());
+    const descriptor = [node.type, node.name].map(v => String(v || '').toLowerCase()).join(' ');
+    const cyberRole = domains.includes('cyber') || descriptor.includes('cyber') || descriptor.includes('network operations');
+    const ewRole = domains.includes('ew') || descriptor.includes('electronic') || descriptor.includes('spectrum');
+    const hasCanonicalCyber = Object.prototype.hasOwnProperty.call(r, 'cyber');
+    const legacyJam = Number(r.jam ?? r.jamming ?? 0);
     return {
       kinetic: Number(r.kinetic || 0),
-      ew: Number(r.ew || 0),
-      jam: Number(r.jam || 0),
+      cyber: Number(hasCanonicalCyber ? r.cyber : (cyberRole ? legacyJam : 0)),
+      ew: Number(hasCanonicalCyber
+        ? (r.ew ?? r.jam ?? r.jamming ?? 0)
+        : (ewRole ? Math.max(Number(r.ew || 0), legacyJam) : Number(r.ew || 0))),
       sof: Number(r.sof || 0)
     };
   }
 
   function resourceForMethod(node, methodKey) {
     const keys = METHOD_RESOURCE_KEYS[methodKey] || [];
-    const r = node.resourceGenByType || {};
+    const r = resourceGenByType(node);
     return keys.reduce((sum, key) => sum + Number(r[key] || 0), 0);
   }
 
@@ -143,7 +152,7 @@ window.GameModule = (function () {
 
   // Can this specific node serve as a firing source for the given method? A valid source
   // must be a living, non-logistics node that actually generates the resource the method
-  // consumes (kinetic -> kinetic stocks, cyber/ew -> jam/ew, sof -> sof). This is the
+  // consumes (kinetic -> kinetic, cyber -> cyber, EW -> EW, SOF -> SOF). This is the
   // per-node half of the authoritative "can side S strike with method M?" rule (C-003).
   // `aliveFn(node)` overrides the liveness test so the resolver can read START-of-turn
   // liveness (a source killed this same turn still fires — preserves simultaneity).
@@ -320,7 +329,7 @@ window.GameModule = (function () {
           n.id, team, (n.type || ''), (n.subsystem || ''), (n.difficulty || 'Medium'),
           Number(n.importance || 5), Math.max(1, Number(n.cascScore || 1)), Number(n.healthMax || 100),
           dom.join('|'), vuln.join('|'),
-          rg.kinetic, rg.ew, rg.jam, rg.sof
+          rg.kinetic, rg.cyber, rg.ew, rg.sof
         ].join(',');
       })
       .sort();   // order-independent across node array ordering

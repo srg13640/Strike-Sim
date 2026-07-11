@@ -21,15 +21,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 300,
       "z": 0,
       "lat": 39.9042,
-      "lon": 116.4074
+      "lon": 116.4074,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-002",
@@ -52,15 +53,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 100,
       "z": 0,
       "lat": 26.08,
-      "lon": 119.3
+      "lon": 119.3,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-003",
@@ -83,15 +85,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": -100,
       "z": 0,
       "lat": 23.1291,
-      "lon": 113.2644
+      "lon": 113.2644,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-004",
@@ -114,15 +117,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 150,
       "z": 0,
       "lat": 32.0603,
-      "lon": 118.7969
+      "lon": 118.7969,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-005",
@@ -145,15 +149,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 200,
       "z": 0,
       "lat": 29.8683,
-      "lon": 121.5495
+      "lon": 121.5495,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-006",
@@ -176,15 +181,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 130,
       "y": 160,
       "z": 0,
       "lat": 32.0603,
-      "lon": 118.7969
+      "lon": 118.7969,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-007",
@@ -207,15 +213,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 50,
       "z": 0,
       "lat": 24.4798,
-      "lon": 118.0894
+      "lon": 118.0894,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-008",
@@ -238,15 +245,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 180,
       "z": 0,
       "lat": 30.867,
-      "lon": 120.1025
+      "lon": 120.1025,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-009",
@@ -269,15 +277,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 170,
       "z": 0,
       "lat": 32.6264,
-      "lon": 116.9989
+      "lon": 116.9989,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-010",
@@ -300,24 +309,25 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": 250,
       "z": 0,
       "lat": 26.5,
-      "lon": 118.5
+      "lon": 118.5,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-011",
-      "name": "SSF Information Support Base Wuxi",
+      "name": "CMC Information Support Force Network Operations Center",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
         "Cyber",
-        "EW"
+        "Land"
       ],
       "type": "Command",
       "health": 100,
@@ -332,19 +342,36 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 130,
       "y": 140,
       "z": 0,
       "lat": 31.5689,
-      "lon": 120.303
+      "lon": 120.303,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "network-information-support",
+        "functions": [
+          "network-operations",
+          "joint-information-support"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2024",
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "Observed organization and mission class; the modeled operations center, marker, and theater relationship are analytical aggregates."
+      }
     },
     {
       "id": "PLA-CMD-012",
-      "name": "SSF Space Systems Division Beijing",
+      "name": "CMC Aerospace Force Space Operations Center",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -363,15 +390,32 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 280,
       "z": 0,
       "lat": 39.9,
-      "lon": 116.4
+      "lon": 116.4,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "space-command",
+        "functions": [
+          "space-command-and-control",
+          "mission-integration"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2024",
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "Observed force role represented as a single service node; location and capacity are illustrative."
+      }
     },
     {
       "id": "PLA-CMD-013",
@@ -394,15 +438,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -150,
       "z": 0,
       "lat": 21.2749,
-      "lon": 110.3594
+      "lon": 110.3594,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-014",
@@ -425,15 +470,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 70,
       "y": -50,
       "z": 0,
       "lat": 23.663,
-      "lon": 116.6226
+      "lon": 116.6226,
+      "resourceGen": 0
     },
     {
       "id": "PLA-CMD-015",
@@ -456,15 +502,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -50,
       "y": 100,
       "z": 0,
       "lat": 30.5833,
-      "lon": 114.2667
+      "lon": 114.2667,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SEN-001",
@@ -487,15 +534,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 0,
       "z": 550,
       "lat": 27.0794,
-      "lon": 116.1742
+      "lon": 116.1742,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-002",
@@ -517,15 +579,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 100,
       "z": 550,
       "lat": 24.5446,
-      "lon": 119.4423
+      "lon": 119.4423,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-003",
@@ -548,15 +625,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 120,
       "z": 10,
       "lat": 26.1255,
-      "lon": 119.2479
+      "lon": 119.2479,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-004",
@@ -578,15 +670,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 80,
       "z": 20,
       "lat": 26.9231,
-      "lon": 116.2503
+      "lon": 116.2503,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-005",
@@ -609,15 +716,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 90,
       "z": 0,
       "lat": 26,
-      "lon": 119
+      "lon": 119,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-006",
@@ -639,15 +761,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 110,
       "z": 15,
       "lat": 26.8606,
-      "lon": 115.7809
+      "lon": 115.7809,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-007",
@@ -669,15 +806,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 200,
       "y": 0,
       "z": -200,
       "lat": 26.8919,
-      "lon": 116.0156
+      "lon": 116.0156,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SEN-008",
@@ -699,15 +837,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -200,
       "z": -100,
       "lat": 19,
-      "lon": 109
+      "lon": 109,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SEN-009",
@@ -729,15 +868,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": -120,
       "z": 8,
       "lat": 26.8294,
-      "lon": 116.1712
+      "lon": 116.1712,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SEN-010",
@@ -759,15 +899,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -180,
       "z": 0,
       "lat": 18.5,
-      "lon": 110
+      "lon": 110,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-011",
@@ -789,15 +944,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 70,
       "z": 0,
       "lat": 25,
-      "lon": 118
+      "lon": 118,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-012",
@@ -819,15 +989,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -50,
       "y": -250,
       "z": 0,
       "lat": 16.734,
-      "lon": 112.3794
+      "lon": 112.3794,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SEN-013",
@@ -850,15 +1021,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 320,
       "z": 0,
       "lat": 39.803,
-      "lon": 116.4487
+      "lon": 116.4487,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-014",
@@ -880,15 +1066,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 250,
       "z": 500,
       "lat": 22.361,
-      "lon": 120.6098
+      "lon": 120.6098,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-SEN-015",
@@ -910,15 +1111,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 0,
       "z": 36000,
       "lat": 39.6622,
-      "lon": 116.5125
+      "lon": 116.5125,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-001",
@@ -940,19 +1156,34 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 60,
       "z": 0,
       "lat": 24.48,
-      "lon": 118.08
+      "lon": 118.08,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-002",
-      "name": "SSF SATCOM Station Fuzhou",
+      "name": "Eastern Theater SATCOM and Data Relay Gateway",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -970,15 +1201,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 110,
       "z": 0,
       "lat": 26.1336,
-      "lon": 119.3569
+      "lon": 119.3569,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      }
     },
     {
       "id": "PLA-REL-003",
@@ -1001,15 +1247,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 95,
       "y": 95,
       "z": 0,
       "lat": 26.0526,
-      "lon": 118.5663
+      "lon": 118.5663,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-004",
@@ -1031,15 +1292,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 110,
       "z": 5,
       "lat": 26.2722,
-      "lon": 119.5273
+      "lon": 119.5273,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-005",
@@ -1061,15 +1337,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 130,
       "z": 0,
       "lat": 26.65,
-      "lon": 119.52
+      "lon": 119.52,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-006",
@@ -1091,15 +1382,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -160,
       "z": 0,
       "lat": 19.0573,
-      "lon": 109.5644
+      "lon": 109.5644,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-007",
@@ -1121,15 +1427,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -140,
       "z": 0,
       "lat": 21.3264,
-      "lon": 110.4188
+      "lon": 110.4188,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-008",
@@ -1151,15 +1472,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 150,
       "z": 10,
       "lat": 27.4725,
-      "lon": 121.0289
+      "lon": 121.0289,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-009",
@@ -1181,19 +1517,34 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 190,
       "z": 0,
       "lat": 29.5582,
-      "lon": 121.0551
+      "lon": 121.0551,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-010",
-      "name": "Quantum Comm Link Beijing-Fuzhou",
+      "name": "Protected Backbone Segment — Beijing–Fuzhou",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -1211,19 +1562,34 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": 200,
       "z": 0,
       "lat": 39.976,
-      "lon": 116.3572
+      "lon": 116.3572,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "protected-backbone",
+        "functions": [
+          "resilient-data-transport"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USSF-FOE-2040"
+        ],
+        "assumption": "A more resilient protected backbone is a 2040 scenario assumption; no claim of universal quantum communications or immunity is made."
+      }
     },
     {
       "id": "PLA-REL-011",
-      "name": "SSF Mobile SATCOM Vehicle",
+      "name": "Information Support Force Mobile SATCOM Element",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -1241,15 +1607,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 100,
       "z": 0,
       "lat": 24.6723,
-      "lon": 117.9966
+      "lon": 117.9966,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      }
     },
     {
       "id": "PLA-REL-012",
@@ -1271,15 +1652,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 80,
       "z": 20,
       "lat": 27.9723,
-      "lon": 116.8734
+      "lon": 116.8734,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-013",
@@ -1301,15 +1697,30 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 100,
       "z": 20000,
       "lat": 26.2678,
-      "lon": 119.2165
+      "lon": 119.2165,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-014",
@@ -1331,15 +1742,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 70,
       "z": 0,
       "lat": 26.0723,
-      "lon": 118.4647
+      "lon": 118.4647,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-REL-015",
@@ -1361,19 +1787,20 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 200,
       "y": 50,
       "z": 0,
       "lat": 26.4509,
-      "lon": 119.1048
+      "lon": 119.1048,
+      "resourceGen": 0
     },
     {
       "id": "PLA-REL-016",
-      "name": "Lingshui Quantum Relay",
+      "name": "Protected Backbone Relay — Hainan",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -1391,19 +1818,34 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": -170,
       "z": 0,
       "lat": 18.5704,
-      "lon": 109.9834
+      "lon": 109.9834,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      }
     },
     {
       "id": "PLA-REL-017",
-      "name": "SSF Tactical Data Link Hub",
+      "name": "Eastern Theater Tactical Data Link Hub",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -1421,15 +1863,30 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 120,
       "z": 0,
       "lat": 27.8785,
-      "lon": 116.794
+      "lon": 116.794,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "information-domain-enabler"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      }
     },
     {
       "id": "PLA-FIR-001",
@@ -1451,15 +1908,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 10,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 60,
       "y": 220,
       "z": 0,
       "lat": 28,
-      "lon": 117
+      "lon": 117,
+      "resourceGen": 10
     },
     {
       "id": "PLA-FIR-002",
@@ -1480,16 +1938,17 @@
       "importance": 9,
       "cascScore": 4,
       "resourceGenByType": {
-        "kinetic": 12,
+        "kinetic": 10,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 70,
       "y": 240,
       "z": 0,
       "lat": 26.5817,
-      "lon": 118.5824
+      "lon": 118.5824,
+      "resourceGen": 10
     },
     {
       "id": "PLA-FIR-003",
@@ -1511,15 +1970,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 10,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 130,
       "z": 0,
       "lat": 26.0808,
-      "lon": 118.5768
+      "lon": 118.5768,
+      "resourceGen": 10
     },
     {
       "id": "PLA-FIR-004",
@@ -1542,15 +2002,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 8,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 160,
       "z": 0,
       "lat": 28.4112,
-      "lon": 122.093
+      "lon": 122.093,
+      "resourceGen": 8
     },
     {
       "id": "PLA-FIR-005",
@@ -1573,15 +2034,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 8,
-        "ew": 2,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 180,
       "y": 100,
       "z": 0,
       "lat": 28.7664,
-      "lon": 115.9406
+      "lon": 115.9406,
+      "resourceGen": 8
     },
     {
       "id": "PLA-FIR-006",
@@ -1603,15 +2065,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
-        "ew": 1,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 190,
       "y": 110,
       "z": 0,
       "lat": 30.082,
-      "lon": 121.7744
+      "lon": 121.7744,
+      "resourceGen": 6
     },
     {
       "id": "PLA-FIR-007",
@@ -1633,15 +2096,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 8,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 95,
       "y": 80,
       "z": 0,
       "lat": 24.9,
-      "lon": 118.6
+      "lon": 118.6,
+      "resourceGen": 8
     },
     {
       "id": "PLA-FIR-008",
@@ -1663,15 +2127,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 9,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 140,
       "z": 0,
       "lat": 26.7261,
-      "lon": 119.5986
+      "lon": 119.5986,
+      "resourceGen": 9
     },
     {
       "id": "PLA-FIR-009",
@@ -1693,15 +2158,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 10,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 180,
       "z": 0,
       "lat": 28.005,
-      "lon": 122.1662
+      "lon": 122.1662,
+      "resourceGen": 10
     },
     {
       "id": "PLA-FIR-010",
@@ -1722,16 +2188,17 @@
       "importance": 9,
       "cascScore": 4,
       "resourceGenByType": {
-        "kinetic": 15,
+        "kinetic": 10,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 40,
       "y": 260,
       "z": 0,
       "lat": 26.578,
-      "lon": 118.475
+      "lon": 118.475,
+      "resourceGen": 10
     },
     {
       "id": "PLA-FIR-011",
@@ -1753,15 +2220,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 140,
       "z": 0,
       "lat": 28.1297,
-      "lon": 117.6939
+      "lon": 117.6939,
+      "resourceGen": 6
     },
     {
       "id": "PLA-FIR-012",
@@ -1783,15 +2251,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 8,
-        "ew": 2,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 170,
       "y": 90,
       "z": 0,
       "lat": 30.0679,
-      "lon": 121.5152
+      "lon": 121.5152,
+      "resourceGen": 8
     },
     {
       "id": "PLA-FIR-013",
@@ -1813,15 +2282,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 7,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 85,
       "y": 75,
       "z": 0,
       "lat": 24.6817,
-      "lon": 118.0317
+      "lon": 118.0317,
+      "resourceGen": 7
     },
     {
       "id": "PLA-FIR-014",
@@ -1843,15 +2313,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 8,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 105,
       "y": 85,
       "z": 0,
       "lat": 24.6841,
-      "lon": 118.0458
+      "lon": 118.0458,
+      "resourceGen": 8
     },
     {
       "id": "PLA-FIR-015",
@@ -1873,15 +2344,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 85,
       "y": 65,
       "z": 0,
       "lat": 32.2669,
-      "lon": 118.7674
+      "lon": 118.7674,
+      "resourceGen": 6
     },
     {
       "id": "PLA-FIR-016",
@@ -1903,15 +2375,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
-        "ew": 1,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 200,
       "y": 120,
       "z": 0,
       "lat": 30.0772,
-      "lon": 121.4966
+      "lon": 121.4966,
+      "resourceGen": 6
     },
     {
       "id": "PLA-FIR-017",
@@ -1933,15 +2406,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 105,
       "z": 0,
       "lat": 26.1645,
-      "lon": 119.2845
+      "lon": 119.2845,
+      "resourceGen": 5
     },
     {
       "id": "PLA-FIR-018",
@@ -1963,15 +2437,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 7,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 130,
       "z": 12,
       "lat": 32.2364,
-      "lon": 118.7343
+      "lon": 118.7343,
+      "resourceGen": 7
     },
     {
       "id": "PLA-FIR-019",
@@ -1993,15 +2468,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 210,
       "y": 80,
       "z": 0,
       "lat": 30.0468,
-      "lon": 121.5009
+      "lon": 121.5009,
+      "resourceGen": 5
     },
     {
       "id": "PLA-FIR-020",
@@ -2023,15 +2499,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 6,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 95,
       "y": 75,
       "z": 0,
       "lat": 24.3419,
-      "lon": 118.2067
+      "lon": 118.2067,
+      "resourceGen": 6
     },
     {
       "id": "PLA-ASS-001",
@@ -2055,15 +2532,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 85,
       "y": 55,
       "z": 0,
       "lat": 24.5,
-      "lon": 118
+      "lon": 118,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-002",
@@ -2086,15 +2564,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 60,
       "z": 0,
       "lat": 24.56,
-      "lon": 118.1354
+      "lon": 118.1354,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-003",
@@ -2117,15 +2596,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 45,
       "z": 0,
       "lat": 24.5591,
-      "lon": 118.1298
+      "lon": 118.1298,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-004",
@@ -2148,15 +2628,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 3,
-        "ew": 1,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 160,
       "y": 40,
       "z": 0,
       "lat": 19.0782,
-      "lon": 109.5342
+      "lon": 109.5342,
+      "resourceGen": 3
     },
     {
       "id": "PLA-ASS-005",
@@ -2178,15 +2659,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 3,
-        "ew": 1,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 170,
       "y": 50,
       "z": 0,
       "lat": 26.2731,
-      "lon": 119.4088
+      "lon": 119.4088,
+      "resourceGen": 3
     },
     {
       "id": "PLA-ASS-006",
@@ -2208,15 +2690,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 30,
       "z": 0,
       "lat": 24.6907,
-      "lon": 118.0947
+      "lon": 118.0947,
+      "resourceGen": 2
     },
     {
       "id": "PLA-ASS-007",
@@ -2238,15 +2721,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 155,
       "y": 35,
       "z": 0,
       "lat": 24.7484,
-      "lon": 118.2161
+      "lon": 118.2161,
+      "resourceGen": 2
     },
     {
       "id": "PLA-ASS-008",
@@ -2269,15 +2753,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 60,
       "y": -80,
       "z": 0,
       "lat": 26.4967,
-      "lon": 119.5132
+      "lon": 119.5132,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-009",
@@ -2300,15 +2785,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 65,
       "y": -70,
       "z": 0,
       "lat": 23.3503,
-      "lon": 113.3547
+      "lon": 113.3547,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-010",
@@ -2330,15 +2816,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 160,
       "y": 45,
       "z": 5,
       "lat": 19.2689,
-      "lon": 109.3793
+      "lon": 109.3793,
+      "resourceGen": 2
     },
     {
       "id": "PLA-ASS-011",
@@ -2360,15 +2847,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 165,
       "y": 55,
       "z": 5,
       "lat": 26.4662,
-      "lon": 119.2679
+      "lon": 119.2679,
+      "resourceGen": 2
     },
     {
       "id": "PLA-ASS-012",
@@ -2391,15 +2879,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 40,
       "z": 0,
       "lat": 24.6752,
-      "lon": 117.9251
+      "lon": 117.9251,
+      "resourceGen": 5
     },
     {
       "id": "PLA-ASS-013",
@@ -2421,15 +2910,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 160,
       "z": 0,
       "lat": 32.7091,
-      "lon": 116.9399
+      "lon": 116.9399,
+      "resourceGen": 4
     },
     {
       "id": "PLA-ASS-014",
@@ -2451,15 +2941,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 150,
       "z": 0,
       "lat": 32.8077,
-      "lon": 116.8251
+      "lon": 116.8251,
+      "resourceGen": 0
     },
     {
       "id": "PLA-ASS-015",
@@ -2482,15 +2973,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 160,
       "y": 35,
       "z": 0,
       "lat": 19.2619,
-      "lon": 109.3745
+      "lon": 109.3745,
+      "resourceGen": 2
     },
     {
       "id": "PLA-ASS-016",
@@ -2512,15 +3004,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 20,
       "z": 0,
       "lat": 24.8767,
-      "lon": 117.9491
+      "lon": 117.9491,
+      "resourceGen": 0
     },
     {
       "id": "PLA-ASS-017",
@@ -2542,15 +3035,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 50,
       "z": 3,
       "lat": 28.0117,
-      "lon": 115.6828
+      "lon": 115.6828,
+      "resourceGen": 5
     },
     {
       "id": "PLA-ASS-018",
@@ -2572,15 +3066,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 85,
       "y": 45,
       "z": 0,
       "lat": 28.293,
-      "lon": 115.9205
+      "lon": 115.9205,
+      "resourceGen": 3
     },
     {
       "id": "PLA-BLK-001",
@@ -2604,15 +3099,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
-        "ew": 2,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 250,
       "y": 150,
       "z": 0,
       "lat": 29.613,
-      "lon": 121.749
+      "lon": 121.749,
+      "resourceGen": 6
     },
     {
       "id": "PLA-BLK-002",
@@ -2635,15 +3131,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 7,
-        "ew": 2,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 260,
       "y": 160,
       "z": 0,
       "lat": 29.6201,
-      "lon": 121.7537
+      "lon": 121.7537,
+      "resourceGen": 7
     },
     {
       "id": "PLA-BLK-003",
@@ -2666,15 +3163,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 8,
-        "ew": 3,
-        "jam": 2,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 270,
       "y": 170,
       "z": 0,
       "lat": 25.8998,
-      "lon": 118.5911
+      "lon": 118.5911,
+      "resourceGen": 8
     },
     {
       "id": "PLA-BLK-004",
@@ -2696,15 +3194,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 300,
       "y": 100,
       "z": -300,
       "lat": 22.8856,
-      "lon": 113.4968
+      "lon": 113.4968,
+      "resourceGen": 5
     },
     {
       "id": "PLA-BLK-005",
@@ -2726,15 +3225,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 280,
       "y": 80,
       "z": -350,
       "lat": 22.8832,
-      "lon": 113.4827
+      "lon": 113.4827,
+      "resourceGen": 6
     },
     {
       "id": "PLA-BLK-006",
@@ -2756,15 +3256,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 5,
-        "ew": 2,
-        "jam": 1,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 240,
       "y": 140,
       "z": 0,
       "lat": 22.3153,
-      "lon": 122.218
+      "lon": 122.218,
+      "resourceGen": 5
     },
     {
       "id": "PLA-BLK-007",
@@ -2786,15 +3287,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": -200,
       "z": -200,
       "lat": 21.1735,
-      "lon": 110.4436
+      "lon": 110.4436,
+      "resourceGen": 4
     },
     {
       "id": "PLA-BLK-008",
@@ -2816,25 +3318,27 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 6,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 260,
       "y": 165,
       "z": 10,
       "lat": 29.3788,
-      "lon": 121.9627
+      "lon": 121.9627,
+      "resourceGen": 6
     },
     {
       "id": "PLA-BLK-009",
-      "name": "SSF ASAT Battalion Korla",
+      "name": "Aerospace Force Reversible Counterspace Group",
       "team": "red",
-      "subsystem": "Blockade",
+      "subsystem": "Information Attack",
       "domain": [
-        "Space"
+        "Space",
+        "EW"
       ],
-      "type": "Blockade",
+      "type": "EW/Cyber",
       "health": 100,
       "healthMax": 100,
       "status": "Active",
@@ -2846,15 +3350,32 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 5,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 3,
         "sof": 0
       },
       "x": -200,
       "y": 400,
       "z": 0,
       "lat": 39.6635,
-      "lon": 116.5997
+      "lon": 116.5997,
+      "resourceGen": 3,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "reversible-counterspace",
+        "functions": [
+          "satcom-interference",
+          "pnt-interference"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-WEG"
+        ],
+        "assumption": "This models a reversible theater effect package. It is not an always-available kinetic ASAT unit or a claimed deployment."
+      }
     },
     {
       "id": "PLA-BLK-010",
@@ -2876,15 +3397,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 180,
       "y": 20,
       "z": 0,
       "lat": 21.0829,
-      "lon": 110.3145
+      "lon": 110.3145,
+      "resourceGen": 3
     },
     {
       "id": "PLA-BLK-011",
@@ -2906,19 +3428,20 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
-        "ew": 1,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 220,
       "y": 100,
       "z": 0,
       "lat": 21.0852,
-      "lon": 110.3286
+      "lon": 110.3286,
+      "resourceGen": 4
     },
     {
       "id": "PLA-IAK-001",
-      "name": "SSF Network Systems Division",
+      "name": "CMC Cyberspace Force Operations Center",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -2936,19 +3459,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 5,
-        "sof": 3
+        "sof": 0
       },
       "x": 20,
       "y": 280,
       "z": 0,
       "lat": 26.1813,
-      "lon": 119.5124
+      "lon": 119.5124,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "cyber-command",
+        "functions": [
+          "cyber-command-and-control"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2024",
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "Observed force role represented as an aggregate command service; no offensive capacity is assigned to the headquarters itself."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-002",
-      "name": "61419 Cyber Unit",
+      "name": "Taiwan Theater Cyber Mission Group",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -2966,19 +3505,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 4,
         "ew": 0,
-        "jam": 6,
-        "sof": 4
+        "sof": 0
       },
       "x": 30,
       "y": 290,
       "z": 0,
       "lat": 26.1883,
-      "lon": 119.5171
+      "lon": 119.5171,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "cyber-effects",
+        "functions": [
+          "c4isr-disruption",
+          "network-access"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The mission group and value are analytical aggregates; exact force structure, access, and timing are unknown."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-003",
-      "name": "EW Regiment Fujian",
+      "name": "Eastern Theater Spectrum Warfare Brigade",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -2996,19 +3551,37 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 8,
-        "jam": 8,
+        "cyber": 0,
+        "ew": 5,
         "sof": 0
       },
       "x": 95,
       "y": 105,
       "z": 0,
       "lat": 26.0424,
-      "lon": 118.5962
+      "lon": 118.5962,
+      "resourceGen": 5,
+      "capabilityProfile": {
+        "category": "electromagnetic-warfare",
+        "functions": [
+          "electronic-attack",
+          "electronic-support",
+          "electronic-protection"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-WEG"
+        ],
+        "assumption": "The brigade label and capacity aggregate theater-level spectrum effects rather than identify a verified formation."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-004",
-      "name": "J-16D EW Aircraft Squadron",
+      "name": "Airborne Electronic Attack Group — J-16D/J-15D aggregate",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -3027,23 +3600,40 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 7,
-        "jam": 7,
+        "cyber": 0,
+        "ew": 4,
         "sof": 0
       },
       "x": 105,
       "y": 115,
       "z": 10,
       "lat": 32.1733,
-      "lon": 119.0422
+      "lon": 119.0422,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "airborne-electronic-attack",
+        "functions": [
+          "escort-jamming",
+          "stand-in-electronic-attack"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-J16D"
+        ],
+        "assumption": "ODIN anchors the J-16D equipment class; the mixed group, availability, marker, and capacity are scenario assumptions."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-005",
-      "name": "Psychological Warfare TVU",
+      "name": "Taiwan Cognitive Operations Cell",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
-        "Cyber"
+        "Information"
       ],
       "type": "EW/Cyber",
       "health": 100,
@@ -3057,23 +3647,40 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
-        "sof": 5
+        "sof": 0
       },
       "x": 10,
       "y": 260,
       "z": 0,
       "lat": 40.0149,
-      "lon": 116.6386
+      "lon": 116.6386,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "cognitive-operations",
+        "functions": [
+          "influence-support",
+          "narrative-amplification"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "Modeled as an information capability with no generic cyber, EW, or SOF currency."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-006",
-      "name": "Space Countermeasure Unit",
+      "name": "PNT and SATCOM Denial Group",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
-        "Space"
+        "Space",
+        "EW"
       ],
       "type": "EW/Cyber",
       "health": 100,
@@ -3087,19 +3694,36 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 6,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 3,
         "sof": 0
       },
       "x": -10,
       "y": 300,
       "z": 0,
       "lat": 26.3855,
-      "lon": 119.4525
+      "lon": 119.4525,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "space-electromagnetic-warfare",
+        "functions": [
+          "pnt-interference",
+          "satcom-interference"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-WEG"
+        ],
+        "assumption": "This is a reversible spectrum-effects aggregate, not a claim of exact unit structure or continuous coverage."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-007",
-      "name": "Electronic Countermeasure Brigade",
+      "name": "Eastern Theater Electronic Countermeasures Group",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -3117,23 +3741,41 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 7,
-        "jam": 8,
+        "cyber": 0,
+        "ew": 4,
         "sof": 0
       },
       "x": 110,
       "y": 95,
       "z": 0,
       "lat": 27.0382,
-      "lon": 122.1985
+      "lon": 122.1985,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "electromagnetic-warfare",
+        "functions": [
+          "electronic-attack",
+          "electronic-protection"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-WEG"
+        ],
+        "assumption": "Capacity and marker are theater-level analytical abstractions."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-008",
-      "name": "GPS Jamming Battalion",
+      "name": "PNT / Navigation Warfare Battalion",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
-        "EW"
+        "EW",
+        "Space"
       ],
       "type": "EW/Cyber",
       "health": 100,
@@ -3147,19 +3789,36 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 0,
-        "jam": 9,
+        "cyber": 0,
+        "ew": 4,
         "sof": 0
       },
       "x": 100,
       "y": 90,
       "z": 0,
       "lat": 26.6319,
-      "lon": 122.2717
+      "lon": 122.2717,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "navigation-warfare",
+        "functions": [
+          "pnt-interference",
+          "navigation-deception"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "ODIN-WEG"
+        ],
+        "assumption": "The battalion name and capacity are game abstractions; effect range and availability are not public facts."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-IAK-009",
-      "name": "Cyber Attack Task Force",
+      "name": "Critical Infrastructure Access Portfolio",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -3177,15 +3836,31 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 3,
         "ew": 0,
-        "jam": 5,
-        "sof": 5
+        "sof": 0
       },
       "x": 40,
       "y": 280,
       "z": 0,
       "lat": 26.1626,
-      "lon": 119.5122
+      "lon": 119.5122,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "cyber-access",
+        "functions": [
+          "pre-positioned-access",
+          "critical-infrastructure-risk"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "CISA-VOLT-2024"
+        ],
+        "assumption": "The source supports persistent-access risk, not guaranteed wartime access, effect, attribution, or timing."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "PLA-LOG-001",
@@ -3208,15 +3883,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 120,
       "z": 0,
       "lat": 26.0622,
-      "lon": 119.1952
+      "lon": 119.1952,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-002",
@@ -3238,15 +3914,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 70,
       "z": 0,
       "lat": 24.8794,
-      "lon": 118.4933
+      "lon": 118.4933,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-003",
@@ -3268,15 +3945,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 60,
       "z": 0,
       "lat": 24.4603,
-      "lon": 117.9889
+      "lon": 117.9889,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-004",
@@ -3298,15 +3976,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 210,
       "z": 0,
       "lat": 29.8475,
-      "lon": 121.447
+      "lon": 121.447,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-005",
@@ -3328,15 +4007,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 200,
       "z": 0,
       "lat": 26.4784,
-      "lon": 118.3877
+      "lon": 118.3877,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-006",
@@ -3358,15 +4038,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 170,
       "z": 0,
       "lat": 28.3502,
-      "lon": 121.8074
+      "lon": 121.8074,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-007",
@@ -3388,15 +4069,16 @@
       "cascScore": 1,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 40,
       "z": 0,
       "lat": 19.0196,
-      "lon": 109.2627
+      "lon": 109.2627,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-008",
@@ -3419,15 +4101,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 80,
       "z": 0,
       "lat": 25.5,
-      "lon": 119.78
+      "lon": 119.78,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-009",
@@ -3449,15 +4132,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -50,
       "y": 120,
       "z": 0,
       "lat": 30.5697,
-      "lon": 114.1653
+      "lon": 114.1653,
+      "resourceGen": 0
     },
     {
       "id": "PLA-LOG-010",
@@ -3479,15 +4163,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 280,
       "y": 150,
       "z": 0,
       "lat": 29.8802,
-      "lon": 121.735
+      "lon": 121.735,
+      "resourceGen": 0
     },
     {
       "id": "PLA-SUP-001",
@@ -3509,15 +4194,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 100,
       "z": 0,
       "lat": 26.0802,
-      "lon": 118.5158
+      "lon": 118.5158,
+      "resourceGen": 5
     },
     {
       "id": "PLA-SUP-002",
@@ -3539,15 +4225,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 80,
       "y": 65,
       "z": 0,
       "lat": 24.5612,
-      "lon": 118.0965
+      "lon": 118.0965,
+      "resourceGen": 4
     },
     {
       "id": "PLA-SUP-003",
@@ -3569,19 +4256,34 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 3,
-        "jam": 0,
         "sof": 0
       },
       "x": 95,
       "y": 85,
       "z": 0,
       "lat": 24.685,
-      "lon": 118.1196
+      "lon": 118.1196,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "capability-service",
+        "functions": [
+          "electromagnetic-spectrum-operations"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The node is a scenario-level capability aggregate. Its marker, mission capacity, readiness, and contingency tasking are illustrative."
+      },
+      "locationPrecision": "illustrative"
     },
     {
       "id": "PLA-CMD-016",
-      "name": "Eastern TC Fusion Center",
+      "name": "Eastern Theater Joint Information Operations Fusion Center",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -3599,19 +4301,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 105,
       "y": 105,
       "z": 0,
       "lat": 26.0428,
-      "lon": 119.3312
+      "lon": 119.3312,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "theater-fusion",
+        "functions": [
+          "multi-domain-fusion",
+          "effects-coordination"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The exact center is an assessed theater-level aggregation, not a claimed unit or facility."
+      }
     },
     {
       "id": "PLA-CMD-017",
-      "name": "Southern TC Fusion Center",
+      "name": "Southern Theater Joint Information Support Element",
       "team": "red",
       "subsystem": "Information Attack",
       "domain": [
@@ -3629,15 +4347,397 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": -90,
       "z": 0,
       "lat": 23.0919,
-      "lon": 113.2855
+      "lon": 113.2855,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "theater-information-support",
+        "functions": [
+          "network-support",
+          "data-relay-coordination"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The exact element and marker are scenario abstractions."
+      }
+    },
+    {
+      "id": "PLA-IAK-010",
+      "name": "Space / C4ISR Cyber Access Group",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber",
+        "Space"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 3,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 3,
+      "lat": 27,
+      "lon": 119,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cyber-access",
+        "functions": [
+          "c4isr-access",
+          "space-ground-segment-access"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The group and access are assessed scenario abstractions; access can be discovered, denied, or unavailable."
+      }
+    },
+    {
+      "id": "PLA-IAK-011",
+      "name": "Force-Projection and Logistics Cyber Effects Group",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 3,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 3,
+      "lat": 26.4,
+      "lon": 118.8,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cyber-effects",
+        "functions": [
+          "logistics-disruption",
+          "force-flow-disruption"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025",
+          "CISA-VOLT-2024"
+        ],
+        "assumption": "Public reporting supports target classes, not guaranteed access or on-demand effects."
+      }
+    },
+    {
+      "id": "PLA-IAK-012",
+      "name": "Cyberspace Mission Assurance Group",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 2,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 30.5,
+      "lon": 114.3,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cyber-defense",
+        "functions": [
+          "mission-assurance",
+          "incident-response",
+          "service-recovery"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "The defensive mission grouping and capacity are scenario abstractions."
+      }
+    },
+    {
+      "id": "PLA-IAK-013",
+      "name": "Spectrum Reconnaissance and Emitter-Mapping Group",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Air",
+        "EW"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 2,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 27.4,
+      "lon": 120.3,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "electronic-support",
+        "functions": [
+          "spectrum-reconnaissance",
+          "emitter-mapping"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "ODIN-Y9LG",
+          "ODIN-Y9JB",
+          "ODIN-TYPE815G"
+        ],
+        "assumption": "ODIN anchors equipment classes; the cross-platform group and availability are not claimed real units."
+      }
+    },
+    {
+      "id": "PLA-IAK-014",
+      "name": "Distributed Cognitive EW Mesh",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "EW"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 3,
+        "sof": 0
+      },
+      "resourceGen": 3,
+      "lat": 25.8,
+      "lon": 119.4,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "adaptive-electromagnetic-warfare",
+        "functions": [
+          "adaptive-waveforms",
+          "distributed-emitter-coordination"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USSF-FOE-2040"
+        ],
+        "assumption": "AI-assisted distributed EW at this maturity is an explicit 2040 game assumption, not a current capability claim."
+      }
+    },
+    {
+      "id": "PLA-IAK-015",
+      "name": "Autonomous Cyber Support and Recovery Cell",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "EW/Cyber",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 2,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 31,
+      "lon": 118.4,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cyber-mission-assurance",
+        "functions": [
+          "automated-triage",
+          "assisted-service-recovery"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Automation assists human-authorized recovery; it is not autonomous victory or perfect defense."
+      }
+    },
+    {
+      "id": "PLA-IAK-016",
+      "name": "Proliferated LEO Data Relay and Reconstitution Service",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Space"
+      ],
+      "type": "Comms",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 32,
+      "lon": 112,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "space-data-service",
+        "functions": [
+          "proliferated-relay",
+          "responsive-reconstitution"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USSF-FOE-2040"
+        ],
+        "assumption": "A mature proliferated and reconstitutable service is a 2040 scenario assumption; exact architecture is unspecified."
+      }
+    },
+    {
+      "id": "PLA-IAK-017",
+      "name": "State-Media and Proxy Amplification Network",
+      "team": "red",
+      "subsystem": "Information Attack",
+      "domain": [
+        "Information"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 35,
+      "lon": 110,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "external-information-enabler",
+        "functions": [
+          "content-amplification",
+          "proxy-distribution"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "DOD-CMPR-2025"
+        ],
+        "assumption": "This is an external Red enabler, not represented as a PLA formation and not given cyber/EW/SOF currency."
+      }
     }
   ],
   "links": [
@@ -3798,28 +4898,8 @@
       "target": "PLA-REL-006"
     },
     {
-      "source": "PLA-SEN-001",
-      "target": "PLA-CMD-016"
-    },
-    {
-      "source": "PLA-SEN-002",
-      "target": "PLA-CMD-016"
-    },
-    {
-      "source": "PLA-SEN-003",
-      "target": "PLA-CMD-016"
-    },
-    {
-      "source": "PLA-SEN-005",
-      "target": "PLA-CMD-016"
-    },
-    {
       "source": "PLA-SEN-006",
       "target": "PLA-CMD-016"
-    },
-    {
-      "source": "PLA-CMD-016",
-      "target": "PLA-CMD-002"
     },
     {
       "source": "PLA-CMD-016",
@@ -4326,24 +5406,8 @@
       "target": "PLA-CMD-012"
     },
     {
-      "source": "PLA-CMD-012",
-      "target": "PLA-BLK-009"
-    },
-    {
-      "source": "PLA-CMD-016",
-      "target": "PLA-SEN-011"
-    },
-    {
-      "source": "PLA-CMD-017",
-      "target": "PLA-SEN-008"
-    },
-    {
       "source": "PLA-CMD-016",
       "target": "PLA-REL-005"
-    },
-    {
-      "source": "PLA-CMD-016",
-      "target": "PLA-REL-014"
     },
     {
       "source": "PLA-CMD-002",
@@ -4360,6 +5424,184 @@
     {
       "source": "PLA-CMD-001",
       "target": "PLA-REL-016"
+    },
+    {
+      "source": "PLA-IAK-010",
+      "target": "PLA-CMD-011"
+    },
+    {
+      "source": "PLA-IAK-010",
+      "target": "PLA-CMD-016"
+    },
+    {
+      "source": "PLA-IAK-010",
+      "target": "PLA-REL-017"
+    },
+    {
+      "source": "PLA-IAK-011",
+      "target": "PLA-CMD-011"
+    },
+    {
+      "source": "PLA-IAK-011",
+      "target": "PLA-CMD-016"
+    },
+    {
+      "source": "PLA-IAK-011",
+      "target": "PLA-LOG-001"
+    },
+    {
+      "source": "PLA-IAK-012",
+      "target": "PLA-CMD-011"
+    },
+    {
+      "source": "PLA-IAK-012",
+      "target": "PLA-REL-017"
+    },
+    {
+      "source": "PLA-IAK-013",
+      "target": "PLA-CMD-016"
+    },
+    {
+      "source": "PLA-IAK-013",
+      "target": "PLA-SEN-003"
+    },
+    {
+      "source": "PLA-IAK-013",
+      "target": "PLA-IAK-003"
+    },
+    {
+      "source": "PLA-IAK-013",
+      "target": "PLA-IAK-004"
+    },
+    {
+      "source": "PLA-IAK-014",
+      "target": "PLA-CMD-016"
+    },
+    {
+      "source": "PLA-IAK-014",
+      "target": "PLA-IAK-013"
+    },
+    {
+      "source": "PLA-IAK-014",
+      "target": "PLA-REL-005"
+    },
+    {
+      "source": "PLA-IAK-015",
+      "target": "PLA-CMD-011"
+    },
+    {
+      "source": "PLA-IAK-015",
+      "target": "PLA-IAK-002"
+    },
+    {
+      "source": "PLA-IAK-015",
+      "target": "PLA-IAK-009"
+    },
+    {
+      "source": "PLA-IAK-016",
+      "target": "PLA-CMD-012"
+    },
+    {
+      "source": "PLA-IAK-016",
+      "target": "PLA-REL-002"
+    },
+    {
+      "source": "PLA-IAK-016",
+      "target": "PLA-REL-013"
+    },
+    {
+      "source": "PLA-IAK-017",
+      "target": "PLA-CMD-016"
+    },
+    {
+      "source": "PLA-IAK-017",
+      "target": "PLA-IAK-005"
+    },
+    {
+      "source": "PLA-IAK-017",
+      "target": "PLA-REL-017"
     }
-  ]
+  ],
+  "sources": [
+    {
+      "id": "DOD-CMPR-2024",
+      "title": "Military and Security Developments Involving the PRC 2024",
+      "publisher": "U.S. Department of Defense",
+      "year": 2024,
+      "url": "https://media.defense.gov/2024/Dec/18/2003615520/-1/-1/0/MILITARY-AND-SECURITY-DEVELOPMENTS%20-INVOLVING-THE-PEOPLES-REPUBLIC-OF-CHINA-2024.PDF",
+      "supports": "PLA 2024 reorganization and present-day information-force context; not exact modeled units or locations."
+    },
+    {
+      "id": "DOD-CMPR-2025",
+      "title": "Military and Security Developments Involving the PRC 2025",
+      "publisher": "U.S. Department of Defense",
+      "year": 2025,
+      "url": "https://media.defense.gov/2025/Dec/23/2003849070/-1/-1/1/ANNUAL-REPORT-TO-CONGRESS-MILITARY-AND-SECURITY-DEVELOPMENTS-INVOLVING-THE-PEOPLES-REPUBLIC-OF-CHINA-2025.PDF",
+      "supports": "Public assessment of PLA cyber, information-support, space, and Taiwan-contingency mission areas."
+    },
+    {
+      "id": "CISA-VOLT-2024",
+      "title": "PRC State-Sponsored Actors Compromise and Maintain Persistent Access to U.S. Critical Infrastructure",
+      "publisher": "CISA, NSA, FBI and partners",
+      "year": 2024,
+      "url": "https://www.cisa.gov/sites/default/files/2024-02/aa24-038a-jcsa-prc-state-sponsored-actors-compromise-us-critical-infrastructure_1.pdf",
+      "supports": "Public basis for modeling pre-positioned access risk; not proof of on-demand effects in this scenario."
+    },
+    {
+      "id": "ODIN-WEG",
+      "title": "World Equipment Guide taxonomy",
+      "publisher": "U.S. Army ODIN",
+      "year": 2026,
+      "url": "https://odin.t2com.army.mil",
+      "supports": "Equipment taxonomy separating cyber and EW, including electronic attack, support, and protection."
+    },
+    {
+      "id": "ODIN-J16D",
+      "title": "J-16D Electronic Warfare Aircraft",
+      "publisher": "U.S. Army ODIN",
+      "year": 2026,
+      "url": "https://odin.t2com.army.mil/content.19cbc56d-c92e-4bbd-a013-a705f4910b4b",
+      "supports": "Public equipment-class reference; not modeled quantity, readiness, or deployment."
+    },
+    {
+      "id": "ODIN-Y9LG",
+      "title": "Y-9LG Electronic Warfare Aircraft",
+      "publisher": "U.S. Army ODIN",
+      "year": 2026,
+      "url": "https://odin.t2com.army.mil/content.e98a9282-33ed-49bc-9cf9-be31fd36ef76",
+      "supports": "Public equipment-class reference for airborne spectrum operations."
+    },
+    {
+      "id": "ODIN-Y9JB",
+      "title": "Y-9JB Electronic Intelligence Aircraft",
+      "publisher": "U.S. Army ODIN",
+      "year": 2026,
+      "url": "https://odin.t2com.army.mil/content.8adf51ed-1958-4247-bbf4-d86194d486a6",
+      "supports": "Public equipment-class reference for airborne emitter collection."
+    },
+    {
+      "id": "ODIN-TYPE815G",
+      "title": "Type 815G Intelligence Collection Ship",
+      "publisher": "U.S. Army ODIN",
+      "year": 2026,
+      "url": "https://odin.t2com.army.mil/content.570e9578-dbac-4811-ba9a-7221c0865138",
+      "supports": "Public equipment-class reference for maritime electronic support."
+    },
+    {
+      "id": "USSF-FOE-2040",
+      "title": "Future Operating Environment 2040",
+      "publisher": "U.S. Space Force",
+      "year": 2026,
+      "url": "https://www.spaceforce.mil/Portals/2/Documents/SAF_2026/Future_Operating_Environment_2040_Final.pdf",
+      "supports": "Future-environment framing for hybrid, proliferated, automated, and contested space services; not exact force structure."
+    }
+  ],
+  "metadata": {
+    "scenarioName": "PLA cross-strait operating system — 2040 notional",
+    "description": "Open-source-informed capability graph with explicit assessed and notional-2040 aggregates.",
+    "version": "2.0.0",
+    "classification": "UNCLASSIFIED // NOTIONAL",
+    "resourceModel": "resource-model-v2",
+    "updated": "2026-07-10"
+  }
 }

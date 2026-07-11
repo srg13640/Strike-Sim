@@ -22,15 +22,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 0,
       "y": 0,
       "z": 0,
       "lat": 26.3364,
-      "lon": 127.7836
+      "lon": 127.7836,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-002",
@@ -53,15 +54,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 20,
       "y": 80,
       "z": 0,
       "lat": 26.4667,
-      "lon": 127.9167
+      "lon": 127.9167,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-003",
@@ -84,15 +86,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 200,
       "z": 0,
       "lat": 35.5092,
-      "lon": 139.3944
+      "lon": 139.3944,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-004",
@@ -116,19 +119,20 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -40,
       "y": -60,
       "z": 0,
       "lat": 26.3167,
-      "lon": 127.9167
+      "lon": 127.9167,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-005",
-      "name": "Counter C2 Brigade HQ – Torii Station, Okinawa",
+      "name": "INDOPACOM Multi-Domain Effects Coordination Node",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -149,15 +153,32 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 4,
-        "jam": 4,
-        "sof": 3
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
       },
       "x": 10,
       "y": 20,
       "z": 0,
       "lat": 26.5,
-      "lon": 127.9
+      "lon": 127.9,
+      "resourceGen": 0,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "effects-coordination",
+        "functions": [
+          "multi-domain-effects-coordination",
+          "authorities-management"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "US-ARMY-MDTF",
+          "USCYBERCOM-2025"
+        ],
+        "assumption": "This is a theater coordination service, not a claimed brigade at a named installation or a source of effects itself."
+      }
     },
     {
       "id": "USA-CMD-006",
@@ -180,15 +201,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 40,
       "y": 100,
       "z": 0,
       "lat": 26.3,
-      "lon": 127.8
+      "lon": 127.8,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-007",
@@ -211,15 +233,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 220,
       "z": 0,
       "lat": 35.5,
-      "lon": 139.4
+      "lon": 139.4,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-008",
@@ -241,15 +264,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -30,
       "y": -80,
       "z": 0,
       "lat": 26.2167,
-      "lon": 127.6833
+      "lon": 127.6833,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-009",
@@ -272,15 +296,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 30,
       "y": 90,
       "z": 0,
       "lat": 26.5322,
-      "lon": 127.706
+      "lon": 127.706,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-010",
@@ -303,15 +328,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 210,
       "z": 0,
       "lat": 35.7486,
-      "lon": 139.3486
+      "lon": 139.3486,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-011",
@@ -334,15 +360,16 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -200,
       "y": -200,
       "z": 0,
       "lat": 13.5833,
-      "lon": 144.9333
+      "lon": 144.9333,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-012",
@@ -365,15 +392,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -100,
       "y": -150,
       "z": 0,
       "lat": 14.617,
-      "lon": 121.05
+      "lon": 121.05,
+      "resourceGen": 0
     },
     {
       "id": "USA-CMD-013",
@@ -395,15 +423,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -150,
       "y": -300,
       "z": 0,
       "lat": -14.5167,
-      "lon": 132.3833
+      "lon": 132.3833,
+      "resourceGen": 0
     },
     {
       "id": "USA-FIR-001",
@@ -426,15 +455,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 50,
       "y": 110,
       "z": 0,
       "lat": 26.4457,
-      "lon": 127.723
+      "lon": 127.723,
+      "resourceGen": 5
     },
     {
       "id": "USA-FIR-002",
@@ -456,15 +486,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -180,
       "y": -180,
       "z": 0,
       "lat": 13.5448,
-      "lon": 144.7074
+      "lon": 144.7074,
+      "resourceGen": 5
     },
     {
       "id": "USA-FIR-003",
@@ -487,15 +518,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 10,
       "y": 10,
       "z": 0,
       "lat": 26.4638,
-      "lon": 127.6818
+      "lon": 127.6818,
+      "resourceGen": 5
     },
     {
       "id": "USA-FIR-004",
@@ -518,15 +550,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -80,
       "y": 100,
       "z": 0,
       "lat": 18.4833,
-      "lon": 120.6833
+      "lon": 120.6833,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-005",
@@ -548,15 +581,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -120,
       "y": -120,
       "z": 0,
       "lat": 9.75,
-      "lon": 118.75
+      "lon": 118.75,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-006",
@@ -578,15 +612,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 130,
       "y": 230,
       "z": 0,
       "lat": 35.4685,
-      "lon": 138.6549
+      "lon": 138.6549,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-007",
@@ -608,15 +643,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 30,
       "y": 70,
       "z": 0,
       "lat": 26.4476,
-      "lon": 127.7193
+      "lon": 127.7193,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-008",
@@ -638,15 +674,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -140,
       "y": -280,
       "z": 0,
       "lat": -14.4009,
-      "lon": 132.2936
+      "lon": 132.2936,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-009",
@@ -668,15 +705,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 190,
       "z": 0,
       "lat": 35.7547,
-      "lon": 139.2018
+      "lon": 139.2018,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-010",
@@ -698,15 +736,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 210,
       "z": 0,
       "lat": 35.4617,
-      "lon": 139.5165
+      "lon": 139.5165,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-011",
@@ -728,15 +767,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 60,
       "y": 120,
       "z": 0,
       "lat": 26.4215,
-      "lon": 128.0529
+      "lon": 128.0529,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-012",
@@ -758,15 +798,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -160,
       "y": -160,
       "z": 0,
       "lat": 26.4239,
-      "lon": 128.0669
+      "lon": 128.0669,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-013",
@@ -788,15 +829,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 180,
       "z": 0,
       "lat": 35.4687,
-      "lon": 139.5212
+      "lon": 139.5212,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-014",
@@ -818,15 +860,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 240,
       "z": 0,
       "lat": 35.471,
-      "lon": 139.5353
+      "lon": 139.5353,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-015",
@@ -848,15 +891,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
-        "ew": 4,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": -20,
       "y": -40,
       "z": 0,
       "lat": 26.3257,
-      "lon": 127.862
+      "lon": 127.862,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-016",
@@ -878,15 +922,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
-        "ew": 4,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": -190,
       "y": -190,
       "z": 0,
       "lat": 13.4266,
-      "lon": 144.8426
+      "lon": 144.8426,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-017",
@@ -908,15 +953,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 100,
       "y": 200,
       "z": 0,
       "lat": 35.4781,
-      "lon": 139.5401
+      "lon": 139.5401,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-018",
@@ -938,15 +984,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 40,
       "y": 60,
       "z": 0,
       "lat": 26.3135,
-      "lon": 127.8488
+      "lon": 127.8488,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-019",
@@ -968,15 +1015,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -90,
       "y": -130,
       "z": 0,
       "lat": 14.5744,
-      "lon": 121.0544
+      "lon": 121.0544,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-020",
@@ -998,15 +1046,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 250,
       "z": 0,
       "lat": 35.0879,
-      "lon": 137.8807
+      "lon": 137.8807,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-021",
@@ -1028,15 +1077,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 130,
       "y": 200,
       "z": 0,
       "lat": 35.7266,
-      "lon": 139.6822
+      "lon": 139.6822,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-022",
@@ -1058,15 +1108,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 5,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 60,
       "y": 130,
       "z": 0,
       "lat": 26.6911,
-      "lon": 128.2092
+      "lon": 128.2092,
+      "resourceGen": 5
     },
     {
       "id": "USA-FIR-023",
@@ -1088,15 +1139,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 4,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -170,
       "y": -170,
       "z": 0,
       "lat": 13.5288,
-      "lon": 144.6764
+      "lon": 144.6764,
+      "resourceGen": 4
     },
     {
       "id": "USA-FIR-024",
@@ -1118,15 +1170,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 110,
       "y": 210,
       "z": 0,
       "lat": 35.7383,
-      "lon": 139.1151
+      "lon": 139.1151,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-025",
@@ -1148,15 +1201,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 2,
-        "ew": 4,
-        "jam": 0,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": -110,
       "y": -140,
       "z": 0,
       "lat": 14.6907,
-      "lon": 120.8826
+      "lon": 120.8826,
+      "resourceGen": 2
     },
     {
       "id": "USA-FIR-026",
@@ -1178,15 +1232,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 150,
       "y": 260,
       "z": 0,
       "lat": 35.0935,
-      "lon": 137.8845
+      "lon": 137.8845,
+      "resourceGen": 3
     },
     {
       "id": "USA-FIR-027",
@@ -1208,15 +1263,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 3,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -130,
       "y": -290,
       "z": 0,
       "lat": -14.4074,
-      "lon": 132.4989
+      "lon": 132.4989,
+      "resourceGen": 3
     },
     {
       "id": "USA-SEN-001",
@@ -1238,15 +1294,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 200,
       "y": 300,
       "z": 10,
       "lat": 40.7039,
-      "lon": 141.3683
+      "lon": 141.3683,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-002",
@@ -1268,15 +1325,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 10,
       "y": 20,
       "z": 10,
       "lat": 26.3376,
-      "lon": 127.7968
+      "lon": 127.7968,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-003",
@@ -1299,15 +1357,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 25,
       "y": 85,
       "z": 0,
       "lat": 26.4685,
-      "lon": 127.9224
+      "lon": 127.9224,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-004",
@@ -1329,15 +1388,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 105,
       "y": 205,
       "z": 0,
       "lat": 35.5057,
-      "lon": 139.3905
+      "lon": 139.3905,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-005",
@@ -1359,15 +1419,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 95,
       "y": 195,
       "z": 8,
       "lat": 35.5008,
-      "lon": 139.3723
+      "lon": 139.3723,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-006",
@@ -1389,15 +1450,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -190,
       "y": -190,
       "z": 0,
       "lat": 13.4338,
-      "lon": 144.7793
+      "lon": 144.7793,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-007",
@@ -1419,15 +1481,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 5,
       "y": 5,
       "z": 10,
       "lat": 26.3548,
-      "lon": 127.7649
+      "lon": 127.7649,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-008",
@@ -1449,15 +1512,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 115,
       "y": 215,
       "z": 0,
       "lat": 35.4891,
-      "lon": 139.3769
+      "lon": 139.3769,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-009",
@@ -1479,15 +1543,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -100,
       "y": -140,
       "z": 10,
       "lat": 14.5929,
-      "lon": 120.9986
+      "lon": 120.9986,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-010",
@@ -1509,15 +1574,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -145,
       "y": -285,
       "z": 0,
       "lat": -12.4849,
-      "lon": 130.9365
+      "lon": 130.9365,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-011",
@@ -1539,15 +1605,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 180,
       "y": 320,
       "z": 0,
       "lat": 34.9742,
-      "lon": 138.0908
+      "lon": 138.0908,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-012",
@@ -1569,15 +1636,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 90,
       "y": 180,
       "z": 0,
       "lat": 34.977,
-      "lon": 138.0927
+      "lon": 138.0927,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-013",
@@ -1599,15 +1667,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -185,
       "y": -185,
       "z": 0,
       "lat": 13.416,
-      "lon": 144.8921
+      "lon": 144.8921,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-014",
@@ -1629,15 +1698,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -110,
       "y": -130,
       "z": 8,
       "lat": 14.5788,
-      "lon": 121.104
+      "lon": 121.104,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-015",
@@ -1659,15 +1729,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -135,
       "y": -275,
       "z": 10,
       "lat": -14.5221,
-      "lon": 132.4784
+      "lon": 132.4784,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-016",
@@ -1689,15 +1760,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -195,
       "y": -195,
       "z": 10,
       "lat": 13.4207,
-      "lon": 144.8903
+      "lon": 144.8903,
+      "resourceGen": 0
     },
     {
       "id": "USA-SEN-017",
@@ -1719,15 +1791,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -95,
       "y": -135,
       "z": 0,
       "lat": 14.5798,
-      "lon": 121.0946
+      "lon": 121.0946,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-001",
@@ -1750,15 +1823,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 5,
       "y": 5,
       "z": 0,
       "lat": 26.4458,
-      "lon": 127.6908
+      "lon": 127.6908,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-002",
@@ -1780,15 +1854,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -210,
       "y": -210,
       "z": 12,
       "lat": 13.6686,
-      "lon": 144.8527
+      "lon": 144.8527,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-003",
@@ -1810,15 +1885,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 15,
       "y": 15,
       "z": 0,
       "lat": 26.4276,
-      "lon": 127.732
+      "lon": 127.732,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-004",
@@ -1840,15 +1916,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 115,
       "y": 215,
       "z": 0,
       "lat": 35.6005,
-      "lon": 139.3239
+      "lon": 139.3239,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-005",
@@ -1870,15 +1947,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -180,
       "y": -180,
       "z": 0,
       "lat": 13.5295,
-      "lon": 144.7183
+      "lon": 144.7183,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-006",
@@ -1900,15 +1978,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -105,
       "y": -145,
       "z": 12,
       "lat": 14.6923,
-      "lon": 120.9302
+      "lon": 120.9302,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-007",
@@ -1930,15 +2009,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -155,
       "y": -295,
       "z": 0,
       "lat": -14.4286,
-      "lon": 132.3046
+      "lon": 132.3046,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-008",
@@ -1960,15 +2040,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -90,
       "y": -130,
       "z": 0,
       "lat": 14.6942,
-      "lon": 120.9265
+      "lon": 120.9265,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-009",
@@ -1990,15 +2071,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -140,
       "y": -280,
       "z": 12,
       "lat": -12.3667,
-      "lon": 130.7608
+      "lon": 130.7608,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-010",
@@ -2020,15 +2102,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -35,
       "y": -55,
       "z": 0,
       "lat": 26.3111,
-      "lon": 127.9818
+      "lon": 127.9818,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-011",
@@ -2050,15 +2133,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 130,
       "y": 230,
       "z": 0,
       "lat": 34.992,
-      "lon": 138.0675
+      "lon": 138.0675,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-012",
@@ -2080,15 +2164,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 20,
       "y": 30,
       "z": 12,
       "lat": 26.3292,
-      "lon": 127.8656
+      "lon": 127.8656,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-013",
@@ -2110,15 +2195,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -175,
       "y": -175,
       "z": 0,
       "lat": 13.4301,
-      "lon": 144.8612
+      "lon": 144.8612,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-014",
@@ -2140,15 +2226,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -160,
       "y": -300,
       "z": 0,
       "lat": -14.5127,
-      "lon": 132.4493
+      "lon": 132.4493,
+      "resourceGen": 0
     },
     {
       "id": "USA-REL-015",
@@ -2170,15 +2257,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -95,
       "y": -145,
       "z": 12,
       "lat": 14.5883,
-      "lon": 121.0599
+      "lon": 121.0599,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-001",
@@ -2200,15 +2288,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -50,
       "y": -70,
       "z": 0,
       "lat": 26.3156,
-      "lon": 127.7213
+      "lon": 127.7213,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-002",
@@ -2230,15 +2319,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -45,
       "y": -65,
       "z": 0,
       "lat": 26.4128,
-      "lon": 127.9594
+      "lon": 127.9594,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-003",
@@ -2260,15 +2350,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -210,
       "y": -210,
       "z": 0,
       "lat": 13.5337,
-      "lon": 144.835
+      "lon": 144.835,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-004",
@@ -2290,15 +2381,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -110,
       "y": -150,
       "z": 0,
       "lat": 14.6909,
-      "lon": 121.0431
+      "lon": 121.0431,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-005",
@@ -2320,15 +2412,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -220,
       "y": -200,
       "z": 0,
       "lat": 15.0919,
-      "lon": 145.6637
+      "lon": 145.6637,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-006",
@@ -2350,15 +2443,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -150,
       "y": -310,
       "z": 0,
       "lat": -12.3709,
-      "lon": 130.8718
+      "lon": 130.8718,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-007",
@@ -2380,15 +2474,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -100,
       "y": -140,
       "z": 0,
       "lat": 14.69,
-      "lon": 121.0375
+      "lon": 121.0375,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-008",
@@ -2410,15 +2505,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -20,
       "y": -50,
       "z": 0,
       "lat": 26.4422,
-      "lon": 127.8357
+      "lon": 127.8357,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-009",
@@ -2440,15 +2536,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -150,
       "y": -100,
       "z": 0,
       "lat": 28.7339,
-      "lon": 133.101
+      "lon": 133.101,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-010",
@@ -2470,15 +2567,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 240,
       "z": 0,
       "lat": 35.3903,
-      "lon": 139.5693
+      "lon": 139.5693,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-011",
@@ -2500,15 +2598,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -190,
       "y": -190,
       "z": 0,
       "lat": 13.5394,
-      "lon": 144.6837
+      "lon": 144.6837,
+      "resourceGen": 0
     },
     {
       "id": "USA-LOG-012",
@@ -2530,15 +2629,16 @@
       "cascScore": 2,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -160,
       "y": -310,
       "z": 0,
       "lat": -12.3578,
-      "lon": 130.7356
+      "lon": 130.7356,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-001",
@@ -2560,15 +2660,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -200,
       "y": -200,
       "z": 0,
       "lat": 13.4234,
-      "lon": 144.6923
+      "lon": 144.6923,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-002",
@@ -2590,15 +2691,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 10,
       "y": 10,
       "z": 0,
       "lat": 26.3443,
-      "lon": 127.663
+      "lon": 127.663,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-003",
@@ -2620,15 +2722,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 120,
       "y": 220,
       "z": 0,
       "lat": 35.4953,
-      "lon": 139.2886
+      "lon": 139.2886,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-004",
@@ -2650,15 +2753,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 30,
       "y": 60,
       "z": 0,
       "lat": 26.3187,
-      "lon": 127.6892
+      "lon": 127.6892,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-005",
@@ -2680,15 +2784,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -90,
       "y": -140,
       "z": 0,
       "lat": 14.5796,
-      "lon": 120.8948
+      "lon": 120.8948,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-006",
@@ -2710,15 +2815,16 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 140,
       "y": 250,
       "z": 0,
       "lat": 34.9806,
-      "lon": 137.9004
+      "lon": 137.9004,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-007",
@@ -2740,15 +2846,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -180,
       "y": -180,
       "z": 0,
       "lat": 13.4215,
-      "lon": 144.6811
+      "lon": 144.6811,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-008",
@@ -2770,15 +2877,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": 40,
       "y": 70,
       "z": 0,
       "lat": 26.3149,
-      "lon": 127.6966
+      "lon": 127.6966,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-009",
@@ -2800,15 +2908,16 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -100,
       "y": -150,
       "z": 0,
       "lat": 14.5759,
-      "lon": 120.9023
+      "lon": 120.9023,
+      "resourceGen": 0
     },
     {
       "id": "USA-SUP-010",
@@ -2830,19 +2939,20 @@
       "cascScore": 3,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 0,
-        "jam": 0,
         "sof": 0
       },
       "x": -140,
       "y": -290,
       "z": 0,
       "lat": -14.5319,
-      "lon": 132.3804
+      "lon": 132.3804,
+      "resourceGen": 0
     },
     {
       "id": "USA-IAK-001",
-      "name": "Offensive Cyber Company A – Torii Station",
+      "name": "Joint Cyber Mission Force Package — Theater",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -2860,19 +2970,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 4,
         "ew": 0,
-        "jam": 5,
-        "sof": 4
+        "sof": 0
       },
       "x": 15,
       "y": 25,
       "z": 0,
       "lat": 26.4021,
-      "lon": 127.9106
+      "lon": 127.9106,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "cyber-mission-force",
+        "functions": [
+          "cyber-effects",
+          "defensive-cyber-support"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USCYBERCOM-2025"
+        ],
+        "assumption": "The mission-force construct is public; exact contingency package, access, marker, and capacity are scenario assumptions."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-002",
-      "name": "Space Control Company A – Okinawa",
+      "name": "Space Forces Indo-Pacific Integration Cell",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -2890,22 +3016,39 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 5,
-        "jam": 0,
-        "sof": 3
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
       },
       "x": 25,
       "y": 35,
       "z": 0,
       "lat": 26.2449,
-      "lon": 127.8125
+      "lon": 127.8125,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "theater-space-integration",
+        "functions": [
+          "space-command-and-control",
+          "space-domain-awareness"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USSF-INDOPAC"
+        ],
+        "assumption": "Observed theater role represented as a single service node; it does not create a generic space-attack resource."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-003",
-      "name": "EW Battalion HQ – Camp Zama",
+      "name": "Multi-Domain Effects Battalion — Cyber / EW Element",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
+        "Cyber",
         "EW"
       ],
       "type": "Support",
@@ -2920,19 +3063,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 5,
-        "jam": 5,
+        "cyber": 2,
+        "ew": 2,
         "sof": 0
       },
       "x": 130,
       "y": 230,
       "z": 0,
       "lat": 35.414,
-      "lon": 139.4119
+      "lon": 139.4119,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "multi-domain-effects",
+        "functions": [
+          "cyber-support",
+          "electromagnetic-warfare"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "US-ARMY-MDTF"
+        ],
+        "assumption": "The combined package and values are analytical abstractions, not an exact deployed formation."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-004",
-      "name": "Terrestrial Layer EW Company B – Guam",
+      "name": "Joint Electromagnetic Spectrum Operations Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -2950,19 +3109,36 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 0,
         "ew": 4,
-        "jam": 4,
         "sof": 0
       },
       "x": -170,
       "y": -170,
       "z": 0,
       "lat": 13.3468,
-      "lon": 144.8138
+      "lon": 144.8138,
+      "resourceGen": 4,
+      "capabilityProfile": {
+        "category": "joint-electromagnetic-spectrum-operations",
+        "functions": [
+          "electronic-attack",
+          "electronic-support",
+          "electronic-protection"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "US-ARMY-MDTF"
+        ],
+        "assumption": "The package is a theater-level capability aggregate; location and capacity are illustrative."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-005",
-      "name": "Offensive Cyber Company B – Philippines",
+      "name": "Taiwan Mission Partner Cyber Defense Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -2980,23 +3156,41 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 2,
         "ew": 0,
-        "jam": 4,
-        "sof": 4
+        "sof": 0
       },
       "x": -90,
       "y": -130,
       "z": 0,
       "lat": 14.5058,
-      "lon": 121.0181
+      "lon": 121.0181,
+      "resourceGen": 2,
+      "capabilityProfile": {
+        "category": "partner-cyber-defense",
+        "functions": [
+          "threat-hunting",
+          "incident-response"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "USCYBERCOM-2025"
+        ],
+        "assumption": "Availability, authorities, access, and capacity are scenario assumptions; the package does not imply unrestricted network access."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-006",
-      "name": "Space Control Company B – Australia",
+      "name": "Space Electromagnetic Warfare Mission Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
-        "Space"
+        "Space",
+        "EW"
       ],
       "type": "Support",
       "health": 100,
@@ -3010,22 +3204,39 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 4,
-        "jam": 0,
-        "sof": 3
+        "cyber": 0,
+        "ew": 3,
+        "sof": 0
       },
       "x": -150,
       "y": -300,
       "z": 0,
       "lat": -14.5913,
-      "lon": 132.4001
+      "lon": 132.4001,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "space-electromagnetic-warfare",
+        "functions": [
+          "satcom-protection",
+          "spectrum-effects"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USSF-INDOPAC"
+        ],
+        "assumption": "This aggregate models reversible spectrum activity and does not imply destructive counterspace or an Australian deployment."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-007",
-      "name": "EW Company C – Okinawa",
+      "name": "Japan Cyber / EW Coordination Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
+        "Cyber",
         "EW"
       ],
       "type": "Support",
@@ -3040,19 +3251,41 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 4,
-        "jam": 4,
+        "cyber": 0,
+        "ew": 0,
         "sof": 0
       },
       "x": 35,
       "y": 65,
       "z": 0,
       "lat": 26.2477,
-      "lon": 127.8144
+      "lon": 127.8144,
+      "resourceGen": 0,
+      "capabilityProfile": {
+        "category": "partner-coordination",
+        "functions": [
+          "cyber-coordination",
+          "spectrum-coordination"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "conditional-partner",
+        "sourceRefs": [
+          "JPN-MOD-2026"
+        ],
+        "assumption": "Japanese support requires an independent political, legal, and operational decision.",
+        "potentialResourceGenByType": {
+          "kinetic": 0,
+          "cyber": 1,
+          "ew": 1,
+          "sof": 0
+        }
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-008",
-      "name": "Electromagnetic Battle Management Cell – Kadena",
+      "name": "Electromagnetic Battle Management Service",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -3070,19 +3303,35 @@
       "cascScore": 5,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 3,
-        "jam": 5,
+        "cyber": 0,
+        "ew": 2,
         "sof": 0
       },
       "x": 5,
       "y": 15,
       "z": 0,
       "lat": 26.2555,
-      "lon": 127.7862
+      "lon": 127.7862,
+      "resourceGen": 2,
+      "capabilityProfile": {
+        "category": "electromagnetic-battle-management",
+        "functions": [
+          "spectrum-awareness",
+          "frequency-coordination"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "US-ARMY-MDTF"
+        ],
+        "assumption": "The service is an aggregate theater function; marker and capacity are illustrative."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-009",
-      "name": "Offensive Cyber Task Force – Guam",
+      "name": "JFHQ-C / Defensive Cyber Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
@@ -3100,22 +3349,40 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
+        "cyber": 3,
         "ew": 0,
-        "jam": 4,
-        "sof": 4
+        "sof": 0
       },
       "x": -180,
       "y": -180,
       "z": 0,
       "lat": 13.3346,
-      "lon": 144.8005
+      "lon": 144.8005,
+      "resourceGen": 3,
+      "capabilityProfile": {
+        "category": "defensive-cyber",
+        "functions": [
+          "combatant-command-support",
+          "hunt",
+          "incident-response"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USCYBERCOM-2025"
+        ],
+        "assumption": "The role is public; the contingency package, partner access, marker, and capacity are scenario assumptions."
+      },
+      "locationPrecision": "theater-aggregate"
     },
     {
       "id": "USA-IAK-010",
-      "name": "Space Control Company C – Japan",
+      "name": "U.S. Space Cyber Mission Assurance Package",
       "team": "blue",
       "subsystem": "Counter C2",
       "domain": [
+        "Cyber",
         "Space"
       ],
       "type": "Support",
@@ -3130,15 +3397,1019 @@
       "cascScore": 4,
       "resourceGenByType": {
         "kinetic": 0,
-        "ew": 4,
-        "jam": 0,
-        "sof": 3
+        "cyber": 2,
+        "ew": 0,
+        "sof": 0
       },
       "x": 140,
       "y": 260,
       "z": 0,
       "lat": 34.8974,
-      "lon": 137.9126
+      "lon": 137.9126,
+      "resourceGen": 2,
+      "capabilityProfile": {
+        "category": "space-cyber-defense",
+        "functions": [
+          "mission-assurance",
+          "ground-segment-defense"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "USSF-INDOPAC",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "This is an abstract mission-assurance service, not a claimed company or Japanese deployment."
+      },
+      "locationPrecision": "theater-aggregate"
+    },
+    {
+      "id": "TWN-CMD-001",
+      "name": "ICEFCOM Joint Operations Center",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Land",
+        "Cyber",
+        "EW"
+      ],
+      "type": "Command",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 9,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.7,
+      "lon": 120.9,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "national-information-command",
+        "functions": [
+          "cyber-defense-coordination",
+          "communications-coordination",
+          "electromagnetic-spectrum-coordination"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-ICEFCOM-2024",
+          "TWN-QDR-2025"
+        ],
+        "assumption": "Observed responsibilities are represented as one national command-service node; marker and wartime organization are illustrative."
+      }
+    },
+    {
+      "id": "TWN-REL-001",
+      "name": "Distributed Defense Data Fabric",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber",
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.6,
+      "lon": 120.8,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "defense-data-service",
+        "functions": [
+          "distributed-data",
+          "edge-compute",
+          "identity-services"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "A mature distributed defense data fabric is a 2040 scenario assumption."
+      }
+    },
+    {
+      "id": "TWN-REL-002",
+      "name": "Terrestrial Fiber / Microwave Backbone",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.4,
+      "lon": 120.7,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "terrestrial-transport",
+        "functions": [
+          "fiber-transport",
+          "microwave-transport"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-MODA-RESILIENCE"
+        ],
+        "assumption": "Public resilience direction supports the service class; military topology and marker are illustrative."
+      }
+    },
+    {
+      "id": "TWN-REL-003",
+      "name": "Mobile / PPDR Communications Layer",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.9,
+      "lon": 121,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "mobile-resilient-communications",
+        "functions": [
+          "mobile-command-connectivity",
+          "priority-public-safety-communications"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "TWN-MODA-RESILIENCE"
+        ],
+        "assumption": "Civil and defense service integration is a scenario assumption."
+      }
+    },
+    {
+      "id": "TWN-REL-004",
+      "name": "NGSO Emergency Access Cluster",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Space"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24.1,
+      "lon": 121.1,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "commercial-satellite-access",
+        "functions": [
+          "emergency-backhaul",
+          "alternate-satcom"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-MODA-RESILIENCE"
+        ],
+        "assumption": "This aggregates contracted emergency access; provider participation, terminals, bandwidth, and wartime availability are conditional."
+      }
+    },
+    {
+      "id": "TWN-REL-005",
+      "name": "Taiwan Mission Partner Gateway",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber",
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 8,
+      "cascScore": 4,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24,
+      "lon": 120.7,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "mission-partner-gateway",
+        "functions": [
+          "cross-domain-sharing",
+          "identity-and-release-controls"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "A mature coalition gateway and data-release regime are explicit 2040 scenario assumptions."
+      }
+    },
+    {
+      "id": "TWN-CYB-001",
+      "name": "Military Network Defense / SOC Pool",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 8,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 3,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 3,
+      "lat": 23.8,
+      "lon": 120.6,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "defensive-cyber",
+        "functions": [
+          "monitoring",
+          "isolation",
+          "incident-response"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-ICEFCOM-2024",
+          "TWN-QDR-2025"
+        ],
+        "assumption": "Observed mission responsibilities are aggregated into one capacity pool; team count and readiness are not asserted."
+      }
+    },
+    {
+      "id": "TWN-CYB-002",
+      "name": "Critical Infrastructure Cyber Coordination",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 2,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 2,
+      "lat": 23.2,
+      "lon": 120.8,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "civil-military-cyber-coordination",
+        "functions": [
+          "telecom-coordination",
+          "energy-coordination",
+          "port-and-cloud-coordination"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-MODA-RESILIENCE",
+          "TWN-QDR-2025"
+        ],
+        "assumption": "Cross-sector operational integration and capacity are scenario assumptions."
+      }
+    },
+    {
+      "id": "TWN-CYB-003",
+      "name": "Clean Backup and Service Recovery Layer",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 1,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 1,
+      "lat": 23.5,
+      "lon": 121.1,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cyber-recovery",
+        "functions": [
+          "clean-backup",
+          "credential-rotation",
+          "service-rebuild"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Automated assistance and recovery depth are 2040 assumptions; human authorization remains required."
+      }
+    },
+    {
+      "id": "TWN-EW-001",
+      "name": "Spectrum Awareness and Management Service",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "EW"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 1,
+        "sof": 0
+      },
+      "resourceGen": 1,
+      "lat": 24.2,
+      "lon": 120.8,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "spectrum-management",
+        "functions": [
+          "interference-detection",
+          "frequency-coordination"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025"
+        ],
+        "assumption": "The mission is public; the aggregate node and capacity are scenario abstractions."
+      }
+    },
+    {
+      "id": "TWN-EW-002",
+      "name": "Dispersed Electronic Protection / EW Package",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "EW"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 3,
+        "sof": 0
+      },
+      "resourceGen": 3,
+      "lat": 22.9,
+      "lon": 120.7,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "electromagnetic-warfare",
+        "functions": [
+          "electronic-protection",
+          "deception",
+          "limited-jamming"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025"
+        ],
+        "assumption": "Exact systems, dispersal, authorities, range, and capacity are not public facts."
+      }
+    },
+    {
+      "id": "TWN-SEN-001",
+      "name": "Taiwan EO / SAR Mission Service",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Space"
+      ],
+      "type": "Sensor",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 24.3,
+      "lon": 121,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "space-imagery-service",
+        "functions": [
+          "electro-optical-imagery",
+          "synthetic-aperture-radar-imagery"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "TWN-QDR-2025",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Sovereign and contracted imagery are aggregated as a future service; access and survivability are not guaranteed."
+      }
+    },
+    {
+      "id": "TWN-REL-006",
+      "name": "Satellite Ground and Mission Operations Service",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Space",
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23,
+      "lon": 121,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "space-ground-service",
+        "functions": [
+          "tasking",
+          "downlink",
+          "mission-data-processing"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025"
+        ],
+        "assumption": "The node represents a distributed service, not a single targetable facility."
+      }
+    },
+    {
+      "id": "TWN-INF-001",
+      "name": "Cognitive Defense and Attribution Cell",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Information",
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 25,
+      "lon": 121,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "cognitive-defense",
+        "functions": [
+          "incident-verification",
+          "attribution-support",
+          "deception-exposure"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-QDR-2025"
+        ],
+        "assumption": "This capability affects trust and decision quality and does not generate generic cyber damage."
+      }
+    },
+    {
+      "id": "TWN-REL-007",
+      "name": "Public Alert and Trusted Distribution Network",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Information",
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 23.1,
+      "lon": 120.6,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "trusted-public-information",
+        "functions": [
+          "public-warning",
+          "trusted-distribution"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "high",
+        "availability": "scenario-active",
+        "sourceRefs": [
+          "TWN-MODA-RESILIENCE"
+        ],
+        "assumption": "The public service class is observed; defense integration and wartime behavior are scenario assumptions."
+      }
+    },
+    {
+      "id": "BLU-REL-001",
+      "name": "Multi-Provider Commercial SATCOM Portfolio",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Space"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 21,
+      "lon": 133,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "commercial-satcom",
+        "functions": [
+          "alternate-connectivity",
+          "bulk-transport"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "commercial-contract",
+        "sourceRefs": [
+          "TWN-MODA-RESILIENCE",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Service depends on contracts, provider willingness, terminals, bandwidth, policy, and technical reachability."
+      }
+    },
+    {
+      "id": "BLU-REL-002",
+      "name": "Overseas Cloud / CDN and International Transit",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 20,
+      "lon": 138,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "commercial-cloud-and-transit",
+        "functions": [
+          "external-hosting",
+          "content-delivery",
+          "international-transit"
+        ],
+        "evidenceClass": "assessed",
+        "confidence": "medium",
+        "availability": "commercial-contract",
+        "sourceRefs": [
+          "TWN-MODA-RESILIENCE"
+        ],
+        "assumption": "Service is commercial and conditional; loss should degrade availability rather than imply physical destruction."
+      }
+    },
+    {
+      "id": "USA-REL-016",
+      "name": "Mission Partner Environment / CJADC2 Service",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber",
+        "Land"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 18,
+      "lon": 140,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "mission-partner-data-service",
+        "functions": [
+          "controlled-data-sharing",
+          "joint-data-integration"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USCYBERCOM-2025",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Seamless coalition interoperability is not assumed; this node represents an authorized, controlled 2040 service."
+      }
+    },
+    {
+      "id": "USA-SPC-001",
+      "name": "Hybrid SATCOM / PNT Service",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Space"
+      ],
+      "type": "Relay",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 7,
+      "cascScore": 3,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 16,
+      "lon": 145,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "hybrid-space-service",
+        "functions": [
+          "satcom",
+          "pnt",
+          "service-rerouting"
+        ],
+        "evidenceClass": "notional-2040",
+        "confidence": "low",
+        "availability": "future-notional",
+        "sourceRefs": [
+          "USSF-INDOPAC",
+          "USSF-FOE-2040"
+        ],
+        "assumption": "Military, allied, and commercial services are aggregated; Taiwan access is not automatic."
+      }
+    },
+    {
+      "id": "JPN-CYB-001",
+      "name": "JSDF Cyber Defense Package",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": 35.7,
+      "lon": 139.7,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "partner-cyber-defense",
+        "functions": [
+          "cyber-situational-awareness",
+          "incident-response"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "medium",
+        "availability": "conditional-partner",
+        "sourceRefs": [
+          "JPN-MOD-2026"
+        ],
+        "assumption": "Japanese participation and network access require independent political, legal, and operational decisions.",
+        "potentialResourceGenByType": {
+          "kinetic": 0,
+          "cyber": 2,
+          "ew": 0,
+          "sof": 0
+        }
+      }
+    },
+    {
+      "id": "AUS-CYB-001",
+      "name": "ADF Cyber Command Package",
+      "team": "blue",
+      "subsystem": "Counter C2",
+      "domain": [
+        "Cyber"
+      ],
+      "type": "Support",
+      "health": 100,
+      "healthMax": 100,
+      "status": "Active",
+      "difficulty": "Hardened",
+      "vulnerabilities": [
+        "Cyber",
+        "Kinetic",
+        "EW"
+      ],
+      "importance": 6,
+      "cascScore": 2,
+      "resourceGenByType": {
+        "kinetic": 0,
+        "cyber": 0,
+        "ew": 0,
+        "sof": 0
+      },
+      "resourceGen": 0,
+      "lat": -25.3,
+      "lon": 133.8,
+      "locationPrecision": "theater-aggregate",
+      "capabilityProfile": {
+        "category": "partner-cyber-defense",
+        "functions": [
+          "defensive-cyber",
+          "information-warfare-support"
+        ],
+        "evidenceClass": "observed",
+        "confidence": "medium",
+        "availability": "conditional-partner",
+        "sourceRefs": [
+          "AUS-JCG"
+        ],
+        "assumption": "Australian participation and network access require independent government and operational decisions.",
+        "potentialResourceGenByType": {
+          "kinetic": 0,
+          "cyber": 2,
+          "ew": 0,
+          "sof": 0
+        }
+      }
     }
   ],
   "links": [
@@ -3189,14 +4460,6 @@
     {
       "source": "USA-CMD-004",
       "target": "USA-CMD-008"
-    },
-    {
-      "source": "USA-CMD-005",
-      "target": "USA-CMD-001"
-    },
-    {
-      "source": "USA-CMD-010",
-      "target": "USA-CMD-001"
     },
     {
       "source": "USA-CMD-010",
@@ -3591,18 +4854,6 @@
       "target": "USA-FIR-015"
     },
     {
-      "source": "USA-CMD-005",
-      "target": "USA-IAK-001"
-    },
-    {
-      "source": "USA-CMD-005",
-      "target": "USA-IAK-003"
-    },
-    {
-      "source": "USA-CMD-005",
-      "target": "USA-IAK-008"
-    },
-    {
       "source": "USA-SEN-003",
       "target": "USA-CMD-009"
     },
@@ -3635,32 +4886,12 @@
       "target": "USA-CMD-009"
     },
     {
-      "source": "USA-SEN-001",
-      "target": "USA-CMD-002"
-    },
-    {
-      "source": "USA-SEN-002",
-      "target": "USA-CMD-002"
-    },
-    {
       "source": "USA-SEN-006",
       "target": "USA-CMD-002"
     },
     {
       "source": "USA-CMD-001",
       "target": "USA-IAK-008"
-    },
-    {
-      "source": "USA-CMD-001",
-      "target": "USA-REL-001"
-    },
-    {
-      "source": "USA-CMD-001",
-      "target": "USA-REL-002"
-    },
-    {
-      "source": "USA-CMD-001",
-      "target": "USA-REL-012"
     },
     {
       "source": "USA-CMD-011",
@@ -3687,32 +4918,210 @@
       "target": "USA-LOG-010"
     },
     {
-      "source": "USA-CMD-004",
-      "target": "USA-LOG-001"
+      "source": "TWN-CMD-001",
+      "target": "TWN-REL-001"
     },
     {
-      "source": "USA-CMD-004",
-      "target": "USA-LOG-002"
+      "source": "TWN-CMD-001",
+      "target": "TWN-CYB-001"
     },
     {
-      "source": "USA-CMD-010",
-      "target": "USA-LOG-003"
+      "source": "TWN-CMD-001",
+      "target": "TWN-EW-001"
     },
     {
-      "source": "USA-CMD-010",
-      "target": "USA-LOG-010"
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-002"
     },
     {
-      "source": "USA-CMD-012",
-      "target": "USA-LOG-004"
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-003"
     },
     {
-      "source": "USA-CMD-013",
-      "target": "USA-LOG-006"
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-004"
     },
     {
-      "source": "USA-CMD-013",
-      "target": "USA-LOG-012"
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-005"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-006"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "TWN-REL-007"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "BLU-REL-001"
+    },
+    {
+      "source": "TWN-REL-001",
+      "target": "BLU-REL-002"
+    },
+    {
+      "source": "TWN-CYB-001",
+      "target": "TWN-CYB-002"
+    },
+    {
+      "source": "TWN-CYB-001",
+      "target": "TWN-CYB-003"
+    },
+    {
+      "source": "TWN-EW-001",
+      "target": "TWN-EW-002"
+    },
+    {
+      "source": "TWN-SEN-001",
+      "target": "TWN-REL-006"
+    },
+    {
+      "source": "TWN-SEN-001",
+      "target": "TWN-REL-001"
+    },
+    {
+      "source": "TWN-INF-001",
+      "target": "TWN-REL-007"
+    },
+    {
+      "source": "TWN-INF-001",
+      "target": "TWN-CYB-002"
+    },
+    {
+      "source": "TWN-REL-005",
+      "target": "USA-CMD-005"
+    },
+    {
+      "source": "TWN-REL-005",
+      "target": "USA-IAK-001"
+    },
+    {
+      "source": "TWN-REL-005",
+      "target": "USA-REL-016"
+    },
+    {
+      "source": "TWN-REL-005",
+      "target": "JPN-CYB-001"
+    },
+    {
+      "source": "TWN-REL-005",
+      "target": "AUS-CYB-001"
+    },
+    {
+      "source": "BLU-REL-001",
+      "target": "TWN-REL-004"
+    },
+    {
+      "source": "BLU-REL-001",
+      "target": "USA-SPC-001"
+    },
+    {
+      "source": "BLU-REL-002",
+      "target": "TWN-REL-005"
+    },
+    {
+      "source": "USA-REL-016",
+      "target": "USA-CMD-005"
+    },
+    {
+      "source": "USA-REL-016",
+      "target": "USA-IAK-001"
+    },
+    {
+      "source": "USA-SPC-001",
+      "target": "USA-IAK-002"
+    },
+    {
+      "source": "USA-SPC-001",
+      "target": "USA-IAK-006"
+    },
+    {
+      "source": "USA-SPC-001",
+      "target": "USA-IAK-010"
     }
-  ]
+  ],
+  "sources": [
+    {
+      "id": "TWN-QDR-2025",
+      "title": "2025 Quadrennial Defense Review",
+      "publisher": "Taiwan Ministry of National Defense",
+      "year": 2025,
+      "url": "https://www.mnd.gov.tw/InformationServices/QDRFile/6/2/2025QDR%E8%8B%B1%E6%96%87%E7%89%88.pdf",
+      "supports": "Sovereign command, cyber monitoring, spectrum management, mobile/redundant C2, multi-cloud, and resilience direction."
+    },
+    {
+      "id": "TWN-ICEFCOM-2024",
+      "title": "ICEFCOM information-services publication",
+      "publisher": "Taiwan Ministry of National Defense",
+      "year": 2024,
+      "url": "https://www.mnd.gov.tw/en/informationservices/publication/83514",
+      "supports": "Public confirmation of ICEFCOM cyber-defense and information-security responsibilities."
+    },
+    {
+      "id": "TWN-MODA-RESILIENCE",
+      "title": "Communications and Cyber Resilience",
+      "publisher": "Taiwan Ministry of Digital Affairs",
+      "year": 2026,
+      "url": "https://moda.gov.tw/en/digital-affairs/communications-cyber-resilience/operations/310",
+      "supports": "Civil communications-resilience architecture; military integration in this graph remains a scenario assumption."
+    },
+    {
+      "id": "USCYBERCOM-2025",
+      "title": "2025 Posture Statement",
+      "publisher": "U.S. Cyber Command",
+      "year": 2025,
+      "url": "https://www.cybercom.mil/Media/News/Article/4150133/posture-statement-of-lieutenant-general-william-j-hartman/",
+      "supports": "JFHQ-C support, defensive cyber, hunt-forward, partner activity, and AI-adoption context."
+    },
+    {
+      "id": "US-ARMY-MDTF",
+      "title": "Multi-Domain Task Force Fact Sheet",
+      "publisher": "U.S. Army",
+      "year": 2023,
+      "url": "https://api.army.mil/e2/c/downloads/2023/10/16/93d3689c/multi-domain-task-force-fact-sheet.pdf",
+      "supports": "Public multi-domain effects organization and mission framing."
+    },
+    {
+      "id": "USSF-INDOPAC",
+      "title": "U.S. Space Forces Indo-Pacific",
+      "publisher": "U.S. Space Force",
+      "year": 2026,
+      "url": "https://www.spaceforce.mil/About-Us/-Space-Force-Components/US-Space-Forces-Indo-Pacific/",
+      "supports": "Theater space integration, command and control, awareness, and partner-cooperation roles."
+    },
+    {
+      "id": "USSF-FOE-2040",
+      "title": "Future Operating Environment 2040",
+      "publisher": "U.S. Space Force",
+      "year": 2026,
+      "url": "https://www.spaceforce.mil/Portals/2/Documents/SAF_2026/Future_Operating_Environment_2040_Final.pdf",
+      "supports": "Future-environment framing, not exact 2040 forces or guaranteed access."
+    },
+    {
+      "id": "JPN-MOD-2026",
+      "title": "Direction of Defense Capability Transformation",
+      "publisher": "Japan Ministry of Defense",
+      "year": 2026,
+      "url": "https://www.mod.go.jp/en/d_policy/defense-capability-transformation/images/6th_19-mar-2026a.pdf",
+      "supports": "Cyber, space, cloud, data, and electromagnetic-spectrum direction; participation remains conditional."
+    },
+    {
+      "id": "AUS-JCG",
+      "title": "Joint Capabilities Group",
+      "publisher": "Australian Department of Defence",
+      "year": 2026,
+      "url": "https://www.defence.gov.au/about/who-we-are/organisation-structure/joint-capabilities-group",
+      "supports": "Current cyber, space, information, and strategic-communications organizations; participation remains conditional."
+    }
+  ],
+  "metadata": {
+    "scenarioName": "Taiwan-led defense network with conditional partners — 2040 notional",
+    "description": "Sovereign Taiwan resilience core plus active U.S. services and explicitly conditional partner/commercial support.",
+    "version": "2.0.0",
+    "classification": "UNCLASSIFIED // NOTIONAL",
+    "resourceModel": "resource-model-v2",
+    "updated": "2026-07-10"
+  }
 }
