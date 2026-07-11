@@ -91,4 +91,5 @@ Precondition notes: CO-005 complete at `1f7d485`. Fonts are ALREADY vendored (`v
 Commit discipline: `CO-006:` prefix, one phase per commit, tree clean each run, zero diffs to `game.js`/`moe.js`/`sim.js`/`sim-worker.js`/`red-mind.js`/`forecasting.js`/`strategic-state.js`/`counterfactual*.js`.
 
 ### Progress
-- Phase 1: IN PROGRESS (this session).
+- Phase 1: ✅ COMPLETE — `1e23e6a` (audio.js, cinematics.js, shell tokens + script tags, performance-layer-proof.js with 11 contracts; engine diff zero; all CO-005 proofs green). The game now boots like a console and sounds alive.
+- Phase 2: NEXT — W5 BRIEF+COMMIT cinematics (letterbox in `director.js` render layer using the shell's `--lbox-*` tokens, operation-name stamp, typed brief from real `scenarioContext()`, doctrine-prior bar animation, arming ceremony around the existing Commit Card) + W4 comms floor (replace toast/event presentation with a typed, callsign-colored chatter feed driven ONLY by real engine events: forecast completion, BDA from resolution reports, tempo changes, CO-005 posterior shifts). Wire `AudioFXModule` cues: `startBed('brief'|'plan')`, stamp/whoosh on phase transitions, arm on commit-hot.
