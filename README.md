@@ -99,12 +99,19 @@ Scenarios are JSON with `nodes` and `links` arrays. A node:
 
 ```json
 {
-  "id": "PLA-CMD-001",
-  "name": "CMC Joint Operations Command Center Beijing",
-  "team": "red",
-  "subsystem": "Firepower Strike",
-  "domain": ["Land"],
+  "id": "TWN-CMD-001",
+  "name": "Taiwan Joint Operations Center",
+  "team": "blue",
+  "subsystem": "Joint Command & Mission Networks",
+  "domain": ["Land", "Cyber", "EW"],
   "type": "Command",
+  "nation": "Taiwan",
+  "serviceOwner": "Taiwan Armed Forces",
+  "component": "Taiwan Joint Force",
+  "jointFunction": "Command and control",
+  "operationalRole": "Synchronize sovereign defense and mission-partner support",
+  "tempoRole": "command",
+  "accessDependencies": [],
   "health": 100, "healthMax": 100,
   "status": "Active",
   "difficulty": "Buried",
@@ -123,7 +130,7 @@ Scenarios are JSON with `nodes` and `links` arrays. A node:
     "evidenceClass": "observed",
     "confidence": "high",
     "availability": "scenario-active",
-    "sourceRefs": ["DOD-CMPR-2025"],
+    "sourceRefs": ["TWN-QDR-2025"],
     "assumption": "The graph node is a theater-level analytical aggregate."
   }
 }
@@ -137,12 +144,17 @@ counts are intentionally allowed to change as the open-source scenario is improv
 and `sof`. Values are integer **mission-capacity points per turn** from 0 through 10;
 they are not counts of units, teams, platforms, weapons, or accesses. Cyber and EW are
 separate ledgers, and the retired serialized key `jam` is not part of the canonical
-format. Optional `capabilityProfile` fields distinguish observed, assessed, and
-notional-2040 content and record availability, confidence, sources, and assumptions.
+format. Blue Joint Force nodes also state ownership, joint function, operational role,
+explicit tempo contribution, access dependencies, and location precision.
+`capabilityProfile` distinguishes observed, assessed, and notional-2040 content and
+records availability, confidence, sources, and assumptions.
 
-See [the Cyber Capability Model](docs/CYBER_CAPABILITY_MODEL.md) for the modeling and
-provenance rules, and [`schemas/strikesim-scenario.schema.json`](schemas/strikesim-scenario.schema.json)
-for the machine-readable data contract.
+See [the Blue Joint Force Model](docs/JOINT_FORCE_MODEL.md), [the Cyber Capability
+Model](docs/CYBER_CAPABILITY_MODEL.md), and
+[`schemas/strikesim-scenario.schema.json`](schemas/strikesim-scenario.schema.json) for
+the modeling, provenance, and machine-readable data contract. Run
+`node tools/joint-force-proof.js` to verify component balance, evidence coverage,
+objectives, source assignment, topology, and the tempo economy through the real engine.
 
 ---
 
@@ -156,6 +168,7 @@ for the machine-readable data contract.
 ├── grok150red.json  grokblue90.json   # bundled scenarios
 ├── schemas/strikesim-scenario.schema.json  # scenario data contract
 ├── docs/CYBER_CAPABILITY_MODEL.md      # capability semantics + provenance
+├── docs/JOINT_FORCE_MODEL.md           # Blue service balance + acceptance gates
 ├── vendor/               # offline-vendored libraries
 └── tiles/                # (optional) local map tiles — not included
 ```

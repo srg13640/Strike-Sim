@@ -465,6 +465,13 @@ window.MapModule = (function () {
       typeof profile.potentialResourceGenByType === 'object'
       ? profile.potentialResourceGenByType : null;
     const team = String(n.team || n.affiliation || 'unknown').replace(/_/g, ' ');
+    const nation = n.nation || 'Nation not stated';
+    const serviceOwner = n.serviceOwner || n.component || 'Component not stated';
+    const jointFunction = n.jointFunction || '';
+    const operationalRole = n.operationalRole || '';
+    const accessDependencies = Array.isArray(n.accessDependencies)
+      ? n.accessDependencies.filter(Boolean).join(', ')
+      : String(n.accessDependencies || '');
     const type = n.type || 'Unspecified type';
     const subsystem = n.subsystem || 'Unspecified subsystem';
 
@@ -497,6 +504,9 @@ window.MapModule = (function () {
         (potential ? '<div class="map-cap-row"><span>Conditional capacity</span><b>' + escapePopupHtml(capacityLine(potential)) + '</b></div>' : '') +
         '<div class="map-cap-row"><span>Evidence</span><b>' + escapePopupHtml(evidence) + '</b></div>' +
         '<div class="map-cap-row"><span>Availability</span><b>' + escapePopupHtml(profile && profile.availability || 'not stated') + '</b></div>' +
+        (jointFunction ? '<div class="map-cap-row"><span>Joint function</span><b>' + escapePopupHtml(jointFunction) + '</b></div>' : '') +
+        (operationalRole ? '<div class="map-cap-row"><span>Operational role</span><b>' + escapePopupHtml(operationalRole) + '</b></div>' : '') +
+        (accessDependencies ? '<div class="map-cap-row"><span>Access depends on</span><b>' + escapePopupHtml(accessDependencies) + '</b></div>' : '') +
         (profile && profile.category ? '<div class="map-cap-row"><span>Role</span><b>' + escapePopupHtml(profile.category) + '</b></div>' : '') +
         (functions ? '<div class="map-cap-row"><span>Functions</span><b>' + escapePopupHtml(functions) + '</b></div>' : '') +
         (profile && profile.assumption ? '<div class="map-cap-assumption"><span>Assumption</span>' + escapePopupHtml(profile.assumption) + '</div>' : '') +
@@ -507,7 +517,8 @@ window.MapModule = (function () {
     return '<div class="map-cap-popup">' +
       '<strong class="map-cap-name">' + escapePopupHtml(n.name || 'Unnamed node') + '</strong>' +
       '<span class="map-cap-id">' + escapePopupHtml(n.id || 'No ID') + '</span>' +
-      '<div class="map-cap-meta">' + escapePopupHtml(team) + ' · ' + escapePopupHtml(type) + ' · ' + escapePopupHtml(subsystem) + '</div>' +
+      '<div class="map-cap-meta">' + escapePopupHtml(team) + ' · ' + escapePopupHtml(nation) + ' · ' + escapePopupHtml(serviceOwner) + '</div>' +
+      '<div class="map-cap-role">' + escapePopupHtml(type) + ' · ' + escapePopupHtml(subsystem) + '</div>' +
       '<div class="map-cap-active"><span>Active capacity</span>' + escapePopupHtml(capacityLine(active)) + '</div>' +
       details + '</div>';
   }
@@ -1006,6 +1017,7 @@ window.MapModule = (function () {
       '.map-cap-id{display:block;font-family:var(--map-font-mono);font-size:10px;',
       '  color:rgba(0,216,255,.55);margin-top:1px;word-break:break-word}',
       '.map-cap-meta{margin-top:6px;color:#a8c8d8;font-size:11px;text-transform:capitalize}',
+      '.map-cap-role{margin-top:2px;color:#7798aa;font-size:10.5px}',
       '.map-cap-active{margin-top:7px;padding:6px 8px;border:1px solid rgba(0,216,255,.16);',
       '  border-radius:4px;background:rgba(0,216,255,.05);font-family:var(--map-font-mono);font-size:10.5px}',
       '.map-cap-active>span,.map-cap-assumption>span,.map-cap-sources>span{display:block;color:var(--map-accent);',

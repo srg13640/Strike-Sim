@@ -203,7 +203,18 @@ window.GameModule = (function () {
       if (!canSourceStrikeWith(src, methodKey, aliveFn)) return { ok: false, reason: 'source-cannot-fire' };
       return { ok: true, reason: 'ok', sourceId: src.id };
     }
-    const src = sourcesForMethod(board, side, methodKey, aliveFn)[0];
+    // Human orders usually omit sourceId. Assign the strongest target-relevant source,
+    // not merely the alphabetically first high-capacity node, so a Joint Force actually
+    // employs maritime, air, land, cyber, and spectrum contributors where they fit.
+    // Equal-scoring sources use a target-bound stable hash: the same target always gets
+    // the same source, while equivalent service packages can share the theater workload.
+    const src = sourcesForMethod(board, side, methodKey, aliveFn)
+      .map(n => ({
+        n,
+        score: resourceForMethod(n, methodKey) * affinity(n, tgt, methodKey),
+        tie: hashSeed('source', side, methodKey, tgt.id, n.id)
+      }))
+      .sort((a, b) => b.score - a.score || b.tie - a.tie || String(a.n.id).localeCompare(String(b.n.id)))[0]?.n;
     if (!src) return { ok: false, reason: 'no-source' };
     return { ok: true, reason: 'ok', sourceId: src.id };
   }
@@ -244,6 +255,12 @@ window.GameModule = (function () {
   // sustainment and you throttle how many orders they can issue — making decapitation a
   // real strategy alongside raw attrition. Pure + deterministic (read-only over board).
   function nodeTempoRole(n) {
+    // Authored scenarios can state the tempo relationship directly. This prevents a
+    // generic label such as "Support" (or a mixed joint-function subsystem name) from
+    // silently turning every protection or cyber node into a logistics asset.
+    if (n && ['command', 'logistics', 'relay', 'none'].includes(n.tempoRole)) {
+      return n.tempoRole === 'none' ? null : n.tempoRole;
+    }
     const ty = String(n.type || '').toLowerCase();
     const sub = String(n.subsystem || '').toLowerCase();
     if (ty.includes('command') || sub.includes('command')) return 'command';
@@ -304,7 +321,9 @@ window.GameModule = (function () {
   function objectiveScore(n) { return nodeValue(n) / diffMult(n.difficulty); }
   function pickObjectives(board, side) {
     return (board.rosters[side] || [])
-      .map(id => board.nodes[id]).filter(n => n && n.alive)
+      .map(id => board.nodes[id])
+      .filter(n => n && n.alive && n.scenarioEnabled !== false &&
+        n.availability !== 'conditional-partner' && n.availability !== 'commercial-contract')
       .sort((a, b) => objectiveScore(b) - objectiveScore(a))
       .slice(0, OBJ_COUNT).map(n => n.id);
   }
@@ -328,7 +347,7 @@ window.GameModule = (function () {
         return [
           n.id, team, (n.type || ''), (n.subsystem || ''), (n.difficulty || 'Medium'),
           Number(n.importance || 5), Math.max(1, Number(n.cascScore || 1)), Number(n.healthMax || 100),
-          dom.join('|'), vuln.join('|'),
+          n.scenarioEnabled === false ? 0 : 1, dom.join('|'), vuln.join('|'),
           rg.kinetic, rg.cyber, rg.ew, rg.sof
         ].join(',');
       })
@@ -364,6 +383,7 @@ window.GameModule = (function () {
     (graph.nodes || []).forEach(n => {
       const team = n.team || (n.originalTeam || null);
       if (team !== 'blue' && team !== 'red') return;   // only the two combatant sides play
+      if (n.scenarioEnabled === false) return;          // dormant partner/commercial packages stay inspectable, not playable
       const healthMax = n.healthMax || 100;
       nodes[n.id] = {
         id: n.id,
@@ -374,6 +394,14 @@ window.GameModule = (function () {
         casc: Math.max(1, Number(n.cascScore || 1)),
         importance: Number(n.importance || 5),
         subsystem: n.subsystem || '',
+        tempoRole: n.tempoRole || null,
+        nation: n.nation || '',
+        serviceOwner: n.serviceOwner || n.component || '',
+        component: n.component || n.serviceOwner || '',
+        jointFunction: n.jointFunction || '',
+        operationalRole: n.operationalRole || '',
+        availability: n.capabilityProfile && n.capabilityProfile.availability || n.availability || 'scenario-active',
+        scenarioEnabled: n.scenarioEnabled !== false,
         resourceGenByType: resourceGenByType(n),
         domain: Array.isArray(n.domain) ? n.domain.slice() : (n.domain ? [n.domain] : []),
         type: n.type || '',
@@ -565,7 +593,8 @@ window.GameModule = (function () {
     return board.rosters[side]
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
-      .filter(n => /command|sustainment|logistics|enabler|coalition/i.test(n.subsystem || ''))
+      .filter(n => (n.tempoRole && n.tempoRole !== 'none') ||
+        /command|sustainment|logistics|enabler|coalition/i.test(n.subsystem || ''))
       .length;
   }
 

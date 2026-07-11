@@ -179,6 +179,48 @@
         "capabilityProfile": {
           "$ref": "#/$defs/capabilityProfile"
         },
+        "nation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceOwner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Military service, joint headquarters, partner force, or civil/commercial owner represented by the aggregate."
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jointFunction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operationalRole": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accessDependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "tempoRole": {
+          "enum": [
+            "command",
+            "logistics",
+            "relay",
+            "none"
+          ],
+          "description": "Explicit contribution to the turn-tempo economy; none prevents heuristic misclassification."
+        },
+        "scenarioEnabled": {
+          "type": "boolean",
+          "description": "False keeps a conditional package inspectable in the graph but excludes it from the playable board until activated."
+        },
         "locationPrecision": {
           "type": "string"
         },

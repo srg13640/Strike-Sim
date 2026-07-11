@@ -60,6 +60,12 @@ function verifyStaticContract() {
     has(inline, 'loadedTeams.red && loadedTeams.blue'));
   check('readiness event is dispatched', has(inline, "new CustomEvent('strikesim:scenario-ready'"));
   check('Director reads combined scenario context', has(director, 'function scenarioContext()'));
+  check('Blue Joint Force ownership survives import normalization',
+    has(shell, 'serviceOwner: r.serviceOwner') && has(shell, 'jointFunction: r.jointFunction') &&
+    has(shell, 'tempoRole: r.tempoRole') && has(shell, 'scenarioEnabled: r.scenarioEnabled'));
+  check('Joint component mix is visible in the console and operation brief',
+    has(shell, 'Blue Joint Force Mix') && has(director, 'function blueJointMixText()'));
+  check('first-run names the Joint Force planner role', has(shell, 'Blue Joint Force operational planner'));
 
   check('first-run offers direct guided-operation CTA', has(shell, 'Start guided operation →'));
   check('first-run offers explicit console choice', has(shell, 'Explore console'));

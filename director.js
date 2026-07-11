@@ -383,6 +383,18 @@ window.DirectorModule = (function () {
     }).join('');
   }
 
+  function blueJointMixText() {
+    var graph = window.AppState && AppState.activeGraph ? AppState.activeGraph() : { nodes: [] };
+    var counts = {};
+    (graph.nodes || []).filter(function (node) { return node.team === 'blue' && node.status !== 'Neutralized'; })
+      .forEach(function (node) {
+        var owner = node.serviceOwner || node.component || 'Unassigned';
+        counts[owner] = (counts[owner] || 0) + 1;
+      });
+    return Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b); })
+      .map(function (owner) { return esc(owner) + ' ' + counts[owner]; }).join(' · ');
+  }
+
   function renderBrief() {
     var st = GM.getState();
     if (!st) return;
@@ -402,7 +414,7 @@ window.DirectorModule = (function () {
     $('dir-wrap').innerHTML =
       '<div class="dir-kicker">OPERATION BRIEF · ' + esc(title) + '</div>' +
       '<h1 class="dir-h1">Deny the lodgment before the window closes.</h1>' +
-      '<div class="dir-sub">You are the Blue operational planner. ' + st.cfg.turnLimit + ' turns / ' + horizon + ' notional days of simultaneous commitment against a doctrine-driven Red.</div>' +
+      '<div class="dir-sub">You are the Blue Joint Force operational planner. ' + st.cfg.turnLimit + ' turns / ' + horizon + ' notional days of simultaneous commitment against a doctrine-driven Red.</div>' +
 
       '<div class="dir-card">' +
       '<div class="dir-badges"><span class="dir-badge">' + esc(ctx.classification || 'SCENARIO DATA') + '</span>' +
@@ -423,7 +435,8 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Decision budget</span><b>' + st.ap.blue + ' orders / turn (tempo-driven)</b></div>' +
       '</div>' +
       '<div class="dir-card"><h3>FORCE BALANCE</h3>' +
-      '<div class="dir-stat"><span>Blue force</span><b>' + st.alive.blue + ' nodes · AP ' + st.ap.blue + '</b></div>' +
+      '<div class="dir-stat"><span>Blue Joint Force</span><b>' + st.alive.blue + ' enabled nodes · AP ' + st.ap.blue + '</b></div>' +
+      '<div class="dir-note" style="margin:7px 0 9px">' + blueJointMixText() + '</div>' +
       '<div class="dir-stat"><span>Red force</span><b>' + st.alive.red + ' nodes · AP ' + st.ap.red + '</b></div>' +
       '<div class="dir-stat"><span>Blue tempo assets</span><b>' + st.tempo.blue.c2 + ' C2 · ' + st.tempo.blue.logi + ' LOG</b></div>' +
       '<div class="dir-stat"><span>Red tempo assets</span><b>' + st.tempo.red.c2 + ' C2 · ' + st.tempo.red.logi + ' LOG</b></div>' +

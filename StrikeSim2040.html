@@ -36,7 +36,7 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p14"></script>
+  <script src="map.js?v=p15"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
   <script src="engine.js?v=p6"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
@@ -49,7 +49,7 @@
   <script src="moe.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p12"></script>
+  <script src="game.js?v=p13"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
   <script src="wargame.js?v=p12"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
@@ -57,10 +57,10 @@
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=p2"></script>
+  <script src="director.js?v=p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
-  <script src="inline-datasets.js?v=p7"></script>
+  <script src="inline-datasets.js?v=p8"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -603,6 +603,11 @@
     }
     .team-summary-item .team-name { display: flex; align-items: center; gap: 6px; text-transform: capitalize; }
     .team-summary-item .team-stats { color: var(--muted); }
+    .force-mix-grid { display: grid; gap: 5px; margin-top: 7px; max-height: 190px; overflow-y: auto; }
+    .force-mix-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 8px; align-items: start; padding: 6px 7px; border: 1px solid rgba(148,163,184,.16); border-radius: 6px; background: rgba(0,216,255,.025); }
+    .force-mix-row strong { color: var(--text); font-size: 11px; font-weight: 650; }
+    .force-mix-row span { color: var(--muted); font-size: 10px; text-align: right; white-space: nowrap; }
+    .force-mix-row small { display: block; grid-column: 1 / -1; color: #7998a8; font-size: 9.5px; line-height: 1.25; }
 
     /* Details card */
     #details {
@@ -1813,6 +1818,12 @@
     </div>
     </div>
 
+    <div class="panel" aria-labelledby="blue-force-mix-title">
+    <h2 id="blue-force-mix-title">Blue Joint Force Mix</h2>
+    <p class="hint mt4">Scenario aggregates by owner; conditional packages remain visible with zero active points. Totals are analytical weights, not a literal order of battle.</p>
+    <div id="blue-force-mix" class="force-mix-grid" aria-live="polite"></div>
+    </div>
+
     <div class="section" aria-labelledby="search-title">
     <h3 id="search-title">Search</h3>
     <div class="row">
@@ -2341,6 +2352,14 @@
       ngc2: r.ngc2 || r.NGC2 || null,
       capabilityProfile: r.capabilityProfile || r.Capability_Profile || null,
       sourceRefs: r.sourceRefs || r.Source_Refs || [],
+      nation: r.nation || r.Nation || null,
+      serviceOwner: r.serviceOwner || r.Service_Owner || r.component || r.Component || null,
+      component: r.component || r.Component || r.serviceOwner || r.Service_Owner || null,
+      jointFunction: r.jointFunction || r.Joint_Function || null,
+      operationalRole: r.operationalRole || r.Operational_Role || null,
+      accessDependencies: r.accessDependencies || r.Access_Dependencies || [],
+      tempoRole: r.tempoRole || r.Tempo_Role || null,
+      scenarioEnabled: r.scenarioEnabled ?? r.Scenario_Enabled ?? true,
       locationPrecision: r.locationPrecision || r.Location_Precision || null,
       threeObj: r.__threeObj || null,
     };
@@ -2452,6 +2471,8 @@
       const healthPercent = Math.round((node.health / (node.healthMax || 100)) * 100);
       const healthColor = healthPercent > 70 ? 'var(--success)' : healthPercent > 40 ? 'var(--warning)' : 'var(--danger)';
       const teamName = (node.team || '3rd_party').replace('_', ' ');
+      const componentName = node.serviceOwner || node.component || 'Component not stated';
+      const nationName = node.nation || 'Nation not stated';
       const coords = (node.lat != null && node.lon != null) ? `${Number(node.lat).toFixed(2)}, ${Number(node.lon).toFixed(2)}` : '—';
       const rgt = canonicalResourceGen(node);
       const profile = node.capabilityProfile || null;
@@ -2478,6 +2499,10 @@
         '<div class="kv"><strong>Capability evidence</strong></div>',
         '<div class="kv">Class: ' + htmlText(profile.evidenceClass || 'not stated') + ' · confidence ' + htmlText(profile.confidence || 'not stated') + '</div>',
         '<div class="kv">Availability: ' + htmlText(profile.availability || 'scenario active') + '</div>',
+        node.jointFunction ? '<div class="kv">Joint function: ' + htmlText(node.jointFunction) + '</div>' : '',
+        node.operationalRole ? '<div class="kv">Operational role: ' + htmlText(node.operationalRole) + '</div>' : '',
+        Array.isArray(node.accessDependencies) && node.accessDependencies.length
+          ? '<div class="kv">Access depends on: ' + htmlText(node.accessDependencies.join(', ')) + '</div>' : '',
         '<div class="kv">Role: ' + htmlText(profile.category || 'not stated') + '</div>',
         '<div class="kv">Functions: ' + htmlText((profile.functions || []).join(', ') || 'None listed') + '</div>',
         potentialText ? '<div class="kv">Conditional capacity: ' + htmlText(potentialText) + '</div>' : '',
@@ -2486,7 +2511,8 @@
       ].filter(Boolean).join('') : '';
       pop.innerHTML = `
         <h4>${node.name} <span class="meta">(${node.id})</span></h4>
-        <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${teamName}</strong> · ${node.domain?.join(', ') || '—'}</div>
+        <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${htmlText(teamName)}</strong> · ${htmlText(nationName)} · ${htmlText(componentName)}</div>
+        <div class="kv">Domain: ${htmlText(node.domain?.join(', ') || '—')}</div>
         <div class="kv">Type: ${node.type || '—'}</div>
         <div class="kv">Health: <span style="color:${healthColor}">${Math.round(node.health)} / ${node.healthMax || 100}</span></div>
         <div class="kv">Difficulty: ${node.difficulty || '—'}</div>
@@ -3623,6 +3649,37 @@
     const rr = document.getElementById('res-red'); if (rr) rr.textContent = String(red);
     const rbb = document.getElementById('res-blue-types'); if (rbb) rbb.textContent = `(Kinetic ${blueTypes.ke} · Cyber ${blueTypes.cyber} · EW ${blueTypes.ew} · SOF ${blueTypes.sof})`;
     const rrb = document.getElementById('res-red-types'); if (rrb) rrb.textContent = `(Kinetic ${redTypes.ke} · Cyber ${redTypes.cyber} · EW ${redTypes.ew} · SOF ${redTypes.sof})`;
+    renderBlueForceMix(blueNodes);
+    }
+
+    function renderBlueForceMix(blueNodes) {
+    const host = document.getElementById('blue-force-mix');
+    if (!host) return;
+    const groups = new Map();
+    (blueNodes || []).forEach(node => {
+      const owner = node.serviceOwner || node.component || 'Unassigned component';
+      if (!groups.has(owner)) groups.set(owner, { nodes: 0, kinetic: 0, cyber: 0, ew: 0, sof: 0 });
+      const group = groups.get(owner);
+      const capacity = canonicalResourceGen(node);
+      group.nodes += 1;
+      group.kinetic += capacity.kinetic;
+      group.cyber += capacity.cyber;
+      group.ew += capacity.ew;
+      group.sof += capacity.sof;
+    });
+    const htmlText = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    })[ch]);
+    const rows = Array.from(groups.entries()).map(([owner, values]) => ({
+      owner,
+      ...values,
+      total: values.kinetic + values.cyber + values.ew + values.sof
+    })).sort((a, b) => b.nodes - a.nodes || b.total - a.total || a.owner.localeCompare(b.owner));
+    host.innerHTML = rows.map(row =>
+      '<div class="force-mix-row"><strong>' + htmlText(row.owner) + '</strong>' +
+      '<span>' + row.nodes + ' nodes · ' + row.total + ' pts</span>' +
+      '<small>K ' + row.kinetic + ' · Cyber ' + row.cyber + ' · EW ' + row.ew + ' · SOF ' + row.sof + '</small></div>'
+    ).join('') || '<div class="muted">No active Blue force data.</div>';
     }
 
     // --- MAP HELPERS ---
@@ -4422,7 +4479,7 @@
         '<div class="fr-panel" role="dialog" aria-modal="true" aria-labelledby="fr-title" tabindex="-1">' +
           '<div class="fr-title" id="fr-title">TAIWAN STRAIT 2040</div>' +
           '<div class="fr-sub">Opening Denial Window · public-source baseline + explicit 2040 assumptions</div>' +
-          '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue operational planner</b>. Red is trying to preserve enough cross-strait throughput to establish a lodgment. Your job is to break that operating system before the hard horizon closes.</p>' +
+          '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue Joint Force operational planner</b>. Red is trying to preserve enough cross-strait throughput to establish a lodgment. Your job is to synchronize Taiwan, maritime, air, land, space, cyber, and sustainment capabilities to break that operating system before the hard horizon closes.</p>' +
           '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Read the situation, roles, assumptions, and victory logic</div>' +
           '<div class="fr-step"><span class="fr-n">2</span> Select targets and queue <b>strike, harden, or repair</b> orders</div>' +
           '<div class="fr-step"><span class="fr-n">3</span> Forecast, commit, watch the turn resolve, then use the <b>AAR</b></div></div>' +
