@@ -39,6 +39,8 @@ window.DirectorModule = (function () {
     standingCarry: null,
     lastForecast: null,
     record: null,         // GM.serialize() snapshot at match end (for counterfactuals)
+    startModel: null,     // CO-007 I-4: the player model PASSED to newMatch (pre-match) — replay payloads need it
+    challenge: null,      // CO-007 S3: validated #op= payload for the op being briefed/played, else null
     counterfactual: null,
     counterfactualWorker: null,
     aar: null,
@@ -530,6 +532,28 @@ window.DirectorModule = (function () {
     if (GM.isActive()) GM.endMatch();
     op.returnFocus = $('dir-launch');
     GM.init({ onResolved: function () {}, onState: function () {} });   // Director drives; legacy HUD stays dormant
+    // CO-007 S3: challenge intake. A valid #op= payload (decoded fail-silent by share.js,
+    // consumed exactly once) briefs the ISSUER'S world: their variant, their chips, their
+    // seed. Anything unavailable degrades to a normal brief with one comms line — never
+    // an error surface (I-5).
+    op.challenge = (window.ShareModule && typeof ShareModule.consumePending === 'function' && ShareModule.consumePending()) || null;
+    if (op.challenge) {
+      var ch = op.challenge;
+      if (!selectVariant(ch.variantId === 'default' ? 'default' : ch.variantId)) {
+        op.challenge = null;
+        comms('JOC', 'CHALLENGE LINK REFERENCES AN UNAVAILABLE OPERATION VARIANT — STANDARD BRIEF LOADED', 'warn');
+      } else {
+        briefOpts.turnLimit = ch.cfg.turnLimit;
+        briefOpts.redDiff = ch.cfg.redDiff;
+        briefOpts.roeId = ch.cfg.roeId;
+        try {
+          var liveFp = GM._internal.computeFingerprint(AppState.activeGraph());
+          if (ch.fp && !GM._internal.fingerprintsMatch(ch.fp, liveFp)) {
+            comms('JOC', 'SCENARIO CONTENT HAS CHANGED SINCE THIS LINK WAS MINTED — SAME SEED, EXACT REPLAY NOT GUARANTEED', 'warn');
+          }
+        } catch (e) { /* diagnostics only */ }
+      }
+    }
     newBriefMatch();
     setPhase('brief');
     renderBrief();
@@ -538,6 +562,9 @@ window.DirectorModule = (function () {
     var opTitle = scenarioContext().title || 'OPERATION BRIEF';
     cine('briefCinematic', { title: String(opTitle).split('—')[0].trim().toUpperCase() });
     comms('JOC', opAddr() + 'OPERATION OPEN — ' + String(opTitle).toUpperCase() + ' · SEED ' + GMseed());
+    if (op.challenge) {
+      comms('JOC', 'CHALLENGE ACCEPTED — ' + (op.challenge.callsign ? String(op.challenge.callsign).toUpperCase() + '’S' : 'A RIVAL') + ' WORLD · SEED ' + op.challenge.seed + ' · NEUTRAL HABIT MODEL IN EFFECT');
+    }
     evt('Operation started — briefing.');
   }
 
@@ -552,13 +579,19 @@ window.DirectorModule = (function () {
     // budget, lodgment clock, doctrine prior, and strategic overrides. The player's
     // BRIEF chips still win for turn budget and difficulty.
     var mc = op.variantConfig || {};
+    // CO-007 S3: challenge intake plays the issuer's exact world — forced seed, NEUTRAL
+    // player model (I-4: fair ground; Red exploits nobody's career habits). A normal op
+    // stashes the PRE-match model so a replay payload can reproduce Red exactly.
+    op.startModel = op.challenge ? null : readPlayerModel();
     GM.newMatch({
       turnLimit: briefOpts.turnLimit,
       lodgmentRequiredTurns: mc.lodgmentRequiredTurns,
       doctrinePrior: mc.doctrinePrior,
       strategic: mc.strategic,
-      // CO-005 A6: Red carries the player's career habit model into the new match.
-      playerModel: readPlayerModel(),
+      seed: op.challenge ? op.challenge.seed : undefined,
+      // CO-005 A6: Red carries the player's career habit model into the new match
+      // (or the neutral model on a challenge — normalizePlayerModel(null) is empty).
+      playerModel: op.startModel,
       control: { blue: 'human', red: 'ai' },
       difficulty: { blue: 'hard', red: briefOpts.redDiff },
       roeId: briefOpts.roeId
@@ -663,6 +696,18 @@ window.DirectorModule = (function () {
       '<div class="dir-card"><h3>YOUR KEY OBJECTIVES (DEFEND)</h3>' + objList(st, 'blue') + '</div>' +
       '<div class="dir-card"><h3>RED KEY SYSTEMS (DISRUPT)</h3>' + objList(st, 'red') + '</div>' +
       '</div>' +
+
+      // CO-007 S3: the challenge banner — the issuer's terms, pinned. Changing any chip
+      // below voids the challenge (announced on the comms floor, never an error).
+      (op.challenge ?
+        '<div class="dir-card"><h3>CHALLENGE ACCEPTED — SAME WORLD, FAIR GROUND</h3>' +
+        '<div class="dir-stat"><span>Issued by</span><b>' + esc(op.challenge.callsign ? String(op.challenge.callsign).toUpperCase() : 'AN UNNAMED OPERATOR') + '</b></div>' +
+        '<div class="dir-stat"><span>World seed</span><b>' + esc(String(op.challenge.seed)) + ' (forced)</b></div>' +
+        (op.challenge.claim && op.challenge.claim.winner ?
+          '<div class="dir-stat"><span>Their result</span><b>' + esc(String(op.challenge.claim.winner).toUpperCase()) +
+          (op.challenge.claim.turns ? ' IN ' + op.challenge.claim.turns + ' TURNS' : '') +
+          (op.challenge.claim.bss != null ? ' · BSS ' + (op.challenge.claim.bss >= 0 ? '+' : '') + op.challenge.claim.bss.toFixed(3) : '') + '</b></div>' : '') +
+        '<div class="dir-note" style="margin-top:8px">Red faces you with a NEUTRAL habit model — neither your career tells nor theirs. Their claim is unverified until it survives the replay verifier. Changing any parameter below voids the challenge.</div></div>' : '') +
 
       '<div class="dir-card"><h3>OPERATION PARAMETERS</h3>' +
       (Object.keys(variantRegistry()).length ?
@@ -1951,6 +1996,9 @@ window.DirectorModule = (function () {
       '<div class="dir-actions">' +
       '<button class="dir-btn" data-act="copy-aar">COPY AAR</button>' +
       '<button class="dir-btn" data-act="download-aar">DOWNLOAD .MD</button>' +
+      // CO-007 S3: serverless "beat my world" link — flag-gated; absent = nonexistent (I-3).
+      (window.ShareModule && ShareModule.active() ?
+        '<button class="dir-btn" data-act="challenge-link">COPY CHALLENGE LINK</button>' : '') +
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
       '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
     renderCounterfactualCard();
@@ -2047,6 +2095,29 @@ window.DirectorModule = (function () {
     op.aarExported = true;
   }
 
+  // CO-007 S3: mint the replay link — seed + committed order log + stated forecasts +
+  // the PRE-match habit model (I-4), so the recipient's machine and the verifier can
+  // re-resolve this exact operation. Serverless: the URL is the whole transport.
+  function copyChallengeLink() {
+    if (!(window.ShareModule && ShareModule.active() && op.record)) return;
+    var cs = '';
+    var c = cinApi();
+    if (c && typeof c.getCallsign === 'function') { try { cs = String(c.getCallsign() || ''); } catch (e) {} }
+    ShareModule.copyChallengeLink(op.record, {
+      variantId: briefOpts.variantId || 'default',
+      callsign: cs || null,
+      forecastEntries: op.scoredEntries,
+      startModel: op.startModel || null
+    }, function (url) {
+      if (url) {
+        comms('JOC', 'CHALLENGE LINK COPIED — SEED ' + op.record.seed + ' · REPLAYABLE ORDER LOG EMBEDDED');
+        try { if (typeof window.showToast === 'function') window.showToast('Challenge link copied. Anyone who opens it plays your exact world.', 'success'); } catch (e) {}
+      } else {
+        try { if (typeof window.showToast === 'function') window.showToast('Could not build the challenge link for this operation.', 'warn', 4000); } catch (e) {}
+      }
+    });
+  }
+
   function onOverlayInput(ev) {
     var cfField = ev.target.getAttribute && ev.target.getAttribute('data-cf');
     if (cfField && op.phase === 'aar' && op.counterfactual && op.counterfactual.status !== 'running') {
@@ -2108,12 +2179,22 @@ window.DirectorModule = (function () {
     if (submit) submit.disabled = card.step === 'blind' ? !cardIsReady(card) : !(card.final.lower < card.final.upper);
   }
 
+  // CO-007 S3: a challenge is the issuer's EXACT terms. Re-choosing any BRIEF chip is a
+  // deliberate act that voids it — same map, your own career model, a freshly derived
+  // seed — announced once on the comms floor, never an error.
+  function voidChallenge() {
+    if (!op.challenge) return;
+    op.challenge = null;
+    comms('JOC', 'CHALLENGE VOIDED — PARAMETERS CHANGED. STANDARD OPERATION TERMS APPLY.', 'warn');
+  }
+
   // ---- overlay actions / lifecycle -----------------------------------------------------
   function onOverlayClick(ev) {
     var t = ev.target.closest('[data-act],[data-turns],[data-diff],[data-roe],[data-variant]');
     if (!t) return;
     if (t.hasAttribute('data-variant')) {
       var vid = t.getAttribute('data-variant');
+      voidChallenge();
       if (selectVariant(vid)) {
         newBriefMatch(); renderBrief();
         sfxA('beep', { freq: 700, vol: 0.06, dur: 0.18 });
@@ -2121,9 +2202,9 @@ window.DirectorModule = (function () {
       }
       return;
     }
-    if (t.hasAttribute('data-turns')) { briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
-    if (t.hasAttribute('data-diff')) { briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
-    if (t.hasAttribute('data-roe')) { briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-turns')) { voidChallenge(); briefOpts.turnLimit = Number(t.getAttribute('data-turns')); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-diff')) { voidChallenge(); briefOpts.redDiff = t.getAttribute('data-diff'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-roe')) { voidChallenge(); briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
     else if (act === 'unlock-commit') {
@@ -2154,6 +2235,7 @@ window.DirectorModule = (function () {
     }
     else if (act === 'copy-aar') copyAar();
     else if (act === 'download-aar') downloadAar();
+    else if (act === 'challenge-link') copyChallengeLink();
     else if (act === 'run-counterfactual') runCounterfactual();
     else if (act === 'run-exploit-probe') runExploitProbe();
     else if (act === 'exit') abortOperation(true);
