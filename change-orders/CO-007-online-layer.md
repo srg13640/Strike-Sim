@@ -122,3 +122,25 @@ nested repo, not these commits.
 - 2026-07-11 — Offline-safe slice ACTIVATED (Seth: "continue with 007"). Plan of record
   written; survey established the human-input surface (BRIEF cfg + queueOrder kinds +
   stated forecasts) and the I-4 player-model finding. Next: S1+S2+S3.
+- 2026-07-11 — **S1+S2+S3 SHIPPED** (`a99e286`): online-flags.js (frozen, network OFF,
+  share ON), share.js (spec-v1 codec SS1z/SS1j, strict fail-silent validation, boot
+  intake, clipboard), Director wiring (challenge briefs force seed/chips + NEUTRAL model,
+  chip changes void the challenge, CHALLENGE banner card, AAR COPY CHALLENGE LINK).
+- 2026-07-11 — **S4+S5 SHIPPED** (`e696c30`): tools/replay-verify.js (validates through
+  share.js's own validator; fingerprint drift gate; engine-rejected injection = MISMATCH;
+  exit 0/1/2) + tools/online-layer-proof.js — **48 contracts green** (static 37, e2e 11:
+  exact reproduction of a scripted human-blue fixture on the default graph AND the
+  small-island variant; tampered claim/order caught; drift caught; kill switch inert).
+  En route, repaired the counterfactual proof (`c157f97`) — seventh tool missing the
+  strategic-state-before-game load order; the live worker was already correct.
+- 2026-07-11 — **S6 SHIPPED** (site/ nested repo `9ab29fe`): co007/ server sketch —
+  hosted flag file, HMAC daily-seed endpoint, UNVERIFIED-parking submit endpoint,
+  verify-runner shelling the repo verifier (smoke: VERIFIED real fixture, rejected junk).
+  Not wired into the site build. NEVER DEPLOY until activation.
+- **OFFLINE-SAFE SLICE COMPLETE.** All regression proofs green from a pristine HEAD
+  export. Acceptance #1 (no-network parity) holds by construction: zero sockets in new
+  files (proof-scanned), flags frozen OFF, share is serverless. Acceptance #3 (kill
+  switch) proof-tested. Acceptance #2 (server-side replay before ranking) is designed
+  and smoke-tested but PARKED with the hosting decision. Remaining for activation:
+  daily-seed client UI, Brier outcome re-derivation harness (the documented cut),
+  KV/D1 wiring, Cloudflare Access gate, build-tag version binding.
