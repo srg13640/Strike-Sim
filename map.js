@@ -411,6 +411,118 @@ window.MapModule = (function () {
     return out;
   }
 
+  // Map is the Operation loop's default PLAN surface, so its popup must carry enough
+  // context to support a decision without forcing the operator back to the 3D view.
+  // Keep the first layer compact; provenance and assumptions sit behind <details>.
+  function escapePopupHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  function safeHttpUrl(value) {
+    const raw = String(value == null ? '' : value).trim();
+    if (!/^https?:\/\//i.test(raw)) return '';
+    try {
+      const parsed = new URL(raw);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function capacityValue(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.round(n * 10) / 10);
+  }
+
+  function capacityFor(node) {
+    const r = node && node.resourceGenByType && typeof node.resourceGenByType === 'object'
+      ? node.resourceGenByType : {};
+    return {
+      kinetic: capacityValue(r.kinetic),
+      cyber: capacityValue(r.cyber),
+      ew: capacityValue(r.ew != null ? r.ew : (r.jam != null ? r.jam : r.jamming)),
+      sof: capacityValue(r.sof)
+    };
+  }
+
+  function capacityLine(resources) {
+    return 'Kinetic ' + capacityValue(resources && resources.kinetic) +
+      ' · Cyber ' + capacityValue(resources && resources.cyber) +
+      ' · EW ' + capacityValue(resources && resources.ew) +
+      ' · SOF ' + capacityValue(resources && resources.sof);
+  }
+
+  function capabilityPopupHtml(node, graphOverride) {
+    const n = node || {};
+    const g = graphOverride || graph();
+    const profile = n.capabilityProfile && typeof n.capabilityProfile === 'object'
+      ? n.capabilityProfile : null;
+    const active = capacityFor(n);
+    const potential = profile && profile.potentialResourceGenByType &&
+      typeof profile.potentialResourceGenByType === 'object'
+      ? profile.potentialResourceGenByType : null;
+    const team = String(n.team || n.affiliation || 'unknown').replace(/_/g, ' ');
+    const nation = n.nation || 'Nation not stated';
+    const serviceOwner = n.serviceOwner || n.component || 'Component not stated';
+    const jointFunction = n.jointFunction || '';
+    const operationalRole = n.operationalRole || '';
+    const accessDependencies = Array.isArray(n.accessDependencies)
+      ? n.accessDependencies.filter(Boolean).join(', ')
+      : String(n.accessDependencies || '');
+    const type = n.type || 'Unspecified type';
+    const subsystem = n.subsystem || 'Unspecified subsystem';
+
+    const refs = profile && Array.isArray(profile.sourceRefs)
+      ? profile.sourceRefs : (Array.isArray(n.sourceRefs) ? n.sourceRefs : []);
+    const sourceById = new Map((Array.isArray(g.sources) ? g.sources : [])
+      .filter(source => source && source.id != null)
+      .map(source => [String(source.id), source]));
+    const sourceItems = refs.map(ref => {
+      const id = String(ref);
+      const source = sourceById.get(id);
+      if (!source) return '<span>' + escapePopupHtml(id) + '</span>';
+      const url = safeHttpUrl(source.url);
+      const title = source.title || source.publisher || id;
+      const suffix = [source.publisher, source.year].filter(Boolean).join(' · ');
+      const label = escapePopupHtml(title) + (suffix ? '<small>' + escapePopupHtml(suffix) + '</small>' : '');
+      return url
+        ? '<a href="' + escapePopupHtml(url) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>'
+        : '<span>' + label + '</span>';
+    }).join('');
+
+    let details = '';
+    if (profile || sourceItems) {
+      const evidence = profile
+        ? [profile.evidenceClass || 'not stated', profile.confidence ? profile.confidence + ' confidence' : 'confidence not stated'].join(' · ')
+        : 'not stated';
+      const functions = profile && Array.isArray(profile.functions) ? profile.functions.join(', ') : '';
+      details = '<details class="map-cap-details"><summary>Capability profile</summary>' +
+        '<div class="map-cap-detail-body">' +
+        (potential ? '<div class="map-cap-row"><span>Conditional capacity</span><b>' + escapePopupHtml(capacityLine(potential)) + '</b></div>' : '') +
+        '<div class="map-cap-row"><span>Evidence</span><b>' + escapePopupHtml(evidence) + '</b></div>' +
+        '<div class="map-cap-row"><span>Availability</span><b>' + escapePopupHtml(profile && profile.availability || 'not stated') + '</b></div>' +
+        (jointFunction ? '<div class="map-cap-row"><span>Joint function</span><b>' + escapePopupHtml(jointFunction) + '</b></div>' : '') +
+        (operationalRole ? '<div class="map-cap-row"><span>Operational role</span><b>' + escapePopupHtml(operationalRole) + '</b></div>' : '') +
+        (accessDependencies ? '<div class="map-cap-row"><span>Access depends on</span><b>' + escapePopupHtml(accessDependencies) + '</b></div>' : '') +
+        (profile && profile.category ? '<div class="map-cap-row"><span>Role</span><b>' + escapePopupHtml(profile.category) + '</b></div>' : '') +
+        (functions ? '<div class="map-cap-row"><span>Functions</span><b>' + escapePopupHtml(functions) + '</b></div>' : '') +
+        (profile && profile.assumption ? '<div class="map-cap-assumption"><span>Assumption</span>' + escapePopupHtml(profile.assumption) + '</div>' : '') +
+        (sourceItems ? '<div class="map-cap-sources"><span>Public sources</span>' + sourceItems + '</div>' : '') +
+        '</div></details>';
+    }
+
+    return '<div class="map-cap-popup">' +
+      '<strong class="map-cap-name">' + escapePopupHtml(n.name || 'Unnamed node') + '</strong>' +
+      '<span class="map-cap-id">' + escapePopupHtml(n.id || 'No ID') + '</span>' +
+      '<div class="map-cap-meta">' + escapePopupHtml(team) + ' · ' + escapePopupHtml(nation) + ' · ' + escapePopupHtml(serviceOwner) + '</div>' +
+      '<div class="map-cap-role">' + escapePopupHtml(type) + ' · ' + escapePopupHtml(subsystem) + '</div>' +
+      '<div class="map-cap-active"><span>Active capacity</span>' + escapePopupHtml(capacityLine(active)) + '</div>' +
+      details + '</div>';
+  }
+
   function refreshMapMarkers() {
     if (!leafletMap || !markersLayer) return;
     markersLayer.clearLayers();
@@ -493,12 +605,7 @@ window.MapModule = (function () {
       }
 
       marker.__node = n;
-      // HUD-styled popup: name in mono accent, ID in muted mono.
-      marker.bindPopup(
-        `<strong>${n.name}</strong>` +
-        `<span style="display:block;font-family:var(--map-font-mono,'Share Tech Mono',monospace);` +
-        `font-size:10px;color:rgba(0,216,255,0.55);margin-top:1px">${n.id}</span>`
-      );
+      marker.bindPopup(capabilityPopupHtml(n), { maxWidth: 380 });
       mapMarkers.set(n.id, marker);
     });
 
@@ -698,12 +805,7 @@ window.MapModule = (function () {
 
     if (selectedNode && mapMarkers.has(selectedNode.id)) {
       const m = mapMarkers.get(selectedNode.id);
-      m.bindPopup(
-        `<strong>${selectedNode.name}</strong>` +
-        `<span style="display:block;font-family:'Share Tech Mono',monospace;font-size:10px;` +
-        `color:rgba(0,216,255,0.55);margin-top:1px">${selectedNode.id}</span>`,
-        { autoPan: true }
-      ).openPopup();
+      m.bindPopup(capabilityPopupHtml(selectedNode), { autoPan: true, maxWidth: 380 }).openPopup();
       if (selectedNode.lat != null && selectedNode.lon != null) {
         // C-017: pan to the marker's display coordinate (which may be offset by declutter)
         // so the map recenters on where the symbol is actually drawn, not a hidden true pos.
@@ -797,6 +899,30 @@ window.MapModule = (function () {
       m.openPopup();
       if (leafletMap && node.lat != null && node.lon != null) leafletMap.setView([node.lat, pacLon(node.lon)], Math.max(leafletMap.getZoom(), 3), { animate: true });
     }
+  }
+
+  // CO-006 Phase 3: the war film's camera. A cut is presentation only — it reads the
+  // graph's public lat/lon, respects reduced motion (no camera movement at all), and
+  // no-ops while the map pane is hidden (the WATCH feed remains the record). It never
+  // touches match state; the Director paces and throttles every cut.
+  function flyToNode(nodeId, opts) {
+    opts = opts || {};
+    if (!leafletMap || !mapVisible()) return false;
+    try {
+      // CO-006 P4: the operator's forced toggle (html.cin-rm) counts as reduced motion too
+      if (typeof document !== 'undefined' && document.documentElement &&
+          document.documentElement.classList.contains('cin-rm')) return false;
+      if (typeof window !== 'undefined' && window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    } catch (e) {}
+    const n = nodeById(nodeId);
+    if (!n || n.lat == null || n.lon == null) return false;
+    try {
+      leafletMap.flyTo([n.lat, pacLon(n.lon)], Math.max(leafletMap.getZoom(), opts.zoom || 4), {
+        duration: opts.duration || 0.85
+      });
+      return true;
+    } catch (e) { return false; }
   }
 
   // Called by the main script's mode toggle and window-resize handler.
@@ -911,6 +1037,29 @@ window.MapModule = (function () {
       '  display:block;font-family:var(--map-font-mono);font-size:13px;',
       '  color:var(--map-accent);letter-spacing:.04em;margin-bottom:2px;',
       '}',
+      '.map-cap-popup{min-width:250px;max-width:340px}',
+      '.map-cap-id{display:block;font-family:var(--map-font-mono);font-size:10px;',
+      '  color:rgba(0,216,255,.55);margin-top:1px;word-break:break-word}',
+      '.map-cap-meta{margin-top:6px;color:#a8c8d8;font-size:11px;text-transform:capitalize}',
+      '.map-cap-role{margin-top:2px;color:#7798aa;font-size:10.5px}',
+      '.map-cap-active{margin-top:7px;padding:6px 8px;border:1px solid rgba(0,216,255,.16);',
+      '  border-radius:4px;background:rgba(0,216,255,.05);font-family:var(--map-font-mono);font-size:10.5px}',
+      '.map-cap-active>span,.map-cap-assumption>span,.map-cap-sources>span{display:block;color:var(--map-accent);',
+      '  font:10px var(--map-font-ui);letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px}',
+      '.map-cap-details{margin-top:7px;border-top:1px solid rgba(0,216,255,.14);padding-top:5px}',
+      '.map-cap-details summary{cursor:pointer;color:#bfeaff;font:600 11px var(--map-font-ui);',
+      '  list-style-position:outside;outline-offset:2px}',
+      '.map-cap-detail-body{margin-top:6px;display:grid;gap:5px}',
+      '.map-cap-row{display:grid;grid-template-columns:minmax(72px,.7fr) minmax(120px,1.5fr);gap:8px;',
+      '  align-items:start;font-size:10.5px}',
+      '.map-cap-row>span{color:#7798aa}.map-cap-row>b{font-weight:500;color:#d5e9f2;overflow-wrap:anywhere}',
+      '.map-cap-assumption{padding:6px 7px;background:rgba(255,176,0,.05);border-left:2px solid rgba(255,176,0,.45);',
+      '  color:#c9dce5;font-size:10.5px;overflow-wrap:anywhere}',
+      '.map-cap-sources{display:grid;gap:3px;margin-top:1px}',
+      '.map-cap-sources a,.map-cap-sources>span:not(:first-child){display:block;color:#76dcff;font-size:10.5px;',
+      '  overflow-wrap:anywhere;text-decoration:none}',
+      '.map-cap-sources a:hover{text-decoration:underline;color:#fff}',
+      '.map-cap-sources small{display:block;color:#7798aa;font-size:9.5px}',
       '.leaflet-popup-tip-container .leaflet-popup-tip{',
       '  background:rgba(9,16,24,0.9)!important;',
       '}',
@@ -967,6 +1116,7 @@ window.MapModule = (function () {
       '@media(prefers-reduced-motion:reduce){',
       '  .mil-blip::after,.mil-blip.mil-selected::after,.mil-blip.mil-hi::after{animation:none;opacity:.35}',
       '}',
+      'html.cin-rm .mil-blip::after,html.cin-rm .mil-blip.mil-selected::after,html.cin-rm .mil-blip.mil-hi::after{animation:none;opacity:.35}',
 
       // ---- Objective marker ------------------------------------------------------
       '@keyframes mapObjPulse{',
@@ -990,6 +1140,7 @@ window.MapModule = (function () {
       '  --obj-glow:var(--map-alert);',
       '}',
       '@media(prefers-reduced-motion:reduce){.map-obj-marker{animation:none}}',
+      'html.cin-rm .map-obj-marker{animation:none}',
 
       // ---- Radar-sweep FX --------------------------------------------------------
       // A single rotating conic-gradient div in its own pane. Cheap: one element,
@@ -1012,6 +1163,7 @@ window.MapModule = (function () {
       '  mix-blend-mode:screen;',
       '}',
       '@media(prefers-reduced-motion:reduce){#map-radar-sweep{animation:none;display:none}}',
+      'html.cin-rm #map-radar-sweep{animation:none;display:none}',
 
       // ---- Strike FX (existing arc + new cinematic tracer/shockwave) ------------
       '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}',
@@ -1075,6 +1227,9 @@ window.MapModule = (function () {
       '  .wg-shockwave{animation:wgImpact .85s ease-out forwards}',
       '  .wg-shockwave.wg-shock-kill{animation-duration:.95s}',
       '}',
+      'html.cin-rm .wg-tracer-dot,html.cin-rm .wg-tracer-trail{display:none}',
+      'html.cin-rm .wg-shockwave{animation:wgImpact .85s ease-out forwards}',
+      'html.cin-rm .wg-shockwave.wg-shock-kill{animation-duration:.95s}',
     ].join('');
     (document.head || document.documentElement).appendChild(st);
   }
@@ -1183,11 +1338,14 @@ window.MapModule = (function () {
     const color = team === 'blue' ? '#6fe0ff' : '#ff8a4a';
     const isKill = !!opts.kill;
 
-    // Detect reduced-motion preference once per call.
+    // Detect reduced-motion preference once per call — the system media query OR the
+    // operator's W6 forced toggle (html.cin-rm, owned by cinematics; CO-006 P4).
     const reducedMotion = (
-      typeof window !== 'undefined' &&
-      window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      (typeof document !== 'undefined' && document.documentElement &&
+       document.documentElement.classList.contains('cin-rm')) ||
+      (typeof window !== 'undefined' &&
+       window.matchMedia &&
+       window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     );
 
     // Cleanup registry: everything added during this strike, removed on completion.
@@ -1377,9 +1535,11 @@ window.MapModule = (function () {
     closeMapPopup,
     invalidateSize,
     flashStrike,
+    flyToNode,
     playStrikes,
     replayHiddenStrikes,  // C-020: call from main script on map-mode activation
     getMap,
-    getMarkers
+    getMarkers,
+    _internal: { capabilityPopupHtml, escapePopupHtml, safeHttpUrl, capacityFor }
   };
 })();

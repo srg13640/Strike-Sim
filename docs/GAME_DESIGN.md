@@ -118,12 +118,16 @@ BRIEF ─→ PLAN ─→ COMMIT ─→ WATCH ─┐        one turn (~4–7 min)
    ("what dies if this dies"), threat rings tied to actual reach.
 3. **Balance pass** — DIFF completion + objective fragility normalization against the
    0.45–0.55 target, 200-seed harness in `tools/`.
-4. **Red doctrine personalities** — replace difficulty-noise AI with 2–3 named
-   doctrines (attrition / decapitation / denial), disclosed in the Brief.
+4. **Red doctrine personalities** — ✅ SHIPPED (CO-005): Harsanyi doctrine types with a
+   disclosed prior, level-k/quantal-response difficulty, per-turn regret-matching mix,
+   belief-respecting ghost forecast, Bayesian intel posterior, and a restricted-Nash
+   player model (capped at 0.5) that adapts to the player's habits across operations.
+   See `docs/RED_MIND.md`, `docs/FORECASTING_MODEL.md`, `change-orders/CO-005-*.md`.
 5. **Operation framing** — rebuild campaign layer so posture materially shapes the
    board (`newMatch` posture hook), or retire it.
-6. **Scenario switcher + operation save/replay** — AppState is already scenario-first;
-   seeds make replays free.
+6. **Scenario switcher + operation save/replay** — PARTIAL (CO-005 C5): BRIEF-selectable
+   operation variants shipped (SMALL ISLAND FAIT ACCOMPLI, in-place graph swap with
+   restore); full save/replay UI remains open.
 
 ## 9. Anti-Goals
 

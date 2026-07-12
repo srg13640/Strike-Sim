@@ -152,6 +152,19 @@ window.StageModule = (function () {
     injectButton();
     reparentOverlays();
 
+    // Canonical browser-game render gate. The expensive 3D scene is alive only while
+    // it is the visible, unobstructed foreground surface; EngineModule additionally
+    // idles between interactions after the force layout settles.
+    if (window.AppShell && AppShell.subscribe) {
+      AppShell.subscribe(function (state) {
+        try {
+          if (window.EngineModule && EngineModule.setRenderActive) {
+            EngineModule.setRenderActive(state.view === '3d' && !state.hidden && !state.overlayOpen);
+          }
+        } catch (e) {}
+      });
+    }
+
     if (window.ResizeObserver) {
       ro = new ResizeObserver(schedule);
       // Observing #graph AND #map means we also catch the display:none -> block flip when
@@ -165,12 +178,22 @@ window.StageModule = (function () {
     document.addEventListener('fullscreenchange', function () { syncFsButton(); schedule(); });
     document.addEventListener('webkitfullscreenchange', function () { syncFsButton(); schedule(); });
 
-    // Keyboard: F toggles fullscreen (ignored while typing in a field).
+    function workflowLayerOpen() {
+      var layers = document.querySelectorAll('.modal-backdrop, #first-run-card, #dir-overlay');
+      for (var i = 0; i < layers.length; i++) {
+        var style = window.getComputedStyle(layers[i]);
+        if (style.display !== 'none' && style.visibility !== 'hidden') return true;
+      }
+      return false;
+    }
+
+    // Keyboard: F toggles fullscreen (ignored while typing, activating a control,
+    // or working inside a modal/guided-operation layer).
     document.addEventListener('keydown', function (e) {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       var t = e.target || {};
       var tag = (t.tagName || '').toUpperCase();
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY' || t.isContentEditable || workflowLayerOpen()) return;
       if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
     });
 

@@ -91,6 +91,8 @@ Each Red node is mapped to a functional subsystem via its `node.type` field, fol
 
 The `node.type` mapping is the primary classifier; the implementation degrades gracefully on incomplete order-of-battle data. When `node.type` is missing or unrecognized, the classifier falls back to the node's `subsystem` field (Information Attack → `info`, Firepower Strike → `fires`, Assault → `lift`, Blockade → `seacontrol`). If neither field resolves, the node is assigned to `fires`; a null node reference resolves to `protect`. Nodes lacking an `importance` value receive the mid-scale default of 5. These defaults keep the assessment total — every Red node is scored — at the cost of classification noise on poorly attributed data.
 
+The node classifier is separate from the turn-based game's **mission-capacity economy**. A node may generate canonical `kinetic`, `cyber`, `ew`, or `sof` capacity for playable actions, but those values are relative per-turn points — not personnel, platform, sortie, weapon, access, or readiness counts — and they do not enter the denial-MOE equations directly. Cyber and EW remain distinct ledgers: cyber represents network, code, data, defensive, and recovery capacity; EW represents activity in the electromagnetic spectrum. SOF capacity requires a modeled special-operations capability and is not inferred from a cyber, EW, information, intelligence, or space label. The data and provenance rules are documented in [the Cyber Capability Model](CYBER_CAPABILITY_MODEL.md).
+
 ### 5.2 Subsystem Score
 
 For subsystem S with node set N(S), each node carries a **cascade-aware weight**:

@@ -23,8 +23,10 @@ python3 -m http.server 8000
 # then open:  http://localhost:8000/StrikeSim2040.html
 ```
 
-The app boots, auto-loads the two bundled scenarios (Red + Blue), and frames the 3D
-view from the Blue perspective looking toward Red. First settle takes ~5 seconds.
+The app boots, auto-loads the bundled Red and Blue force networks, and frames the 3D
+view from the Blue perspective looking toward Red. Loader labels describe the force,
+not a frozen node count, so the libraries can evolve without becoming misleading.
+First settle takes ~5 seconds.
 
 **Prerequisites:** any modern browser with WebGL. Python 3 *or* Node.js for the static
 server. That's it.
@@ -65,7 +67,7 @@ static server.
 | `map.js` (`MapModule`) | Leaflet 2D map rendering: markers, links, popups, offline tile detection. |
 | `engine.js` (`EngineModule`) | 3D engine lifecycle (3d-force-graph / Three.js), the Blue→Red opening camera shot, and geo-mode layout. |
 | `views.js` (`ViewsModule`) | Alternate render views: the data table and the D3 task-org chart. |
-| `inline-datasets.js` | Startup auto-loader for the two bundled scenarios. |
+| `inline-datasets.js` | Startup auto-loader for the bundled Red and Blue force networks. |
 | `vendor/` | Vendored libraries (offline): Three.js r128, OrbitControls, 3d-force-graph, D3 v7, Leaflet 1.9.4. |
 
 ### Design conventions
@@ -97,23 +99,62 @@ Scenarios are JSON with `nodes` and `links` arrays. A node:
 
 ```json
 {
-  "id": "PLA-CMD-001",
-  "name": "CMC Joint Operations Command Center Beijing",
-  "team": "red",
-  "subsystem": "Firepower Strike",
-  "domain": ["Land"],
+  "id": "TWN-CMD-001",
+  "name": "Taiwan Joint Operations Center",
+  "team": "blue",
+  "subsystem": "Joint Command & Mission Networks",
+  "domain": ["Land", "Cyber", "EW"],
   "type": "Command",
+  "nation": "Taiwan",
+  "serviceOwner": "Taiwan Armed Forces",
+  "component": "Taiwan Joint Force",
+  "jointFunction": "Command and control",
+  "operationalRole": "Synchronize sovereign defense and mission-partner support",
+  "tempoRole": "command",
+  "accessDependencies": [],
   "health": 100, "healthMax": 100,
   "status": "Active",
   "difficulty": "Buried",
   "vulnerabilities": ["Cyber", "SOF"],
   "importance": 10, "cascScore": 5,
-  "lat": 39.9042, "lon": 116.4074
+  "lat": 39.9042, "lon": 116.4074,
+  "resourceGenByType": {
+    "kinetic": 0,
+    "cyber": 0,
+    "ew": 0,
+    "sof": 0
+  },
+  "capabilityProfile": {
+    "category": "joint-command",
+    "functions": ["command-and-control"],
+    "evidenceClass": "observed",
+    "confidence": "high",
+    "availability": "scenario-active",
+    "sourceRefs": ["TWN-QDR-2025"],
+    "assumption": "The graph node is a theater-level analytical aggregate."
+  }
 }
 ```
 
-A link is `{ "source": "<id>", "target": "<id>" }`. Bundled scenarios:
-`grok150red.json` (120 Red nodes) and `grokblue90.json` (104 Blue nodes).
+A link is `{ "source": "<id>", "target": "<id>" }`. The bundled libraries retain
+their historical filenames, `grok150red.json` and `grokblue90.json`, but their node
+counts are intentionally allowed to change as the open-source scenario is improved.
+
+`resourceGenByType` is required and has exactly four keys: `kinetic`, `cyber`, `ew`,
+and `sof`. Values are integer **mission-capacity points per turn** from 0 through 10;
+they are not counts of units, teams, platforms, weapons, or accesses. Cyber and EW are
+separate ledgers, and the retired serialized key `jam` is not part of the canonical
+format. Blue Joint Force nodes also state ownership, joint function, operational role,
+explicit tempo contribution, access dependencies, and location precision.
+`capabilityProfile` distinguishes observed, assessed, and notional-2040 content and
+records availability, confidence, sources, and assumptions.
+
+See [the Blue Joint Force Model](docs/JOINT_FORCE_MODEL.md), [the Cyber Capability
+Model](docs/CYBER_CAPABILITY_MODEL.md), and
+[`schemas/strikesim-scenario.schema.json`](schemas/strikesim-scenario.schema.json) for
+the modeling, provenance, and machine-readable data contract. Run
+`node tools/joint-force-proof.js` to verify component balance, evidence coverage,
+objectives, source assignment, topology, and the tempo economy through the real engine.
 
 ---
 
@@ -125,6 +166,9 @@ A link is `{ "source": "<id>", "target": "<id>" }`. Bundled scenarios:
 ├── ui.js  state.js  sim.js  map.js  engine.js  campaign.js  views.js
 ├── inline-datasets.js    # startup scenario auto-loader
 ├── grok150red.json  grokblue90.json   # bundled scenarios
+├── schemas/strikesim-scenario.schema.json  # scenario data contract
+├── docs/CYBER_CAPABILITY_MODEL.md      # capability semantics + provenance
+├── docs/JOINT_FORCE_MODEL.md           # Blue service balance + acceptance gates
 ├── vendor/               # offline-vendored libraries
 └── tiles/                # (optional) local map tiles — not included
 ```

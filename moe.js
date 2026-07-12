@@ -68,8 +68,7 @@ window.MoeModule = (function () {
    * Core assessment over an array of Red units: [{ subsys, importance, healthFrac }].
    * opts: { balance, tMin, k, costTolerance, threshold }
    */
-  function assess(redUnits, opts) {
-    var o = Object.assign({}, DEFAULTS, opts || {});
+  function summarize(redUnits, healthAccessor) {
     var cur = {}, base = {};               // per-subsystem importance-weighted sums
     var totBaseImp = 0, totCurImp = 0;     // for redCost (all subsystems)
     for (var i = 0; i < redUnits.length; i++) {
@@ -78,12 +77,20 @@ window.MoeModule = (function () {
       var casc = (u.cascScore == null ? 1 : u.cascScore);
       var w = imp * (1 + 0.5 * casc);   // cascade-aware: high-cascade key nodes dominate their
                                         // subsystem (PLA systems-destruction warfare, RR-1708)
-      var hf = clamp01(u.healthFrac == null ? 1 : u.healthFrac);
+      var rawHealth = healthAccessor ? healthAccessor(u) : u.healthFrac;
+      var hf = clamp01(rawHealth == null ? 1 : rawHealth);
       var s = u.subsys || 'fires';
       base[s] = (base[s] || 0) + w;
       cur[s] = (cur[s] || 0) + w * hf;
       totBaseImp += w; totCurImp += w * hf;
     }
+    return { cur: cur, base: base, totBaseImp: totBaseImp, totCurImp: totCurImp };
+  }
+
+  function assessSummary(summary, opts) {
+    var o = Object.assign({}, DEFAULTS, opts || {});
+    var cur = summary.cur, base = summary.base;
+    var totBaseImp = summary.totBaseImp, totCurImp = summary.totCurImp;
     var subsystemScores = {};
     Object.keys(base).forEach(function (s) { subsystemScores[s] = base[s] > 0 ? cur[s] / base[s] : 1; });
 
@@ -118,6 +125,42 @@ window.MoeModule = (function () {
       capabilityDenial: capabilityDenial, costDenial: costDenial,
       subsystemScores: subsystemScores, balance: o.balance
     };
+  }
+
+  function assess(redUnits, opts) {
+    return assessSummary(summarize(redUnits || []), opts);
+  }
+
+  // Compile immutable board identity once for large same-board ensembles. The compiled
+  // path calls the exact same summarize -> assessSummary arbiter as assess()/assessGraph;
+  // it only avoids rebuilding/classifying 128 unit records in every ghost world.
+  function compileGraph(nodes) {
+    var units = [];
+    (nodes || []).forEach(function (n) {
+      if (!n || n.team !== 'red') return;
+      var base = n.healthMax || n.health || 100;
+      var hf = clamp01((n.health == null ? base : n.health) / base);
+      if (n.status === 'Neutralized' || n.alive === false) hf = 0;
+      units.push({
+        id: n.id,
+        subsys: classify(n),
+        importance: n.importance,
+        cascScore: n.cascScore,
+        healthMax: base,
+        healthFrac: hf
+      });
+    });
+    return { v: 1, units: units };
+  }
+
+  function assessCompiled(compiled, stateById, opts) {
+    var units = compiled && compiled.units || [];
+    return assessSummary(summarize(units, function (u) {
+      var n = stateById && stateById[u.id];
+      if (!n) return u.healthFrac;
+      if (n.alive === false || n.status === 'Neutralized') return 0;
+      return clamp01(Number(n.health == null ? u.healthMax : n.health) / Number(n.healthMax || u.healthMax || 100));
+    }), opts);
   }
 
   // Build Red units from a trial's per-node state Map + sim nodeInfo, then assess.
@@ -248,6 +291,8 @@ window.MoeModule = (function () {
     assess: assess,
     denialOutcome: denialOutcome,
     assessGraph: assessGraph,
+    compileGraph: compileGraph,
+    assessCompiled: assessCompiled,
     generateCoa: generateCoa,
     SUBSYS_LABELS: SUBSYS_LABELS,
     ENABLER_WEIGHTS: ENABLER_WEIGHTS,

@@ -377,7 +377,7 @@ function simCoreChooseRedCounter(methodKey, redBudget, redTypeBudget, detectionL
     sof: ['SOF Interception', 'Reinforcement']
   };
   const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-  const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike': 'ke', 'Reinforcement': 'ke', 'Deception': 'ew', 'Sabotage': 'ke' };
+  const redCounterType = { 'Cyber Defense': 'cyber', 'EW Countermeasure': 'ew', 'SOF Interception': 'sof', 'Counter-Strike': 'ke', 'Reinforcement': 'ke', 'Deception': 'cyber', 'Sabotage': 'ke' };
   const opts = optionsByMethod[methodKey] || optionsByMethod.kinetic;
   let best = null;
   opts.forEach(name => {
@@ -428,11 +428,22 @@ function simulateTrialCore(actionPlan, opts) {
   const moe = context.moe;
   const blueBudgetBase = teamResources?.blue ?? 0;
   const redBudgetBase = teamResources?.red ?? 0;
-  const blueTypeBase = JSON.parse(JSON.stringify(teamResources?.blueTypes || { ke: 0, ew: 0, jam: 0, sof: 0 }));
-  const redTypeBase = JSON.parse(JSON.stringify(teamResources?.redTypes || { ke: 0, ew: 0, jam: 0, sof: 0 }));
+  const normalizeTypeBudget = raw => {
+    if (!raw || typeof raw !== 'object') return {};
+    const value = raw;
+    const canonical = Object.prototype.hasOwnProperty.call(value, 'cyber');
+    return {
+      ke: Number(value.ke || 0),
+      cyber: Number(canonical ? value.cyber : (value.ew || 0)),
+      ew: Number(canonical ? value.ew : (value.jam || 0)),
+      sof: Number(value.sof || 0)
+    };
+  };
+  const blueTypeBase = normalizeTypeBudget(teamResources?.blueTypes);
+  const redTypeBase = normalizeTypeBudget(teamResources?.redTypes);
   const redCounterCosts = { 'Cyber Defense': 1, 'EW Countermeasure': 1, 'SOF Interception': 1, 'Reinforcement': 1, 'Deception': 1, 'Sabotage': 2, 'Counter-Strike': 1 };
-  const redCounterType = { 'Cyber Defense': 'ew', 'EW Countermeasure': 'jam', 'SOF Interception': 'sof', 'Counter-Strike': 'ke', 'Reinforcement': 'ke', 'Deception': 'ew', 'Sabotage': 'ke' };
-  const blueMethodType = { kinetic: 'ke', cyber: 'ew', ew: 'jam', sof: 'sof' };
+  const redCounterType = { 'Cyber Defense': 'cyber', 'EW Countermeasure': 'ew', 'SOF Interception': 'sof', 'Counter-Strike': 'ke', 'Reinforcement': 'ke', 'Deception': 'cyber', 'Sabotage': 'ke' };
+  const blueMethodType = { kinetic: 'ke', cyber: 'cyber', ew: 'ew', sof: 'sof' };
 
   const state = new Map();
   nodeInfo.forEach((info, id) => state.set(id, { alive: info.status !== 'Neutralized', health: info.health }));
@@ -623,6 +634,8 @@ function simulateTrialCore(actionPlan, opts) {
     if (regenFrac > 0) {
       blueBudget += blueBudgetBase * regenFrac;
       redBudget += redBudgetBase * regenFrac;
+      Object.keys(blueTypeBase).forEach(key => { blueTypeBudget[key] += blueTypeBase[key] * regenFrac; });
+      Object.keys(redTypeBase).forEach(key => { redTypeBudget[key] += redTypeBase[key] * regenFrac; });
     }
     if (blueNeutralized.size > maxBlueLoss) break;
     if (successSatisfied() && stepsToGoal === null) stepsToGoal = i + 1;
@@ -678,7 +691,7 @@ function parityFixture() {
     maxBlueLoss: 2,
     regenFrac: 0,
     dynamicRed: true,
-    teamResources: { blue: 12, red: 8, blueTypes: { ke: 4, ew: 4, jam: 2, sof: 2 }, redTypes: { ke: 3, ew: 3, jam: 1, sof: 1 } },
+    teamResources: { blue: 12, red: 8, blueTypes: { ke: 4, cyber: 4, ew: 2, sof: 2 }, redTypes: { ke: 3, cyber: 3, ew: 1, sof: 1 } },
     settings: { cascadeAlpha: 0.25, difficultyModifiers: { Soft: 1.2, Medium: 1.0, Hardened: 0.8, Buried: 0.6 } },
     strikeMethods: {
       kinetic: { name: 'Kinetic', baseProb: 0.55, cost: 2, baseDamage: [25, 50], vulnerability: 'armor' },

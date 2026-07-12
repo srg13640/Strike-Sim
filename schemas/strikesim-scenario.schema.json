@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://strikesim.local/schemas/strikesim-scenario.schema.json",
+  "title": "StrikeSim 2040 scenario",
+  "description": "Portable StrikeSim graph data with a canonical four-resource mission-capacity model.",
+  "type": "object",
+  "required": [
+    "nodes",
+    "links"
+  ],
+  "properties": {
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional operation narrative consumed by the Director BRIEF (background, initiatingEvent, blueRole, redObjective). CO-005 C5.",
+      "properties": {
+        "background": { "type": "string" },
+        "initiatingEvent": { "type": "string" },
+        "blueRole": { "type": "string" },
+        "redObjective": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "matchConfig": {
+      "type": "object",
+      "description": "Optional authored match overrides applied when this scenario/variant is selected at BRIEF (CO-005 C5). Keys mirror game.js newMatch cfgOverrides.",
+      "properties": {
+        "turnLimit": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "lodgmentRequiredTurns": { "type": "number", "exclusiveMinimum": 0 },
+        "doctrinePrior": {
+          "type": "object",
+          "description": "Disclosed prior over Red doctrine types; values are re-normalized at load.",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "strategic": { "type": "object", "description": "strategic-state.js config overrides (escalation, indicators, signals)." }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "resourceGenByType": {
+      "type": "object",
+      "description": "Relative mission-capacity points generated per turn. Values are not unit, team, billet, platform, sortie, or munition counts.",
+      "required": [
+        "kinetic",
+        "cyber",
+        "ew",
+        "sof"
+      ],
+      "properties": {
+        "kinetic": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "cyber": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "ew": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "sof": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilityProfile": {
+      "type": "object",
+      "description": "Provenance and scenario-employment context for a modeled capability.",
+      "required": [
+        "category",
+        "functions",
+        "evidenceClass",
+        "confidence",
+        "availability",
+        "sourceRefs",
+        "assumption"
+      ],
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "functions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "evidenceClass": {
+          "enum": [
+            "observed",
+            "assessed",
+            "notional-2040"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "scenario-active",
+            "conditional-partner",
+            "commercial-contract",
+            "future-notional"
+          ]
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "assumption": {
+          "type": "string"
+        },
+        "potentialResourceGenByType": {
+          "$ref": "#/$defs/resourceGenByType"
+        }
+      },
+      "additionalProperties": true
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "team",
+        "subsystem",
+        "domain",
+        "type",
+        "resourceGenByType"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "team": {
+          "enum": [
+            "red",
+            "blue"
+          ]
+        },
+        "subsystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceGenByType": {
+          "$ref": "#/$defs/resourceGenByType"
+        },
+        "capabilityProfile": {
+          "$ref": "#/$defs/capabilityProfile"
+        },
+        "nation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceOwner": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Military service, joint headquarters, partner force, or civil/commercial owner represented by the aggregate."
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jointFunction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operationalRole": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accessDependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "tempoRole": {
+          "enum": [
+            "command",
+            "logistics",
+            "relay",
+            "none"
+          ],
+          "description": "Explicit contribution to the turn-tempo economy; none prevents heuristic misclassification."
+        },
+        "scenarioEnabled": {
+          "type": "boolean",
+          "description": "False keeps a conditional package inspectable in the graph but excludes it from the playable board until activated."
+        },
+        "locationPrecision": {
+          "type": "string"
+        },
+        "health": {
+          "type": "number",
+          "minimum": 0
+        },
+        "healthMax": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "status": {
+          "type": "string"
+        },
+        "difficulty": {
+          "type": "string"
+        },
+        "vulnerabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "importance": {
+          "type": "number"
+        },
+        "cascScore": {
+          "type": "number"
+        },
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lon": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "link": {
+      "type": "object",
+      "required": [
+        "source",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "publisher",
+        "year",
+        "url"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "year": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1900,
+              "maximum": 2100
+            },
+            {
+              "type": "string",
+              "minLength": 4
+            }
+          ]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "supports": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "scenarioName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "classification": {
+          "type": "string"
+        },
+        "resourceModel": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

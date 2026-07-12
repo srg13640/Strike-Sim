@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const EXPECTED_API = [
@@ -13,6 +14,7 @@ const EXPECTED_API = [
   'queueOrder',
   'removeOrder',
   'clearOrders',
+  'preparePlan',
   'commitTurn',
   'nextTurn',
   'endMatch',
@@ -21,8 +23,14 @@ const EXPECTED_API = [
   'boardNode',
   'methods',
   'methodKeys',
+  'strategicOptions',
+  'canStrike',
+  'validOrder',
   'serialize',
   'deserialize',
+  'fingerprint',
+  'fingerprintMatches',
+  'scenarioStatus',
   '_internal'
 ];
 
@@ -60,6 +68,9 @@ function loadGame(graph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => graph };
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'strategic-state.js'), 'utf8'), context, { filename: 'strategic-state.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
   if (errors.length) throw new Error(errors.join('\n'));
   return context.window.GameModule;
@@ -110,6 +121,28 @@ function main() {
 
   const wargameUi = fs.readFileSync(path.join(ROOT, 'wargame.js'), 'utf8');
   assert(wargameUi.includes('id="wg-launch"') || wargameUi.includes("id='wg-launch'") || wargameUi.includes('#wg-launch'), 'wargame launch button missing from UI module');
+
+  // Balance is part of the gate, not an adjacent advisory. The default 200-seed run
+  // uses the player-facing eight-turn horizon and the real MoeModule denial arbiter.
+  // Developers may set STRIKESIM_GATE_SKIP_BALANCE=1 for a fast API-only smoke test;
+  // release evidence must run this script without that override.
+  if (process.env.STRIKESIM_GATE_SKIP_BALANCE !== '1') {
+    const matches = Number(process.env.STRIKESIM_GATE_MATCHES || 200);
+    const output = execFileSync(process.execPath, [
+      path.join(ROOT, 'tools', 'wargame-loop-eval.js'),
+      '--matches', String(matches), '--turns', '8'
+    ], { cwd: ROOT, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+    const lines = output.trim().split(/\r?\n/);
+    const evaluation = JSON.parse(lines[lines.length - 1]);
+    assert(evaluation.balance_pass === true,
+      `hard/hard balance outside 0.45–0.55: ${evaluation.blue_win_rate}`);
+    assert(evaluation.max_reasoning_rollouts <= 50,
+      `bounded reasoning exceeded 50 rollouts: ${evaluation.max_reasoning_rollouts}`);
+    assert(Object.values(evaluation.perturbations || {}).every(Boolean),
+      `one or more behavior perturbations failed: ${JSON.stringify(evaluation.perturbations)}`);
+    assert(evaluation.turn_limit === 8, 'balance gate did not use the live eight-turn horizon');
+    console.log(`balance gate passed (${evaluation.matches} seeds; Blue ${Math.round(evaluation.blue_win_rate * 100)}%; max ${evaluation.max_reasoning_rollouts} rollouts)`);
+  }
 
   console.log('wargame-loop gate passed');
 }

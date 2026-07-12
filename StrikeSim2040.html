@@ -28,7 +28,7 @@
   <script src="ui.js?v=p5"></script>
   <!-- Scenario-centric application state. Must load before the main script so the
        active scenario's graph exists when `data` is bound to it. -->
-  <script src="state.js?v=p5"></script>
+  <script src="state.js?v=p6"></script>
   <!-- milsymbol.js (MIT) — authoritative MIL-STD-2525C/APP-6 renderer. Exposes global
        `ms`. symbols.js uses it when present and falls back to its built-in renderer if not. -->
   <script src="vendor/milsymbol.js"></script>
@@ -36,31 +36,44 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p13"></script>
+  <script src="map.js?v=p17"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p6"></script>
+  <script src="engine.js?v=p8"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p5"></script>
+  <script src="stage.js?v=p7"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
-  <script src="sim.js?v=p7"></script>
+  <script src="sim.js?v=p8"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
        the COA generator and the Monte Carlo 'denial' success mode. See docs/METHODOLOGY.md. -->
   <script src="moe.js?v=p2"></script>
   <!-- Turn-based War Game engine: simultaneous-order resolution, AI commander,
        deterministic + serializable (depends on state.js at call time). -->
-  <script src="game.js?v=p11"></script>
+  <script src="red-mind.js?v=co005-p1"></script>
+  <script src="forecasting.js?v=co005-p2"></script>
+  <script src="strategic-state.js?v=co005-p4"></script>
+  <script src="game.js?v=co005-p1"></script>
+  <!-- CO-007 online layer (offline-safe slice): the ONE swappable flag file, then the
+       serverless share/challenge link codec. Network features stay parked; removing
+       both files must leave the solo loop untouched. -->
+  <script src="online-flags.js?v=co007-p1"></script>
+  <script src="share.js?v=co007-p1"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p12"></script>
+  <script src="wargame.js?v=p13"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=1"></script>
+  <script src="director.js?v=co006-p4"></script>
+  <!-- CO-006 performance layer: procedural sound engine + the Console Frame
+       (boot ritual → title screen front door). Presentation only — reads public
+       state, drives #dir-launch, never touches match state or seeded RNG. -->
+  <script src="audio.js?v=co006-p4"></script>
+  <script src="cinematics.js?v=co006-p4"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p8"></script>
-  <script src="inline-datasets.js?v=p5"></script>
+  <script src="inline-datasets.js?v=p9"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -93,6 +106,14 @@
     --mono: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
     --display: 'Orbitron', 'Oswald', system-ui, sans-serif;
     --ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+    /* ── CO-006 performance-layer tokens (single source for cinematics/audio UI) ── */
+    --lbox-dur: 1.1s;                          /* letterbox bar travel */
+    --lbox-ease: cubic-bezier(.77,0,.18,1);
+    --stamp-dur: .38s;                         /* operation-name stamp overshoot */
+    --fx-scanline-opacity: 0.16;
+    --fx-grain-opacity: 0.05;
+    --type-tick-ms: 12;                        /* typewriter cadence (JS reads the custom prop) */
 
     /* Coherent z-index scale (was ad-hoc per module) */
     --z-canvas: 1; --z-rail: 30; --z-popup: 40; --z-mapctl: 50; --z-modal: 200;
@@ -303,6 +324,9 @@
     #node-popup h4 { margin: 0 0 6px; font-size: 14px; color: var(--text); }
     #node-popup .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     #node-popup .kv { font-size: 12px; margin: 2px 0; }
+    #node-popup .capability-profile { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(148,163,184,.24); }
+    #node-popup .capability-profile a { color: var(--accent); text-decoration: none; }
+    #node-popup .capability-profile a:hover { text-decoration: underline; }
     #node-popup .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 
     html, body {
@@ -600,6 +624,11 @@
     }
     .team-summary-item .team-name { display: flex; align-items: center; gap: 6px; text-transform: capitalize; }
     .team-summary-item .team-stats { color: var(--muted); }
+    .force-mix-grid { display: grid; gap: 5px; margin-top: 7px; max-height: 190px; overflow-y: auto; }
+    .force-mix-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 8px; align-items: start; padding: 6px 7px; border: 1px solid rgba(148,163,184,.16); border-radius: 6px; background: rgba(0,216,255,.025); }
+    .force-mix-row strong { color: var(--text); font-size: 11px; font-weight: 650; }
+    .force-mix-row span { color: var(--muted); font-size: 10px; text-align: right; white-space: nowrap; }
+    .force-mix-row small { display: block; grid-column: 1 / -1; color: #7998a8; font-size: 9.5px; line-height: 1.25; }
 
     /* Details card */
     #details {
@@ -1011,16 +1040,24 @@
     /* First-run orientation card */
     #first-run-card { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; }
     #first-run-card .fr-backdrop { position: absolute; inset: 0; background: rgba(3,8,14,.72); backdrop-filter: blur(2px); }
-    #first-run-card .fr-panel { position: relative; width: min(540px, 92vw); background: linear-gradient(180deg,#0e2236,#0a1622); border: 1px solid #244d6e; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); color: #cfe0ee; font-family: 'Inter', system-ui, sans-serif; }
+    #first-run-card .fr-panel { position: relative; width: min(540px, 92vw); max-height: 94vh; overflow:auto; background: linear-gradient(180deg,#0e2236,#0a1622); border: 1px solid #244d6e; border-radius: 14px; padding: 22px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.6); color: #cfe0ee; font-family: 'Inter', system-ui, sans-serif; }
     #first-run-card .fr-title { font-family: 'Oswald','Inter',system-ui,sans-serif; font-weight: 700; letter-spacing: .14em; font-size: 22px; color: #eaf4ff; }
     #first-run-card .fr-sub { color: #8fb4d4; font-size: 13px; margin-top: 2px; }
     #first-run-card .fr-body { font-size: 13.5px; line-height: 1.5; margin: 14px 0; color: #cfe0ee; }
     #first-run-card .fr-steps { display: grid; gap: 7px; margin: 12px 0; }
     #first-run-card .fr-step { display: flex; align-items: center; gap: 10px; background: rgba(20,44,66,.5); border: 1px solid #1d3e59; border-radius: 8px; padding: 9px 12px; font-size: 13px; }
     #first-run-card .fr-n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1d6f3f; color: #eafff0; font-weight: 700; font-size: 12px; flex: 0 0 auto; }
-    #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 16px; line-height: 1.45; }
-    #first-run-card .fr-ok { width: 100%; background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; font: 600 14px 'Inter',system-ui,sans-serif; padding: 11px; border-radius: 8px; cursor: pointer; }
-    #first-run-card .fr-ok:hover { border-color: #46d585; }
+    #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 10px; line-height: 1.45; }
+    #first-run-card .fr-status { min-height: 18px; color: #7fa6c4; font-size: 11.5px; margin: 0 0 10px; }
+    #first-run-card .fr-actions { display: grid; grid-template-columns: 1fr 1.45fr; gap: 9px; }
+    #first-run-card button { min-height: 44px; border-radius: 8px; cursor: pointer; font: 600 13px 'Inter',system-ui,sans-serif; padding: 10px 12px; }
+    #first-run-card .fr-primary { background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; }
+    #first-run-card .fr-primary:hover:not(:disabled) { border-color: #46d585; }
+    #first-run-card .fr-primary:disabled { opacity:.5; cursor:wait; }
+    #first-run-card .fr-secondary { background:#10283b; border:1px solid #285476; color:#b8d8ec; }
+    #first-run-card .fr-secondary:hover { border-color:#4b9bd0; color:#eef9ff; }
+    #first-run-card button:focus-visible { outline:2px solid #63d7ff; outline-offset:2px; }
+    @media (max-width:560px) { #first-run-card .fr-panel { padding:18px; max-height:94vh; overflow:auto; } #first-run-card .fr-actions { grid-template-columns:1fr; } }
     #fr-help-btn { position: fixed; bottom: 16px; left: 16px; z-index: 1450; width: 30px; height: 30px; border-radius: 50%; background: #13314a; color: #bfe4ff; border: 1px solid #2c5f86; font: 700 15px system-ui; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
     #fr-help-btn:hover { border-color: #4bb8ff; color: #fff; }
     /* Active-view "you are here" highlight on the Quick-Action view buttons */
@@ -1031,6 +1068,17 @@
        Display: Orbitron · UI: Inter · Data stream: Share Tech Mono
        ══════════════════════════════════════════════════════════════════════ */
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+    /* CO-006 P4 (W6): html.cin-rm is the operator's forced reduced-motion toggle —
+       cinematics.js owns the class; it mirrors the media query rule above exactly. */
+    html.cin-rm *, html.cin-rm *::before, html.cin-rm *::after { animation-duration:.001s !important; animation-iteration-count:1 !important; }
+    /* Browser-game lifecycle: ambient chrome sleeps when the tab is hidden or a full
+       workflow overlay is covering the play surface. The active overlay keeps its own
+       short entrance animation; only the obscured command surface is paused. */
+    body.app-hidden *, body.app-hidden *::before, body.app-hidden *::after,
+    body.app-overlay-open #app *, body.app-overlay-open #app::before,
+    body.app-overlay-open #hud-overlay *, body.app-overlay-open #hud-ticker * {
+      animation-play-state: paused !important;
+    }
 
     body { font-family: var(--ui); background: radial-gradient(1400px 920px at 26% -8%, #0e2030 0%, #07121c 47%, #03070b 100%); }
 
@@ -1238,7 +1286,7 @@
       body.wargame-open { --side-width: var(--wg-hud-w, 340px); }
       #side { width: 330px; }
     }
-    @media (max-width: 1000px) {
+    @media (max-width: 1200px) {
       /* Command bar wraps instead of clipping; --bar-h is re-measured by the shell
          resize handler so dependent offsets (app top, radar, banner) follow. */
       #cmd-bar { flex-wrap: wrap; height: auto; min-height: 56px; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
@@ -1281,12 +1329,14 @@
     "use strict";
     var mqMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     var state = {
-      view: '3d',                                  // '3d' | 'map' | 'table' | 'org'
+      view: 'map',                                 // '3d' | 'map' | 'table' | 'org'
       wargameOpen: false,
       hidden: !!document.hidden,
-      reducedMotion: !!(mqMotion && mqMotion.matches)
+      reducedMotion: !!(mqMotion && mqMotion.matches),
+      overlayOpen: false
     };
     var subs = [];
+    var overlaySources = Object.create(null);
     function notify(changed) {
       for (var i = 0; i < subs.length; i++) { try { subs[i](state, changed); } catch (e) {} }
     }
@@ -1294,6 +1344,10 @@
       if (changed.indexOf('wargameOpen') !== -1 && document.body) {
         document.body.classList.toggle('wargame-open', state.wargameOpen);
       }
+      if (!document.body) return;
+      if (changed.indexOf('view') !== -1) document.body.setAttribute('data-app-view', state.view);
+      if (changed.indexOf('hidden') !== -1) document.body.classList.toggle('app-hidden', state.hidden);
+      if (changed.indexOf('overlayOpen') !== -1) document.body.classList.toggle('app-overlay-open', state.overlayOpen);
     }
     function set(patch) {
       var changed = [];
@@ -1305,6 +1359,12 @@
     function subscribe(fn) {
       subs.push(fn);
       return function () { var i = subs.indexOf(fn); if (i !== -1) subs.splice(i, 1); };
+    }
+    function setOverlay(name, active) {
+      name = String(name || 'anonymous');
+      if (active) overlaySources[name] = true;
+      else delete overlaySources[name];
+      set({ overlayOpen: Object.keys(overlaySources).length > 0 });
     }
     // Managed ambient interval: pauses while the tab is hidden, runs once immediately
     // on resume so displays catch up (C-050).
@@ -1324,10 +1384,15 @@
       if (mqMotion.addEventListener) mqMotion.addEventListener('change', onMq);
       else if (mqMotion.addListener) mqMotion.addListener(onMq);
     }
+    if (document.body) {
+      document.body.setAttribute('data-app-view', state.view);
+      document.body.classList.toggle('app-hidden', state.hidden);
+    }
     return {
       state: state,
       set: set,
       subscribe: subscribe,
+      setOverlay: setOverlay,
       every: every,
       prefersReducedMotion: function () { return state.reducedMotion; }
     };
@@ -1370,6 +1435,7 @@
       if (!stack.length) applyInert();
       el.style.display = 'flex';
       stack.push(entry);
+      if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('modal', true);
       var dlg = dialogOf(entry);
       var f = focusablesIn(dlg);
       if (f.length) { try { f[0].focus(); } catch (e) {} }
@@ -1383,7 +1449,10 @@
       if (idx === -1) { if (el) el.style.display = 'none'; return; } // not service-opened: degrade to plain hide
       var entry = stack.splice(idx, 1)[0];
       entry.el.style.display = 'none';
-      if (!stack.length) liftInert();
+      if (!stack.length) {
+        liftInert();
+        if (window.AppShell && AppShell.setOverlay) AppShell.setOverlay('modal', false);
+      }
       try { if (entry.prevFocus && document.contains(entry.prevFocus)) entry.prevFocus.focus(); } catch (e) {}
       if (typeof entry.onClose === 'function') { try { entry.onClose(); } catch (e) {} }
     }
@@ -1788,7 +1857,8 @@
     </div>
 
     <div class="panel" aria-labelledby="team-resources-title">
-    <h2 id="team-resources-title">Team Resources</h2>
+    <h2 id="team-resources-title">Mission Capacity</h2>
+    <p class="hint mt4">Abstract capacity points per turn from active scenario nodes — not personnel, platform, or weapon counts.</p>
     <div id="team-resources" class="team-summary-grid">
       <div class="team-summary-item">
         <div class="team-name"><span class="swatch" style="background: var(--team-blue)"></span> Blue</div>
@@ -1799,6 +1869,12 @@
         <div class="team-stats"><span id="res-red">0</span> pts <span class="muted" id="res-red-types"></span></div>
       </div>
     </div>
+    </div>
+
+    <div class="panel" aria-labelledby="blue-force-mix-title">
+    <h2 id="blue-force-mix-title">Blue Joint Force Mix</h2>
+    <p class="hint mt4">Scenario aggregates by owner; conditional packages remain visible with zero active points. Totals are analytical weights, not a literal order of battle.</p>
+    <div id="blue-force-mix" class="force-mix-grid" aria-live="polite"></div>
     </div>
 
     <div class="section" aria-labelledby="search-title">
@@ -1927,7 +2003,7 @@
       <div class="results-grid">
         <div class="result-metric">
           <span class="result-value" id="mc-success">—</span>
-          <span class="result-label">Chance of Success</span>
+          <span class="result-label">Model-Trial Threshold Rate</span>
           <span class="result-ci" id="mc-success-ci" style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--muted);margin-top:3px"></span>
         </div>
         <div class="result-metric">
@@ -2085,12 +2161,8 @@
     })();
   </script>
 
-  <!-- three.js must load first so window.THREE exists for OrbitControls (which attaches
-       THREE.OrbitControls) and for the standalone WebGLRenderer / minimap that the app
-       builds directly against the global THREE. -->
-  <script src="vendor/three.min.js"></script>
-  <script src="vendor/3d-force-graph.min.js"></script>
-  <script src="vendor/OrbitControls.js"></script>
+  <!-- The WebGL stack is intentionally loaded on demand when the player selects 3D.
+       The guided game and default Map view never pay its parse, memory, or GPU cost. -->
   <script src="vendor/d3.v7.min.js"></script>
   <script src="vendor/leaflet.js"></script>
 
@@ -2211,7 +2283,7 @@
     sof:    { name: 'SOF Mission',   cost: 1, baseProb: 0.90, baseDamage: [60, 90], vulnerability: 'SOF' }
     };
 
-    // Resources removed for now; future: red/blue from imported libraries
+    // Strike methods draw on the active scenario's canonical mission-capacity model.
 
     let simTime = 0;
     let playing = false;
@@ -2231,7 +2303,37 @@
     let highlightSet = new Set();
     let geoModeEnabled = false; // app-level mode flag; geo 3D layout lives in EngineModule
     let importCounter = 0;
-    let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, ew:0, jam:0, sof:0 }, redTypes: { ke:0, ew:0, jam:0, sof:0 } };
+    let teamResources = { blue: 0, red: 0, blueTypes: { ke:0, cyber:0, ew:0, sof:0 }, redTypes: { ke:0, cyber:0, ew:0, sof:0 } };
+
+    // Canonical resource contract (resource-model-v2). Values are relative mission-capacity
+    // points per turn, not literal teams, systems, munitions, or effects. The old jam field
+    // is accepted only as an import alias: Cyber-domain nodes map it to cyber; EW-domain
+    // nodes map it to ew. New exports serialize only kinetic/cyber/ew/sof.
+    function canonicalResourceGen(node) {
+      const r = node?.resourceGenByType || {};
+      const domains = (Array.isArray(node?.domain) ? node.domain : [node?.domain])
+        .map(value => String(value || '').toLowerCase());
+      const descriptor = [node?.type, node?.name].map(value => String(value || '').toLowerCase()).join(' ');
+      const cyberRole = domains.includes('cyber') || descriptor.includes('cyber') || descriptor.includes('network operations');
+      const ewRole = domains.includes('ew') || descriptor.includes('electronic') || descriptor.includes('spectrum');
+      const hasCanonical = Object.prototype.hasOwnProperty.call(r, 'cyber');
+      const legacyJam = Number(r.jam ?? r.jamming ?? 0);
+      if (!node?.resourceGenByType) {
+        const total = Math.max(0, Number(node?.resourceGen || 0));
+        if (cyberRole) return { kinetic:0, cyber:total, ew:0, sof:0 };
+        if (ewRole) return { kinetic:0, cyber:0, ew:total, sof:0 };
+        if (descriptor.includes('sof') || descriptor.includes('special operations')) return { kinetic:0, cyber:0, ew:0, sof:total };
+        return { kinetic:total, cyber:0, ew:0, sof:0 };
+      }
+      return {
+        kinetic: Math.max(0, Number(r.kinetic || 0)),
+        cyber: Math.max(0, Number(hasCanonical ? r.cyber : (cyberRole ? legacyJam : 0))),
+        ew: Math.max(0, Number(hasCanonical
+          ? (r.ew ?? r.jam ?? r.jamming ?? 0)
+          : (ewRole ? Math.max(Number(r.ew || 0), legacyJam) : Number(r.ew || 0)))),
+        sof: Math.max(0, Number(r.sof || 0))
+      };
+    }
 
     // Map state. The map *mode* flag stays here (app-level orchestration); the Leaflet
     // instance, layers, and marker index now live in MapModule (see map.js).
@@ -2297,6 +2399,17 @@
       counters: r.counters || r.Counters || null,
       signature: r.signature || r.Signature || null,
       ngc2: r.ngc2 || r.NGC2 || null,
+      capabilityProfile: r.capabilityProfile || r.Capability_Profile || null,
+      sourceRefs: r.sourceRefs || r.Source_Refs || [],
+      nation: r.nation || r.Nation || null,
+      serviceOwner: r.serviceOwner || r.Service_Owner || r.component || r.Component || null,
+      component: r.component || r.Component || r.serviceOwner || r.Service_Owner || null,
+      jointFunction: r.jointFunction || r.Joint_Function || null,
+      operationalRole: r.operationalRole || r.Operational_Role || null,
+      accessDependencies: r.accessDependencies || r.Access_Dependencies || [],
+      tempoRole: r.tempoRole || r.Tempo_Role || null,
+      scenarioEnabled: r.scenarioEnabled ?? r.Scenario_Enabled ?? true,
+      locationPrecision: r.locationPrecision || r.Location_Precision || null,
       threeObj: r.__threeObj || null,
     };
     });
@@ -2324,20 +2437,50 @@
       const warnings = [];
       const idSet = new Set();
       const dupes = new Set();
+      const sourceIds = new Set((data.sources || []).map(source => source?.id).filter(Boolean));
+      const canonicalKeys = ['cyber', 'ew', 'kinetic', 'sof'];
       (data.nodes||[]).forEach(n => {
         if (!n?.id) warnings.push('Node without id');
         else if (idSet.has(n.id)) dupes.add(n.id); else idSet.add(n.id);
         if (n?.lat != null && (isNaN(n.lat) || n.lat < -90 || n.lat > 90)) warnings.push(`Node ${n.id} has invalid latitude: ${n.lat}`);
         if (n?.lon != null && (isNaN(n.lon) || n.lon < -180 || n.lon > 180)) warnings.push(`Node ${n.id} has invalid longitude: ${n.lon}`);
+        const rawResources = n?.resourceGenByType;
+        if (!rawResources || typeof rawResources !== 'object' || Array.isArray(rawResources)) {
+          warnings.push(`Node ${n?.id || '?'} is missing typed mission capacity`);
+        } else {
+          const keys = Object.keys(rawResources).sort();
+          if (keys.includes('jam') || keys.includes('jamming')) warnings.push(`Node ${n.id} uses legacy jam capacity`);
+          if (canonicalKeys.some(key => !keys.includes(key))) warnings.push(`Node ${n.id} is missing a canonical capacity field`);
+          const extraKeys = keys.filter(key => !canonicalKeys.includes(key));
+          if (extraKeys.length) warnings.push(`Node ${n.id} has unsupported capacity fields: ${extraKeys.join(', ')}`);
+          keys.forEach(key => {
+            const value = Number(rawResources[key]);
+            if (!Number.isInteger(value) || value < 0 || value > 10) warnings.push(`Node ${n.id} has invalid ${key} capacity: ${rawResources[key]}`);
+          });
+        }
+        const profileRefs = Array.isArray(n?.capabilityProfile?.sourceRefs)
+          ? n.capabilityProfile.sourceRefs
+          : (Array.isArray(n?.sourceRefs) ? n.sourceRefs : []);
+        profileRefs.forEach(ref => {
+          if (!sourceIds.has(ref)) warnings.push(`Node ${n.id} cites missing source ${ref}`);
+        });
       });
       if (dupes.size) warnings.push(`Duplicate node ids: ${Array.from(dupes).slice(0,5).join(', ')}${dupes.size>5?'…':''}`);
       const badLinks = [];
+      const duplicateLinks = [];
+      const linkKeys = new Set();
       (data.links||[]).forEach(l => {
         const s = l?.source?.id ?? l?.source;
         const t = l?.target?.id ?? l?.target;
         if (!idSet.has(s) || !idSet.has(t)) badLinks.push(`${s||'?'}→${t||'?'}`);
+        if (s && t) {
+          const key = String(s) < String(t) ? `${s}__${t}` : `${t}__${s}`;
+          if (linkKeys.has(key)) duplicateLinks.push(`${s}↔${t}`);
+          linkKeys.add(key);
+        }
       });
       if (badLinks.length) warnings.push(`Links to missing nodes: ${badLinks.slice(0,5).join(', ')}${badLinks.length>5?'…':''}`);
+      if (duplicateLinks.length) warnings.push(`Duplicate links: ${duplicateLinks.slice(0,5).join(', ')}${duplicateLinks.length>5?'…':''}`);
       return warnings;
     }
 
@@ -2377,11 +2520,48 @@
       const healthPercent = Math.round((node.health / (node.healthMax || 100)) * 100);
       const healthColor = healthPercent > 70 ? 'var(--success)' : healthPercent > 40 ? 'var(--warning)' : 'var(--danger)';
       const teamName = (node.team || '3rd_party').replace('_', ' ');
+      const componentName = node.serviceOwner || node.component || 'Component not stated';
+      const nationName = node.nation || 'Nation not stated';
       const coords = (node.lat != null && node.lon != null) ? `${Number(node.lat).toFixed(2)}, ${Number(node.lon).toFixed(2)}` : '—';
-      const rgt = node.resourceGenByType || { kinetic: node.resourceGen || 0, cyber: 0, ew: 0, jam: 0, sof: 0 };
+      const rgt = canonicalResourceGen(node);
+      const profile = node.capabilityProfile || null;
+      const sourceCatalog = new Map((data.sources || []).map(source => [source.id, source]));
+      const htmlText = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[ch]);
+      const sourceRefs = Array.isArray(profile?.sourceRefs) ? profile.sourceRefs : (node.sourceRefs || []);
+      const potential = profile?.potentialResourceGenByType;
+      const potentialText = potential
+        ? `Kinetic ${Number(potential.kinetic || 0)} · Cyber ${Number(potential.cyber || 0)} · EW ${Number(potential.ew || 0)} · SOF ${Number(potential.sof || 0)}`
+        : '';
+      const sourceHtml = sourceRefs.map(id => {
+        const source = sourceCatalog.get(id);
+        const sourceUrl = /^https?:\/\//i.test(String(source?.url || '')) ? htmlText(source.url) : '';
+        const sourceLabel = source
+          ? `${source.publisher || source.title || id}${source.year ? ` (${source.year})` : ''}`
+          : id;
+        return source && sourceUrl
+          ? '<a href="' + sourceUrl + '" target="_blank" rel="noreferrer">' + htmlText(sourceLabel) + '</a>'
+          : htmlText(id);
+      }).join(' · ');
+      const capabilityHtml = profile ? [
+        '<div class="kv"><strong>Capability evidence</strong></div>',
+        '<div class="kv">Class: ' + htmlText(profile.evidenceClass || 'not stated') + ' · confidence ' + htmlText(profile.confidence || 'not stated') + '</div>',
+        '<div class="kv">Availability: ' + htmlText(profile.availability || 'scenario active') + '</div>',
+        node.jointFunction ? '<div class="kv">Joint function: ' + htmlText(node.jointFunction) + '</div>' : '',
+        node.operationalRole ? '<div class="kv">Operational role: ' + htmlText(node.operationalRole) + '</div>' : '',
+        Array.isArray(node.accessDependencies) && node.accessDependencies.length
+          ? '<div class="kv">Access depends on: ' + htmlText(node.accessDependencies.join(', ')) + '</div>' : '',
+        '<div class="kv">Role: ' + htmlText(profile.category || 'not stated') + '</div>',
+        '<div class="kv">Functions: ' + htmlText((profile.functions || []).join(', ') || 'None listed') + '</div>',
+        potentialText ? '<div class="kv">Conditional capacity: ' + htmlText(potentialText) + '</div>' : '',
+        profile.assumption ? '<div class="kv">Assumption: ' + htmlText(profile.assumption) + '</div>' : '',
+        sourceHtml ? '<div class="kv">Sources: ' + sourceHtml + '</div>' : ''
+      ].filter(Boolean).join('') : '';
       pop.innerHTML = `
         <h4>${node.name} <span class="meta">(${node.id})</span></h4>
-        <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${teamName}</strong> · ${node.domain?.join(', ') || '—'}</div>
+        <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${htmlText(teamName)}</strong> · ${htmlText(nationName)} · ${htmlText(componentName)}</div>
+        <div class="kv">Domain: ${htmlText(node.domain?.join(', ') || '—')}</div>
         <div class="kv">Type: ${node.type || '—'}</div>
         <div class="kv">Health: <span style="color:${healthColor}">${Math.round(node.health)} / ${node.healthMax || 100}</span></div>
         <div class="kv">Difficulty: ${node.difficulty || '—'}</div>
@@ -2390,7 +2570,7 @@
         <div class="kv"><strong>Resources (per type)</strong></div>
         <div class="kv"><label>Kinetic <input id="popup-kinetic" type="number" min="0" value="${rgt.kinetic ?? 0}" style="width:80px;"></label></div>
         <div class="kv"><label>Cyber <input id="popup-cyber" type="number" min="0" value="${rgt.cyber ?? 0}" style="width:80px;"></label></div>
-        <div class="kv"><label>Jamming/EW <input id="popup-jam" type="number" min="0" value="${(rgt.jam ?? rgt.jamming ?? rgt.ew) ?? 0}" style="width:80px;"></label></div>
+        <div class="kv"><label>Electronic Warfare <input id="popup-ew" type="number" min="0" value="${rgt.ew ?? 0}" style="width:80px;"></label></div>
         <div class="kv"><label>SOF <input id="popup-sof" type="number" min="0" value="${rgt.sof ?? 0}" style="width:80px;"></label></div>
         <div class="actions">
           <button id="popup-strike-btn" class="warn" type="button" ${node.status === 'Neutralized' ? 'disabled' : ''}>Strike</button>
@@ -2398,6 +2578,13 @@
           <button id="popup-close-btn" class="secondary" type="button">Close</button>
         </div>
       `;
+      if (capabilityHtml) {
+        const details = document.createElement('div');
+        details.className = 'capability-profile';
+        details.innerHTML = capabilityHtml;
+        const actions = pop.querySelector('.actions');
+        pop.insertBefore(details, actions);
+      }
       pop.style.display = 'block';
       updateNodePopupPosition(node);
       const strikeBtn = document.getElementById('popup-strike-btn');
@@ -2412,10 +2599,9 @@
         const updated = {
           kinetic: num('popup-kinetic'),
           cyber: num('popup-cyber'),
-          jam: num('popup-jam'),
+          ew: num('popup-ew'),
           sof: num('popup-sof')
         };
-        updated.ew = updated.jam; // mirror EW into jam bucket for legacy fields
         node.resourceGenByType = updated;
         node.resourceGen = Object.values(updated).reduce((a,b)=>a+b,0);
         recalcTeamResources();
@@ -2490,7 +2676,12 @@
     // Command-bar view switcher: set the app to exactly one view. Reuses the existing
     // toggle functions (which already turn the other views off).
     function setView(v) {
-      if (v === '3d') { if (mapModeEnabled) toggleMapMode(); if (tableModeEnabled) toggleTableMode(); if (orgModeEnabled) toggleOrgMode(); }
+      if (v === '3d') {
+        if (!graphInstance) { open3DOnDemand(); return; }
+        if (mapModeEnabled) toggleMapMode();
+        if (tableModeEnabled) toggleTableMode();
+        if (orgModeEnabled) toggleOrgMode();
+      }
       else if (v === 'map' && !mapModeEnabled) toggleMapMode();
       else if (v === 'table' && !tableModeEnabled) toggleTableMode();
       else if (v === 'org' && !orgModeEnabled) toggleOrgMode();
@@ -2692,6 +2883,7 @@
     function refreshGraph() {
       const { visibleNodes, visibleLinks } = currentVisible();
       if (graphInstance) {
+        if (window.EngineModule?.wake) EngineModule.wake(1800);
         graphInstance.graphData({ nodes: visibleNodes, links: visibleLinks });
         if (geoModeEnabled) {
           EngineModule.applyGeoLayout(visibleNodes);
@@ -3029,6 +3221,7 @@
         Object.keys(simStats).forEach(k => { if (k in snap.simStats) simStats[k] = snap.simStats[k]; });
         initUI();
         if (graphInstance) {
+          if (window.EngineModule?.wake) EngineModule.wake(1800);
           graphInstance.graphData(data);
           if (!geoModeEnabled) graphInstance.d3ReheatSimulation();
         }
@@ -3051,6 +3244,7 @@
     resetApplicationState();
     initUI();
     if (graphInstance) {
+    if (window.EngineModule?.wake) EngineModule.wake(1800);
     graphInstance.graphData(data);
     graphInstance.d3ReheatSimulation();
     }
@@ -3125,11 +3319,18 @@
       if (Array.isArray(payload)) return transformPla(payload);
       return {
         nodes: Array.isArray(payload.nodes) ? payload.nodes : (payload.nodes ?? []),
-        links: Array.isArray(payload.links) ? payload.links : []
+        links: Array.isArray(payload.links) ? payload.links : [],
+        sources: Array.isArray(payload.sources) ? payload.sources : [],
+        metadata: payload.metadata || null
       };
     }
     if (importedRaw.nodes) {
-      return { nodes: importedRaw.nodes, links: importedRaw.links || [] };
+      return {
+        nodes: importedRaw.nodes,
+        links: importedRaw.links || [],
+        sources: Array.isArray(importedRaw.sources) ? importedRaw.sources : [],
+        metadata: importedRaw.metadata || null
+      };
     }
     if (Array.isArray(importedRaw)) {
       return transformPla(importedRaw);
@@ -3179,6 +3380,14 @@
     }).filter(Boolean);
     data.nodes.push(...clonedNodes);
     data.links.push(...newLinks);
+    if (Array.isArray(importedData.sources) && importedData.sources.length) {
+      const sourceMap = new Map((data.sources || []).map(source => [source.id, source]));
+      importedData.sources.forEach(source => { if (source?.id) sourceMap.set(source.id, source); });
+      data.sources = Array.from(sourceMap.values());
+    }
+    if (importedData.metadata) {
+      data.metadata = Object.assign({}, data.metadata || {}, importedData.metadata);
+    }
     if (options.recordLastImport !== false) {
       lastImportIds = new Set(clonedNodes.map(n => n.id));
       lastImportMode = 'add';
@@ -3421,9 +3630,9 @@
     if (highlightColor && highlightSet.size > 0) {
     const src = l.source?.id ?? l.source;
     const tgt = l.target?.id ?? l.target;
-    return (highlightSet.has(src) && highlightSet.has(tgt)) ? 2.5 : 1;
+    return (highlightSet.has(src) && highlightSet.has(tgt)) ? 2.5 : 0;
     }
-    return 1;
+    return 0;
     });
     // Also push colors directly onto three.js materials to avoid lighting washing out palette
     try {
@@ -3476,42 +3685,58 @@
 
     // --- Team resources ---
     function recalcTeamResources() {
-    const initTypes = () => ({ ke:0, cyber:0, jam:0, sof:0 });
-    const sumTypes = (acc, src) => { acc.ke+=(src.ke||0); acc.cyber+=(src.cyber||0); acc.jam+=(src.jam||0); acc.sof+=(src.sof||0); return acc; };
-    // Treat EW as part of jamming, cyber as its own bucket
-    const mapRgt = (rgt) => ({
-      ke: Number(rgt.kinetic||0),
-      cyber: Number(rgt.cyber||0),
-      jam: Number(rgt.jam ?? rgt.jamming ?? rgt.ew ?? 0),
-      sof: Number(rgt.sof||0)
-    });
-    function classifyCategory(n) {
-      const d = (n.domain||[]).map(s=>String(s).toLowerCase());
-      const t = String(n.type||'').toLowerCase();
-      const vulns = (n.vulnerabilities||[]).map(v=>String(v).toLowerCase());
-      if (t.includes('sof') || t.includes('special')) return 'sof';
-      if (d.includes('cyber') || t.includes('cyber')) return 'cyber';
-      if (d.includes('ew') || t.includes('ew') || vulns.some(v=>v.includes('jam'))) return 'jam';
-      return 'ke';
-    }
+    const initTypes = () => ({ ke:0, cyber:0, ew:0, sof:0 });
+    const sumNode = (acc, node) => {
+      const resources = canonicalResourceGen(node);
+      acc.ke += resources.kinetic;
+      acc.cyber += resources.cyber;
+      acc.ew += resources.ew;
+      acc.sof += resources.sof;
+      return acc;
+    };
     const blueNodes = data.nodes.filter(n => (n.team === 'blue') && n.status !== 'Neutralized');
     const redNodes  = data.nodes.filter(n => (n.team === 'red')  && n.status !== 'Neutralized');
-    const blueTypes = blueNodes.reduce((acc,n)=>{
-      if (n.resourceGenByType) return sumTypes(acc, mapRgt(n.resourceGenByType));
-      const cat = classifyCategory(n); acc[cat]+= (Number(n.resourceGen)||0); return acc;
-    }, initTypes());
-    const redTypes  = redNodes.reduce((acc,n)=>{
-      if (n.resourceGenByType) return sumTypes(acc, mapRgt(n.resourceGenByType));
-      const cat = classifyCategory(n); acc[cat]+= (Number(n.resourceGen)||0); return acc;
-    }, initTypes());
+    const blueTypes = blueNodes.reduce(sumNode, initTypes());
+    const redTypes  = redNodes.reduce(sumNode, initTypes());
     const blue = Object.values(blueTypes).reduce((a,b)=>a+b,0);
     const red  = Object.values(redTypes).reduce((a,b)=>a+b,0);
     teamResources.blue = blue; teamResources.red = red;
     teamResources.blueTypes = blueTypes; teamResources.redTypes = redTypes;
     const rb = document.getElementById('res-blue'); if (rb) rb.textContent = String(blue);
     const rr = document.getElementById('res-red'); if (rr) rr.textContent = String(red);
-    const rbb = document.getElementById('res-blue-types'); if (rbb) rbb.textContent = `(KE:${blueTypes.ke} Cyber:${blueTypes.cyber} JAM:${blueTypes.jam} SOF:${blueTypes.sof})`;
-    const rrb = document.getElementById('res-red-types'); if (rrb) rrb.textContent = `(KE:${redTypes.ke} Cyber:${redTypes.cyber} JAM:${redTypes.jam} SOF:${redTypes.sof})`;
+    const rbb = document.getElementById('res-blue-types'); if (rbb) rbb.textContent = `(Kinetic ${blueTypes.ke} · Cyber ${blueTypes.cyber} · EW ${blueTypes.ew} · SOF ${blueTypes.sof})`;
+    const rrb = document.getElementById('res-red-types'); if (rrb) rrb.textContent = `(Kinetic ${redTypes.ke} · Cyber ${redTypes.cyber} · EW ${redTypes.ew} · SOF ${redTypes.sof})`;
+    renderBlueForceMix(blueNodes);
+    }
+
+    function renderBlueForceMix(blueNodes) {
+    const host = document.getElementById('blue-force-mix');
+    if (!host) return;
+    const groups = new Map();
+    (blueNodes || []).forEach(node => {
+      const owner = node.serviceOwner || node.component || 'Unassigned component';
+      if (!groups.has(owner)) groups.set(owner, { nodes: 0, kinetic: 0, cyber: 0, ew: 0, sof: 0 });
+      const group = groups.get(owner);
+      const capacity = canonicalResourceGen(node);
+      group.nodes += 1;
+      group.kinetic += capacity.kinetic;
+      group.cyber += capacity.cyber;
+      group.ew += capacity.ew;
+      group.sof += capacity.sof;
+    });
+    const htmlText = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    })[ch]);
+    const rows = Array.from(groups.entries()).map(([owner, values]) => ({
+      owner,
+      ...values,
+      total: values.kinetic + values.cyber + values.ew + values.sof
+    })).sort((a, b) => b.nodes - a.nodes || b.total - a.total || a.owner.localeCompare(b.owner));
+    host.innerHTML = rows.map(row =>
+      '<div class="force-mix-row"><strong>' + htmlText(row.owner) + '</strong>' +
+      '<span>' + row.nodes + ' nodes · ' + row.total + ' pts</span>' +
+      '<small>K ' + row.kinetic + ' · Cyber ' + row.cyber + ' · EW ' + row.ew + ' · SOF ' + row.sof + '</small></div>'
+    ).join('') || '<div class="muted">No active Blue force data.</div>';
     }
 
     // --- MAP HELPERS ---
@@ -3519,6 +3744,7 @@
     // wireMapModule() so existing call sites keep working.
 
     function toggleMapMode() {
+    if (mapModeEnabled && !graphInstance) { open3DOnDemand(); return; }
     mapModeEnabled = !mapModeEnabled;
     if (mapModeEnabled && orgModeEnabled) {
       orgModeEnabled = false;
@@ -3575,6 +3801,12 @@
       } else {
         if (legendWasVisibleBeforeTable) setLegendVisible(true);
       }
+      if (!tableModeEnabled && !graphInstance) {
+        mapModeEnabled = true;
+        document.getElementById('map').style.display = 'block';
+        const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
+        ensureMap();
+      }
       document.getElementById('table').style.display = tableModeEnabled ? 'block' : 'none';
       document.getElementById('graph').style.display = tableModeEnabled ? 'none' : (mapModeEnabled ? 'none' : 'block');
       const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = tableModeEnabled ? '3D' : 'Table';
@@ -3628,7 +3860,13 @@
         const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
         if (mapModeEnabled) document.getElementById('map').style.display = 'block';
         else if (tableModeEnabled) document.getElementById('table').style.display = 'block';
-        else document.getElementById('graph').style.display = 'block';
+        else if (graphInstance) document.getElementById('graph').style.display = 'block';
+        else {
+          mapModeEnabled = true;
+          document.getElementById('map').style.display = 'block';
+          const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
+          ensureMap();
+        }
         resetView();
       }
       updateViewStatus();
@@ -3691,11 +3929,36 @@
         if (arrow) arrow.textContent = collapsed ? '▶' : '◀';
       }
       if (leftCollapseBtn) leftCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      [leftPanel.querySelector(':scope > header'), document.getElementById('left-panel-content')].filter(Boolean).forEach((region) => {
+        region.inert = collapsed;
+        region.setAttribute('aria-hidden', String(collapsed));
+      });
+      if (collapsed && leftPanel.contains(document.activeElement) && document.activeElement !== leftHandle) leftHandle?.focus();
     };
     const setRightCollapsed = (collapsed) => {
       if (!rightPanel) return;
       rightPanel.classList.toggle('collapsed', collapsed);
       document.body.classList.toggle('right-collapsed', collapsed);
+      if (rightHandle) rightHandle.setAttribute('aria-expanded', String(!collapsed));
+      if (rightCollapseBtn) rightCollapseBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      [rightPanel.querySelector(':scope > header'), document.getElementById('side-content')].filter(Boolean).forEach((region) => {
+        region.inert = collapsed;
+        region.setAttribute('aria-hidden', String(collapsed));
+      });
+      if (collapsed && rightPanel.contains(document.activeElement) && document.activeElement !== rightHandle) rightHandle?.focus();
+    };
+    // A small public shell contract lets guided experiences temporarily clear the
+    // analytical rails without pretending the expert tools do not exist. These
+    // programmatic changes do not overwrite the user's responsive/manual preference.
+    window.StrikeSimShell = window.StrikeSimShell || {};
+    window.StrikeSimShell.getPanelState = () => ({
+      leftCollapsed: !!(leftPanel && leftPanel.classList.contains('locked-collapsed')),
+      rightCollapsed: !!(rightPanel && rightPanel.classList.contains('collapsed'))
+    });
+    window.StrikeSimShell.setPanels = (next = {}) => {
+      if (typeof next.leftCollapsed === 'boolean') setLeftCollapsed(next.leftCollapsed);
+      if (typeof next.rightCollapsed === 'boolean') setRightCollapsed(next.rightCollapsed);
+      return window.StrikeSimShell.getPanelState();
     };
     if (leftPanel && leftCollapseBtn) {
       setLeftCollapsed(false);
@@ -3742,13 +4005,13 @@
         setLeftCollapsed(narrowLeft ? true : (userLeftCollapsed ?? false));
         wasNarrowLeft = narrowLeft;
       }
-      // The bar wraps below 1000px (CSS, height:auto there); republish its real
+      // The bar wraps below 1200px (CSS, height:auto there); republish its real
       // height so every var(--bar-h) consumer (app top, radar, banner, WG HUD)
       // follows. At full width the bar's height IS var(--bar-h), so measuring
       // would be circular — reset to the stylesheet default instead.
       const bar = document.getElementById('cmd-bar');
       if (bar) {
-        if (w < 1000) {
+        if (w < 1200) {
           const h = Math.max(56, Math.round(bar.getBoundingClientRect().height));
           document.documentElement.style.setProperty('--bar-h', h + 'px');
         } else {
@@ -3759,7 +4022,7 @@
     applyResponsiveShell();
     // The bar's content changes after load (module launch buttons relocate into it),
     // which can change its wrapped height — re-measure whenever the bar resizes.
-    // No feedback loop: below 1000px the bar's height is content-driven (height:auto,
+    // No feedback loop: below 1200px the bar's height is content-driven (height:auto,
     // literal min-height), so writing --bar-h never changes the bar itself.
     try {
       const barEl = document.getElementById('cmd-bar');
@@ -3801,11 +4064,26 @@
     document.getElementById('import-json-btn').addEventListener('click', openImportModal);
     document.getElementById('neutralize-btn-main').addEventListener('click', openStrikeModal);
 
-    const isTypingTarget = (target) => {
-      if (!target || !target.tagName) return false;
-      const tag = target.tagName.toLowerCase();
-      return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable === true;
+    const isInteractiveTarget = (target) => {
+      if (!(target instanceof Element) || typeof target.closest !== 'function') return false;
+      return !!target.closest([
+        'button', 'a[href]', 'input', 'textarea', 'select', 'summary',
+        '[contenteditable]:not([contenteditable="false"])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[role="button"]', '[role="link"]', '[role="checkbox"]', '[role="radio"]',
+        '[role="switch"]', '[role="tab"]', '[role="menuitem"]',
+        '[role="menuitemcheckbox"]', '[role="menuitemradio"]', '[role="option"]',
+        '[role="combobox"]', '[role="textbox"]', '[role="searchbox"]',
+        '[role="spinbutton"]', '[role="slider"]', '[role="treeitem"]'
+      ].join(','));
     };
+    const shortcutLayerIsOpen = () => Array.prototype.some.call(
+      document.querySelectorAll('.modal-backdrop, #first-run-card, #dir-overlay'),
+      (el) => {
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      }
+    );
 
     // Keyboard controls:
     // M = run Monte Carlo (10000 trials)
@@ -3814,9 +4092,9 @@
     // [ and ] = cycle selected target through visible nodes
     // Space = pause/resume sim tick timer
     window.addEventListener('keydown', (e) => {
-      if (isTypingTarget(e.target)) return;
-      // C-027: don't let global shortcuts fire behind an open modal (Escape still passes).
-      if (e.key !== 'Escape' && Array.prototype.some.call(document.querySelectorAll('.modal-backdrop'), m => getComputedStyle(m).display !== 'none')) return;
+      // Preserve native keyboard activation/focus behavior and never let app-wide
+      // shortcuts mutate the console behind a dialog or full-screen workflow layer.
+      if (isInteractiveTarget(e.target) || shortcutLayerIsOpen()) return;
       const key = e.key;
       if (key === 'Escape') {
         selectNode(null);
@@ -4009,7 +4287,7 @@
       if (selT) selT.value = rec.target.id;
       if (selM) selM.value = rec.methodKey;
       const p = Math.round(rec.p * 100);
-      if (hint) hint.textContent = `Recommended: ${strikeMethods[rec.methodKey].name} on ${rec.target.name} (${rec.target.id}) · ~${p}% success. ${rec.reason}.`;
+      if (hint) hint.textContent = `Recommended: ${strikeMethods[rec.methodKey].name} on ${rec.target.name} (${rec.target.id}) · ~${p}% modeled per-attempt effect rate. ${rec.reason}.`;
     });
     document.getElementById('coa-add-step-btn').addEventListener('click', () => {
       const selT = document.getElementById('coa-target-select');
@@ -4019,7 +4297,7 @@
       const hint = document.getElementById('coa-step-hint');
       const node = data.nodes.find(n => n.id === selT.value);
       const p = node ? Math.round(strikeProbFor(node, selM.value) * 100) : 0;
-      if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% success.`;
+      if (hint) hint.textContent = `Added: ${strikeMethods[selM.value].name} → ${node?.name || selT.value} · ~${p}% modeled per-attempt effect rate.`;
     });
     document.getElementById('coa-clear-btn').addEventListener('click', clearCOAPlan);
     document.getElementById('coa-simulate-plan-btn').addEventListener('click', () => {
@@ -4095,6 +4373,38 @@
     }
 
     // ---- Robust 3D engine startup -------------------------------------------------
+    let graph3dDepsPromise = null;
+    let graph3dStartupPromise = null;
+
+    function loadScriptOnce(src, ready) {
+      if (ready && ready()) return Promise.resolve();
+      const existing = Array.from(document.scripts).find(s => s.getAttribute('src') === src);
+      if (existing) {
+        return new Promise((resolve, reject) => {
+          if (ready && ready()) { resolve(); return; }
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', () => reject(new Error('Could not load ' + src)), { once: true });
+        });
+      }
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.addEventListener('load', resolve, { once: true });
+        s.addEventListener('error', () => reject(new Error('Could not load ' + src)), { once: true });
+        document.head.appendChild(s);
+      });
+    }
+
+    function loadGraph3DDependencies() {
+      if (window.THREE && window.ForceGraph3D) return Promise.resolve();
+      if (!graph3dDepsPromise) {
+        graph3dDepsPromise = loadScriptOnce('vendor/three.min.js', () => !!window.THREE)
+          .then(() => loadScriptOnce('vendor/3d-force-graph.min.js', () => !!window.ForceGraph3D));
+      }
+      return graph3dDepsPromise;
+    }
+
     // The render callbacks, reused by the initial attempt and by any retry.
     function graph3dOpts(rendererConfig) {
       const o = {
@@ -4146,6 +4456,62 @@
       return false;
     }
 
+    function set3DButtonsBusy(busy) {
+      document.querySelectorAll('[data-view="3d"], #map-btn').forEach(btn => {
+        btn.disabled = !!busy;
+        if (btn.matches('[data-view="3d"]')) btn.textContent = busy ? '3D LOADING…' : '3D';
+      });
+    }
+
+    // Allocate WebGL only after an explicit player request. This keeps the default Map
+    // and the entire guided operation on the inexpensive 2D path.
+    function open3DOnDemand() {
+      if (graphInstance) {
+        mapModeEnabled = false;
+        tableModeEnabled = false;
+        orgModeEnabled = false;
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('table').style.display = 'none';
+        document.getElementById('org-chart').style.display = 'none';
+        document.getElementById('graph').style.display = 'block';
+        document.getElementById('map-btn').textContent = 'Map';
+        updateViewStatus();
+        refreshGraph();
+        if (window.StageModule?.resize) StageModule.resize();
+        if (window.EngineModule?.wake) EngineModule.wake(1500);
+        return Promise.resolve(true);
+      }
+      if (graph3dStartupPromise) return graph3dStartupPromise;
+      set3DButtonsBusy(true);
+      const loader = document.getElementById('graph-loading');
+      if (loader) { loader.style.display = 'block'; loader.textContent = 'Starting 3D view on demand…'; }
+      graph3dStartupPromise = loadGraph3DDependencies()
+        .then(() => {
+          if (!tryInitGraph3D()) return false;
+          mapModeEnabled = false;
+          tableModeEnabled = false;
+          orgModeEnabled = false;
+          document.getElementById('map').style.display = 'none';
+          document.getElementById('table').style.display = 'none';
+          document.getElementById('org-chart').style.display = 'none';
+          document.getElementById('graph').style.display = 'block';
+          const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
+          document.getElementById('map-btn').textContent = 'Map';
+          updateViewStatus();
+          refreshGraph();
+          EngineModule.frameBlueToRed(900);
+          if (window.StageModule?.resize) StageModule.resize();
+          addEvent({ type: 'View', text: '3D engine loaded on demand; idle rendering sleeps automatically.' });
+          return true;
+        })
+        .catch(err => { handleGraph3DFailure(err); return false; })
+        .finally(() => {
+          set3DButtonsBusy(false);
+          graph3dStartupPromise = null;
+        });
+      return graph3dStartupPromise;
+    }
+
     function handleGraph3DFailure(err) {
       const realMsg = (err && (err.message || String(err))) || 'unknown error';
       // Notify once, calmly — repeated red errors over an environmental limitation are noise.
@@ -4169,8 +4535,8 @@
     // Every step is guarded so one failure can't abort the rest (a degraded Map beats a
     // blank screen), and the "Retry 3D" affordance is shown first so the operator is never
     // stranded without a way back to 3D.
-    function degradeToMap() {
-      showRetry3dButton();
+    function degradeToMap(offer3dRetry) {
+      if (offer3dRetry !== false) showRetry3dButton();
       mapModeEnabled = true;
       try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
       try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
@@ -4220,17 +4586,7 @@
       }
       try { EngineModule.dispose(); } catch (e) {}
       document.getElementById('graph').innerHTML = '';
-      if (!tryInitGraph3D()) return;   // still failing — fallback path already re-messaged
-      const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
-      mapModeEnabled = false;
-      document.getElementById('map').style.display = 'none';
-      document.getElementById('graph').style.display = 'block';
-      const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = 'Map';
-      refreshGraph();
-      EngineModule.frameBlueToRed(1200);
-      if (window.StageModule && StageModule.resize) StageModule.resize();
-      updateViewStatus();
-      showToast('3D view started.', 'success', 3000);
+      open3DOnDemand().then(ok => { if (ok) showToast('3D view started.', 'success', 3000); });
     }
 
     async function init() {
@@ -4239,17 +4595,11 @@
     bindEventListeners();
     initUI();
 
-    // Pick the landing view by capability. If WebGL is available, build the 3D engine
-    // (with its own progressive fallback). If not, don't even attempt it — that only
-    // throws a scary error — go straight to the Map view, which carries the full
-    // operational picture (symbols, threat rings, strikes) and needs no GPU.
-    if (webglAvailable()) {
-      tryInitGraph3D();
-    } else {
-      addEvent({ type: 'View', text: 'WebGL unavailable — opened the Map view (full operational picture).' });
-      showToast('Opened the Map view — your full operational picture (symbols, threat rings, the works). The 3D globe needs browser hardware acceleration; enable it and click "Retry 3D" anytime.', 'warn', 11000);
-      degradeToMap();
-    }
+    // Online-game landing: Map is the lightweight operational surface. Three.js,
+    // ForceGraph3D, a WebGL context, and the Earth texture stay unloaded until the
+    // player explicitly selects 3D.
+    degradeToMap(false);
+    addEvent({ type: 'View', text: 'Performance mode active: Map loaded first; 3D starts only when requested.' });
 
     refreshGraph();
     // Ensure legend button reflects initial state
@@ -4268,25 +4618,79 @@
       wrap.id = 'first-run-card';
       wrap.innerHTML =
         '<div class="fr-backdrop"></div>' +
-        '<div class="fr-panel" role="dialog" aria-label="Welcome to StrikeSim 2040">' +
-          '<div class="fr-title">STRIKESIM 2040</div>' +
-          '<div class="fr-sub">A Blue-vs-Red multi-domain strike-planning wargame.</div>' +
-          '<p class="fr-body">You command <b style="color:#6cc0ff">Blue</b>. Explore the force network, build an attack plan (a <b>COA</b> — Course of Action), then run thousands of simulations to see whether it\'s worth committing — before you commit.</p>' +
-          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Pick a <b>Red</b> target in the COA Builder</div>' +
-          '<div class="fr-step"><span class="fr-n">2</span> <b>Generate COA</b> or add steps to a plan</div>' +
-          '<div class="fr-step"><span class="fr-n">3</span> <b>Run 10,000 Trials</b> to pressure-test it</div></div>' +
-          '<p class="fr-tip">Tip: the <b>Map</b> view shows the operational picture; <b>⚔ War Game</b> (top) is a turn-based match vs the computer. No 3D? That just needs browser hardware acceleration — every other view works without it.</p>' +
-          '<button class="fr-ok" type="button">Got it</button>' +
+        '<div class="fr-panel" role="dialog" aria-modal="true" aria-labelledby="fr-title" tabindex="-1">' +
+          '<div class="fr-title" id="fr-title">TAIWAN STRAIT 2040</div>' +
+          '<div class="fr-sub">Opening Denial Window · public-source baseline + explicit 2040 assumptions</div>' +
+          '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue Joint Force operational planner</b>. Red is trying to preserve enough cross-strait throughput to establish a lodgment. Your job is to synchronize Taiwan, maritime, air, land, space, cyber, and sustainment capabilities to break that operating system before the hard horizon closes.</p>' +
+          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Read the situation, roles, assumptions, and victory logic</div>' +
+          '<div class="fr-step"><span class="fr-n">2</span> Select targets and queue <b>strike, harden, or repair</b> orders</div>' +
+          '<div class="fr-step"><span class="fr-n">3</span> Forecast, commit, watch the turn resolve, then use the <b>AAR</b></div></div>' +
+          '<p class="fr-tip">The guided operation clears the expert rails while you play. You can reopen them at any time. Forecast bands are model ranges—not real-world predictions.</p>' +
+          '<p class="fr-status" role="status">Loading the bundled scenario…</p>' +
+          '<div class="fr-actions"><button class="fr-secondary" type="button">Explore console</button>' +
+          '<button class="fr-primary" type="button" disabled>Loading scenario…</button></div>' +
         '</div>';
       document.body.appendChild(wrap);
-      const close = () => { wrap.style.display = 'none'; try { localStorage.setItem('strikesim-intro-seen', '1'); } catch (e) {} };
-      wrap.querySelector('.fr-ok').addEventListener('click', close);
+      const primary = wrap.querySelector('.fr-primary');
+      const secondary = wrap.querySelector('.fr-secondary');
+      const status = wrap.querySelector('.fr-status');
+      const panel = wrap.querySelector('.fr-panel');
+      let introIsolation = null;
+      const setIntroOpen = (open) => {
+        try { if (window.AppShell?.setOverlay) AppShell.setOverlay('first-run', !!open); } catch (e) {}
+        if (open && !introIsolation) {
+          introIsolation = [...document.body.children].filter((node) => node !== wrap && node.matches && !node.matches('script,style,link')).map((node) => ({
+            node, inert: !!node.inert, ariaHidden: node.getAttribute('aria-hidden')
+          }));
+          introIsolation.forEach(({ node }) => { node.inert = true; node.setAttribute('aria-hidden', 'true'); });
+        } else if (!open && introIsolation) {
+          introIsolation.forEach(({ node, inert, ariaHidden }) => {
+            node.inert = inert;
+            if (ariaHidden == null) node.removeAttribute('aria-hidden'); else node.setAttribute('aria-hidden', ariaHidden);
+          });
+          introIsolation = null;
+        }
+        wrap.style.display = open ? 'flex' : 'none';
+        wrap.setAttribute('aria-hidden', String(!open));
+      };
+      wrap._setOpen = setIntroOpen;
+      const scenarioReady = () => {
+        const graph = window.AppState?.activeGraph?.();
+        const scenario = window.AppState?.active?.();
+        return !!(graph?.nodes?.length && (!scenario?.isBundled || window.StrikeSimBundledScenarioReady === true));
+      };
+      const syncReady = () => {
+        const ready = scenarioReady();
+        const loadError = window.StrikeSimBundledScenarioError || '';
+        primary.disabled = !ready;
+        primary.textContent = ready ? 'Start guided operation →' : (loadError ? 'Scenario unavailable' : 'Loading scenario…');
+        status.textContent = ready ? `${window.AppState.activeGraph().nodes.length} capabilities loaded · no account required` : (loadError || 'Loading the bundled scenario…');
+        status.style.color = loadError && !ready ? '#ffab91' : '';
+      };
+      const close = () => { setIntroOpen(false); try { localStorage.setItem('strikesim-intro-seen', '1'); } catch (e) {} };
+      primary.addEventListener('click', () => {
+        if (!scenarioReady()) return;
+        close();
+        if (window.DirectorModule?.start) window.DirectorModule.start();
+      });
+      secondary.addEventListener('click', close);
       wrap.querySelector('.fr-backdrop').addEventListener('click', close);
+      wrap.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+        if (e.key !== 'Tab') return;
+        const focusable = [...panel.querySelectorAll('button:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')];
+        if (!focusable.length) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      });
+      window.addEventListener('strikesim:scenario-ready', syncReady);
+      syncReady();
       if (!document.getElementById('fr-help-btn')) {
         const help = document.createElement('button');
         help.id = 'fr-help-btn'; help.type = 'button'; help.textContent = '?';
         help.title = 'What is this? (show the intro again)';
-        help.addEventListener('click', () => { wrap.style.display = 'flex'; });
+        help.addEventListener('click', () => { setIntroOpen(true); syncReady(); setTimeout(() => (primary.disabled ? secondary : primary).focus(), 0); });
         document.body.appendChild(help);
       }
     }
@@ -4295,7 +4699,14 @@
       let seen = false;
       try { seen = localStorage.getItem('strikesim-intro-seen') === '1'; } catch (e) {}
       const wrap = document.getElementById('first-run-card');
-      if (wrap) wrap.style.display = seen ? 'none' : 'flex';
+      if (wrap) {
+        if (typeof wrap._setOpen === 'function') wrap._setOpen(!seen); else wrap.style.display = seen ? 'none' : 'flex';
+        if (!seen) setTimeout(() => {
+          const primary = wrap.querySelector('.fr-primary');
+          const secondary = wrap.querySelector('.fr-secondary');
+          (primary && !primary.disabled ? primary : secondary)?.focus();
+        }, 0);
+      }
     }
 
     // --- Monte Carlo Simulation (COA-based) ---
@@ -4488,7 +4899,7 @@
       const runId = ++mcWorkerRunId;
       mcWorkerActiveRunId = runId;
       try {
-        mcWorker = new Worker('sim-worker.js?v=p7');
+        mcWorker = new Worker('sim-worker.js?v=p8');
       } catch (err) {
         clearMonteCarloWorker();
         return Promise.resolve(null);
@@ -4585,11 +4996,12 @@
         };
       }
       const pct = Math.round(result.successRate * 100);
+      const interval = result.successCiLo == null ? '' : ` (95% model-frequency interval ${Math.round(result.successCiLo * 100)}–${Math.round(result.successCiHi * 100)}%)`;
       const avgBlueLost = mean(result.blueNeutralizedArr || []);
       if (result.cancelled) {
         return {
           tone: 'warn',
-          text: `Partial run only: ${result.trials.toLocaleString()} of ${result.requestedTrials.toLocaleString()} trials completed. Treat the ${pct}% success estimate as directional, not decision-grade.`,
+          text: `Partial run only: ${result.trials.toLocaleString()} of ${result.requestedTrials.toLocaleString()} trials completed. The configured rule was met in ${pct}% of completed model trials${interval}; directional only.`,
           action: 'rerun',
           actionLabel: 'Finish Full Run'
         };
@@ -4597,7 +5009,7 @@
       if (pct >= 75 && avgBlueLost <= 1) {
         return {
           tone: 'good',
-          text: `${pct}% success with ${avgBlueLost.toFixed(1)} average friendly losses. This plan is strong enough to inspect a concrete sample path before briefing.`,
+          text: `The configured rule was met in ${pct}% of model trials${interval}, with ${avgBlueLost.toFixed(1)} average friendly losses. Inspect a concrete sample path before briefing; this is not a real-world probability.`,
           action: 'preview',
           actionLabel: 'Preview Outcome'
         };
@@ -4605,14 +5017,14 @@
       if (pct >= 50) {
         return {
           tone: 'warn',
-          text: `${pct}% success is playable but brittle. Add one recommended step or raise confidence before treating this as the primary COA.`,
+          text: `The configured rule was met in ${pct}% of model trials${interval}; model performance is brittle. Add one recommended step or inspect assumptions before treating this as the primary COA.`,
           action: 'recommend',
           actionLabel: 'Recommend Next Step'
         };
       }
       return {
         tone: 'bad',
-        text: `${pct}% success is too low for a primary COA. Generate a goal plan with more steps or loosen the friendly-loss constraint.`,
+        text: `Only ${pct}% of model trials met the configured rule${interval}. Generate a goal plan with more steps or loosen the friendly-loss constraint.`,
         action: 'goal',
         actionLabel: 'Generate Goal Plan'
       };
@@ -4907,7 +5319,7 @@
           const margin = blueBudget - planCost;
           details.innerHTML = [
             `Plan length: ${actionPlan.length} steps.`,
-            `${Math.round(successRate * 100)}% success (95% CI ${ciText}) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
+            `${Math.round(successRate * 100)}% of model trials met the configured rule (95% frequency interval ${ciText}) across ${effectiveTrials.toLocaleString()} completed trials${cancelled ? ` (${trials.toLocaleString()} requested)` : ''}.`,
             `Wins average ${avgSteps.toFixed(1)} actions and ${Math.round(expImpact)} impact.`,
             `Seed: ${baseSeed} (${seedOverride == null ? 'auto' : 'manual'}), RNG: LCG.`,
             `Resources: Blue budget ${blueBudget}, planned spend ${planCost} (margin ${margin >= 0 ? '+' : ''}${margin}).`
@@ -4946,8 +5358,8 @@
         const pct = Math.round(successRate * 100);
         const runStatus = cancelled ? `MC canceled after ${effectiveTrials.toLocaleString()} of ${trials.toLocaleString()} trials` : `MC(${effectiveTrials.toLocaleString()}) complete`;
         if (bar && cancelled) bar.textContent = `Canceled at ${Math.round((effectiveTrials / trials) * 100)}%`;
-        addEvent({ type: 'MC', text: `${runStatus}: ${pct}% success, ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
-        showToast(`${runStatus}: ${pct}% success.`, cancelled ? 'warn' : 'success', 5000);
+        addEvent({ type: 'MC', text: `${runStatus}: rule met in ${pct}% of model trials (95% frequency interval ${ciText}), ~${Math.round(expImpact)} impact, avg ${avgSteps.toFixed(1)} steps.` });
+        showToast(`${runStatus}: rule met in ${pct}% of model trials (95% interval ${ciText}).`, cancelled ? 'warn' : 'success', 5000);
         // Denial MOE breakdown (continuous effect) — shown only in denial mode, after the
         // shared renderer so it isn't overwritten.
         if (successMode === 'denial' && denialDiArr.length) {
@@ -4969,7 +5381,7 @@
                  : 'Partial denial — sustained pressure or a larger plan is needed to force culmination.');
           }
           const noteD = document.getElementById('mc-note');
-          if (noteD) noteD.textContent = 'Denial MOE — “Chance of Success” = P(denial index ≥ 0.5). Continuous effect breakdown shown above.';
+          if (noteD) noteD.textContent = 'Denial MOE — threshold rate = fraction of model trials with denial index ≥ 0.5; continuous effect breakdown shown above.';
           addEvent({ type: 'MC', text: 'Denial MOE: index ' + Math.round(mDI * 100) + '%, throughput ' + Math.round(mTput * 100) + '%, halt ' + haltPct + '%.' });
         }
       } catch (err) {
@@ -5210,12 +5622,11 @@
     }
 
     function useBlueResourceMixForWizard() {
-      const t = teamResources?.blueTypes || { ke:0, ew:0, jam:0, sof:0 };
+      const t = teamResources?.blueTypes || { ke:0, cyber:0, ew:0, sof:0 };
       const mapToMethods = {
         kinetic: t.ke || 0,
-        // Treat cyber as the EW bucket in resources naming from recalc; best effort mapping
-        cyber: (t.ew || 0),
-        ew: (t.jam || 0),
+        cyber: t.cyber || 0,
+        ew: t.ew || 0,
         sof: (t.sof || 0)
       };
       const total = Object.values(mapToMethods).reduce((a,b)=>a+b,0) || 1;
@@ -5596,7 +6007,7 @@
             <div class="kv-row"><span>Trials</span><strong>${r.trials.toLocaleString()}</strong></div>
             <div class="kv-row"><span>Seed / RNG</span><strong>${r.seed} / ${r.rng}</strong></div>
             <div class="kv-row"><span>Success Rule</span><strong>${r.successMode === 'impact' ? `Impact ≥ ${r.victoryThreshold}` : `Neutralize ${r.successN}`}</strong></div>
-            <div class="kv-row"><span>Chance of Success</span><strong>${Math.round(r.successRate*100)}%</strong></div>
+            <div class="kv-row"><span>Model-Trial Threshold Rate</span><strong>${Math.round(r.successRate*100)}% · 95% interval ${Math.round(r.successCiLo*100)}–${Math.round(r.successCiHi*100)}%</strong></div>
             <div class="kv-row"><span>Avg Steps (wins)</span><strong>${r.avgSteps}</strong></div>
             <div class="kv-row"><span>Avg Impact (wins)</span><strong>${r.expImpact}</strong></div>
             <div class="kv-row"><span>Typical/Strong Impact</span><strong>${r.p50Impact}/${r.p90Impact}</strong></div>
@@ -5704,10 +6115,10 @@
     // Carlo results could differ by execution path. Deferred so it never competes
     // with first render; silent unless something is actually wrong (the pass/fail
     // lands in the event log either way).
-    setTimeout(function assertSimParity() {
+    function assertSimParity() {
       if (!canUseMonteCarloWorker() || !window.SimModule || typeof SimModule.parityHash !== 'function') return;
       try {
-        const pw = new Worker('sim-worker.js?v=p7');
+        const pw = new Worker('sim-worker.js?v=p8');
         const bail = setTimeout(() => { try { pw.terminate(); } catch (e) {} }, 5000);
         pw.onmessage = (ev) => {
           const m = ev.data || {};
@@ -5725,7 +6136,10 @@
         pw.onerror = () => { clearTimeout(bail); try { pw.terminate(); } catch (e) {} };
         pw.postMessage({ type: 'parity', runId: 'parity-boot', seed: 42, n: 64 });
       } catch (e) { /* parity probe must never break boot */ }
-    }, 2500);
+    }
+    // Validation remains automatic, but yields the startup window to the player.
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(assertSimParity, { timeout: 10000 });
+    else setTimeout(assertSimParity, 8000);
   </script>
 
   <!-- ── Stark-HUD overhaul: boot fade, live telemetry clock, readout FX ── -->
@@ -5734,11 +6148,11 @@
     try {
       var lines = [
         '▸ initializing C2 core ............. <span class="ok">OK</span>',
-        '▸ loading force networks (RED/BLUE) . <span class="ok">OK</span>',
+        '▸ preparing force packages (RED/BLUE)  <span class="ok">OK</span>',
         '▸ calibrating MIL-STD-2525 symbology  <span class="ok">OK</span>',
-        '▸ spinning up Monte Carlo engine .... <span class="ok">OK</span>',
-        '▸ establishing geospatial link ..... <span class="ok">OK</span>',
-        '▸ rendering command picture ........ <span class="ok">OK</span>'
+        '▸ readying operational map ......... <span class="ok">OK</span>',
+        '▸ 3D renderer set to on-demand ...... <span class="ok">OK</span>',
+        '▸ performance lifecycle armed ....... <span class="ok">OK</span>'
       ];
       // C-050: cinematic boot is first-run-only and always skippable. Returning
       // operators get a fast branded fade; reduced-motion gets near-instant.
@@ -5746,7 +6160,7 @@
       var bootReduced = window.AppShell ? AppShell.prefersReducedMotion()
         : !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       var bootSeen = false; try { bootSeen = localStorage.getItem('strikesim_boot_seen') === '1'; } catch(e) {}
-      var bootDwell = bootReduced ? 150 : (bootSeen ? 650 : 2300);
+      var bootDwell = bootReduced ? 100 : (bootSeen ? 250 : 900);
       var logEl = document.getElementById('boot-log'), i = 0;
       if (bootReduced || bootSeen) {
         // no typing theater on repeat visits — render the log at once
@@ -5755,7 +6169,7 @@
         (function nextLine(){
           if (!logEl || i >= lines.length) return;
           var d = document.createElement('div'); d.innerHTML = lines[i++];
-          logEl.appendChild(d); setTimeout(nextLine, 300);
+          logEl.appendChild(d); setTimeout(nextLine, 110);
         })();
       }
       function killBoot(){
@@ -5771,8 +6185,8 @@
       window.addEventListener('keydown', killBoot, { once: true });
       var bootStart = Date.now();
       function scheduleKill(){ setTimeout(killBoot, Math.max(0, bootDwell - (Date.now()-bootStart))); }
-      if (document.readyState === 'complete') scheduleKill(); else window.addEventListener('load', scheduleKill);
-      setTimeout(killBoot, 6000); // hard cap — boot never hangs
+      if (document.readyState !== 'loading') scheduleKill(); else document.addEventListener('DOMContentLoaded', scheduleKill, { once: true });
+      setTimeout(killBoot, 2000); // hard cap — the game shell never waits on visual assets
 
       function buildTelemetry(){
         var bar = document.getElementById('cmd-bar');
@@ -5922,7 +6336,8 @@
         '#hud-ticker .ht-item{padding:0 4px;color:#bfe0f2}',
         '#hud-ticker .ht-sep{padding:0 12px;color:var(--cyan);opacity:.55}',
         '@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}',
-        '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}'
+        '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}',
+        'html.cin-rm #hud-ticker .ht-track{animation:none}'
       ].join('\n');
       document.head.appendChild(css);
 

@@ -81,7 +81,9 @@
   function playStrikeFX(events) {
     try {
       if (!events || !events.length) return;
-      var prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // CO-006 P4: system media query OR the operator's forced toggle (html.cin-rm)
+      var prefersReduced = (document.documentElement && document.documentElement.classList.contains('cin-rm')) ||
+        (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       if (prefersReduced) return;
 
       var kills  = events.filter(function (e) { return e.kind === 'kill' || e.kind === 'cascade'; }).length;
