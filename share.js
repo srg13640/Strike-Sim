@@ -16,7 +16,7 @@
  *
  * INVARIANTS (CO-007): fail-silent on anything malformed (I-5); every behavior gated
  * on OnlineFlags 'share' (I-3); the pre-match player model rides `pm` because Red's
- * exploit policy depends on it (I-4); no Math.random, no network, no console noise.
+ * exploit policy depends on it (I-4); no unseeded randomness, no network, no console noise.
  * ===================================================================================== */
 (function () {
   'use strict';
