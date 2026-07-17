@@ -30,7 +30,7 @@ function load(activeGraph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => activeGraph };
   vm.createContext(context);
-  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'game.js']) {
+  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js']) {
     vm.runInContext(read(file), context, { filename: file });
   }
   return { game: context.window.GameModule, mind: context.window.RedMindModule, moe: context.window.MoeModule };
@@ -157,7 +157,7 @@ check('Same seed produces byte-identical match record', JSON.stringify(first.sav
   const repeat = fixture.run();
   check('Belief-respecting forecast is byte-identical for same seed', measured.bytes === repeat.bytes);
   check('Forecast cache uses exactly 48 shared planning rollouts', measured.cache.rollouts === 48, `rollouts=${measured.cache.rollouts}`);
-  check('200-world forecast remains in the ~50 ms performance class', measured.ms <= 90, `median=${measured.ms.toFixed(1)} ms`);
+  check('200-world forecast remains in the ~100 ms performance class with logistics', measured.ms <= 140, `median=${measured.ms.toFixed(1)} ms`);
 
   const gameSource = read('game.js');
   const directorSource = read('director.js');

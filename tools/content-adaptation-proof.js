@@ -101,7 +101,7 @@ function loadGame(graph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => graph };
   vm.createContext(context);
-  for (const f of ['moe.js', 'red-mind.js', 'strategic-state.js', 'game.js']) {
+  for (const f of ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js']) {
     vm.runInContext(read(f), context, { filename: f });
   }
   return context.window.GameModule;

@@ -23,6 +23,8 @@ function loadGame(graph) {
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), ctx, { filename: 'moe.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), ctx, { filename: 'red-mind.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'strategic-state.js'), 'utf8'), ctx, { filename: 'strategic-state.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'logistics.js'), 'utf8'), ctx, { filename: 'logistics.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), ctx, { filename: 'game.js' });
   return ctx.window.GameModule;
 }

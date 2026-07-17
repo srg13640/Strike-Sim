@@ -52,6 +52,9 @@ is auditable. That is the pitch to a publisher **and** to a RAND reviewer.
 3. **Insight is the victory condition.** The AAR is a deliverable, not a scoreboard.
    Forecast-vs-actual per turn, decisive moments, counterfactual probes.
 4. **Substance over chrome.** Chrome is only justified when it serves a loop phase.
+5. **Sustain the plan.** Every committed action has a typed logistics cost; damaged
+   routes, ports, airfields, repair capacity, and mission command alter future options.
+   Allocation under constraint is a plan decision, not a background modifier.
 
 ## 4. The Core Loop
 
@@ -67,7 +70,8 @@ BRIEF ─→ PLAN ─→ COMMIT ─→ WATCH ─┐        one turn (~4–7 min)
   budget. Ends with "Begin Planning." One screen, 60 seconds, zero jargon walls.
 - **PLAN** — The existing console *is* the planning workspace (map/3D/table/org are
   reconnaissance tools now, not disconnected demos). A command dock holds the order
-  queue: strike / harden / repair against the AP (command-tempo) budget.
+  queue: strike / harden / repair against the AP (command-tempo) budget, alongside the
+  turn's logistics allocation for operations, repair, routes, prepositioning, or DDIL.
 - **COMMIT** — The ritual. Order summary + the Forecast strip + "The world will draw
   one outcome from this range." EXECUTE is irreversible.
 - **WATCH** — The turn resolves as paced playback: strike arcs on the map, an event
@@ -105,7 +109,8 @@ BRIEF ─→ PLAN ─→ COMMIT ─→ WATCH ─┐        one turn (~4–7 min)
   Blue is propped up by a 6-vs-5 AP crutch; fix objective fragility, not the economy).
 - Every difficulty label in shipped data must exist in the `DIFF` table (silent
   Medium-fallback is a credibility bug, not a balance choice).
-- Forecast K defaults to 200 ghost worlds (<50ms on a 224-node board); the AAR
+- Forecast K defaults to 200 ghost worlds (target ≤140ms on the current 253-node
+  contested-logistics board); the AAR
   honesty ledger compares each turn's forecast band to the actual draw.
 - Seeds are always visible and exportable: any operation can be replayed exactly.
 
@@ -128,6 +133,10 @@ BRIEF ─→ PLAN ─→ COMMIT ─→ WATCH ─┐        one turn (~4–7 min)
 6. **Scenario switcher + operation save/replay** — PARTIAL (CO-005 C5): BRIEF-selectable
    operation variants shipped (SMALL ISLAND FAIT ACCOMPLI, in-place graph swap with
    restore); full save/replay UI remains open.
+7. **Contested logistics adapter** — SHIPPED: deterministic fuel, ammunition,
+   maintenance, personnel, route/hub disruption, DDIL, prepositioning, rerouting,
+   repair, and allocation decisions integrated across the Operation Loop, replay,
+   counterfactual, campaign posture, and AAR.
 
 ## 9. Anti-Goals
 

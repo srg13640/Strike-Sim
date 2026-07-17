@@ -5,7 +5,7 @@
 'use strict';
 
 if (typeof window === 'undefined') self.window = self;
-importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'game.js', 'counterfactual.js');
+importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js');
 
 var activeRun = null;
 

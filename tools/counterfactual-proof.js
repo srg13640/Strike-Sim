@@ -48,9 +48,9 @@ function load(graph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => graph };
   vm.createContext(context);
-  // The canonical load order (CO-005 harness rule): strategic-state.js BEFORE game.js.
+  // Canonical load order: strategic-state and logistics adapters BEFORE game.js.
   // This proof was the seventh tool bitten by the missing line; fixed under CO-007.
-  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'game.js', 'counterfactual.js']) {
+  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js']) {
     vm.runInContext(read(file), context, { filename: file });
   }
   return context.window;
@@ -145,7 +145,7 @@ check('ensemble returns counts, uncertainty bands, paired decision value, and pr
 check('worker imports the one kernel and never imports the legacy simulation core', () => {
   const worker = read('counterfactual-worker.js');
   const director = read('director.js');
-  assert.ok(worker.includes("importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'game.js', 'counterfactual.js')"));
+  assert.ok(worker.includes("importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js')"));
   assert.ok(!worker.includes('sim.js') && !worker.includes('sim-worker.js') && !worker.includes('simulateTrialCore'));
   assert.ok(!worker.includes('Math.random') && !worker.includes('Date.now'));
   assert.ok(director.includes("new Worker('counterfactual-worker.js')"));

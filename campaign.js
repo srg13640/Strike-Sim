@@ -1312,6 +1312,30 @@
       fog: true,
       turnLimit: clamp(Math.round(6 + m.sustainment / 25), 6, 10),
       seed: Math.max(1, campaignScore(m) * 1009 + state.results.length * 37),
+      /* Campaign posture enters the tactical model as abstract readiness points.
+       * Sustainment drives fuel/ammunition and forward buffers; readiness drives
+       * maintenance/personnel availability. Exposure reduces protected access. */
+      logistics: {
+        stocks: {
+          blue: {
+            fuel: clamp(34 + m.sustainment * 0.54 + m.initiative * 0.10, 30, 96),
+            ammunition: clamp(30 + m.sustainment * 0.50 + m.dib * 0.16, 28, 96),
+            maintenance: clamp(28 + m.readiness * 0.48 + m.sustainment * 0.20, 28, 96),
+            personnel: clamp(34 + m.readiness * 0.46 + m.allies * 0.12, 30, 96)
+          },
+          red: {
+            fuel: clamp(70 + m.exposure * 0.10 - m.denial * 0.08, 50, 90),
+            ammunition: clamp(74 + m.exposure * 0.08 - m.dib * 0.05, 50, 92),
+            maintenance: clamp(68 + m.exposure * 0.08 - m.readiness * 0.04, 48, 88),
+            personnel: clamp(72 + m.exposure * 0.06 - m.allies * 0.04, 50, 90)
+          }
+        },
+        prepositioning: {
+          blue: clamp(26 + m.sustainment * 0.48 + m.allies * 0.16 - m.exposure * 0.10, 25, 92),
+          red: clamp(62 + m.exposure * 0.12 - m.denial * 0.10, 40, 86)
+        },
+        decisions: { blue: 'balanced', red: 'balanced' }
+      },
       /* Advisory fields — carried into match config but not consumed by AP accounting */
       campaignPostureApBlue: postureApBlue,
       campaignPostureApRed:  postureApRed
@@ -1329,7 +1353,9 @@
     }
 
     window.GameModule.newMatch(cfg);
-    note('War Game started from campaign posture, turn limit ' + cfg.turnLimit + '.');
+    note('War Game started from campaign posture, turn limit ' + cfg.turnLimit +
+      ', logistics buffer ' + Math.round(cfg.logistics.prepositioning.blue) +
+      ' (abstract readiness points; not real inventory or personnel counts).');
     close();
     var wgLaunch = document.getElementById('wg-launch');
     if (wgLaunch && !wgLaunch.classList.contains('wg-hidden')) wgLaunch.click();

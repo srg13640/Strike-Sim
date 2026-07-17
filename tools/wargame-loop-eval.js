@@ -52,6 +52,7 @@ function loadGame(graph) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'strategic-state.js'), 'utf8'), context, { filename: 'strategic-state.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'logistics.js'), 'utf8'), context, { filename: 'logistics.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
   if (!context.window.MoeModule || typeof context.window.MoeModule.assessGraph !== 'function') {
     throw new Error('balance harness requires MoeModule; legacy attrition fallback is not a valid gate');

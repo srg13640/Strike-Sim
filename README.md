@@ -45,6 +45,9 @@ server. That's it.
 - **NDS Campaign Planner** — design a higher-level campaign around homeland defense,
   Indo-Pacific deterrence-by-denial, allies/partners, and defense-industrial-base
   endurance; then hand the resulting posture into the turn-based War Game.
+- **Contested logistics** — allocate fuel, ammunition, maintenance, personnel,
+  rerouting, repair, prepositioning, and DDIL resilience while ports, airfields, and
+  sea/air/land/digital routes are disrupted by the same resolved battlefield state.
 - **Import / export** — load additional scenarios or export the current graph as JSON.
 
 ---
@@ -63,6 +66,7 @@ static server.
 | `state.js` (`AppState`) | Scenario-centric application state. A *scenario* owns the graph; foundation for future multi-scenario support. |
 | `sim.js` (`SimModule`) | Simulation foundation: seeded RNG, action/counter profiles, statistics, and the graph→context snapshot builder. |
 | `director.js` (`DirectorModule`) | **The Operation Loop — the game's front door.** Brief → Plan → Commit → Watch → AAR phase machine over the War Game engine: ghost-world forecasts at commit (honest ranges, never predictions), paced turn playback, and a counterfactual AAR that re-runs the same seeded world under a changed policy. Design spine: `docs/GAME_DESIGN.md`. |
+| `logistics.js` (`LogisticsModule`) | Deterministic adapter from the force graph to typed stocks, port/airfield hubs, sea/air/land/digital routes, DDIL friction, prepositioned buffers, and allocation/reroute/repair decisions. |
 | `campaign.js` (`CampaignModule`) | NDS-aligned campaign game layer: phase planning, strategic metrics, campaign brief export, and War Game posture handoff. *(Launcher hidden — pending rebuild as operation framing per the design spine.)* |
 | `map.js` (`MapModule`) | Leaflet 2D map rendering: markers, links, popups, offline tile detection. |
 | `engine.js` (`EngineModule`) | 3D engine lifecycle (3d-force-graph / Three.js), the Blue→Red opening camera shot, and geo-mode layout. |
@@ -132,6 +136,10 @@ Scenarios are JSON with `nodes` and `links` arrays. A node:
     "availability": "scenario-active",
     "sourceRefs": ["TWN-QDR-2025"],
     "assumption": "The graph node is a theater-level analytical aggregate."
+  },
+  "logisticsProfile": {
+    "role": "logistics-c2",
+    "modes": ["land", "digital"]
   }
 }
 ```
@@ -148,9 +156,15 @@ format. Blue Joint Force nodes also state ownership, joint function, operational
 explicit tempo contribution, access dependencies, and location precision.
 `capabilityProfile` distinguishes observed, assessed, and notional-2040 content and
 records availability, confidence, sources, and assumptions.
+`logisticsProfile` is optional because the adapter can infer logistics roles from the
+existing graph. Authors should use it to explicitly mark hubs and transport modes when
+names and types are ambiguous. Scenario `matchConfig.logistics` may set each side's
+initial 0–100 stock and prepositioning readiness points. These are intentionally
+abstract and never represent physical gallons, rounds, people, casualties, sorties,
+or tonnage.
 
 See [the Blue Joint Force Model](docs/JOINT_FORCE_MODEL.md), [the Cyber Capability
-Model](docs/CYBER_CAPABILITY_MODEL.md), and
+Model](docs/CYBER_CAPABILITY_MODEL.md), [the Contested Logistics Model](docs/LOGISTICS_MODEL.md), and
 [`schemas/strikesim-scenario.schema.json`](schemas/strikesim-scenario.schema.json) for
 the modeling, provenance, and machine-readable data contract. Run
 `node tools/joint-force-proof.js` to verify component balance, evidence coverage,
@@ -163,12 +177,13 @@ objectives, source assignment, topology, and the tempo economy through the real 
 ```
 .
 ├── StrikeSim2040.html          # app shell + orchestration + sim engine
-├── ui.js  state.js  sim.js  map.js  engine.js  campaign.js  views.js
+├── ui.js  state.js  sim.js  map.js  engine.js  campaign.js  logistics.js  views.js
 ├── inline-datasets.js    # startup scenario auto-loader
 ├── grok150red.json  grokblue90.json   # bundled scenarios
 ├── schemas/strikesim-scenario.schema.json  # scenario data contract
 ├── docs/CYBER_CAPABILITY_MODEL.md      # capability semantics + provenance
 ├── docs/JOINT_FORCE_MODEL.md           # Blue service balance + acceptance gates
+├── docs/LOGISTICS_MODEL.md             # contested-logistics adapter contract
 ├── vendor/               # offline-vendored libraries
 └── tiles/                # (optional) local map tiles — not included
 ```
@@ -182,7 +197,8 @@ objectives, source assignment, topology, and the tempo economy through the real 
   COA UI. They are a candidate for a future `sim-engine` module — best done alongside the
   work below, which modifies them directly.
 - **Project Janus** (`Janus_Implementation_Plan.md`) — a proposed bounded-rationality /
-  fatigue / logistics extension to the simulation engine. *Concept by Pat Beaudry.*
+  fatigue extension to the simulation engine. Its logistics concern is now covered by
+  the shipped deterministic adapter. *Concept by Pat Beaudry.*
 - **Multiple named scenarios.** `AppState` is already scenario-centric; a scenario
   switcher UI is the intended next feature on that foundation.
 - **Campaign save/resume.** The Campaign Planner can export a Markdown brief today;
