@@ -113,7 +113,7 @@ check('Forecasting module uses no ambient randomness or clock', !source.includes
   c.window.window = c.window;
   c.window.AppState = { activeGraph: () => graph };
   vm.createContext(c);
-  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'game.js']) vm.runInContext(read(file), c, { filename: file });
+  for (const file of ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js']) vm.runInContext(read(file), c, { filename: file });
   const game = c.window.GameModule;
   game.init({});
   let state = game.newMatch({ seed: 8080, control: { blue: 'human', red: 'ai' } });

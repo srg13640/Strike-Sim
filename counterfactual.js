@@ -20,13 +20,29 @@ window.CounterfactualModule = (function () {
   function copy(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
   function clamp(value, lo, hi) { return Math.min(hi, Math.max(lo, Number(value) || 0)); }
 
-  function freshBoard(graph) {
+  function logistics() { return window.LogisticsModule || null; }
+
+  function freshBoard(graph, record) {
     var board = engine().buildBoard(graph || { nodes: [], links: [] });
     Object.keys(board.nodes).forEach(function (id) {
       board.nodes[id].health = board.nodes[id].healthMax || 100;
       board.nodes[id].alive = true;
     });
+    var L = logistics();
+    if (L) board.logistics = L.restore(record && record.logisticsInitial, board,
+      record && record.cfg && record.cfg.logistics || {});
     return board;
+  }
+
+  function prepareLogistics(branch, row) {
+    var L = logistics(), model = branch && branch.board && branch.board.logistics;
+    if (!L || !model) return;
+    ['blue', 'red'].forEach(function (side) {
+      var recorded = row && row.logistics && row.logistics.decisions && row.logistics.decisions[side];
+      var fallback = row && row.report && row.report.logistics && row.report.logistics.sides &&
+        row.report.logistics.sides[side] && row.report.logistics.sides[side].decision;
+      L.setDecision(model, side, recorded || fallback || L.chooseDecision(model, side));
+    });
   }
 
   function cloneOrders(orders) {
@@ -67,7 +83,7 @@ window.CounterfactualModule = (function () {
 
     var replacement = Object.assign({}, edit.replacement, { side: 'blue' });
     if (['strike', 'harden', 'repair'].indexOf(replacement.kind) < 0) return { ok: false, reason: 'bad-kind' };
-    var board = freshBoard(graph);
+    var board = freshBoard(graph, record);
     var target = board.nodes[replacement.targetId];
     if (!target) return { ok: false, reason: 'no-target' };
     if (replacement.kind === 'strike') {
@@ -150,12 +166,14 @@ window.CounterfactualModule = (function () {
   function runExploitPair(payload, trial) {
     var I = engine(), mind = window.RedMindModule, record = payload.record, cfg = record.cfg || {};
     var model = mind.normalizePlayerModel(payload.playerModel);
-    var original = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
-    var exploit = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var original = { board: freshBoard(payload.graph, record), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var exploit = { board: freshBoard(payload.graph, record), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
     var rows = historyByTurn(record), maxTurn = Math.max(1, Number(cfg.turnLimit || record.history.length || 1));
 
     for (var turn = 1; turn <= maxTurn; turn++) {
       var row = rows[turn];
+      prepareLogistics(original, row);
+      prepareLogistics(exploit, row);
       var blueOrders = row
         ? cloneOrders(row.orders && row.orders.blue)
         : plannedOrders(record, original.board, 'blue', turn, trial, 'exploit-blue');
@@ -190,12 +208,14 @@ window.CounterfactualModule = (function () {
     var I = engine(), record = payload.record, cfg = record.cfg || {};
     var checked = validateEdit(record, payload.graph, payload.edit);
     if (!checked.ok) throw new Error('Invalid counterfactual edit: ' + checked.reason);
-    var original = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
-    var alternate = { board: freshBoard(payload.graph), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var original = { board: freshBoard(payload.graph, record), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
+    var alternate = { board: freshBoard(payload.graph, record), lodgment: 0, outcome: null, decidedTurn: null, lastAssessment: null };
     var rows = historyByTurn(record), maxTurn = Math.max(1, Number(cfg.turnLimit || record.history.length || 1));
 
     for (var turn = 1; turn <= maxTurn; turn++) {
       var row = rows[turn];
+      prepareLogistics(original, row);
+      prepareLogistics(alternate, row);
       var originalBlue, alternateBlue, originalRed, alternateRed;
       if (row) {
         originalBlue = cloneOrders(row.orders && row.orders.blue);

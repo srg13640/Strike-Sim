@@ -464,6 +464,16 @@
       'padding:1px 7px;margin:2px 3px 0 0;color:#bcd6ec;background:rgba(9,16,24,0.6);',
       "font:400 10px/1.4 'Share Tech Mono',ui-monospace,monospace;",
     '}',
+    '.wg-logi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:7px;}',
+    '.wg-logi-stock{padding:6px 3px;border:1px solid rgba(0,216,255,.13);background:rgba(2,12,20,.5);text-align:center;border-radius:4px;}',
+    '.wg-logi-stock b{display:block;color:#eaf4ff;font:700 13px/1 "Courier New",monospace;}',
+    '.wg-logi-stock span{display:block;margin-top:3px;color:#7892a8;font:700 8px/1 "Courier New",monospace;letter-spacing:.08em;text-transform:uppercase;}',
+    '.wg-logi-stock.low{border-color:rgba(255,176,0,.45);}.wg-logi-stock.low b{color:#ffb000;}',
+    '.wg-logi-status{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}',
+    '.wg-logi-route{display:flex;justify-content:space-between;gap:7px;padding:4px 0;border-bottom:1px solid rgba(0,216,255,.07);font-size:10px;color:#9eb7cb;}',
+    '.wg-logi-route b.open{color:#51cf66}.wg-logi-route b.degraded{color:#ffb000}.wg-logi-route b.closed{color:#ff4d5e}',
+    '.wg-logi-decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px;}',
+    '.wg-logi-decisions .wg-btn{padding:6px 3px;font-size:9px;}.wg-logi-decisions .wg-btn.on{border-color:#ffb000;color:#ffb000;background:rgba(255,176,0,.08);}',
 
     // Result banner
     '.wg-banner{',
@@ -676,6 +686,7 @@
         '<p class="wg-hint" style="margin-top:6px;">On: enemy strength is masked while you plan, and a two-human match hands off blind so neither side sees the other\'s orders.</p></div>' +
       '<p class="wg-hint">Both sides commit orders blind each turn, then everything resolves at once. Blue wins by halting Red\'s invasion &mdash; throughput below what a lodgment needs &mdash; before the window closes; Red wins by building the lodgment first. Still ambiguous at the horizon? The engine projects the continuation from the final state &mdash; the clock never extends.</p>' +
       '<p class="wg-strat">&#9889; <b>Command tempo:</b> your action points each turn come from your surviving <b>Command</b> &amp; <b>Logistics</b> nodes. Strike the enemy\'s C2/sustainment to throttle how many orders they can issue &mdash; or protect your own to keep your tempo up.</p>' +
+      '<p class="wg-strat">&#9851; <b>Contested logistics:</b> fuel, ammunition, maintenance, and personnel are consumed by orders. Allocate each turn among combat surge, repair, rerouting, prepositioning, or DDIL resilience; port and airfield disruption changes route flow and invasion throughput.</p>' +
       '<p class="wg-strat">&#127919; <b>Key objectives:</b> each side has 8 high-value nodes. Lose most of yours and you\'re defeated outright &mdash; so it\'s hold-your-key-terrain and deny-theirs, not just attrition.</p>' +
       '<button class="wg-btn full" data-act="brief-view" style="margin-top:4px;">&#128220; VIEW SCENARIO BRIEF</button>';
     document.getElementById('wg-foot').innerHTML = '<button class="wg-btn primary" data-act="start">START MATCH</button>';
@@ -798,7 +809,7 @@
 
     // During planning under fog, mask the side that is NOT currently planning.
     var maskEnemy = (fog && state.phase === 'plan' && cfg.control[activeSide] === 'human') ? otherSide(activeSide) : null;
-    var html = scoreboard(state, maskEnemy) + denialSection(state);
+    var html = scoreboard(state, maskEnemy) + denialSection(state) + logisticsSection(state, maskEnemy);
 
     if (state.phase === 'over') {
       // banner only; orders hidden
@@ -856,10 +867,12 @@
     var obj = state.objectives || {};
     var blueCard = maskEnemy === 'blue'
       ? maskedCard('blue', 'BLUE', state.alive.blue, state.rosters.blue)
-      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB, tempo.blue, obj.blue);
+      : card('blue', 'BLUE', state.score.blue, state.alive.blue, state.rosters.blue, fracB, tempo.blue, obj.blue,
+        state.logistics && state.logistics.sides && state.logistics.sides.blue);
     var redCard = maskEnemy === 'red'
       ? maskedCard('red', 'RED', state.alive.red, state.rosters.red)
-      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR, tempo.red, obj.red);
+      : card('red', 'RED', state.score.red, state.alive.red, state.rosters.red, fracR, tempo.red, obj.red,
+        state.logistics && state.logistics.sides && state.logistics.sides.red);
     return banner + '<div class="wg-sec"><div class="wg-score">' + blueCard + redCard + '</div></div>';
   }
   function maskedCard(side, label, alive, total) {
@@ -867,7 +880,7 @@
       '<div class="wg-pts">&mdash; &middot; &mdash;</div><div class="wg-meta">' + alive + '/' + total + ' active &middot; strength unknown</div>' +
       '<div class="wg-bar"></div></div>';
   }
-  function card(side, label, score, alive, total, frac, tempo, obj) {
+  function card(side, label, score, alive, total, frac, tempo, obj, logistics) {
     var forcePct = Math.round(frac * 100);
     var forceColor = hpColor(frac);
     var tempoRow = '';
@@ -889,7 +902,35 @@
       '<div class="wg-pts" style="color:' + sideColor(side) + ';text-shadow:0 0 10px ' + sideColor(side) + '55;">' + Math.round(score) + '</div>' +
       '<div class="wg-meta">' + alive + '/' + total + ' active &middot; force <span style="color:' + forceColor + '">' + forcePct + '%</span></div>' +
       '<div class="wg-bar"><i style="width:' + forcePct + '%;background:' + forceColor + ';opacity:0.85;"></i></div>' +
-      tempoRow + objRow + '</div>';
+      tempoRow + (logistics ? '<div class="wg-meta">&#9851; Supply <b>' + Math.round((logistics.readiness || 0) * 100) +
+        '%</b> &middot; Flow ' + Math.round((logistics.flow || 0) * 100) + '%</div>' : '') + objRow + '</div>';
+  }
+
+  function logisticsSection(state, maskEnemy) {
+    var model = state.logistics, side = activeSide;
+    if (!model || !model.sides || !model.sides[side] || maskEnemy === side) return '';
+    var st = model.sides[side], options = W.logisticsOptions ? W.logisticsOptions() : { presets: [] };
+    var stocks = ['fuel', 'ammunition', 'maintenance', 'personnel'].map(function (k) {
+      var v = Number(st.stocks && st.stocks[k] || 0);
+      return '<div class="wg-logi-stock' + (v < 30 ? ' low' : '') + '"><b>' + Math.round(v) + '</b><span>' + esc(k) + '</span></div>';
+    }).join('');
+    var routes = (st.routes || []).map(function (r) {
+      return '<div class="wg-logi-route"><span>' + esc(r.label) + (r.rerouted ? ' &middot; rerouted' : '') + '</span><b class="' +
+        esc(r.status) + '">' + esc(String(r.status || '').toUpperCase()) + ' ' + Math.round(Number(r.effectiveCapacity || 0) * 100) + '%</b></div>';
+    }).join('');
+    var canDecide = state.phase === 'plan' && state.cfg.control[side] === 'human' && !(state.ordersLocked && state.ordersLocked[side]);
+    var decisions = canDecide ? '<div class="wg-logi-decisions">' + (options.presets || []).map(function (p) {
+      return '<button class="wg-btn' + (st.decision && st.decision.id === p.id ? ' on' : '') + '" data-logistics="' + esc(p.id) +
+        '" title="' + esc(p.note) + '">' + esc(p.short) + '</button>';
+    }).join('') + '</div>' : '';
+    return '<div class="wg-sec"><h4>Logistics allocation &mdash; ' + side.toUpperCase() + '</h4>' +
+      '<div class="wg-logi-status"><span class="wg-aar-pill">READINESS ' + Math.round(Number(st.readiness || 0) * 100) + '%</span>' +
+      '<span class="wg-aar-pill">FLOW ' + Math.round(Number(st.flow || 0) * 100) + '%</span>' +
+      '<span class="wg-aar-pill">DDIL ' + Math.round(Number(st.ddil || 0) * 100) + '%</span>' +
+      '<span class="wg-aar-pill">PREPO ' + Math.round(Number(st.prepositioning || 0)) + '</span></div>' +
+      '<div class="wg-logi-grid">' + stocks + '</div>' + decisions +
+      '<p class="wg-hint" style="margin-top:6px;">Current decision: <b>' + esc(st.decision && st.decision.label || 'Balanced sustainment') +
+        '</b>. Allocation is locked with the combat-order hash.</p>' + routes + '</div>';
   }
 
   // ---- Increment A read-only consumers of the GameModule contract fields ----------
@@ -1148,6 +1189,7 @@
         aarMetric('Red kills', red.kills + red.cascades) +
       '</div></div>' +
       aarScoreSection(aar) +
+      aarLogisticsSection(aar.logistics) +
       aarMethodSection('Blue method effectiveness', blue) +
       aarMethodSection('Red method effectiveness', red) +
       aarTargetSection('Key targets damaged', aar.topDamaged, true) +
@@ -1158,6 +1200,25 @@
 
   function aarMetric(label, value) {
     return '<div class="wg-aar-metric"><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function aarLogisticsSection(logistics) {
+    if (!logistics || !logistics.sides) return '';
+    var rows = ['blue', 'red'].map(function (side) {
+      var s = logistics.sides[side] || {}, f = s.finalStocks || {}, totals = s.totals || {};
+      var disrupted = (s.routes || []).filter(function (r) { return r.status !== 'open'; }).length;
+      return '<tr><td style="color:' + sideColor(side) + '">' + side.toUpperCase() + '</td>' +
+        '<td class="num">' + fmt(f.fuel) + '</td><td class="num">' + fmt(f.ammunition) + '</td>' +
+        '<td class="num">' + fmt(f.maintenance) + '</td><td class="num">' + fmt(f.personnel) + '</td>' +
+        '<td class="num">' + Math.round(Number(s.finalFlow || 0) * 100) + '%</td>' +
+        '<td class="num">' + Math.round(Number(s.finalDdil || 0) * 100) + '%</td></tr>' +
+        '<tr><td colspan="7" style="color:#7892a8">' + esc(side.toUpperCase() + ': ' + Number(totals.reroutes || 0) +
+          ' reroutes, ' + Number(totals.shortages || 0) + ' unsupported orders, ' + disrupted + ' disrupted routes, prepositioned stock ' +
+          Math.round(Number(s.finalPrepositioning || 0))) + '</td></tr>';
+    }).join('');
+    return '<div class="wg-sec"><h4>Logistics endurance</h4><table class="wg-aar-table"><thead><tr>' +
+      '<th>Side</th><th>Fuel</th><th>Ammo</th><th>Maint</th><th>Pers</th><th>Flow</th><th>DDIL</th></tr></thead><tbody>' + rows +
+      '</tbody></table></div>';
   }
 
   function pct(n, d) {
@@ -1217,7 +1278,7 @@
 
   // ---- actions -------------------------------------------------------------------
   function onHudClick(ev) {
-    var t = ev.target.closest('[data-act],[data-order],[data-rm],[data-active],[data-side],[data-turns],[data-diff],[data-fog],[data-pick]');
+    var t = ev.target.closest('[data-act],[data-order],[data-rm],[data-active],[data-side],[data-turns],[data-diff],[data-fog],[data-pick],[data-logistics]');
     if (!t) return;
 
     // setup toggles
@@ -1227,6 +1288,11 @@
     if (t.hasAttribute('data-fog')) { setGroupOn(t); return; }
 
     if (t.hasAttribute('data-active')) { activeSide = t.getAttribute('data-active'); render(W.getState()); return; }
+    if (t.hasAttribute('data-logistics')) {
+      var changed = W.setLogisticsDecision && W.setLogisticsDecision(activeSide, t.getAttribute('data-logistics'));
+      if (!changed && typeof addEvent === 'function') addEvent({ type: 'War', text: 'Logistics allocation could not be changed after commitment.' });
+      return;
+    }
     if (t.hasAttribute('data-pick')) { if (typeof selectNodeById === 'function') selectNodeById(t.getAttribute('data-pick')); else if (typeof selectNode === 'function') { var n = findNode(t.getAttribute('data-pick')); if (n) selectNode(n); } lastSelId = null; pollSelection(); return; }
     if (t.hasAttribute('data-rm')) { W.removeOrder(activeSide, Number(t.getAttribute('data-rm'))); return; }
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://strikesim.local/schemas/strikesim-scenario.schema.json",
   "title": "StrikeSim 2040 scenario",
-  "description": "Portable StrikeSim graph data with a canonical four-resource mission-capacity model.",
+  "description": "Portable StrikeSim graph data with canonical mission-capacity and contested-logistics models.",
   "type": "object",
   "required": [
     "nodes",
@@ -52,7 +52,8 @@
           "description": "Disclosed prior over Red doctrine types; values are re-normalized at load.",
           "additionalProperties": { "type": "number", "minimum": 0 }
         },
-        "strategic": { "type": "object", "description": "strategic-state.js config overrides (escalation, indicators, signals)." }
+        "strategic": { "type": "object", "description": "strategic-state.js config overrides (escalation, indicators, signals)." },
+        "logistics": { "$ref": "#/$defs/logisticsConfig" }
       },
       "additionalProperties": true
     }
@@ -156,6 +157,64 @@
       },
       "additionalProperties": true
     },
+    "logisticsStocks": {
+      "type": "object",
+      "description": "Abstract readiness points, not physical inventory, personnel, lift, or casualty counts.",
+      "required": ["fuel", "ammunition", "maintenance", "personnel"],
+      "properties": {
+        "fuel": { "type": "number", "minimum": 0, "maximum": 100 },
+        "ammunition": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maintenance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "personnel": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
+    "logisticsConfig": {
+      "type": "object",
+      "description": "Optional initial state for the deterministic contested-logistics adapter.",
+      "properties": {
+        "stocks": {
+          "type": "object",
+          "properties": {
+            "blue": { "$ref": "#/$defs/logisticsStocks" },
+            "red": { "$ref": "#/$defs/logisticsStocks" }
+          },
+          "additionalProperties": false
+        },
+        "prepositioning": {
+          "type": "object",
+          "properties": {
+            "blue": { "type": "number", "minimum": 0, "maximum": 100 },
+            "red": { "type": "number", "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": false
+        },
+        "decisions": {
+          "type": "object",
+          "properties": {
+            "blue": { "enum": ["balanced", "surge", "repair", "reroute", "preposition", "ddil"] },
+            "red": { "enum": ["balanced", "surge", "repair", "reroute", "preposition", "ddil"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "logisticsProfile": {
+      "type": "object",
+      "description": "Optional authoring metadata that overrides logistics-role and route/hub inference for this node.",
+      "properties": {
+        "role": { "enum": ["hub", "depot", "route", "distribution", "repair", "logistics-c2"] },
+        "hubKind": { "enum": ["port", "airfield", "other"] },
+        "modes": {
+          "type": "array",
+          "items": { "enum": ["sea", "air", "land", "digital"] },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
     "node": {
       "type": "object",
       "required": [
@@ -204,6 +263,9 @@
         },
         "capabilityProfile": {
           "$ref": "#/$defs/capabilityProfile"
+        },
+        "logisticsProfile": {
+          "$ref": "#/$defs/logisticsProfile"
         },
         "nation": {
           "type": "string",

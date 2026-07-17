@@ -113,8 +113,8 @@ function loadGame(graph) {
   context.window.window = context.window;
   context.window.AppState = { activeGraph: () => graph };
   vm.createContext(context);
-  // The canonical order (CO-005 harness rule): moe → red-mind → strategic-state → game.
-  for (const f of ['moe.js', 'red-mind.js', 'strategic-state.js', 'game.js']) {
+  // The canonical order: moe → red-mind → strategic-state → logistics → game.
+  for (const f of ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js']) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), context, { filename: f });
   }
   if (!context.window.MoeModule || !context.window.GameModule) {
@@ -167,6 +167,7 @@ function main() {
     lodgmentRequiredTurns: matchConfig.lodgmentRequiredTurns,
     doctrinePrior: matchConfig.doctrinePrior,
     strategic: matchConfig.strategic,
+    logistics: payload.li || matchConfig.logistics,
     playerModel: payload.pm,
     control: { blue: 'human', red: 'ai' },
     difficulty: { blue: 'hard', red: payload.cfg.redDiff },
@@ -180,6 +181,10 @@ function main() {
     }
     if (state.turn !== row.t) {
       die(1, 'turn misalignment — log says turn ' + row.t + ', match is at turn ' + state.turn);
+    }
+    if (row.ld && !game.setLogisticsDecision('blue', row.ld)) {
+      die(1, 'turn ' + row.t + ': engine REJECTED logistics allocation ' + JSON.stringify(row.ld) +
+        ' — tampered payload or rules drift');
     }
     for (const o of row.orders) {
       const ok = game.queueOrder('blue', {

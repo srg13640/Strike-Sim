@@ -12,7 +12,8 @@
  *   #op=SS1<z|j>.<base64url>     z = deflate-raw, j = plain JSON fallback
  *   { v:1, kind:'challenge'|'replay', seed, variantId, fp, cfg:{turnLimit,redDiff,roeId},
  *     pm, callsign, ts, claim:{winner,turns,reason,lodgment,bss},
- *     turns:[{t, orders:[{k,tid,m,src,axis,tc}], f:[{q,p,h,o}]}] }
+ *     li:{stocks,prepositioning,decisions},
+ *     turns:[{t, ld, orders:[{k,tid,m,src,axis,tc}], f:[{q,p,h,o}]}] }
  *
  * INVARIANTS (CO-007): fail-silent on anything malformed (I-5); every behavior gated
  * on OnlineFlags 'share' (I-3); the pre-match player model rides `pm` because Red's
@@ -142,6 +143,27 @@
   function cleanStr(v, max) {
     return typeof v === 'string' && v.length <= (max || 64) ? v : null;
   }
+  function cleanLogisticsInit(value) {
+    if (!value || typeof value !== 'object') return null;
+    var resources = ['fuel', 'ammunition', 'maintenance', 'personnel'];
+    var out = { stocks: { blue: {}, red: {} }, prepositioning: {}, decisions: {} };
+    for (var s = 0; s < 2; s++) {
+      var side = s ? 'red' : 'blue', stocks = value.stocks && value.stocks[side];
+      if (!stocks || typeof stocks !== 'object') return null;
+      for (var i = 0; i < resources.length; i++) {
+        var key = resources[i], number = stocks[key];
+        if (typeof number !== 'number' || !isFinite(number) || number < 0 || number > 100) return null;
+        out.stocks[side][key] = number;
+      }
+      var prepo = value.prepositioning && value.prepositioning[side];
+      if (typeof prepo !== 'number' || !isFinite(prepo) || prepo < 0 || prepo > 100) return null;
+      out.prepositioning[side] = prepo;
+      var decision = cleanStr(value.decisions && value.decisions[side], 32);
+      if (!decision) return null;
+      out.decisions[side] = decision;
+    }
+    return out;
+  }
   function validatePayload(p) {
     if (!p || typeof p !== 'object' || p.v !== 1) return null;
     if (p.kind !== 'challenge' && p.kind !== 'replay') return null;
@@ -160,7 +182,7 @@
       pm: p.pm && typeof p.pm === 'object' ? p.pm : null,
       callsign: cleanStr(p.callsign, 24) || null,
       ts: finitePos(p.ts) ? p.ts : null,
-      claim: null, turns: null
+      claim: null, turns: null, li: cleanLogisticsInit(p.li)
     };
     if (p.claim && typeof p.claim === 'object') {
       out.claim = {
@@ -203,7 +225,8 @@
             });
           }
         }
-        turns.push({ t: Math.round(row.t), orders: cleanOrders, f: f });
+        var ld = cleanStr(row.ld, 32);
+        turns.push({ t: Math.round(row.t), ld: ld, orders: cleanOrders, f: f });
       }
       out.turns = turns;
     }
@@ -264,6 +287,16 @@
       ts: Date.now(),
       claim: claimFrom(record, opts.forecastEntries)
     };
+    var initial = record.logisticsInitial && record.logisticsInitial.sides;
+    if (initial && initial.blue && initial.red) {
+      payload.li = { stocks: {}, prepositioning: {}, decisions: {} };
+      ['blue', 'red'].forEach(function (side) {
+        payload.li.stocks[side] = Object.assign({}, initial[side].initialStocks || initial[side].stocks || {});
+        payload.li.prepositioning[side] = Number(initial[side].initialPrepositioning == null
+          ? initial[side].prepositioning : initial[side].initialPrepositioning);
+        payload.li.decisions[side] = initial[side].decision && initial[side].decision.id || 'balanced';
+      });
+    }
     if (kind === 'replay') {
       var byTurn = {};
       (opts.forecastEntries || []).forEach(function (e) {
@@ -278,6 +311,8 @@
       payload.turns = (record.history || []).map(function (h) {
         return {
           t: h.turn,
+          ld: h.logistics && h.logistics.decisions && h.logistics.decisions.blue &&
+            (h.logistics.decisions.blue.id || h.logistics.decisions.blue) || null,
           orders: ((h.orders && h.orders.blue) || []).map(packOrder).filter(Boolean),
           f: byTurn[h.turn] || []
         };

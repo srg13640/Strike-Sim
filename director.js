@@ -205,6 +205,10 @@ window.DirectorModule = (function () {
       'roe-min-escalation': 'Your declared ROE has not unlocked this target yet.',
       'roe-denied': 'Your declared ROE prohibits this target.',
       'roe-default-deny': 'Your declared ROE does not authorize this target.',
+      'fuel-shortage': 'Fuel stocks cannot support this order.',
+      'ammunition-shortage': 'Ammunition stocks cannot support this order.',
+      'maintenance-shortage': 'Maintenance capacity cannot support this order.',
+      'personnel-shortage': 'Personnel capacity cannot support this order.',
       'signal-needs-enemy-axis': 'Choose a Red system to define the deception axis.',
       'decoy-quota': 'Only one zero-cost decoy is allowed per turn.'
     })[reason] || 'This order is not available in the current state.';
@@ -588,6 +592,7 @@ window.DirectorModule = (function () {
       lodgmentRequiredTurns: mc.lodgmentRequiredTurns,
       doctrinePrior: mc.doctrinePrior,
       strategic: mc.strategic,
+      logistics: mc.logistics,
       seed: op.challenge ? op.challenge.seed : undefined,
       // CO-005 A6: Red carries the player's career habit model into the new match
       // (or the neutral model on a challenge — normalizePlayerModel(null) is empty).
@@ -631,6 +636,7 @@ window.DirectorModule = (function () {
       ' / decapitation ' + Math.round((posture.decapitation || 0) * 100) +
       ' / denial ' + Math.round((posture.denial || 0) * 100);
     var strategic = st.strategic || { escalation: { value: 0 }, allies: {}, allyRules: {}, roe: {} };
+    var blueLogistics = st.logistics && st.logistics.sides && st.logistics.sides.blue || null;
     var strategicOptions = GM.strategicOptions();
     var roeOptions = strategicOptions.roe || {};
     var allyThresholds = Object.keys(strategic.allyRules || {}).map(function (id) {
@@ -672,6 +678,9 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Prevent consolidation</span><b>keep lodgment below 100%</b></div>' +
       '<div class="dir-stat"><span>Hold your key objectives</span><b>lose ≤' + Math.floor((st.objectives.blue.total || 8) * OBJ_LOSS_FRAC) + ' of ' + (st.objectives.blue.total || 8) + '</b></div>' +
       '<div class="dir-stat"><span>Guard your tempo</span><b>C2 &amp; logistics feed your AP</b></div>' +
+      (blueLogistics ? '<div class="dir-stat"><span>Sustain the operation</span><b>fuel ' + Math.round(blueLogistics.stocks.fuel) +
+        ' · ammunition ' + Math.round(blueLogistics.stocks.ammunition) + ' · maintenance ' + Math.round(blueLogistics.stocks.maintenance) +
+        ' · personnel ' + Math.round(blueLogistics.stocks.personnel) + '</b></div>' : '') +
       '<div class="dir-stat"><span>Decision budget</span><b>' + st.ap.blue + ' orders / turn (tempo-driven)</b></div>' +
       '<div class="dir-stat"><span>Escalation ladder</span><b>E ' + Number(strategic.escalation.value || 0).toFixed(1) + ' / 10 · horizontal + vertical impulses explicit</b></div>' +
       '</div>' +
@@ -681,6 +690,8 @@ window.DirectorModule = (function () {
       '<div class="dir-stat"><span>Red force</span><b>' + st.alive.red + ' nodes · AP ' + st.ap.red + '</b></div>' +
       '<div class="dir-stat"><span>Blue tempo assets</span><b>' + st.tempo.blue.c2 + ' C2 · ' + st.tempo.blue.logi + ' LOG</b></div>' +
       '<div class="dir-stat"><span>Red tempo assets</span><b>' + st.tempo.red.c2 + ' C2 · ' + st.tempo.red.logi + ' LOG</b></div>' +
+      (blueLogistics ? '<div class="dir-stat"><span>Blue distribution network</span><b>' + blueLogistics.routes.length +
+        ' routes · ' + blueLogistics.hubs.length + ' port/airfield hubs · DDIL ' + Math.round(blueLogistics.ddil * 100) + '%</b></div>' : '') +
       '<div class="dir-note" style="margin-top:8px"><b>INTEL ASSESSMENT — PLA POSTURE:</b> ' + esc(postureText) + '. This is the disclosed prior, not Red’s hidden draw.</div>' +
       // CO-006 P2: the same disclosed prior, staged as animated doctrine bars (mockup grammar).
       '<div class="dir-prior" aria-hidden="true">' + [['attrition', 'a'], ['decapitation', 'd'], ['denial', 'n']].map(function (k) {
@@ -688,7 +699,7 @@ window.DirectorModule = (function () {
         return '<div class="pr"><span class="lbl">' + k[0] + '</span><span class="track"><i class="fill ' + k[1] + '" style="--w:' + v + '%"></i></span><b>' + v + '</b></div>';
       }).join('') + '</div>' +
       allyThresholds +
-      '<div class="dir-note" style="margin-top:8px">Strikes, hardens, repairs, and feints each cost one order; one decoy emission is free. A node killed this turn still acts — both sides committed first.</div>' +
+      '<div class="dir-note" style="margin-top:8px">Strikes, hardens, repairs, and feints each cost one order; one decoy emission is free. Every order also consumes typed logistics. Allocate fuel, ammunition, maintenance, personnel, routes, prepositioning, and DDIL resilience before commitment. A node killed this turn still acts — both sides committed first.</div>' +
       '</div>' +
       '</div>' +
 
@@ -874,6 +885,8 @@ window.DirectorModule = (function () {
     var st = GM.getState();
     if (!st) return;
     var apMax = st.ap.blue, apLeft = st.apLeft.blue;
+    var logi = st.logistics && st.logistics.sides && st.logistics.sides.blue || null;
+    var logiOptions = GM.logisticsOptions ? GM.logisticsOptions() : { presets: [] };
     var lastDenial = (st.denialHistory || []).slice(-1)[0] || null;
     var escalation = st.strategic && st.strategic.escalation ? Number(st.strategic.escalation.value || 0) : 0;
     var operationalStatus = 'E <b>' + escalation.toFixed(1) + '</b> · ' + (lastDenial ? 'RED THR <b>' + Math.round(lastDenial.throughput * 100) + '%</b> · ' : '') +
@@ -908,6 +921,8 @@ window.DirectorModule = (function () {
       '<span class="stat">TURN <b>' + st.turn + '/' + st.cfg.turnLimit + '</b></span>' +
       '<span class="stat ap">ORDERS ' + pips + '</span>' +
       '<span class="stat">TEMPO <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b></span>' +
+      (logi ? '<span class="stat">SUPPLY <b>' + Math.round(logi.readiness * 100) + '%</b> · FLOW <b>' +
+        Math.round(logi.flow * 100) + '%</b> · DDIL <b>' + Math.round(logi.ddil * 100) + '%</b></span>' : '') +
       '<span class="stat">OBJ <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + ' held</b></span>' +
       '<span class="stat">RED OBJ <b>' + st.objectives.red.held + '/' + st.objectives.red.total + ' standing</b></span>' +
       '<span class="spacer"></span>' +
@@ -915,6 +930,14 @@ window.DirectorModule = (function () {
       '</div>' +
       intelAssessmentHtml(st) +
       indicatorChannelHtml(st) +
+      (logi ? '<div class="row"><span class="stat">LOGISTICS</span><span class="dir-chips">' +
+        (logiOptions.presets || []).map(function (p) {
+          return '<button type="button" class="dir-chip' + (logi.decision && logi.decision.id === p.id ? ' on' : '') +
+            '" aria-pressed="' + !!(logi.decision && logi.decision.id === p.id) + '" data-logistics="' + esc(p.id) +
+            '" title="' + esc(p.note) + '">' + esc(p.short) + '</button>';
+        }).join('') + '</span><span class="dir-note">FUEL ' + Math.round(logi.stocks.fuel) + ' · AMMO ' +
+        Math.round(logi.stocks.ammunition) + ' · MAINT ' + Math.round(logi.stocks.maintenance) + ' · PERS ' +
+        Math.round(logi.stocks.personnel) + ' · PREPO ' + Math.round(logi.prepositioning) + '</span></div>' : '') +
       '<div class="row">' +
       '<span class="dir-chips">' +
       ['strike', 'harden', 'repair', 'feint', 'decoy'].map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + (k === 'decoy' ? ' · 0 AP' : '') + '</button>'; }).join('') +
@@ -938,10 +961,16 @@ window.DirectorModule = (function () {
   }
 
   function onDockClick(ev) {
-    var t = ev.target.closest('[data-kind],[data-method],[data-act],[data-rm]');
+    var t = ev.target.closest('[data-kind],[data-method],[data-act],[data-rm],[data-logistics]');
     if (!t) return;
     if (t.hasAttribute('data-kind')) { op.kind = t.getAttribute('data-kind'); op.targetId = null; renderDock(); sfxA('tick', { vol: 0.03 }); return; }
     if (t.hasAttribute('data-method')) { op.methodKey = t.getAttribute('data-method'); renderDock(); sfxA('tick', { vol: 0.03 }); return; }
+    if (t.hasAttribute('data-logistics')) {
+      if (GM.setLogisticsDecision('blue', t.getAttribute('data-logistics'))) {
+        renderDock(); sfxA('beep', { freq: 520, vol: 0.06, dur: 0.14 });
+      }
+      return;
+    }
     if (t.hasAttribute('data-rm')) { GM.removeOrder('blue', Number(t.getAttribute('data-rm'))); renderDock(); sfxA('tick', { vol: 0.04 }); return; }
     var act = t.getAttribute('data-act');
     if (act === 'queue') {
@@ -975,6 +1004,9 @@ window.DirectorModule = (function () {
     if (snapshot.strategic) {
       board.strategic = JSON.parse(JSON.stringify(snapshot.strategic));
       I.syncActivationRosters(board, board.strategic.activation);
+    }
+    if (snapshot.logistics && window.LogisticsModule) {
+      board.logistics = window.LogisticsModule.restore(snapshot.logistics, board, snapshot.cfg && snapshot.cfg.logistics || {});
     }
     for (var id in snapshot.health) {
       var b = board.nodes[id];
@@ -1014,9 +1046,10 @@ window.DirectorModule = (function () {
         if (/command|c2|headquarters/i.test(descriptor)) commandDown++;
       } else { blueDown++; if (keyIds[e.targetId]) blueKeyLost++; }
     });
-    var assessment = window.MoeModule && compiledMoe && window.MoeModule.assessCompiled
+    var rawAssessment = window.MoeModule && compiledMoe && window.MoeModule.assessCompiled
       ? window.MoeModule.assessCompiled(compiledMoe, board.nodes)
       : window.MoeModule && window.MoeModule.assessGraph ? window.MoeModule.assessGraph(I.moeRedNodes(board)) : null;
+    var assessment = I.adaptDenialLogistics ? I.adaptDenialLogistics(board, rawAssessment) : rawAssessment;
     var throughput = assessment ? Number(assessment.throughput || 0) : 0;
     var startingLodgment = Number(state.lodgment && state.lodgment.value || 0);
     var endLodgment = Math.min(1, startingLodgment + throughput / 4);
@@ -1100,12 +1133,17 @@ window.DirectorModule = (function () {
   // ---- COMMIT (the ritual) -------------------------------------------------------------
   function commitOrderRows(st) {
     var methods = GM.methods();
-    return st.orders.blue.length ? st.orders.blue.map(function (o) {
+    var logi = st.logistics && st.logistics.sides && st.logistics.sides.blue;
+    var allocation = logi ? '<div class="dir-obj"><span>Logistics allocation → ' + esc(logi.decision && logi.decision.label || 'Balanced sustainment') +
+      '</span><span class="v">FUEL ' + Math.round(logi.stocks.fuel) + ' · AMMO ' + Math.round(logi.stocks.ammunition) +
+      ' · MAINT ' + Math.round(logi.stocks.maintenance) + ' · PERS ' + Math.round(logi.stocks.personnel) +
+      ' · FLOW ' + Math.round(logi.flow * 100) + '%</span></div>' : '';
+    return allocation + (st.orders.blue.length ? st.orders.blue.map(function (o) {
       var n = GM.boardNode(o.targetId);
       var src = o.sourceId ? GM.boardNode(o.sourceId) : null;
       var what = o.kind === 'strike' ? (methods[o.methodKey] ? methods[o.methodKey].name : 'Strike') : o.kind.charAt(0).toUpperCase() + o.kind.slice(1);
       return '<div class="dir-obj"><span>' + esc(what) + ' → ' + esc(n ? n.name : o.targetId) + '</span><span class="v">' + (src ? 'via ' + esc(src.name) : (n ? esc(n.difficulty || '') : '')) + '</span></div>';
-    }).join('') : '<div class="dir-note" style="color:#ffd18a">Deliberate pass: Blue will take no action this turn. Red will still act.</div>';
+    }).join('') : '<div class="dir-note" style="color:#ffd18a">Deliberate pass: Blue will take no action this turn. Red will still act.</div>');
   }
 
   function copyBeliefValues(values) {
@@ -1559,6 +1597,7 @@ window.DirectorModule = (function () {
         tempoRole: node.tempoRole, nation: node.nation, serviceOwner: node.serviceOwner,
         component: node.component, jointFunction: node.jointFunction, operationalRole: node.operationalRole,
         availability: node.availability, capabilityProfile: node.capabilityProfile ? JSON.parse(JSON.stringify(node.capabilityProfile)) : null,
+        logisticsProfile: node.logisticsProfile ? JSON.parse(JSON.stringify(node.logisticsProfile)) : null,
         scenarioEnabled: node.scenarioEnabled, resourceGenByType: Object.assign({}, node.resourceGenByType || {}),
         domain: Array.isArray(node.domain) ? node.domain.slice() : node.domain,
         type: node.type, healthMax: node.healthMax || 100, health: node.healthMax || 100, status: 'Active'
@@ -1917,6 +1956,35 @@ window.DirectorModule = (function () {
       '<div class="dir-scoreline">Declared ROE: <b>' + esc(strategic.roe && strategic.roe.label || 'not recorded') + '</b> · ' + signals + ' costly/free deception emissions recorded. Escalation weights and thresholds are notional sensitivity settings.</div></div>';
   }
 
+  function logisticsAarHtml(logistics) {
+    if (!logistics || !logistics.sides) return '';
+    var names = { fuel: 'FUEL', ammunition: 'AMMO', maintenance: 'MAINT', personnel: 'PERS' };
+    function sideCard(side) {
+      var row = logistics.sides[side] || {}, finalStocks = row.finalStocks || {}, initialStocks = row.initialStocks || {};
+      var stocks = Object.keys(names).map(function (key) {
+        return '<div class="dir-obj"><span>' + names[key] + '</span><span class="v">' +
+          Math.round(Number(initialStocks[key] || 0)) + ' → ' + Math.round(Number(finalStocks[key] || 0)) + '</span></div>';
+      }).join('');
+      var decisions = Object.keys(row.decisions || {}).map(function (id) {
+        return '<span class="dir-badge">' + esc(id).toUpperCase() + ' ×' + Number(row.decisions[id] || 0) + '</span>';
+      }).join('') || '<span class="dir-badge">NO ALLOCATION RECORD</span>';
+      var disrupted = (row.routes || []).filter(function (r) { return r.status !== 'open'; }).length;
+      var hubs = (row.hubs || []).filter(function (h) { return h.status !== 'open'; }).length;
+      var totals = row.totals || {};
+      return '<div class="dir-card"><h3>' + side.toUpperCase() + ' LOGISTICS ENDURANCE</h3>' + stocks +
+        '<div class="dir-metrics" style="margin-top:8px"><div class="dir-metric"><b>' + Math.round(Number(row.finalReadiness || 0) * 100) + '%</b><span>READINESS</span></div>' +
+        '<div class="dir-metric"><b>' + Math.round(Number(row.finalFlow || 0) * 100) + '%</b><span>ROUTE FLOW</span></div>' +
+        '<div class="dir-metric"><b>' + Math.round(Number(row.finalDdil || 0) * 100) + '%</b><span>DDIL FRICTION</span></div>' +
+        '<div class="dir-metric"><b>' + Math.round(Number(row.finalPrepositioning || 0)) + '</b><span>PREPOSITIONED BUFFER</span></div></div>' +
+        '<div class="dir-badges" style="margin-top:8px">' + decisions + '</div>' +
+        '<div class="dir-scoreline">' + disrupted + ' disrupted routes · ' + hubs + ' disrupted port/airfield hubs · ' +
+        Number(totals.reroutes || 0) + ' reroutes · ' + Number(totals.routeRepairs || 0) + ' route repairs · ' +
+        Number(totals.shortages || 0) + ' shortage events.</div></div>';
+    }
+    return '<div class="dir-grid">' + sideCard('blue') + sideCard('red') + '</div>' +
+      '<div class="dir-note">Logistics values are abstract, deterministic readiness points for this notional research tool—not real inventory, lift, sortie, or casualty estimates.</div>';
+  }
+
   function openAar() {
     var st = GM.getState();
     op.record = GM.serialize();
@@ -1978,6 +2046,7 @@ window.DirectorModule = (function () {
       predictabilityCardHtml(st) +
       doctrineTrajectoryHtml(aar.redMind) +
       strategicAarHtml(aar.strategic) +
+      logisticsAarHtml(aar.logistics) +
 
       '<div class="dir-grid">' +
       '<div class="dir-card"><h3>SECONDARY ATTRITION LEDGER</h3>' + scoreBars(aar) + '<div class="dir-note">Score is descriptive; the denial/lodgment arbiter above decides the operation.</div></div>' +
@@ -2032,8 +2101,23 @@ window.DirectorModule = (function () {
       '- Red throughput: ' + (last.throughput == null ? '—' : Math.round(last.throughput * 100) + '%') + ' (model halt threshold: below 30%)',
       '- Red system coherence: ' + (last.osvi == null ? '—' : Math.round(last.osvi * 100) + '%'),
       '- Lodgment accumulated: ' + Math.round(((aar.lodgment && aar.lodgment.value) || 0) * 100) + '%', '',
-      '## Turn record', ''
+      '## Logistics endurance', ''
     ];
+    ['blue', 'red'].forEach(function (side) {
+      var row = aar.logistics && aar.logistics.sides && aar.logistics.sides[side];
+      if (!row) return;
+      var stocks = row.finalStocks || {}, totals = row.totals || {};
+      lines.push('- ' + side.toUpperCase() + ': readiness ' + Math.round(Number(row.finalReadiness || 0) * 100) +
+        '%, flow ' + Math.round(Number(row.finalFlow || 0) * 100) + '%, DDIL friction ' + Math.round(Number(row.finalDdil || 0) * 100) +
+        '%, prepositioned buffer ' + Math.round(Number(row.finalPrepositioning || 0)) + '.');
+      lines.push('- ' + side.toUpperCase() + ' final stocks: fuel ' + Math.round(Number(stocks.fuel || 0)) +
+        ', ammunition ' + Math.round(Number(stocks.ammunition || 0)) + ', maintenance ' + Math.round(Number(stocks.maintenance || 0)) +
+        ', personnel ' + Math.round(Number(stocks.personnel || 0)) + '; reroutes ' + Number(totals.reroutes || 0) +
+        ', route repairs ' + Number(totals.routeRepairs || 0) + ', shortages ' + Number(totals.shortages || 0) + '.');
+    });
+    lines.push('',
+      '## Turn record', ''
+    );
     (rec.history || []).forEach(function (h) {
       lines.push('### Turn ' + h.turn, '');
       var orders = (h.orders && h.orders.blue) || [];
@@ -2048,6 +2132,15 @@ window.DirectorModule = (function () {
       var d = (aar.denialHistory || []).filter(function (x) { return x.turn === h.turn; })[0];
       var l = (aar.lodgment && aar.lodgment.history || []).filter(function (x) { return x.turn === h.turn; })[0];
       if (d) lines.push('- Throughput ' + Math.round(d.throughput * 100) + '%; system coherence ' + Math.round(d.osvi * 100) + '%; lodgment ' + Math.round(((l && l.value) || 0) * 100) + '%.');
+      var logi = h.report && h.report.logistics && h.report.logistics.sides && h.report.logistics.sides.blue;
+      if (logi) {
+        var after = logi.stocksAfter || {}, shortages = logi.shortages || [];
+        lines.push('- Logistics allocation ' + String(logi.decision && logi.decision.id || 'balanced').toUpperCase() +
+          '; readiness ' + Math.round(Number(logi.readiness || 0) * 100) + '%, flow ' + Math.round(Number(logi.flow || 0) * 100) +
+          '%, DDIL ' + Math.round(Number(logi.ddil || 0) * 100) + '%, stocks F ' + Math.round(Number(after.fuel || 0)) +
+          ' / A ' + Math.round(Number(after.ammunition || 0)) + ' / M ' + Math.round(Number(after.maintenance || 0)) +
+          ' / P ' + Math.round(Number(after.personnel || 0)) + (shortages.length ? '; SHORTAGES: ' + shortages.join(', ') : '') + '.');
+      }
       lines.push('');
     });
     var F = window.ForecastingModule;

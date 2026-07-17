@@ -39,7 +39,7 @@ The model separates three claims:
 
 2040 additions include scaled collaborative aircraft, distributed unmanned maritime sensing, proliferated multi-orbit transport/tracking, autonomous last-mile logistics, AI-assisted mission assurance, and expeditionary repair. Their labels do not claim those exact formations will exist.
 
-SOCPAC is represented organizationally, but Blue SOF capacity remains zero. The current engine treats any nonzero SOF source as an unlimited high-damage method for every order in a turn. SOF currency should not be activated until typed magazines/availability are modeled symmetrically for both sides.
+SOCPAC is represented organizationally, but Blue SOF capacity remains zero. The contested-logistics adapter now prices SOF fuel, ammunition, maintenance, and personnel demand symmetrically for both sides. SOF currency remains inactive until scenario authors add a defensible availability, access, and mission-capacity model with public provenance.
 
 ## Acceptance gates
 
@@ -66,4 +66,3 @@ SOCPAC is represented organizationally, but Blue SOF capacity remains zero. The 
 - Military Sealift Command Far East, [Mission](https://www.msc.usff.navy.mil/Organization/MSC-Area-Commands/MSC-Far-East/Mission-Vision-History/)
 - U.S. Special Operations Command, [2025 Fact Book](https://www.socom.mil/FactBook/2025%20Fact%20Book.pdf)
 - U.S. Army, [Multi-Domain Task Force Fact Sheet](https://api.army.mil/e2/c/downloads/2023/10/16/93d3689c/multi-domain-task-force-fact-sheet.pdf)
-

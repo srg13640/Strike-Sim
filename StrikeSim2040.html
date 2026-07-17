@@ -52,20 +52,23 @@
   <script src="red-mind.js?v=co005-p1"></script>
   <script src="forecasting.js?v=co005-p2"></script>
   <script src="strategic-state.js?v=co005-p4"></script>
-  <script src="game.js?v=co005-p1"></script>
+  <!-- Deterministic contested-logistics adapter: typed stocks, routes/hubs, DDIL,
+       prepositioning, rerouting, repair, and per-turn allocation decisions. -->
+  <script src="logistics.js?v=p1"></script>
+  <script src="game.js?v=logistics-p1"></script>
   <!-- CO-007 online layer (offline-safe slice): the ONE swappable flag file, then the
        serverless share/challenge link codec. Network features stay parked; removing
        both files must leave the solo loop untouched. -->
   <script src="online-flags.js?v=co007-p1"></script>
   <script src="share.js?v=co007-p1"></script>
   <!-- War Game UI layer: self-contained HUD + launch button over GameModule. -->
-  <script src="wargame.js?v=p13"></script>
+  <script src="wargame.js?v=logistics-p1"></script>
   <!-- NDS Campaign Planner: strategic campaign design layer over the current scenario
        and War Game posture handoff. -->
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=co006-p4"></script>
+  <script src="director.js?v=logistics-p1"></script>
   <!-- CO-006 performance layer: procedural sound engine + the Console Frame
        (boot ritual → title screen front door). Presentation only — reads public
        state, drives #dir-launch, never touches match state or seeded RNG. -->

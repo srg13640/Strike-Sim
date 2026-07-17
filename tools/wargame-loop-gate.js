@@ -24,6 +24,8 @@ const EXPECTED_API = [
   'methods',
   'methodKeys',
   'strategicOptions',
+  'logisticsOptions',
+  'setLogisticsDecision',
   'canStrike',
   'validOrder',
   'serialize',
@@ -71,6 +73,7 @@ function loadGame(graph) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'moe.js'), 'utf8'), context, { filename: 'moe.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'red-mind.js'), 'utf8'), context, { filename: 'red-mind.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'strategic-state.js'), 'utf8'), context, { filename: 'strategic-state.js' });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'logistics.js'), 'utf8'), context, { filename: 'logistics.js' });
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8'), context, { filename: 'game.js' });
   if (errors.length) throw new Error(errors.join('\n'));
   return context.window.GameModule;
@@ -100,9 +103,16 @@ function main() {
     seed: 42
   });
   assert(state && state.rosters.blue > 0 && state.rosters.red > 0, 'wargame did not build both rosters');
+  assert(state.logistics && state.logistics.sides.blue && state.logistics.sides.red,
+    'wargame did not initialize contested logistics for both sides');
+  assert(['fuel', 'ammunition', 'maintenance', 'personnel'].every(k =>
+    typeof state.logistics.sides.blue.stocks[k] === 'number'), 'typed logistics stocks missing');
+  assert(game.logisticsOptions().presets.length === 6, 'allocation decision presets missing');
   state = game.commitTurn();
   assert(state && (state.phase === 'resolved' || state.phase === 'over'), 'commitTurn did not resolve');
   assert(game.serialize() && game.serialize().orders, 'serialize did not include orders');
+  assert(game.serialize().v === 7 && game.serialize().logistics && game.serialize().logisticsInitial,
+    'v7 save did not include logistics state and replay anchor');
 
   game.endMatch();
   assert(game.isActive() === false, 'endMatch left match active');
@@ -118,9 +128,15 @@ function main() {
   };
   state = game.newMatch(campaignCfg);
   assert(state && state.cfg.fog === true && state.ap.blue === 5, 'campaign handoff config did not apply');
+  assert(game.setLogisticsDecision('blue', 'reroute') === true, 'human logistics allocation could not be changed');
+  assert(game.getState().logistics.sides.blue.decision.id === 'reroute', 'logistics allocation did not persist in plan state');
 
   const wargameUi = fs.readFileSync(path.join(ROOT, 'wargame.js'), 'utf8');
   assert(wargameUi.includes('id="wg-launch"') || wargameUi.includes("id='wg-launch'") || wargameUi.includes('#wg-launch'), 'wargame launch button missing from UI module');
+
+  execFileSync(process.execPath, [path.join(ROOT, 'tools', 'logistics-proof.js')], {
+    cwd: ROOT, encoding: 'utf8', stdio: process.env.STRIKESIM_GATE_VERBOSE === '1' ? 'inherit' : 'pipe'
+  });
 
   // Balance is part of the gate, not an adjacent advisory. The default 200-seed run
   // uses the player-facing eight-turn horizon and the real MoeModule denial arbiter.
