@@ -68,7 +68,7 @@
   <script src="campaign.js?v=p3"></script>
   <!-- The Operation Loop (Brief→Plan→Commit→Watch→AAR): the game's front door.
        Drives GameModule; hides the legacy War Game / Campaign launchers. -->
-  <script src="director.js?v=logistics-p1"></script>
+  <script src="director.js?v=tutorial-p2"></script>
   <!-- CO-006 performance layer: procedural sound engine + the Console Frame
        (boot ritual → title screen front door). Presentation only — reads public
        state, drives #dir-launch, never touches match state or seeded RNG. -->
@@ -1052,13 +1052,15 @@
     #first-run-card .fr-n { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1d6f3f; color: #eafff0; font-weight: 700; font-size: 12px; flex: 0 0 auto; }
     #first-run-card .fr-tip { font-size: 12px; color: #9fbdd6; margin: 12px 0 10px; line-height: 1.45; }
     #first-run-card .fr-status { min-height: 18px; color: #7fa6c4; font-size: 11.5px; margin: 0 0 10px; }
-    #first-run-card .fr-actions { display: grid; grid-template-columns: 1fr 1.45fr; gap: 9px; }
+    #first-run-card .fr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
     #first-run-card button { min-height: 44px; border-radius: 8px; cursor: pointer; font: 600 13px 'Inter',system-ui,sans-serif; padding: 10px 12px; }
     #first-run-card .fr-primary { background: linear-gradient(180deg,#1d6f3f,#15532f); border: 1px solid #2e9e5b; color: #eafff0; }
+    #first-run-card .fr-primary { grid-column: 1 / -1; }
     #first-run-card .fr-primary:hover:not(:disabled) { border-color: #46d585; }
     #first-run-card .fr-primary:disabled { opacity:.5; cursor:wait; }
     #first-run-card .fr-secondary { background:#10283b; border:1px solid #285476; color:#b8d8ec; }
     #first-run-card .fr-secondary:hover { border-color:#4b9bd0; color:#eef9ff; }
+    #first-run-card .fr-secondary:disabled { opacity:.5; cursor:wait; }
     #first-run-card button:focus-visible { outline:2px solid #63d7ff; outline-offset:2px; }
     @media (max-width:560px) { #first-run-card .fr-panel { padding:18px; max-height:94vh; overflow:auto; } #first-run-card .fr-actions { grid-template-columns:1fr; } }
     #fr-help-btn { position: fixed; bottom: 16px; left: 16px; z-index: 1450; width: 30px; height: 30px; border-radius: 50%; background: #13314a; color: #bfe4ff; border: 1px solid #2c5f86; font: 700 15px system-ui; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.45); }
@@ -4625,17 +4627,19 @@
           '<div class="fr-title" id="fr-title">TAIWAN STRAIT 2040</div>' +
           '<div class="fr-sub">Opening Denial Window · public-source baseline + explicit 2040 assumptions</div>' +
           '<p class="fr-body">You are the <b style="color:#6cc0ff">Blue Joint Force operational planner</b>. Red is trying to preserve enough cross-strait throughput to establish a lodgment. Your job is to synchronize Taiwan, maritime, air, land, space, cyber, and sustainment capabilities to break that operating system before the hard horizon closes.</p>' +
-          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Read the situation, roles, assumptions, and victory logic</div>' +
-          '<div class="fr-step"><span class="fr-n">2</span> Select targets and queue <b>strike, harden, or repair</b> orders</div>' +
-          '<div class="fr-step"><span class="fr-n">3</span> Forecast, commit, watch the turn resolve, then use the <b>AAR</b></div></div>' +
-          '<p class="fr-tip">The guided operation clears the expert rails while you play. You can reopen them at any time. Forecast bands are model ranges—not real-world predictions.</p>' +
+          '<div class="fr-steps"><div class="fr-step"><span class="fr-n">1</span> Let the computer coach walk you through a strike</div>' +
+          '<div class="fr-step"><span class="fr-n">2</span> Make a sustainment allocation on the second turn</div>' +
+          '<div class="fr-step"><span class="fr-n">3</span> Forecast, commit, watch both turns, and read the <b>AAR</b></div></div>' +
+          '<p class="fr-tip"><b>New here?</b> Start with the fixed two-turn tutorial. It narrows the controls and gives you one explicit next action at every phase. Forecast bands are model ranges—not real-world predictions.</p>' +
           '<p class="fr-status" role="status">Loading the bundled scenario…</p>' +
-          '<div class="fr-actions"><button class="fr-secondary" type="button">Explore console</button>' +
-          '<button class="fr-primary" type="button" disabled>Loading scenario…</button></div>' +
+          '<div class="fr-actions"><button class="fr-primary" data-fr="tutorial" type="button" disabled>Loading scenario…</button>' +
+          '<button class="fr-secondary" data-fr="operation" type="button" disabled>Start full operation</button>' +
+          '<button class="fr-secondary" data-fr="explore" type="button">Explore console</button></div>' +
         '</div>';
       document.body.appendChild(wrap);
       const primary = wrap.querySelector('.fr-primary');
-      const secondary = wrap.querySelector('.fr-secondary');
+      const operation = wrap.querySelector('[data-fr="operation"]');
+      const explore = wrap.querySelector('[data-fr="explore"]');
       const status = wrap.querySelector('.fr-status');
       const panel = wrap.querySelector('.fr-panel');
       let introIsolation = null;
@@ -4666,7 +4670,8 @@
         const ready = scenarioReady();
         const loadError = window.StrikeSimBundledScenarioError || '';
         primary.disabled = !ready;
-        primary.textContent = ready ? 'Start guided operation →' : (loadError ? 'Scenario unavailable' : 'Loading scenario…');
+        operation.disabled = !ready;
+        primary.textContent = ready ? 'Play 2-turn tutorial →' : (loadError ? 'Scenario unavailable' : 'Loading scenario…');
         status.textContent = ready ? `${window.AppState.activeGraph().nodes.length} capabilities loaded · no account required` : (loadError || 'Loading the bundled scenario…');
         status.style.color = loadError && !ready ? '#ffab91' : '';
       };
@@ -4674,9 +4679,14 @@
       primary.addEventListener('click', () => {
         if (!scenarioReady()) return;
         close();
+        if (window.DirectorModule?.startTutorial) window.DirectorModule.startTutorial();
+      });
+      operation.addEventListener('click', () => {
+        if (!scenarioReady()) return;
+        close();
         if (window.DirectorModule?.start) window.DirectorModule.start();
       });
-      secondary.addEventListener('click', close);
+      explore.addEventListener('click', close);
       wrap.querySelector('.fr-backdrop').addEventListener('click', close);
       wrap.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); close(); return; }
@@ -4693,7 +4703,7 @@
         const help = document.createElement('button');
         help.id = 'fr-help-btn'; help.type = 'button'; help.textContent = '?';
         help.title = 'What is this? (show the intro again)';
-        help.addEventListener('click', () => { setIntroOpen(true); syncReady(); setTimeout(() => (primary.disabled ? secondary : primary).focus(), 0); });
+        help.addEventListener('click', () => { setIntroOpen(true); syncReady(); setTimeout(() => (primary.disabled ? explore : primary).focus(), 0); });
         document.body.appendChild(help);
       }
     }
@@ -4701,13 +4711,15 @@
       buildFirstRunCard();
       let seen = false;
       try { seen = localStorage.getItem('strikesim-intro-seen') === '1'; } catch (e) {}
+      const tutorialRequested = (() => { try { return new URLSearchParams(window.location.search).get('tutorial') === '1'; } catch (e) { return false; } })();
       const wrap = document.getElementById('first-run-card');
       if (wrap) {
-        if (typeof wrap._setOpen === 'function') wrap._setOpen(!seen); else wrap.style.display = seen ? 'none' : 'flex';
-        if (!seen) setTimeout(() => {
+        const shouldOpen = tutorialRequested || !seen;
+        if (typeof wrap._setOpen === 'function') wrap._setOpen(shouldOpen); else wrap.style.display = shouldOpen ? 'flex' : 'none';
+        if (shouldOpen) setTimeout(() => {
           const primary = wrap.querySelector('.fr-primary');
-          const secondary = wrap.querySelector('.fr-secondary');
-          (primary && !primary.disabled ? primary : secondary)?.focus();
+          const explore = wrap.querySelector('[data-fr="explore"]');
+          (primary && !primary.disabled ? primary : explore)?.focus();
         }, 0);
       }
     }

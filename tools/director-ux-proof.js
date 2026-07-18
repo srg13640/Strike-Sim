@@ -5,8 +5,8 @@
  * director-ux-proof.js — regression gate for the guided-operation journey.
  *
  * This intentionally checks the authored UI contract rather than rendering pixels:
- * scenario readiness/identity, first-run routing, Focus vs Advanced Analysis, explicit
- * pass semantics, Commit wording, and the denial/lodgment AAR handoff. It also executes
+ * scenario readiness/identity, first-run/tutorial routing, Focus vs Advanced Analysis,
+ * explicit pass semantics, Commit wording, and the denial/lodgment AAR handoff. It also executes
  * the inline loader against a tiny mock graph to prove the readiness event and combined
  * scenario context are wired, not merely mentioned in comments.
  */
@@ -68,11 +68,39 @@ function verifyStaticContract() {
     has(shell, 'Blue Joint Force Mix') && has(director, 'function blueJointMixText()'));
   check('first-run names the Joint Force planner role', has(shell, 'Blue Joint Force operational planner'));
 
-  check('first-run offers direct guided-operation CTA', has(shell, 'Start guided operation →'));
-  check('first-run offers explicit console choice', has(shell, 'Explore console'));
-  check('guided CTA waits for readiness and starts Director',
+  check('first-run makes the two-turn tutorial the primary CTA', has(shell, 'Play 2-turn tutorial →'));
+  check('first-run preserves full-operation and console choices',
+    has(shell, 'Start full operation') && has(shell, 'Explore console'));
+  check('tutorial CTA waits for readiness and starts the tutorial entrypoint',
     has(shell, "window.addEventListener('strikesim:scenario-ready', syncReady)") &&
+    has(shell, 'if (window.DirectorModule?.startTutorial) window.DirectorModule.startTutorial()'));
+  check('normal operation retains its separate entrypoint',
     has(shell, 'if (window.DirectorModule?.start) window.DirectorModule.start()'));
+
+  check('Director exposes a distinct tutorial mode',
+    has(director, 'function startTutorial()') && has(director, 'startTutorial: startTutorial'));
+  check('tutorial is a fixed two-turn training scenario',
+    has(director, "briefOpts.turnLimit = op.tutorial ? 2 : 8") &&
+    has(director, "briefOpts.redDiff = op.tutorial ? 'easy' : 'hard'") &&
+    has(director, "op.tutorial ? 204002 : undefined") &&
+    has(director, 'TUTORIAL PARAMETERS · LOCKED'));
+  check('computer coach spans all five tutorial phases',
+    has(director, 'function tutorialCoach') &&
+    ['I’ll guide the next two turns.', 'Queue one strike.', 'Make an honest forecast before seeing the model.',
+      'Watch one seeded world resolve.', 'Tutorial complete—you ran the full decision loop.']
+      .every(text => has(director, text)));
+  check('tutorial constrains planning and requires a second-turn logistics choice',
+    has(director, "op.tutorial ? ['strike']") &&
+    has(director, "st.turn === 2 && logi && logi.decision && logi.decision.id === 'balanced'") &&
+    has(director, 'CHOOSE A LOGISTICS POSTURE') && has(director, 'tutorialHasOrder'));
+  check('tutorial offers a one-click coach forecast without bypassing blind lock',
+    has(director, 'data-act="tutorial-estimate"') && has(director, "act === 'tutorial-estimate'") &&
+    has(director, 'tutorialCard.touched.premortem = true') && has(director, 'data-act="submit-blind"'));
+  check('tutorial results do not contaminate career stores',
+    has(director, 'if (!op.tutorial) appendForecastEntries(newEntries)') &&
+    /if \(!op\.tutorial\) \{\s*try \{\s*if \(st && st\.playerModel\) writePlayerModel/.test(director));
+  check('tutorial AAR leads directly into a full operation',
+    has(director, 'data-act="full-op"') && has(director, "act === 'full-op'"));
 
   check('shell exposes panel state contract',
     has(shell, 'StrikeSimShell.getPanelState') && has(shell, 'StrikeSimShell.setPanels'));

@@ -51,7 +51,8 @@ window.DirectorModule = (function () {
     panelState: null,      // shell rails before the guided operation takes focus
     focusMode: true,
     modalIsolation: null,
-    returnFocus: null
+    returnFocus: null,
+    tutorial: false
   };
 
   // ---- tiny utils -----------------------------------------------------------------
@@ -315,6 +316,15 @@ window.DirectorModule = (function () {
       '.dir-skip{float:right;min-height:32px;padding:5px 9px;font-size:10px;}',
       '.dir-btn.danger{border-color:#7a2f2f;color:#ffb0a8;}',
       '.dir-note{font-size:12px;color:#6d8ca4;font-style:italic;}',
+      '.dir-coach{border:1px solid #2f88b8;background:linear-gradient(135deg,rgba(8,57,79,.96),rgba(9,28,42,.96));border-radius:12px;padding:13px 15px;margin:0 0 14px;box-shadow:inset 3px 0 0 #63dcff,0 8px 24px rgba(0,0,0,.2);}',
+      '.dir-coach .step{font:700 10px Oswald,system-ui;letter-spacing:.2em;color:#74dfff;margin-bottom:4px;}',
+      '.dir-coach b{display:block;color:#effbff;font:700 15px Oswald,system-ui;letter-spacing:.05em;margin-bottom:3px;}',
+      '.dir-coach p{margin:0;color:#c7e6f4;font-size:12.5px;line-height:1.45;}',
+      '.dir-coach .dir-btn{margin-top:10px;}',
+      '#dir-dock .dir-coach{margin:3px 0 8px;padding:9px 12px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:center;}',
+      '#dir-dock .dir-coach .step{grid-row:1;padding-right:12px;border-right:1px solid rgba(99,220,255,.32);white-space:nowrap;}',
+      '#dir-dock .dir-coach b{font-size:13px;margin:0;}#dir-dock .dir-coach p{font-size:11.5px;}',
+      '#dir-feed .dir-coach{margin:4px 0 9px;padding:9px 11px;}#dir-feed .dir-coach b{font-size:13px;}',
       '.dir-chips{display:flex;gap:6px;flex-wrap:wrap;min-width:0;max-width:100%;}',
       '.dir-chip{appearance:none;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.25;background:#0b1a26;border:1px solid #1d3a52;color:#8fb2ca;border-radius:7px;padding:5px 11px;cursor:pointer;font:600 12px Inter;}',
       '.dir-chip.on{background:#0e3a55;color:#c9f2ff;border-color:#2f88b8;}',
@@ -413,7 +423,7 @@ window.DirectorModule = (function () {
       '.dir-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}',
       '.dir-metric{background:#091923;border:1px solid #19364a;border-radius:8px;padding:9px;text-align:center;}',
       '.dir-metric b{display:block;color:#e8f7ff;font:700 20px Oswald,system-ui;}.dir-metric span{color:#789bb2;font-size:10px;letter-spacing:.08em;}',
-      '@media(max-width:760px){.dir-grid,.dir-context,.dir-colosseum{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
+      '@media(max-width:760px){.dir-grid,.dir-context,.dir-colosseum{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-dock .dir-coach{grid-template-columns:1fr}#dir-dock .dir-coach .step{border-right:0;padding-right:0}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
       '@media(max-width:520px){#dir-rail .mode{font-size:0}#dir-rail .mode:after{content:"TOOLS";font-size:10px}.dir-btn,.dir-chip{min-height:44px;padding:9px 13px}#dir-dock select{min-width:100%;max-width:100%}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -453,7 +463,7 @@ window.DirectorModule = (function () {
       var cls = i === idx ? 'ph on' : (i < idx ? 'ph done' : 'ph');
       return '<span class="' + cls + '">' + p.toUpperCase() + '</span>' + (i < PHASES.length - 1 ? '<span class="sep">›</span>' : '');
     }).join('');
-    var meta = st ? '<span class="meta">TURN ' + st.turn + '/' + st.cfg.turnLimit + '</span>' : '';
+    var meta = st ? '<span class="meta">' + (op.tutorial ? 'TUTORIAL · ' : '') + 'TURN ' + st.turn + '/' + st.cfg.turnLimit + '</span>' : '';
     var tools = (op.phase === 'plan' || op.phase === 'watch') ?
       '<button class="mode" data-act="panels" title="' + (op.focusMode ? 'Open the expert analysis rails' : 'Collapse the analysis rails and focus the map') + '">' +
       (op.focusMode ? 'ADVANCED ANALYSIS' : 'FOCUS MAP') + '</button>' : '';
@@ -480,6 +490,12 @@ window.DirectorModule = (function () {
     if (p === 'brief' || p === 'commit' || p === 'aar') {
       setTimeout(function () { try { $('dir-wrap').focus(); } catch (e) {} }, 0);
     }
+  }
+
+  function tutorialCoach(step, title, body, actionHtml) {
+    if (!op.tutorial) return '';
+    return '<div class="dir-coach" role="status"><span class="step">COMPUTER COACH · STEP ' + esc(step) + ' OF 5</span>' +
+      '<div><b>' + esc(title) + '</b><p>' + esc(body) + '</p>' + (actionHtml || '') + '</div></div>';
   }
 
   // ---- BRIEF ------------------------------------------------------------------------
@@ -527,20 +543,30 @@ window.DirectorModule = (function () {
 
   function restoreBaseScenario() { try { selectVariant('default'); } catch (e) {} }
 
-  function start() {
+  function start() { openOperation(false); }
+
+  function startTutorial() { openOperation(true); }
+
+  function openOperation(tutorial) {
     if (!GM) return;
     if (!startReady()) {
       try { if (typeof window.showToast === 'function') window.showToast('The bundled scenario is still loading. Try Operation again in a moment.', 'warn', 5000); } catch (e) {}
       return;
     }
     if (GM.isActive()) GM.endMatch();
+    restoreBaseScenario();
+    op.tutorial = !!tutorial;
+    briefOpts.turnLimit = op.tutorial ? 2 : 8;
+    briefOpts.redDiff = op.tutorial ? 'easy' : 'hard';
+    briefOpts.roeId = 'denial';
+    briefOpts.variantId = null;
     op.returnFocus = $('dir-launch');
     GM.init({ onResolved: function () {}, onState: function () {} });   // Director drives; legacy HUD stays dormant
     // CO-007 S3: challenge intake. A valid #op= payload (decoded fail-silent by share.js,
     // consumed exactly once) briefs the ISSUER'S world: their variant, their chips, their
     // seed. Anything unavailable degrades to a normal brief with one comms line — never
     // an error surface (I-5).
-    op.challenge = (window.ShareModule && typeof ShareModule.consumePending === 'function' && ShareModule.consumePending()) || null;
+    op.challenge = op.tutorial ? null : ((window.ShareModule && typeof ShareModule.consumePending === 'function' && ShareModule.consumePending()) || null);
     if (op.challenge) {
       var ch = op.challenge;
       if (!selectVariant(ch.variantId === 'default' ? 'default' : ch.variantId)) {
@@ -565,11 +591,11 @@ window.DirectorModule = (function () {
     // situation paragraph, brief drone bed. All copy is the real scenario's.
     var opTitle = scenarioContext().title || 'OPERATION BRIEF';
     cine('briefCinematic', { title: String(opTitle).split('—')[0].trim().toUpperCase() });
-    comms('JOC', opAddr() + 'OPERATION OPEN — ' + String(opTitle).toUpperCase() + ' · SEED ' + GMseed());
+    comms('JOC', opAddr() + (op.tutorial ? 'TUTORIAL OPEN — COMPUTER COACH ONLINE' : 'OPERATION OPEN — ' + String(opTitle).toUpperCase()) + ' · SEED ' + GMseed());
     if (op.challenge) {
       comms('JOC', 'CHALLENGE ACCEPTED — ' + (op.challenge.callsign ? String(op.challenge.callsign).toUpperCase() + '’S' : 'A RIVAL') + ' WORLD · SEED ' + op.challenge.seed + ' · NEUTRAL HABIT MODEL IN EFFECT');
     }
-    evt('Operation started — briefing.');
+    evt(op.tutorial ? 'Two-turn tutorial started — computer coach online.' : 'Operation started — briefing.');
   }
 
   function variantLabel(id) {
@@ -586,14 +612,14 @@ window.DirectorModule = (function () {
     // CO-007 S3: challenge intake plays the issuer's exact world — forced seed, NEUTRAL
     // player model (I-4: fair ground; Red exploits nobody's career habits). A normal op
     // stashes the PRE-match model so a replay payload can reproduce Red exactly.
-    op.startModel = op.challenge ? null : readPlayerModel();
+    op.startModel = (op.challenge || op.tutorial) ? null : readPlayerModel();
     GM.newMatch({
       turnLimit: briefOpts.turnLimit,
       lodgmentRequiredTurns: mc.lodgmentRequiredTurns,
       doctrinePrior: mc.doctrinePrior,
       strategic: mc.strategic,
       logistics: mc.logistics,
-      seed: op.challenge ? op.challenge.seed : undefined,
+      seed: op.challenge ? op.challenge.seed : (op.tutorial ? 204002 : undefined),
       // CO-005 A6: Red carries the player's career habit model into the new match
       // (or the neutral model on a challenge — normalizePlayerModel(null) is empty).
       playerModel: op.startModel,
@@ -661,6 +687,7 @@ window.DirectorModule = (function () {
       '<div class="dir-kicker">OPERATION BRIEF · ' + esc(title) + '</div>' +
       '<h1 class="dir-h1">Deny the lodgment before the window closes.</h1>' +
       '<div class="dir-sub">You are the Blue Joint Force operational planner. ' + st.cfg.turnLimit + ' turns / ' + horizon + ' notional days of simultaneous commitment against a doctrine-driven Red.</div>' +
+      tutorialCoach('1', 'I’ll guide the next two turns.', 'Turn 1 teaches a strike, forecast, and resolution. Turn 2 adds a logistics allocation decision. Follow the cyan coach card; the expert tools remain available after the tutorial.') +
 
       '<div class="dir-card">' +
       '<div class="dir-badges"><span class="dir-badge">' + esc(ctx.classification || 'SCENARIO DATA') + '</span>' +
@@ -720,6 +747,9 @@ window.DirectorModule = (function () {
           (op.challenge.claim.bss != null ? ' · BSS ' + (op.challenge.claim.bss >= 0 ? '+' : '') + op.challenge.claim.bss.toFixed(3) : '') + '</b></div>' : '') +
         '<div class="dir-note" style="margin-top:8px">Red faces you with a NEUTRAL habit model — neither your career tells nor theirs. Their claim is unverified until it survives the replay verifier. Changing any parameter below voids the challenge.</div></div>' : '') +
 
+      (op.tutorial ?
+        '<div class="dir-card"><h3>TUTORIAL PARAMETERS · LOCKED</h3><div class="dir-badges"><span class="dir-badge">2 TURNS</span><span class="dir-badge">TRAINING RED</span><span class="dir-badge">DENIAL ROE</span><span class="dir-badge">FIXED SEED 204002</span></div>' +
+        '<div class="dir-note">The computer has fixed the scenario so every new player receives the same short, replayable lesson.</div></div>' :
       '<div class="dir-card"><h3>OPERATION PARAMETERS</h3>' +
       (Object.keys(variantRegistry()).length ?
         '<div class="row" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="dir-note">Operation</span><span class="dir-chips">' +
@@ -737,11 +767,11 @@ window.DirectorModule = (function () {
       ['easy', 'hard', 'elite'].map(function (d) { return '<button type="button" class="dir-chip' + (briefOpts.redDiff === d ? ' on' : '') + '" aria-pressed="' + (briefOpts.redDiff === d) + '" data-diff="' + d + '">' + (d === 'hard' ? 'CONTESTED' : d === 'elite' ? 'ELITE' : 'TRAINING') + '</button>'; }).join('') +
       '</span></div><div class="row" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px"><span class="dir-note">Declared ROE commitment</span><span class="dir-chips">' +
       Object.keys(roeOptions).map(function (id) { var roe = roeOptions[id]; return '<button type="button" class="dir-chip' + (briefOpts.roeId === id ? ' on' : '') + '" aria-pressed="' + (briefOpts.roeId === id) + '" data-roe="' + esc(id) + '" title="' + esc(roe.description) + '">' + esc(roe.label) + '</button>'; }).join('') +
-      '</span><div class="dir-note">Enforced in the UI, Red planner, every ghost world, and the resolver. Red knows the commitment.</div></div></div>' +
+      '</span><div class="dir-note">Enforced in the UI, Red planner, every ghost world, and the resolver. Red knows the commitment.</div></div></div>') +
 
       '<div class="dir-actions"><span class="dir-note">Seed ' + esc(String(GMseed())) + ' — this operation is exactly replayable.</span>' +
       '<button class="dir-btn" data-act="exit">EXIT</button>' +
-      '<button class="dir-btn primary" data-act="begin">BEGIN PLANNING →</button></div>';
+      '<button class="dir-btn primary" data-act="begin">' + (op.tutorial ? 'START TUTORIAL — TURN 1 →' : 'BEGIN PLANNING →') + '</button></div>';
   }
 
   function GMseed() { var s = GM.serialize(); return s ? s.seed : '—'; }
@@ -827,6 +857,11 @@ window.DirectorModule = (function () {
       if (op.kind === 'repair') pool = pool.filter(function (b) { return b.health < (b.healthMax || 100); }).sort(function (a, b) { return a.health - b.health; });
       else pool.sort(function (a, b) { return nodeVal(b) - nodeVal(a); });
     }
+    if (op.tutorial && op.kind === 'strike') {
+      pool = pool.filter(function (b) {
+        return GM.methodKeys().some(function (key) { return GM.canStrike('blue', b.id, key).ok; });
+      });
+    }
     var objSet = {};
     (st.objectiveIds.blue || []).concat(st.objectiveIds.red || []).forEach(function (i) { objSet[i] = true; });
     // default the working target to the top of the pool so the select and the recon
@@ -881,6 +916,24 @@ window.DirectorModule = (function () {
     }).join('<br>') + '</span></div>';
   }
 
+  function tutorialPlanCoach(st, logi) {
+    if (!op.tutorial) return '';
+    var queued = st.orders.blue.length > 0;
+    var allocationChanged = !!(logi && logi.decision && logi.decision.id !== 'balanced');
+    if (st.turn === 1) {
+      return tutorialCoach('2', queued ? 'Order queued. Now review the forecast.' : 'Queue one strike.',
+        queued ? 'The target and delivery method are locked into your draft plan. Press REVIEW FORECAST to see the commit card.' :
+          'I selected a high-value authorized Red system and a valid delivery method. Keep BAL logistics for this turn, then press + QUEUE ORDER.');
+    }
+    if (!allocationChanged) {
+      return tutorialCoach('2', 'Make the sustainment decision first.',
+        'The first turn consumed stocks and may have disrupted routes. Choose a new logistics posture—SURGE, REPAIR, REROUTE, PREPO, or DDIL—to decide what the network prioritizes.');
+    }
+    return tutorialCoach('2', queued ? 'Second-turn plan ready.' : 'Allocation set. Queue one more strike.',
+      queued ? 'You changed the logistics allocation and queued an order. Press REVIEW FORECAST to commit the final tutorial turn.' :
+        'Notice how the allocation changes readiness priorities. The computer kept a valid target and method selected; press + QUEUE ORDER.');
+  }
+
   function renderDock() {
     var st = GM.getState();
     if (!st) return;
@@ -896,6 +949,10 @@ window.DirectorModule = (function () {
     var methods = GM.methods();
     var optsHtml = targetOptions();   // resolves op.targetId to the pool default first
     var tgt = op.targetId ? GM.boardNode(op.targetId) : null;
+    if (op.tutorial && tgt && !GM.canStrike('blue', tgt.id, op.methodKey).ok) {
+      var tutorialMethod = GM.methodKeys().filter(function (key) { return GM.canStrike('blue', tgt.id, key).ok; })[0];
+      if (tutorialMethod) op.methodKey = tutorialMethod;
+    }
     var methodChips = GM.methodKeys().map(function (k) {
       var m = methods[k];
       var vulnHit = tgt && (tgt.vulns || []).indexOf(m.vuln) >= 0;
@@ -907,6 +964,9 @@ window.DirectorModule = (function () {
     var proposed = tgt ? { kind: op.kind, targetId: tgt.id } : null;
     if (proposed && op.kind === 'strike') proposed.methodKey = op.methodKey;
     var validity = proposed ? GM.validOrder('blue', proposed) : { ok: false, reason: 'no-target' };
+    var tutorialNeedsAllocation = !!(op.tutorial && st.turn === 2 && logi && logi.decision && logi.decision.id === 'balanced');
+    var tutorialHasOrder = !!(op.tutorial && st.orders.blue.length);
+    var queueDisabled = !validity.ok || tutorialNeedsAllocation || tutorialHasOrder;
     var validationNote = validity.ok ? '' : '<span class="dir-note" style="color:#e8ad77">' + esc(explainInvalid(validity.reason)) + '</span>';
     var queue = st.orders.blue.map(function (o, i) {
       var n = GM.boardNode(o.targetId);
@@ -917,6 +977,7 @@ window.DirectorModule = (function () {
     }).join('') || '<span class="dir-note">No orders queued — click a node on the map or pick a target below.</span>';
 
     $('dir-dock').innerHTML =
+      tutorialPlanCoach(st, logi) +
       '<div class="row">' +
       '<span class="stat">TURN <b>' + st.turn + '/' + st.cfg.turnLimit + '</b></span>' +
       '<span class="stat ap">ORDERS ' + pips + '</span>' +
@@ -931,26 +992,27 @@ window.DirectorModule = (function () {
       intelAssessmentHtml(st) +
       indicatorChannelHtml(st) +
       (logi ? '<div class="row"><span class="stat">LOGISTICS</span><span class="dir-chips">' +
-        (logiOptions.presets || []).map(function (p) {
+        (logiOptions.presets || []).filter(function (p) { return !op.tutorial || st.turn !== 1 || p.id === 'balanced'; }).map(function (p) {
           return '<button type="button" class="dir-chip' + (logi.decision && logi.decision.id === p.id ? ' on' : '') +
             '" aria-pressed="' + !!(logi.decision && logi.decision.id === p.id) + '" data-logistics="' + esc(p.id) +
-            '" title="' + esc(p.note) + '">' + esc(p.short) + '</button>';
+            '" title="' + esc(p.note) + '"' + (op.tutorial && st.turn === 1 ? ' disabled' : '') + '>' + esc(p.short) + '</button>';
         }).join('') + '</span><span class="dir-note">FUEL ' + Math.round(logi.stocks.fuel) + ' · AMMO ' +
         Math.round(logi.stocks.ammunition) + ' · MAINT ' + Math.round(logi.stocks.maintenance) + ' · PERS ' +
         Math.round(logi.stocks.personnel) + ' · PREPO ' + Math.round(logi.prepositioning) + '</span></div>' : '') +
       '<div class="row">' +
       '<span class="dir-chips">' +
-      ['strike', 'harden', 'repair', 'feint', 'decoy'].map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + (k === 'decoy' ? ' · 0 AP' : '') + '</button>'; }).join('') +
+      (op.tutorial ? ['strike'] : ['strike', 'harden', 'repair', 'feint', 'decoy']).map(function (k) { return '<button type="button" class="dir-chip' + (op.kind === k ? ' on' : '') + '" aria-pressed="' + (op.kind === k) + '" data-kind="' + k + '">' + k.toUpperCase() + (k === 'decoy' ? ' · 0 AP' : '') + '</button>'; }).join('') +
       '</span>' +
       '<label class="stat" for="dir-target">TARGET</label><select id="dir-target" aria-label="Order target">' + (optsHtml || '<option value="">— no valid targets —</option>') + '</select>' +
       (op.kind === 'strike' ? '<span class="dir-chips">' + methodChips + '</span>' : '') +
-      '<button class="dir-btn" data-act="queue"' + (validity.ok ? '' : ' disabled') + '>+ QUEUE ORDER</button>' + validationNote +
+      '<button class="dir-btn" data-act="queue"' + (queueDisabled ? ' disabled' : '') + '>+ QUEUE ORDER</button>' + validationNote +
       '</div>' +
       reconHtml(tgt) +
       '<div class="row q">' + queue + '</div>' +
       '<div class="row"><span class="dir-note">Red committed before these indicators rendered. Feints cost combat power; uncaught decoys remain ambiguous.</span><span class="spacer"></span>' +
       (st.orders.blue.length ? '<button class="dir-btn primary" data-act="forecast">REVIEW FORECAST →</button>' :
-        '<button class="dir-btn" data-act="pass">PASS TURN</button><button class="dir-btn primary" disabled>QUEUE AN ORDER TO CONTINUE</button>') + '</div>';
+        (op.tutorial ? '<button class="dir-btn primary" disabled>' + (tutorialNeedsAllocation ? 'CHOOSE A LOGISTICS POSTURE' : 'QUEUE ONE ORDER TO CONTINUE') + '</button>' :
+          '<button class="dir-btn" data-act="pass">PASS TURN</button><button class="dir-btn primary" disabled>QUEUE AN ORDER TO CONTINUE</button>')) + '</div>';
     var sel = $('dir-target');
     if (sel && sel.value) op.targetId = sel.value;
     renderRail();
@@ -1207,6 +1269,8 @@ window.DirectorModule = (function () {
       '<div class="dir-kicker">COMMIT CARD · BLIND · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
       '<h1 class="dir-h1">What do you believe?</h1>' +
       '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Orders lock blind; Red commits when you execute. Forecast before seeing the house. Move each of the three event sliders.</div>' +
+      tutorialCoach('3', 'Make an honest forecast before seeing the model.', 'Probabilities describe uncertainty, not confidence in yourself. Use the coach estimate for a sensible starting point, or move the controls yourself; then lock the blind forecast.',
+        '<button class="dir-btn" data-act="tutorial-estimate"' + (cardIsReady(card) ? ' disabled' : '') + '>' + (cardIsReady(card) ? 'COACH ESTIMATE LOADED' : 'USE COACH ESTIMATE') + '</button>') +
       '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
       outsideViewHtml(st) +
       '<div class="dir-card"><h3>THREE RESOLVABLE CALLS</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.values.questions[q.id], false); }).join('') + '</div>' +
@@ -1224,6 +1288,7 @@ window.DirectorModule = (function () {
       '<div class="dir-kicker">COMMIT CARD · HOUSE REVEALED · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
       '<h1 class="dir-h1">Revise once—then live with it.</h1>' +
       '<div class="dir-sub"><span class="dir-lock">ORDERS REMAIN LOCKED</span> The house line is a model-world frequency with an interval, not a promise.</div>' +
+      tutorialCoach('3', 'Compare your call with the house line.', 'You may revise once, but copying the model does not prove skill. For this lesson, leave the estimate as-is and press COMMIT FORECASTS & EXECUTE.') +
       forecastStrip(op.lastForecast) +
       '<div class="dir-card"><h3>HOUSE vs YOU</h3>' + card.set.questions.map(function (q) { return beliefControl(q, card.final.questions[q.id], true); }).join('') +
       '<div class="dir-note">Copying every house value produces Brier Skill Score 0 by construction. Positive skill requires diverging and being right over many resolved calls.</div></div>' +
@@ -1427,7 +1492,7 @@ window.DirectorModule = (function () {
     }
     judgment.scored = true;
     op.scoredEntries = op.scoredEntries.concat(newEntries);
-    appendForecastEntries(newEntries);
+    if (!op.tutorial) appendForecastEntries(newEntries);
     var turnSkill = F.brierSkill(judgment.entries);
     judgment.summary = {
       playerMean: turnSkill.n ? turnSkill.player / turnSkill.n : null,
@@ -1462,7 +1527,8 @@ window.DirectorModule = (function () {
     // CO-006 P3: the war film — bars in, the comms floor returns for sparse kill
     // confirms. No bed starts: the war's score is stingers and radio only.
     cine('watchCinematic');
-    feed.innerHTML = '<div class="fl sys">TURN ' + report.turn + ' — EXECUTION · ' + events.length + ' EVENTS' +
+    feed.innerHTML = tutorialCoach('4', 'Watch one seeded world resolve.', 'The forecast was a range across many model worlds. This playback is one deterministic draw; a hit or miss does not validate the probability by itself.') +
+      '<div class="fl sys">TURN ' + report.turn + ' — EXECUTION · ' + events.length + ' EVENTS' +
       (instant ? ' · REDUCED MOTION' : ' <button class="dir-btn dir-skip" data-act="skip-watch">SHOW RESULT NOW</button>') + '</div>';
     if (instant) {
       events.forEach(function (e) { feed.insertAdjacentHTML('beforeend', feedLine(e)); });
@@ -1555,11 +1621,13 @@ window.DirectorModule = (function () {
     var escalationLine = report.escalation ? '<br>Escalation <b>E ' + Number(report.escalation.before).toFixed(1) + ' → ' + Number(report.escalation.after).toFixed(1) +
       '</b> (Δ ' + (Number(report.escalation.delta) >= 0 ? '+' : '') + Number(report.escalation.delta).toFixed(1) + ')' +
       ((report.escalation.allyEvents || []).length ? ' · posture transition pending next turn: <b>' + report.escalation.allyEvents.map(function (event) { return esc(event.actor); }).join(', ') + '</b>' : '') : '';
+    var tutorialOutcome = op.tutorial ? tutorialCoach('4', report.turn === 1 ? 'Turn 1 complete. Now add the logistics decision.' : 'Both tutorial turns are complete.',
+      report.turn === 1 ? 'Continue to Turn 2. The coach will require a new sustainment posture before the next strike.' : 'Open the AAR to connect your choices, forecasts, and outcomes.') : '';
     var html = '<div class="outcome"><b>TURN ' + report.turn + ' COMPLETE</b><br>' +
       'Red lost <b>' + (a ? a.redKills : 0) + '</b> · Blue lost <b>' + (a ? a.blueKills : 0) + '</b> · ' +
       'Your objectives <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + '</b> · ' +
       'Tempo <b>' + Math.round(st.tempo.blue.frac * 100) + '%</b>' + denialLine + escalationLine + '<br>' + honesty + judgmentLine +
-      '<div class="dir-actions" style="margin-top:10px">' +
+      tutorialOutcome + '<div class="dir-actions" style="margin-top:10px">' +
       (over ? '<button class="dir-btn primary" data-act="aar">AFTER-ACTION REVIEW →</button>'
         : lastTurn ? '<button class="dir-btn primary" data-act="next">END OF OPERATION — AAR →</button>'
           : '<button class="dir-btn primary" data-act="next">PLAN TURN ' + (st.turn + 1) + ' →</button>') +
@@ -1990,21 +2058,23 @@ window.DirectorModule = (function () {
     op.record = GM.serialize();
     // CO-005 A6/B7: persist the habit model Red will face next operation, and the
     // finished-operation record behind the outside-view reference class.
-    try {
-      if (st && st.playerModel) writePlayerModel(st.playerModel);
-      var aarResult = (st && st.aar && st.aar.result) || {};
-      var lastDenialRow = ((st && st.aar && st.aar.denialHistory) || []).slice(-1)[0] || {};
-      appendOpsArchive({
-        ts: Date.now(),
-        seed: op.record ? op.record.seed : null,
-        variantId: briefOpts.variantId || 'default',
-        archetype: operationArchetype(op.record),
-        winner: (st && st.aar && st.aar.winner) || st.winner || null,
-        halted: aarResult.reason === 'halt',
-        throughputEnd: lastDenialRow.throughput != null ? lastDenialRow.throughput : null,
-        turns: (st && st.aar && st.aar.turns) || st.turn
-      });
-    } catch (e) { /* career stores are best-effort; the AAR itself never depends on them */ }
+    if (!op.tutorial) {
+      try {
+        if (st && st.playerModel) writePlayerModel(st.playerModel);
+        var aarResult = (st && st.aar && st.aar.result) || {};
+        var lastDenialRow = ((st && st.aar && st.aar.denialHistory) || []).slice(-1)[0] || {};
+        appendOpsArchive({
+          ts: Date.now(),
+          seed: op.record ? op.record.seed : null,
+          variantId: briefOpts.variantId || 'default',
+          archetype: operationArchetype(op.record),
+          winner: (st && st.aar && st.aar.winner) || st.winner || null,
+          halted: aarResult.reason === 'halt',
+          throughputEnd: lastDenialRow.throughput != null ? lastDenialRow.throughput : null,
+          turns: (st && st.aar && st.aar.turns) || st.turn
+        });
+      } catch (e) { /* career stores are best-effort; the AAR itself never depends on them */ }
+    }
     stopCounterfactualWorker();
     initCounterfactual();
     setPhase('aar');
@@ -2036,6 +2106,7 @@ window.DirectorModule = (function () {
       '<div class="dir-verdict ' + verdict.cls + '">' + verdict.label + '</div>' +
       rankChip +
       '<div class="dir-sub">' + esc(aar.reason || '') + '</div>' +
+      tutorialCoach('5', 'Tutorial complete—you ran the full decision loop.', 'You framed the mission, queued a strike, made a logistics allocation, forecast uncertainty, committed, watched two seeded turns, and opened the AAR. Your tutorial results were not added to the career model.') +
 
       '<div class="dir-card"><h3>DENIAL / LODGMENT VERDICT</h3>' +
       '<div class="dir-metrics"><div class="dir-metric"><b>' + (lastDenial.throughput == null ? '—' : Math.round(lastDenial.throughput * 100) + '%') + '</b><span>RED THROUGHPUT · HALT &lt;30%</span></div>' +
@@ -2043,9 +2114,7 @@ window.DirectorModule = (function () {
       '<div class="dir-metric"><b>' + Math.round(lodgment * 100) + '%</b><span>LODGMENT ACCUMULATED</span></div>' +
       '<div class="dir-metric"><b>' + esc(result.at && result.at.dday != null ? 'D+' + result.at.dday : '—') + '</b><span>DECISION POINT</span></div></div>' + projectionLine + '</div>' +
 
-      predictabilityCardHtml(st) +
-      doctrineTrajectoryHtml(aar.redMind) +
-      strategicAarHtml(aar.strategic) +
+      (op.tutorial ? '' : predictabilityCardHtml(st) + doctrineTrajectoryHtml(aar.redMind) + strategicAarHtml(aar.strategic)) +
       logisticsAarHtml(aar.logistics) +
 
       '<div class="dir-grid">' +
@@ -2058,19 +2127,20 @@ window.DirectorModule = (function () {
       ledgerRows() + '</table>' +
       '<div class="dir-note" style="margin-top:6px">A good forecast is honest, not lucky: actuals should land inside the band ~80% of the time.</div></div>' +
 
-      calibrationCardHtml() +
+      (op.tutorial ? '' : calibrationCardHtml()) +
 
-      '<div class="dir-card"><h3>COUNTERFACTUAL COLOSSEUM — ONE DECISION, TWO WORLDS</h3><div id="dir-colosseum"></div></div>' +
+      (op.tutorial ? '' : '<div class="dir-card"><h3>COUNTERFACTUAL COLOSSEUM — ONE DECISION, TWO WORLDS</h3><div id="dir-colosseum"></div></div>') +
 
       '<div class="dir-actions">' +
       '<button class="dir-btn" data-act="copy-aar">COPY AAR</button>' +
       '<button class="dir-btn" data-act="download-aar">DOWNLOAD .MD</button>' +
       // CO-007 S3: serverless "beat my world" link — flag-gated; absent = nonexistent (I-3).
-      (window.ShareModule && ShareModule.active() ?
+      (!op.tutorial && window.ShareModule && ShareModule.active() ?
         '<button class="dir-btn" data-act="challenge-link">COPY CHALLENGE LINK</button>' : '') +
       '<button class="dir-btn" data-act="exit-op">EXIT TO CONSOLE</button>' +
-      '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button></div>';
-    renderCounterfactualCard();
+      (op.tutorial ? '<button class="dir-btn primary" data-act="full-op">START FULL OPERATION ▶</button>' :
+        '<button class="dir-btn primary" data-act="new-op">NEW OPERATION ▶</button>') + '</div>';
+    if (!op.tutorial) renderCounterfactualCard();
     // CO-006 P3: the debrief ceremony — verdict stamps first over silence, then the
     // ledgers deal in as cards (soft tick each). setPhase removes the deal class on exit.
     try {
@@ -2300,6 +2370,21 @@ window.DirectorModule = (function () {
     if (t.hasAttribute('data-roe')) { voidChallenge(); briefOpts.roeId = t.getAttribute('data-roe'); newBriefMatch(); renderBrief(); sfxA('tick', { vol: 0.03 }); return; }
     var act = t.getAttribute('data-act');
     if (act === 'begin') beginPlanning();
+    else if (act === 'tutorial-estimate') {
+      var tutorialCard = op.commitCard;
+      if (!op.tutorial || !tutorialCard || tutorialCard.step !== 'blind') return;
+      var coachValues = [0.55, 0.35, 0.25];
+      tutorialCard.set.questions.forEach(function (q, i) {
+        tutorialCard.values.questions[q.id] = coachValues[i % coachValues.length];
+        tutorialCard.touched[q.id] = true;
+      });
+      var causes = tutorialCard.set.premortem.categories || [];
+      causes.forEach(function (cause, i) { tutorialCard.values.premortem[cause.id] = i === 0 ? 0.4 : 0.6 / Math.max(1, causes.length - 1); });
+      tutorialCard.touched.premortem = true;
+      renderBlindCommit();
+      var blindButton = $('dir-wrap').querySelector('[data-act="submit-blind"]');
+      if (blindButton) blindButton.focus();
+    }
     else if (act === 'unlock-commit') {
       if (op.commitCard && op.commitCard.step === 'blind') {
         var unlockTurn = op.commitCard.turn;
@@ -2333,6 +2418,7 @@ window.DirectorModule = (function () {
     else if (act === 'run-exploit-probe') runExploitProbe();
     else if (act === 'exit') abortOperation(true);
     else if (act === 'exit-op') { endOperation(); cine('exitCinematic'); }   // CO-006 P3: letterbox back to the title front door
+    else if (act === 'full-op') { endOperation(); start(); }
     else if (act === 'new-op') { endOperation(); start(); }
   }
 
@@ -2350,6 +2436,7 @@ window.DirectorModule = (function () {
     op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
     op.record = null; op.counterfactual = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    op.tutorial = false;
     restoreBaseScenario();                     // CO-005 C5: put the boot force networks back
     restorePanels();
     try { if (window.AudioFXModule) window.AudioFXModule.stopBed(0.8); } catch (e) {}   // CO-006 P2
@@ -2371,5 +2458,5 @@ window.DirectorModule = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 
-  return { start: start, end: endOperation, _op: op };
+  return { start: start, startTutorial: startTutorial, end: endOperation, _op: op };
 })();
