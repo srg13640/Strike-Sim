@@ -91,6 +91,10 @@ function verifyStaticContract() {
     has(director, 'Deliberate pass: Blue will take no action this turn. Red will still act.'));
 
   check('Plan uses Review wording', has(director, 'REVIEW FORECAST →'));
+  check('chip groups wrap and long labels stay inside their cards',
+    /\.dir-card\{[^}]*min-width:0/.test(director) &&
+    /\.dir-chips\{[^}]*flex-wrap:wrap[^}]*min-width:0[^}]*max-width:100%/.test(director) &&
+    /\.dir-chip\{[^}]*max-width:100%[^}]*white-space:normal[^}]*overflow-wrap:anywhere/.test(director));
   check('Commit uses blind then house then one-final-revision flow',
     has(director, 'COMMIT CARD · BLIND') && has(director, 'HOUSE REVEALED') &&
     has(director, 'data-act="submit-blind"') && has(director, 'data-act="submit-final"'));
