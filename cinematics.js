@@ -23,6 +23,7 @@ window.CinematicsModule = (function () {
   var GHOST_WORLDS = 200;   // mirror of director.js GHOSTS (display copy only, like OBJ_LOSS_FRAC)
 
   var S = { screen: null, scenarioReady: false, forces: { blue: '—', red: '—' }, bootDone: false };
+  var dismissBoot = null;
 
   // ── CO-006 Phase 4 (W6): operator settings — cosmetic, persisted, never match state ──
   var SETTINGS_KEY = 'strikesim.co006.settings';
@@ -266,9 +267,23 @@ window.CinematicsModule = (function () {
       try { localStorage.setItem(BOOT_SEEN_KEY, 'seen'); } catch (e) {}
       wrap.classList.add('gone');
       S.bootDone = true;
+      dismissBoot = null;
+      wrap.removeEventListener('click', enter);
       window.removeEventListener('keydown', enter);
       setTimeout(function () { try { wrap.remove(); } catch (e) {} showTitle(); }, reduceMotion() ? 0 : 700);
     }
+    dismissBoot = function () {
+      if (!wrap.isConnected) return;
+      var a = sfx();
+      if (a) a.unlock();
+      try { localStorage.setItem(BOOT_SEEN_KEY, 'seen'); } catch (e) {}
+      wrap.classList.add('gone');
+      S.bootDone = true;
+      S.screen = null;
+      wrap.removeEventListener('click', enter);
+      window.removeEventListener('keydown', enter);
+      setTimeout(function () { try { wrap.remove(); } catch (e) {} }, reduceMotion() ? 0 : 180);
+    };
     wrap.addEventListener('click', enter);
     window.addEventListener('keydown', enter);
   }
@@ -323,6 +338,7 @@ window.CinematicsModule = (function () {
   }
   function startTitleBed() { var a = sfx(); if (a && a.unlocked()) a.startBed('title'); }
   function hideTitle() {
+    if (dismissBoot) { dismissBoot(); dismissBoot = null; }
     var t = $('cin-title');
     if (t) t.classList.add('gone');
     S.screen = null;
@@ -608,9 +624,10 @@ window.CinematicsModule = (function () {
 
   // ── CO-006 Phase 3: the war film (WATCH) and the debrief ceremony (AAR) ──
   // No bed starts here — per the Phase 2 contract the war is SILENT under the menu's
-  // drones; the film's score is the Director-timed stingers and sparse BDA confirms.
+  // drones; the film's score is the Director-timed stingers. The comprehensive WATCH
+  // feed owns the reading surface, so duplicate comms stay hidden until the next phase.
   function watchCinematic() {
-    commsVisible(true);              // the floor returns for kill confirmations only
+    commsVisible(false);             // never cover the WATCH feed or its next-turn action
     if (reduceMotion()) return;        // instant path: events land set, no bars
     letterbox(true);                 // the film begins
   }

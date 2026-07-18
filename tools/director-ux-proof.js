@@ -69,11 +69,15 @@ function verifyStaticContract() {
   check('first-run names the Joint Force planner role', has(shell, 'Blue Joint Force operational planner'));
 
   check('first-run makes the two-turn tutorial the primary CTA', has(shell, 'Play 2-turn tutorial →'));
+  check('first-run tutorial chooser stays above the cinematic console layers',
+    /#first-run-card\s*\{[^}]*z-index:\s*6000/.test(shell));
   check('first-run preserves full-operation and console choices',
     has(shell, 'Start full operation') && has(shell, 'Explore console'));
   check('tutorial CTA waits for readiness and starts the tutorial entrypoint',
     has(shell, "window.addEventListener('strikesim:scenario-ready', syncReady)") &&
     has(shell, 'if (window.DirectorModule?.startTutorial) window.DirectorModule.startTutorial()'));
+  check('tutorial and full-operation choices dismiss the cinematic title layer',
+    (shell.match(/CinematicsModule\?\.hideTitle/g) || []).length === 2);
   check('normal operation retains its separate entrypoint',
     has(shell, 'if (window.DirectorModule?.start) window.DirectorModule.start()'));
 
@@ -101,6 +105,10 @@ function verifyStaticContract() {
     /if \(!op\.tutorial\) \{\s*try \{\s*if \(st && st\.playerModel\) writePlayerModel/.test(director));
   check('tutorial AAR leads directly into a full operation',
     has(director, 'data-act="full-op"') && has(director, "act === 'full-op'"));
+  check('WATCH result becomes a centered readable surface with a sticky next action',
+    has(director, '#dir-feed.result-ready') && has(director, 'max-height:calc(100vh - 112px)') &&
+    has(director, '#dir-feed .outcome>.dir-actions{position:sticky') &&
+    has(director, "feed.classList.add('result-ready')") && has(director, "feed.classList.remove('result-ready')"));
 
   check('shell exposes panel state contract',
     has(shell, 'StrikeSimShell.getPanelState') && has(shell, 'StrikeSimShell.setPanels'));

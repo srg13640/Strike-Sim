@@ -393,14 +393,16 @@ window.DirectorModule = (function () {
       'padding:5px 9px;letter-spacing:.02em;}',
       '.dir-recon b{color:#dff2ff;}',
       // watch feed
-      '#dir-feed{position:fixed;left:16px;bottom:16px;z-index:1500;display:none;width:min(430px,calc(100vw - 32px));max-height:58vh;overflow:auto;',
+      '#dir-feed{position:fixed;left:16px;bottom:16px;z-index:1500;display:none;width:min(560px,calc(100vw - 32px));max-height:58vh;overflow:auto;',
       'background:rgba(8,14,20,.94);border:1px solid #1f4058;border-radius:12px;padding:10px 12px;font:12.5px Inter;color:#cfe3f2;backdrop-filter:blur(6px);}',
+      '#dir-feed.result-ready{left:50%;transform:translateX(-50%);width:min(820px,calc(100vw - 24px));max-height:calc(100vh - 112px);z-index:1900;}',
       '#dir-feed .fl{padding:3px 2px;border-bottom:1px dotted #142534;opacity:0;animation:dirIn .28s ease forwards;}',
       '@keyframes dirIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}',
       '#dir-feed .fl.blue{color:#9fd4ff;} #dir-feed .fl.red{color:#ffb09f;}',
       '#dir-feed .fl.kill{font-weight:700;color:#fff;} #dir-feed .fl.cas{color:#ffc46b;} #dir-feed .fl.miss{opacity:.62;}',
       '#dir-feed .fl.sys{color:#6fb7d8;font-weight:700;letter-spacing:.08em;}',
       '#dir-feed .outcome{margin-top:8px;padding:9px;border:1px solid #234a66;border-radius:9px;background:rgba(10,24,36,.9);}',
+      '#dir-feed .outcome>.dir-actions{position:sticky;bottom:-10px;margin:10px -9px -9px;padding:10px 9px 9px;background:linear-gradient(180deg,rgba(10,24,36,.18),rgba(10,24,36,.99) 28%);z-index:1;}',
       // AAR bits
       '.dir-ledger{width:100%;border-collapse:collapse;font-size:12.5px;}',
       '.dir-ledger th{font:700 10.5px Oswald;letter-spacing:.16em;color:#6fb7d8;text-align:left;padding:4px 6px;border-bottom:1px solid #1d3a52;}',
@@ -423,7 +425,7 @@ window.DirectorModule = (function () {
       '.dir-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}',
       '.dir-metric{background:#091923;border:1px solid #19364a;border-radius:8px;padding:9px;text-align:center;}',
       '.dir-metric b{display:block;color:#e8f7ff;font:700 20px Oswald,system-ui;}.dir-metric span{color:#789bb2;font-size:10px;letter-spacing:.08em;}',
-      '@media(max-width:760px){.dir-grid,.dir-context,.dir-colosseum{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-dock .dir-coach{grid-template-columns:1fr}#dir-dock .dir-coach .step{border-right:0;padding-right:0}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
+      '@media(max-width:760px){.dir-grid,.dir-context,.dir-colosseum{grid-template-columns:1fr}.dir-metrics{grid-template-columns:1fr 1fr}.dir-fc .rows{grid-template-columns:1fr;gap:5px}.dir-fc .cell{display:flex;align-items:baseline;justify-content:space-between;text-align:left;border-bottom:1px dotted #193247;padding:4px 0}.dir-fc .cell b{font-size:17px}.dir-h1{font-size:27px}#dir-overlay .wrap{margin-top:4vh;padding:0 14px}.dir-actions{justify-content:stretch}.dir-actions .dir-note{flex:1 1 100%}.dir-actions .dir-btn{flex:1}#dir-dock{bottom:8px;width:calc(100vw - 16px);padding:8px}#dir-dock .dir-coach{grid-template-columns:1fr}#dir-dock .dir-coach .step{border-right:0;padding-right:0}#dir-feed,#dir-feed.result-ready{left:50%;bottom:8px;transform:translateX(-50%);width:calc(100vw - 16px);max-height:calc(100vh - 92px)}#dir-rail .ph:not(.on),#dir-rail .sep{display:none}#dir-rail{max-width:calc(100vw - 16px);white-space:nowrap}}',
       '@media(max-width:520px){#dir-rail .mode{font-size:0}#dir-rail .mode:after{content:"TOOLS";font-size:10px}.dir-btn,.dir-chip{min-height:44px;padding:9px 13px}#dir-dock select{min-width:100%;max-width:100%}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -1522,6 +1524,7 @@ window.DirectorModule = (function () {
   function playWatch(report, st) {
     clearWatchTimers();
     var feed = $('dir-feed');
+    feed.classList.remove('result-ready');
     var events = (report.events || []).filter(function (e) { return e.kind !== 'void'; });
     var instant = prefersReducedMotion();
     // CO-006 P3: the war film — bars in, the comms floor returns for sparse kill
@@ -1572,13 +1575,15 @@ window.DirectorModule = (function () {
   }
 
   function showOutcome(stAfterCommit, report) {
-    if ($('dir-feed').querySelector('.outcome')) return;
-    var skip = $('dir-feed').querySelector('[data-act="skip-watch"]');
+    var feed = $('dir-feed');
+    if (feed.querySelector('.outcome')) return;
+    var skip = feed.querySelector('[data-act="skip-watch"]');
     if (skip) skip.remove();
     var st = GM.getState();
     refreshVisuals();
     showObjectiveOverlay();
     cine('watchDone');   // CO-006 P3: the film ends with the outcome — bars out (also via SHOW RESULT NOW)
+    feed.classList.add('result-ready');
     var f = op.forecasts[report.turn], a = op.actuals[report.turn];
     var honesty = (f && a) ?
       '<div class="dir-note">Forecast said ' + bandStr(f.redKills) + ' Red down — the world drew ' + a.redKills + '.' +
@@ -1632,8 +1637,8 @@ window.DirectorModule = (function () {
         : lastTurn ? '<button class="dir-btn primary" data-act="next">END OF OPERATION — AAR →</button>'
           : '<button class="dir-btn primary" data-act="next">PLAN TURN ' + (st.turn + 1) + ' →</button>') +
       '</div></div>';
-    $('dir-feed').insertAdjacentHTML('beforeend', html);
-    $('dir-feed').scrollTop = $('dir-feed').scrollHeight;
+    feed.insertAdjacentHTML('beforeend', html);
+    feed.scrollTop = feed.scrollHeight;
   }
 
   function onFeedClick(ev) {

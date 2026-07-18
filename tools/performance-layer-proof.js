@@ -154,6 +154,12 @@ check('P2: EXECUTE is the irreversible ceremony and WATCH goes quiet (the DEFCON
   assert.ok(!directorSrc.includes("startBed('watch')") && !cinSrc.includes("startBed('watch')"), 'nothing starts a watch bed');
 });
 
+check('P2: tutorial entry can dismiss either boot or title without a second overlay', () => {
+  const hide = cinSrc.slice(cinSrc.indexOf('function hideTitle'), cinSrc.indexOf('function openConsole'));
+  assert.ok(cinSrc.includes('var dismissBoot = null'), 'boot exposes a presentation-only dismissal bridge');
+  assert.ok(hide.includes('dismissBoot()') && hide.includes("classList.add('gone')"), 'one hide call handles boot and title layers');
+});
+
 check('P2: beds follow the loop registers (brief → plan → ceremony → silence)', () => {
   assert.ok(directorSrc.includes("cine('briefCinematic'"), 'brief entry is cinematic');
   assert.ok(directorSrc.includes("cine('planCinematic')"), 'plan entry sets its register');
@@ -202,6 +208,8 @@ check('P3: the war film opens at playback and the bars come down with the outcom
   assert.ok(so.includes("cine('watchDone')"), 'the outcome closes the letterbox — including via SHOW RESULT NOW');
   const cw = cinSrc.slice(cinSrc.indexOf('function watchCinematic'), cinSrc.indexOf('function watchDone'));
   assert.ok(!/startBed/.test(cw), 'WATCH starts no bed — silence is the score (the DEFCON move)');
+  assert.ok(cw.includes('commsVisible(false)'), 'the WATCH feed owns the reading surface without comms overlap');
+  assert.ok(directorSrc.includes("feed.classList.add('result-ready')"), 'the completed turn expands into the result-ready reading surface');
 });
 
 check('P3: stingers are palette voices in the dark register, routed through the guarded bridge', () => {
@@ -326,7 +334,8 @@ check('P4: callsign is sanitized at the boundary and the Director reads it over 
   assert.ok(cinSrc.includes('getCallsign: getCallsign'), 'exposed read-only to the render layer');
   const addr = directorSrc.slice(directorSrc.indexOf('function opAddr()'), directorSrc.indexOf('function pct('));
   assert.ok(addr.includes('cinApi()') && addr.includes('try {') && addr.includes('catch'), 'guarded bridge — loop survives without the performance layer');
-  assert.ok(directorSrc.includes("opAddr() + 'OPERATION OPEN"), 'operation open addresses the operator');
+  assert.ok(directorSrc.includes("opAddr() + (op.tutorial ? 'TUTORIAL OPEN") && directorSrc.includes("'OPERATION OPEN — '"),
+    'tutorial and standard operation open messages address the operator');
   assert.ok(directorSrc.includes("opAddr() + 'PLANNING WINDOW OPEN"), 'planning window addresses the operator');
   assert.ok(!cinSrc.includes('opAddr'), 'cinematics still authors no comms traffic — addressing is the Director\'s');
 });
