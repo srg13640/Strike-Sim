@@ -1,0 +1,119 @@
+# CHANGE ORDER CO-005 — "THE THINKING ENEMY AND THE MEASURED MIND"
+
+**Paste everything below this line into CODEX.**
+
+---
+
+You are taking StrikeSim 2040 up several levels in one coordinated change order. The Operation Loop, denial-MOE victory model, seeded deterministic engine, joint-force Blue, and ghost-world Forecast are done and good. What's left is the gap between what the game *claims* and what it *does*: the "doctrine-driven Red" is a one-ply greedy heuristic with RNG noise, the board is fully observable despite a thesis of "commitment under honest uncertainty," and the AAR promises to "tell the player something true about their own judgment" while never once asking the player what they believe. This change order closes all three gaps with real machinery: game theory for the enemy, IARPA-grade forecasting science for the player, and an escalation ladder for the war.
+
+**Strategic frame.** Ground the new content in the framing of the Army University Press documentary *"China's Force Projection Capabilities | Large and Small Island Operations"* (https://youtu.be/uR1KL5FN-EI): PLA force projection — amphibious lift, joint logistics, and sustainment throughput — is the center of gravity (which the game already models as throughput/lodgment), and Red's real-world menu is not one operation but a *ladder*: small-island seizures (Kinmen/Matsu/Pratas-class fait accompli, low lift, huge escalation ambiguity) → blockade/quarantine → full large-island invasion. Today the game hardcodes the top rung. This change order makes Red's *choice along that ladder* — and Blue's beliefs about it — part of the game.
+
+## 0. READ FIRST (in this order)
+
+1. `docs/GAME_DESIGN.md` — the design spine. §8 roadmap and §9 anti-goals are binding.
+2. `docs/METHODOLOGY.md`, `docs/JOINT_FORCE_MODEL.md`, `docs/CYBER_CAPABILITY_MODEL.md`
+3. `Janus_Implementation_Plan.md` — this change order **subsumes Project Janus** (bounded rationality lands here as principled math, not ad-hoc dice; see A4)
+4. Code anchors: `game.js` → `planOrders()` (~line 607), `resolveTurn()`, `_internal`, the constants block (`HARDEN_MULT=0.55`, `TEMPO_FLOOR_AP=2`, `LODGMENT_REQ_TURNS=4`); `director.js` → `ghostForecast()` (~line 680, `GHOSTS=200`), the honesty-ledger forecast store, `PROBES` (~line 952); `moe.js` → `assessGraph`, `DEFAULTS {balance:0.35, tMin:0.30, k:2.0, threshold:0.5}`
+
+## 1. INVARIANTS — violate none of these
+
+1. **One resolver.** `game.js resolveTurn()` stays the only combat kernel. Every new AI, forecast, counterfactual, and scoring feature calls it as the evaluator. No forks.
+2. **Seeded determinism everywhere.** All new randomness flows through `makeRng(hashSeed(matchSeed, tag, turn, k))`. Same seed → same match, same forecast, same doctrine draw, same indicators, byte-for-byte.
+3. **No prediction theater.** The engine never utters a single-number success verdict. It speaks in distributions, bands, beliefs, and scores-with-uncertainty. (The *player* states point probabilities — that's the instrument, not theater.)
+4. **No new top-level modes.** Everything lands inside BRIEF → PLAN → COMMIT → WATCH → AAR. Do not resurrect `campaign.js` or `wargame.js` launchers.
+5. **Performance budget.** Forecast-class computation stays ~50 ms; anything heavier (counterfactual ensembles) goes to the existing worker pattern.
+6. **Balance.** Hard/hard Blue win rate target 0.45–0.55. Re-run the loop harness (`tools/wargame-loop-eval.js`, gate with `tools/wargame-loop-gate.js`) after every AI change; retune constants, not the arbiter.
+7. `UNCLASSIFIED // NOTIONAL RESEARCH TOOL` stays stamped on everything new.
+
+---
+
+## WORKSTREAM A — THE THINKING ENEMY (game theory)
+
+The current opponent is exploitable by construction: the harden/strike interaction (`HARDEN_MULT`) is matching-pennies, which has no pure-strategy equilibrium — any deterministic policy gets metagamed. Difficulty-as-RNG-jitter blurs this; it doesn't fix it. Replace it with a small, principled stack. Everything here is config objects, Bayes' rule over 3 numbers, and loops that call the existing `planOrders`/`resolveTurn` — no neural nets, no CFR-at-scale, no I-POMDPs.
+
+**A1. Doctrine personalities as Harsanyi types.** Implement `DOCTRINES = { attrition, decapitation, denial }` as named weight-vector configs over the scoring knobs that already exist as hardcoded constants in `planOrders` (tempo-target bonus, lodgment bonus, focus-fire count, strike/defend AP split ~0.7, method preferences). Generalize the signature to `planOrders(board, side, ap, policy, rng)` with legacy difficulty strings mapped to policies for back-compat. Draw Red's type once per operation via `hashSeed(seed, 'doctrine')`. **Disclose the prior in the BRIEF** ("Intel assesses PLA posture: attrition 50 / decapitation 30 / denial 20") — never the draw. A type draw plus decision noise is behaviorally equivalent to a mixed strategy (Harsanyi purification): unexploitable-looking Red from dead-simple machinery. Doctrines should differ in escalation appetite too (see C1) — the fait accompli doctrine sails closest to the ally-entry threshold, per Dan Altman's finding that modern land grabs overwhelmingly come by fait accompli targeting gray areas in red lines, not by coercive threat.
+
+**A2. THE LANDMINE FIX — ship in the same commit as A1.** `director.js ghostForecast()` currently generates ghost-Red with the same policy as real Red, salted only by seed. The moment doctrines exist, that leaks the hidden type through the Forecast band on turn 1 and the Bayesian game collapses. Fix: each ghost world draws its Red doctrine **from Blue's current belief** (turn 1: the disclosed prior; later: the A3 posterior) via `hashSeed(seed, 'ghost-doctrine', turn, k)` — never from the match's true type. This is ~10 lines and it *strengthens* the honesty pillar: the Forecast becomes "honest given what Blue knows," bands widen under genuine strategic ambiguity and tighten as intel firms up, and the honesty ledger now also audits belief calibration.
+
+**A3. Bayesian doctrine tracker (Bayes' Bluff recipe).** After each WATCH, update `P(doctrine | observed Red orders) ∝ P(doctrine) · P(orders | doctrine)`, with per-doctrine likelihoods estimated by binning (target-class × method) frequencies from a few seeded `planOrders(type)` samples on the known board. Surface it as an **INTEL ASSESSMENT** bar in PLAN (always the posterior, never the truth). At AAR, plot posterior-vs-truth trajectory: "You had denial-Red at 70% by turn 3; correct — it was masking lodgment protection behind northern strikes." ~40 lines.
+
+**A4. Level-k reasoning + quantal response — kill the noise dial.** Difficulty becomes `(k, λ)` instead of jitter width: level-0 = current greedy; level-1 = generate 4–6 candidate Red plans, score each by mean `resolveTurn` rollout against ~8 sampled Blue plans (level-0 Blue + the player's empirical tendencies), choose via **softmax(λ)** rather than argmax. Easy = (k0, low λ); hard = (k1, high λ); elite = (k2, high λ). Cap at k=2 — behavioral data puts humans near k≈1.5, and k=2 already produces "it hardened exactly what I was about to hit." Budget ≤50 one-turn rollouts ≈ ms-scale on this board. **This absorbs Project Janus with a pedigree:** fatigue = λ decay over turns, cognitive friction/blunders = seeded stochastic k-drop to 0. Quantal errors are *plausible near-misses*, not lottery picks.
+
+**A5. Per-turn mixing via a tiny matrix game.** Where stakes are matching-pennies-like (defend-the-lift vs decapitate-the-C2), best-responding to a point prediction whipsaws. Build a ≤5×5 payoff matrix (Red candidate plans × sampled Blue plans) from deterministic rollouts scored on score-delta + throughput/lodgment delta from `moe.js`; run ~100 iterations of **regret matching**; sample Red's plan from the resulting mixed strategy with `hashSeed(seed, 'mix', turn)`. ~60 lines, sub-millisecond. This is the ARMOR/LAX result imported: randomized mixed strategies are the fielded answer to an observing adversary. The "Red always defends its lift" metagame dies.
+
+**A6. Restricted-Nash adaptation (safe exploitation).** Red keeps frequency stats of the player's plan features (defense allocation by node class, strike-axis shares, ROE picks) in match state and optionally localStorage across operations. Play `p · (best response to that model) + (1−p) · (A5 safe mix)`, p rising with sample size, **capped ≈ 0.5** so a wrong model can't make Red exploitable. Habits get punished across a career; deliberate self-randomization becomes a real skill.
+
+**A7. AAR exploitability meter.** Off the hot path at AAR: compute what a clairvoyant Red best-responding to the player's realized plan distribution would have scored vs what actual Red scored → a **predictability score** with the top exploited habit named: "You hardened the JOC 8/9 turns; a reactive Red gains +14%." Add one Counterfactual Machine probe: *same world, Red plays the best response to your habits.* The game doesn't just beat you with game theory — it teaches you the game theory that beat you.
+
+---
+
+## WORKSTREAM B — THE MEASURED MIND (IARPA forecasting layer)
+
+The honesty ledger scores the *engine's* calibration — that's meteorology. IARPA's ACE tournament (Good Judgment Project: beat the control crowd by 60–78%, beat classified-briefed analysts by ~25–30%) exists because the interesting instrument is the *human*: judgment is measurable, trainable skill **if** the human states probabilities about resolvable events before resolution, is scored with a proper scoring rule, and sees calibration feedback. IARPA's Sirius program showed a single ~60-minute serious-game session with personalized feedback durably cuts targeted biases ~24–32%. The game has every hard part built — deterministic ground truth, a 200-world house distribution, a ledger UI. Add the elicitation. (This is *not* prediction theater: theater is the game announcing "78% success"; this is the player telling the game distributions over narrow events and being scored honestly.)
+
+**B1. The Commit Card (core).** After orders lock (so forecasting can never distort play), a modal elicits ~20 seconds of belief:
+- 3 event probabilities on 1%-granularity sliders (default 50, must-touch): primary target destroyed this turn? Red throughput ends below X? any Blue key node lost?
+- 1 interval: "80%-sure range for end-of-turn Red throughput" — scored with the Winkler interval score, `IS = (u−l) + (2/α)(l−x)·1[x<l] + (2/α)(x−u)·1[x>u]`, α = 0.2.
+- 1 standing operation-level question ("lodgment < 50% by T+5?") re-scored every turn, last forecast carried forward (GJ Open style — makes *updating* pay).
+
+**Blind-then-hybrid:** player answers blind, then the house line (ghost frequency q) is revealed and they may revise once; store both `f_blind` and `f_final`. (IARPA's HFC found human+model hybrids beat either alone — showing the bands isn't cheating, it's the design.)
+
+**B2. The second book of the ledger — House vs You (core).** Per question, Brier-score both the player and the engine's own MC-implied probability q against the realized world: `BS = (f − o)²`. Headline stat is the **Brier Skill Score vs the house**: `BSS = 1 − ΣBS_player / ΣBS_engine`. Copying the house scores exactly 0 *by construction* — print that rule in the UI; it converts the parroting exploit into the central skill challenge (positive skill requires diverging from the model and being right). This also enriches the engine's own honesty ledger with event-level entries.
+
+**B3. The Calibration Card at AAR (core).** Murphy decomposition over the player's log: reliability `REL = (1/N)Σ nₖ(f̄ₖ−ōₖ)²` (present as "honesty with yourself") and resolution `RES = (1/N)Σ nₖ(ōₖ−ō)²` (present as "willingness to call it"). Folded confidence buckets {50–60…90–99}, dots gated behind n≥10, sentences instead of axes: *"On 23 calls where you said ~80%, it happened 61% of the time — you're running hot by 19 points."* **Gate any verdict** (rank, badge, "you are overconfident") behind ≥30–50 resolutions with a bootstrap band — single-draw scoring is proper but noisy, and tournament rankings below ~100 questions are luck-dominated (Aldous's prediction-tournament paradox). Per-turn feedback is framed as "one world's verdict." Track rolling BSS across operations; tie analyst-rank progression (Watch Officer → Fusion Analyst → Superforecaster) to *sustained* BSS over N≥50, never a hot streak — and say so, because that's a true thing about judgment.
+
+**B4. Question generator (IARPA question standards).** Every question is a predicate over named end-of-turn engine state (`red.throughput < 0.40`) — resolvable by the resolver, no ambiguity, time-bound to a turn. Sweep candidate thresholds and keep those where the ghost-ensemble probability lands in **[0.2, 0.8]** (Goldilocks difficulty, tunable at runtime — an affordance ACE's question writers never had), plus an occasional deliberate tail question (q < 0.1) to test rare-event respect. One predicate per question, categories rotated (attrition / logistics / C2 / detection) so the AAR can say *"calibrated on attrition, overconfident on logistics."*
+
+**B5. Pre-Mortem Pick.** At COMMIT, one forced click: "It's the AAR and this plan failed. Why?" Options = the top 4 failure causes machine-clustered from the *failed subset* of the 200 ghost worlds (SAM attrition / lift intact / tempo collapse / objective timeout), elicited as a probability spread, scored with the multi-category Brier `Σ(fₖ−oₖ)²` against the realized cause. Klein's premortem: prospective hindsight generates ~30% more failure reasons. The ghost ensemble gives the taxonomy for free.
+
+**B6. The Counterfactual Colosseum (flagship — fixes the wired-to-the-wrong-arbiter bug).** The current `PROBES` are three hardcoded attrition policies explicitly disclaimered as not reproducing the denial/lodgment arbiter. Rebuild counterfactuals through `moe.js`/lodgment (the real win condition), let the player author *arbitrary* single-decision counterfactuals, and make it a scored forecasting mode per IARPA's FOCUS program (which used re-run simulated worlds — literally Civilization 5 — as counterfactual ground truth; a deterministic seeded engine is a *better* FOCUS testbed): elicit "had you struck the radars instead, probability the halt still holds?" **before** revealing; resolve twice — the same-seed matched-pair world (the dramatic reveal) and a 200-run counterfactual ensemble in the worker (the statistical truth); score `(f − q_cf)²` against the ensemble frequency (proper here — no realized world exists and no bands were shown, so zero parroting risk). Also report **decision value**: which single order this operation most shifted the win distribution.
+
+**B7. Cheap wins.** (a) *Precision audit* at season AAR: re-score history with forecasts rounded to nearest 10% — "your granularity earned +0.014 Brier" or "your last digit is noise" (Friedman et al.: rounding measurably worsens the best forecasters' scores). (b) *Outside-view strip*: before the ghost bands render, show the player's own base rates from a localStorage archive keyed by plan archetype ("strike packages like this one: 7/12 killed the primary") — reference class first, inside view second, the trained sequence from CHAMPS KNOW (brief training of this shape improved Brier 6–11% in every ACE year). (c) *Update-style label* once mid-turn intel drips exist: classify the player as Anchor / Lurcher / Increments from (update frequency, |Δf|, direction-correctness) — small frequent directionally-correct updates are the superforecaster signature.
+
+---
+
+## WORKSTREAM C — THE ESCALATION LADDER (Schelling, Kahn, Altman + the documentary)
+
+Combat is currently pure attrition of a fixed node set: no escalation cost, no ally-entry decision, no gray zone — despite the METHODOLOGY's own fait-accompli framing, and despite CSIS's 24-iteration finding that **Japan basing access and early US entry are the most decisive variables in the entire scenario space**. RAND's caution (machine players systematically misread de-escalation signals): make escalation state *explicit and numeric*, never implicit in AI vibes.
+
+**C1. Escalation index.** `E ∈ [0,10]` on match state, updated in the existing commit path from resolved events, weighted by target nation/subsystem and method class: Japan-soil nodes, homeland C2, space assets = big rungs; Kahn's vertical (nastier means) vs horizontal (wider geography) escalation both legible in the UI. Data note: Blue nodes already carry `nation` (125/125 in `grokblue90.json`); **Red nodes do not** — add a small tagging pass to `grok150red.json` (mainland/homeland vs littoral/afloat, derivable from lat/lon + subsystem), extend `schemas/strikesim-scenario.schema.json`, and validate with `tools/validate-scenarios.js`. Doctrines get different escalation appetites (A1).
+
+**C2. Endogenous ally entry.** Japan and US-enabler posture tracks with **disclosed thresholds + hysteresis + a seeded trembling term** — crossing a rung *risks* rather than guarantees entry (Schelling's threat that leaves something to chance). Entry/exit toggles node availability through the existing roster machinery. Red's fait-accompli logic becomes real: win the lodgment race *before* commitment consolidates, shaving as close to the threshold as its doctrine dares (Altman: 112 land grabs by fait accompli vs 13 by coercion, 1918–2016 — the strategic logic of the documentary's *small*-island rung).
+
+**C3. ROE as commitment devices.** Blue declares ROE at BRIEF ("no mainland strikes before E ≥ 6") that are **enforced by order validation and disclosed to Red's planner** — a commitment device in the strict Schelling sense: Red's best response changes because Blue provably cannot defect. Denial-vs-punishment becomes a live per-turn temptation with an escalation price, not doctrine flavor text.
+
+**C4. The INDICATORS channel — feints, decoys, called bluffs.** Deception is mathematically impossible today because beliefs equal truth. Don't build a fog-of-war engine; build the *minimal* information gap: each PLAN phase, Blue reads 2–4 machine-generated indicator lines sampled (noisily but honestly by default) from Red's committed-but-unresolved orders — the Naval War College belief-not-truth display. Then: new order kind `feint` (**costs 1 real AP** — a costly signal; feinting Red genuinely fights worse this turn, so calling the bluff is genuinely available) that redirects the indicator generator toward a chosen axis; 0-AP decoy emissions carry a seeded per-turn leak probability, and a caught decoy is flagged "assessed deceptive" and **feeds the A3 posterior** (denial-Red feints more, so a caught feint is intel). Doctrine-linked honesty rates. Blue gets `feint` too — level-1 Red consumes Blue's indicators, so deception is a skill, not an AI privilege. Feint orders resolve to no board effect (signal layer only) — keep `resolveTurn`'s order-ranking deterministic.
+
+**C5. Scenario variant — SMALL ISLAND FAIT ACCOMPLI.** The documentary's core menu, made playable: a second scenario where Red's objective is a Kinmen/Pratas-class seizure — tiny lift requirement (lodgment clock runs *fast*), thin target set, and the real game is C1–C3: does Blue contest a rung this low and risk owning the escalation, or concede the slice? `AppState` is already multi-scenario; add scenario selection to the BRIEF (not a new top-level mode), validate data with `tools/validate-scenarios.js` against `schemas/strikesim-scenario.schema.json`. This turns the ladder from mechanics into content and makes replayability strategic rather than stochastic.
+
+---
+
+## SEQUENCING — build in this order, commit in small slices
+
+- **Phase 1 (foundation):** A1 + A2 together (the landmine fix is non-negotiable in the same commit) + A4. Re-run balance harness; removing the noise crutch will shift the 0.45–0.55 target — retune doctrine weights, not the arbiter.
+- **Phase 2 (the instrument):** B4 → B1 → B2 → B3. The forecasting layer is worthless without the question generator, so build it first.
+- **Phase 3 (the mind games):** A3 + A5 + B5 + B6.
+- **Phase 4 (the ladder):** C1 → C2 → C3 → C4.
+- **Phase 5 (content + polish):** C5 + A6 + A7 + B7.
+
+Before writing code: post a short plan-of-record as `change-orders/CO-005-thinking-enemy-measured-mind.md` (following the existing CO-00x convention) mapping each item to files touched and proofs added. After each phase: a `tools/*-proof.js` per repo convention (e.g., `doctrine-proof.js` asserting same-seed doctrine determinism and posterior convergence; `brier-proof.js` asserting BSS=0 for a house-copying player and the Murphy identity `BS = REL − RES + UNC` on synthetic logs; `escalation-proof.js` asserting threshold hysteresis).
+
+## ACCEPTANCE CRITERIA
+
+1. Same seed → identical match, forecast bands, doctrine draw, indicators, counterfactual ensembles. Prove it in a proof script.
+2. `ghostForecast` provably never reads the true doctrine — ghosts sample from prior/posterior only (assert in code, not just review).
+3. Difficulty no longer uses the `(0.85 + rng*0.3)` jitter; `(k, λ)` fully replaces it; legacy difficulty strings still work.
+4. A house-copying player's BSS = 0 ± bootstrap noise on a synthetic 100-question log.
+5. All elicited questions resolve automatically from engine state; no question ever fails to resolve.
+6. Counterfactual verdicts flow through the denial/lodgment arbiter; the "EXPERIMENTAL ATTRITION SENSITIVITY" disclaimer is gone because it is no longer true.
+7. `tools/wargame-loop-gate.js` green; hard/hard win rate back inside 0.45–0.55; runtime-performance proof still within budget (forecast ≤ ~50 ms class; ensembles in worker).
+8. No single-number success verdict anywhere; every displayed score carries stated uncertainty; verdicts gated behind N ≥ 30–50 resolutions.
+9. `docs/GAME_DESIGN.md` §8 updated; new `docs/FORECASTING_MODEL.md` documenting the scoring math (Brier, BSS, Murphy, Winkler) and `docs/RED_MIND.md` documenting doctrines, level-k/QRE, mixing, and the belief-respecting forecast — both stamped UNCLASSIFIED // NOTIONAL.
+
+## LINEAGE (for METHODOLOGY citations)
+
+Harsanyi incomplete-information games & purification; Southey et al., *Bayes' Bluff* (UAI '05) — type posteriors, response-to-distribution; Camerer–Ho–Chong cognitive hierarchy & Wright–Leyton-Brown quantal cognitive hierarchy; McKelvey–Palfrey quantal response equilibrium; Hart–Mas-Colell regret matching; McMahan et al. double oracle; Johanson et al. Restricted Nash Response; Tambe et al. ARMOR/Stackelberg security games (LAX); Schelling *The Strategy of Conflict* / *Arms and Influence*; Kahn *On Escalation*; Altman "By Fait Accompli, Not Coercion" (ISQ 2017); Colby *The Strategy of Denial* (already foundational); CSIS *The First Battle of the Next War* (24 iterations; Japan-access/US-entry decisiveness); RAND RR-2797 *Deterrence in the Age of Thinking Machines*; RAND PE-A3490-3 *Integrating Forecasting with Gaming* (2026 — recommends per-turn calibration feedback in wargames; this build ships it); IARPA ACE / Good Judgment Project (Mellers et al. 2014, 2015; Tetlock & Gardner *Superforecasting*); Chang et al. 2016 CHAMPS KNOW training effect; Friedman et al. 2018 probability-precision value; Atanasov et al. 2020 "Small Steps to Accuracy"; Aldous 2019 "A Prediction Tournament Paradox"; IARPA HFC / SAGE hybrid human-machine forecasting; IARPA FOCUS (simulated-world counterfactual ground truth); IARPA Sirius / Morewedge et al. 2015 debiasing-game effect; Army University Press, *China's Force Projection Capabilities | Large and Small Island Operations* (https://youtu.be/uR1KL5FN-EI).
+
+---
+
+**One sentence to hold onto while you build:** the enemy becomes a mind you must read, the forecast becomes honest about what you *don't* know, and the after-action review finally measures the only instrument in the room that was never on the scope — the player.
