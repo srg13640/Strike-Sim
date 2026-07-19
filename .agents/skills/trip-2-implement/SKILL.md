@@ -32,13 +32,27 @@ Derive the short description from the plan/feature name. If already on a dedicat
 
 ---
 
-## Implementation Phase — Delegate to Codex
+## Implementation Phase
 
-You do NOT write the implementation yourself — delegate it to Codex via the `codex-implement` skill. (Exception: trivial unplanned changes of a few lines may be done directly.)
+**Default: Claude implements directly** (Seth's standing preference). Codex delegation is available on request — use it when Seth asks for it, wants work parallelized, or wants to save Claude tokens. If the plan is large and delegation might make sense, ask once via `AskUserQuestion` ("Implement directly (default)" / "Delegate to Codex") — otherwise just implement.
+
+### Path A: Direct implementation (default)
+
+Work the plan phase by phase, a coherent chunk of checkboxes at a time:
+
+1. Implement the chunk, keeping the tree green (`node --check` on touched files).
+2. Self-review the delta (`git status -s && git diff`) against the plan, ARCHI.md patterns, and conventions (DRY, KISS, determinism, module seams).
+3. **Checkpoint**: `git add -A` — no commits; history stays clean for release.
+4. Tick the plan checkboxes that are actually done.
+5. After the last chunk, read the **full feature diff** (`git diff HEAD`) once for cross-chunk drift — duplicated helpers, divergent naming, dead code. Fix directly.
+
+Then proceed to the Testing Gate.
+
+### Path B: Delegate to Codex (on request)
 
 Delegation is **batched**: Codex implements a few of the plan's checkboxes per turn, you review and fix each batch, then request the next one with your corrections attached. Same persistent thread throughout — context and conventions compound across turns.
 
-### 1. Read the plan and decide the batches
+#### 1. Read the plan and decide the batches
 
 Read the plan fully and split its to-dos into batches. You are the judge of batch size:
 
@@ -49,7 +63,7 @@ Read the plan fully and split its to-dos into batches. You are the judge of batc
 - **One-shot escape hatch**: a low-risk plan (or phase) of ≤3-4 checkboxes is delegated whole — no batching ceremony.
 - **Filter out non-Codex items**: checkboxes needing human input, dashboard/console access, credentials, or ops actions are yours — resolve them with the user before or between batches, never delegate them.
 
-### 2. Delegate batch by batch
+#### 2. Delegate batch by batch
 
 **Start** the session with the first batch (state dir is handled by the script):
 
@@ -73,7 +87,7 @@ bash .claude/skills/codex-plan-review/scripts/resume.sh \
 - `IMPLEMENTATION_COMPLETE` → review the batch (below).
 - `IMPLEMENTATION_PARTIAL` → read the report; resume with instructions for the remainder, or finish small leftovers yourself during the batch review.
 
-### 3. Review each batch (delta review)
+#### 3. Review each batch (delta review)
 
 After each Codex report, before requesting the next batch:
 
@@ -85,11 +99,11 @@ After each Codex report, before requesting the next batch:
 
 **Adapt as you go**: clean batch → grow the next one; heavy corrections → shrink the next one and spell out the fix pattern in the notes. If Codex ignores notes or repeats corrected mistakes late in a long session, reset the thread at the next batch boundary — the plan file plus a summary note rebuilds context.
 
-### 4. Final pass
+#### 4. Final pass
 
 After the last batch, read the **full feature diff** once (`git diff HEAD`). Batch reviews catch local issues; this pass catches cross-batch drift — duplicated helpers, divergent naming, dead code left by course corrections. Fix directly.
 
-The testing gate and Codex code review run **once**, after the final pass — never per batch. Proceed to the testing gate once you consider the implementation good for review.
+On either path, the testing gate and code review run **once**, after the final pass — never per batch/chunk. Proceed to the testing gate once you consider the implementation good for review.
 
 ---
 
@@ -144,7 +158,7 @@ Fix failures before starting the loop.
 
 ## Codex Code Review
 
-Always run the Codex code review after the testing gate passes — no confirmation needed.
+After the testing gate passes, run the Codex code review by default — it matters most when Claude implemented directly (independent second pair of eyes, and it's the cheap half of the pipeline). It is never mandatory: skip it if Seth says so, if the change is trivial, or if Codex is unavailable/busy — then note "review skipped" so TRIP-3 writes the manual CR fallback.
 
 ### Loop
 

@@ -60,7 +60,7 @@ There is no coverage tooling — proofs assert named behavioral contracts, not l
 
 - Tests are **proof-contract harnesses**: plain Node scripts at `tools/<area>-proof.js`, no framework, exit non-zero on any violated contract.
 - Each proof loads the browser modules headlessly (vm/sandbox shims). **Harness law: load `strategic-state.js` before `game.js`** — this ordering bug has bitten seven different tools.
-- Contracts are named, counted, and printed; a proof grows with its area (e.g. `online-layer-proof.js`: 37 static + 11 e2e contracts). Extend the area's existing proof rather than creating parallel ones.
+- Contracts are named, counted, and printed; a proof grows with its area (e.g. `online-layer-proof.js`: 40 static + 11 e2e contracts as of v0.1.1). Extend the area's existing proof rather than creating parallel ones.
 - Determinism check: run twice, byte-identical output slices.
 - Supporting checks: `validate-scenarios.js` (schema), `wargame-loop-gate.js` (pinned engine API + balance band), `replay-verify.js` (end-to-end fixture reproduction on default + small-island graphs).
 

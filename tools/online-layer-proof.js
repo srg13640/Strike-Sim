@@ -97,13 +97,25 @@ function staticContracts() {
   console.log('— static: director wiring —');
   const dir = src('director.js');
   check('AAR challenge button is flag-gated', /ShareModule && ShareModule\.active\(\)[\s\S]{0,200}challenge-link/.test(dir));
-  check('challenge seed only ever comes from op.challenge', /seed:\s*op\.challenge \? op\.challenge\.seed : undefined/.test(dir));
-  check('pre-match model stashed for replay payloads (I-4)', /op\.startModel = op\.challenge \? null : readPlayerModel\(\)/.test(dir));
+  // CO-tutorial (6d82079): the two-turn tutorial forces its own fixed seed and a
+  // neutral model — the seed still NEVER comes from player/user state.
+  check('challenge seed only ever comes from op.challenge (tutorial pins its own constant)', /seed:\s*op\.challenge \? op\.challenge\.seed : \(op\.tutorial \? 204002 : undefined\)/.test(dir));
+  check('pre-match model stashed for replay payloads (I-4)', /op\.startModel = \(op\.challenge \|\| op\.tutorial\) \? null : readPlayerModel\(\)/.test(dir));
   check('challenge plays the NEUTRAL habit model (I-4)', /playerModel:\s*op\.startModel/.test(dir));
   const chipVoids = (dir.match(/voidChallenge\(\);? (briefOpts|if \(selectVariant)/g) || []).length +
     (dir.match(/voidChallenge\(\);\s*\n?\s*if \(selectVariant/g) || []).length;
   check('every BRIEF chip branch voids an active challenge', (dir.match(/voidChallenge\(\)/g) || []).length >= 5);
   check('director consumes the payload exactly once via consumePending', /ShareModule\.consumePending === 'function' && ShareModule\.consumePending\(\)/.test(dir));
+
+  console.log('— static: tutorial semantics —');
+  // The tutorial is a training world, not a competitive one: it must never ingest a
+  // challenge, never export one, and always run the same fixed, honestly-displayed seed.
+  check('tutorial never consumes a pending challenge', /op\.challenge = op\.tutorial \? null :/.test(dir));
+  check('tutorial world is pinned to the fixed seed and BRIEF displays it honestly',
+    /op\.tutorial \? 204002 : undefined/.test(dir) &&
+    /FIXED SEED 204002/.test(dir) &&
+    (dir.match(/204002/g) || []).length === 2);
+  check('AAR challenge link is tutorial-gated', /!op\.tutorial && window\.ShareModule && ShareModule\.active\(\)/.test(dir));
 
   console.log('— static: codec —');
   const SM = w.ShareModule;

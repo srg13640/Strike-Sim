@@ -24,3 +24,26 @@ Thumbs.db
 
 # stray npm package dir (the vendored single file lives in vendor/)
 milsymbol/
+
+# --- added v0.1.1 (TRIP health baseline) ---
+
+# Nested git repos — never track as gitlinks (hosted layer parked; ARCHI §14)
+site/
+site-preview/
+
+# Agent workspaces, idea dumps, third-party material — reference, not source
+_CODEX Ideas/
+_GEMINI Ideas/
+_codex_review/
+_design_explorations/
+_fable/
+_stark/
+Matt Olson's project/
+
+# Local run artifacts
+loop-runs/
+sandbox/
+
+# iCloud-pinned git lock copies renamed by agents (inert)
+*.lock.stale*
+*.lock.s[0-9]*

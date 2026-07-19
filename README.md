@@ -7,7 +7,7 @@ force networks. It renders a Blue-vs-Red battlespace as an interactive 3D force-
 overlays it on a 2D geographic map with MIL-STD-2525 symbology, runs Monte Carlo
 course-of-action (COA) simulations, and includes a turn-based War Game.
 
-> **Status:** working prototype, refactored into a clean modular architecture.
+> **Version:** 0.1.1 · **Status:** working prototype, refactored into a clean modular architecture.
 > Runs fully offline (air-gap / IL5–IL6 friendly) — no external network calls at runtime.
 
 ---
