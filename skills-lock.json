@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "AskUserQuestion": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "AskUserQuestion/SKILL.md",
+      "computedHash": "cd5f6769a8265829fc249ed7a4cb2d838807b28d5a7cd9d5863e01299c57c28f"
+    },
+    "TRIP-1-plan": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-1-plan/SKILL.md",
+      "computedHash": "0ea1b148d2fd80ed2aa35ff5a25cf26c8a5162ae5a29f9e5f5a2df2e692de077"
+    },
+    "TRIP-2-implement": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-2-implement/SKILL.md",
+      "computedHash": "e1f359f0f1bffaceb5052bad2a5d0fd8cd3be81af979cf0d6e653c7cc003c08d"
+    },
+    "TRIP-3-release": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-3-release/SKILL.md",
+      "computedHash": "d89cbe60855b12b7a33e56cd2f891668cd2209b3f67367fee5d41ac758d14466"
+    },
+    "TRIP-compact": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-compact/SKILL.md",
+      "computedHash": "4ef282e24ebe868c480987a6f1d17b5078c96d0310b0f821042b116807b2b01d"
+    },
+    "TRIP-hotfix": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-hotfix/SKILL.md",
+      "computedHash": "511e4ff553ff2380ff4dd780de9726a4bc87ca0cb34f5039d696687ebf8bb998"
+    },
+    "TRIP-init": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-init/SKILL.md",
+      "computedHash": "cc0cc2dd985ef64583dfe166bc9bb330168b1a71ba5f2f0ee60e56f4cf2a6d55"
+    },
+    "TRIP-research": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-research/SKILL.md",
+      "computedHash": "7b8934fb5ce84b7f5fb15fe0406ea9f977128079ee86785ca2a7a2c95e67a797"
+    },
+    "TRIP-review": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-review/SKILL.md",
+      "computedHash": "4bbff21246d6c4d318af44a09ffea96add1c549758e749a2e1c6ca14f9d14999"
+    },
+    "TRIP-test": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-test/SKILL.md",
+      "computedHash": "91525f8d672e8feb0db316687487533df24cf4cfb02bc69debcb6d016357848d"
+    },
+    "TRIP-upgrade": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/TRIP-upgrade/SKILL.md",
+      "computedHash": "dc749a91b43bbaab6a48592537447a040cf93bff03a06c3ac1e98ed1ebb77182"
+    },
+    "codex-ask": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/codex-ask/SKILL.md",
+      "computedHash": "22c1bc0d91cb5004be7adbc35756e3563e9113659e6abf0f3caade429652446b"
+    },
+    "codex-code-review": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/codex-code-review/SKILL.md",
+      "computedHash": "ebe7a32944d34a3a35aa85eb8a9b1812d4a5e49e94aeceb3bb2d226a363b6247"
+    },
+    "codex-implement": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/codex-implement/SKILL.md",
+      "computedHash": "35f2f4b340313b4d5c1ed1145dfd6022be48c922138407ba4a79e0d1f1aea217"
+    },
+    "codex-plan-review": {
+      "source": "PiLastDigit/TRIP-workflow",
+      "sourceType": "github",
+      "skillPath": "skills/codex-plan-review/SKILL.md",
+      "computedHash": "130c2e5a4fbe37b5e2899ae0c1a554ab1405aeee9087cabfff18107707cbee2b"
+    }
+  }
+}
