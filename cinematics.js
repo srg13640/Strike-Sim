@@ -303,6 +303,7 @@ window.CinematicsModule = (function () {
       '<div class="cin-tagline">You don\'t play the battle. You play the plan.</div>' +
       '<nav id="cin-menu">' +
       '<div class="cin-mitem" data-cin="new">New Operation</div>' +
+      '<div class="cin-mitem" data-cin="tutorial">Guided Tutorial<span class="cin-msub">Two coached turns · learn the loop with the computer coach</span></div>' +
       '<div class="cin-mitem dis" data-cin="continue">Continue Operation<span class="cin-msub">No saved operations on this console</span></div>' +
       '<div class="cin-mitem" data-cin="archive">Operation Archive</div>' +
       '<div class="cin-mitem" data-cin="settings">Settings</div>' +
@@ -328,6 +329,10 @@ window.CinematicsModule = (function () {
         var launch = $('dir-launch');
         if (launch) launch.click();
         else if (typeof window.showToast === 'function') window.showToast('The Operation launcher is still loading — try again in a moment.', 'warn', 4000);
+      } else if (act === 'tutorial') {
+        hideTitle();
+        if (window.DirectorModule && window.DirectorModule.startTutorial) window.DirectorModule.startTutorial();
+        else if (typeof window.showToast === 'function') window.showToast('The tutorial is still loading — try again in a moment.', 'warn', 4000);
       } else if (act === 'archive') {
         showPanel(archivePanelHtml());
       } else if (act === 'settings') {

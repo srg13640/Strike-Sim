@@ -316,6 +316,8 @@ window.DirectorModule = (function () {
       '.dir-skip{float:right;min-height:32px;padding:5px 9px;font-size:10px;}',
       '.dir-btn.danger{border-color:#7a2f2f;color:#ffb0a8;}',
       '.dir-note{font-size:12px;color:#6d8ca4;font-style:italic;}',
+      '.dir-note.is-gate{color:#ffd166;font-style:normal;font-weight:700;}',
+      '.dir-note.is-gate.is-ready{color:#38ef7d;}',
       '.dir-coach{border:1px solid #fdba74;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-radius:12px;padding:13px 15px;margin:0 0 14px;box-shadow:inset 4px 0 0 #ea580c,0 8px 24px rgba(0,0,0,.35);}',
       '.dir-coach .step{font:700 12px Oswald,system-ui;letter-spacing:.18em;color:#9a3412;margin-bottom:4px;}',
       '.dir-coach b{display:block;color:#9a3412;font:700 17px Oswald,system-ui;letter-spacing:.05em;margin-bottom:3px;}',
@@ -1312,7 +1314,7 @@ window.DirectorModule = (function () {
     $('dir-wrap').innerHTML =
       '<div class="dir-kicker">COMMIT CARD · BLIND · TURN ' + st.turn + '/' + st.cfg.turnLimit + '</div>' +
       '<h1 class="dir-h1">What do you believe?</h1>' +
-      '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Orders lock blind; Red commits when you execute. Forecast before seeing the house. Move each of the three event sliders.</div>' +
+      '<div class="dir-sub"><span class="dir-lock">ORDERS LOCKED · ' + esc(String(card.lock.orderHash)) + '</span> Orders lock blind; Red commits when you execute. Forecast before seeing the house. To unlock the lock button: move all three event sliders, drag one pre-mortem cause, and keep LOWER below UPPER in the range.</div>' +
       tutorialCoach('3', 'Make an honest forecast before seeing the model.', 'Probabilities describe uncertainty, not confidence in yourself. Use the coach estimate for a sensible starting point, or move the controls yourself; then lock the blind forecast.',
         '<button class="dir-btn" data-act="tutorial-estimate"' + (cardIsReady(card) ? ' disabled' : '') + '>' + (cardIsReady(card) ? 'COACH ESTIMATE LOADED' : 'USE COACH ESTIMATE') + '</button>') +
       '<div class="dir-card"><h3>LOCKED ORDERS (' + st.orders.blue.length + '/' + st.ap.blue + ')</h3>' + commitOrderRows(st) + '</div>' +
@@ -1321,8 +1323,21 @@ window.DirectorModule = (function () {
       '<div class="dir-card"><h3>RANGE + STANDING CALL</h3>' + intervalControls(card, card.values, false) + standingControl(card, card.values, false) + '</div>' +
       premortemControls(card, card.values, false) +
       '<div class="dir-note">Your point probabilities are the instrument. The game is not issuing an operation-success probability.</div>' +
+      '<div class="dir-note is-gate" id="dir-lock-note" role="status">' + esc(forecastGateProgress(card)) + '</div>' +
       '<div class="dir-actions"><button class="dir-btn" data-act="unlock-commit">← UNLOCK &amp; REPLAN</button>' +
       '<button class="dir-btn primary" data-act="submit-blind"' + (cardIsReady(card) ? '' : ' disabled') + '>LOCK BLIND FORECASTS →</button></div>';
+  }
+
+  // Why the blind-lock button is disabled, in plain words, updated live as the
+  // player records each belief. The gate itself is unchanged (CO-005 discipline:
+  // no lazy default forecasts) — it just explains itself now.
+  function forecastGateProgress(card) {
+    if (cardIsReady(card)) return 'All calls recorded. Lock when ready — the house line reveals after you commit.';
+    var moved = card.set.questions.filter(function (q) { return !!card.touched[q.id]; }).length;
+    var parts = [moved + ' of ' + card.set.questions.length + ' event sliders moved'];
+    parts.push(card.touched.premortem ? 'pre-mortem done' : 'pre-mortem: drag one cause');
+    if (!(card.values && card.values.lower < card.values.upper)) parts.push('range: LOWER must sit below UPPER');
+    return 'Still needed to unlock: ' + parts.join(' · ') + '. A default is not a forecast — move a slider even to keep its value.';
   }
 
   function renderHybridCommit() {
@@ -2389,6 +2404,11 @@ window.DirectorModule = (function () {
     }
     var submit = $('dir-wrap').querySelector('[data-act="' + (card.step === 'blind' ? 'submit-blind' : 'submit-final') + '"]');
     if (submit) submit.disabled = card.step === 'blind' ? !cardIsReady(card) : !(card.final.lower < card.final.upper);
+    var gateNote = $('dir-lock-note');
+    if (gateNote && card.step === 'blind') {
+      gateNote.textContent = forecastGateProgress(card);
+      gateNote.classList.toggle('is-ready', cardIsReady(card));
+    }
   }
 
   // CO-007 S3: a challenge is the issuer's EXACT terms. Re-choosing any BRIEF chip is a
