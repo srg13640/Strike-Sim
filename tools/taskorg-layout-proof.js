@@ -2,7 +2,7 @@
  * taskorg-layout-proof.js — REAL layout proof of the rebuilt Task Org: loads the vendored
  * d3 + views.js buildOrgTree, runs the same d3.tree layout + vertical stacking as
  * renderOrgChart, draws the cards (with milsymbol icons / group buckets / band labels),
- * and writes _stark/taskorg-layout.svg. Validates hierarchy + spacing + no-overlap.
+ * and writes _workshop/design-proofs/taskorg-layout.svg. Validates hierarchy + spacing + no-overlap.
  * Run: node tools/taskorg-layout-proof.js
  */
 const path = require('path'); const fs = require('fs');
@@ -59,7 +59,7 @@ let yCursor = marginTop; const parts = []; let minClear = Infinity;
 
 const H = yCursor;
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#0a1320"/>${parts.join('')}</svg>`;
-fs.mkdirSync(path.join(__dirname, '..', '_stark'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'taskorg-layout.svg'), svg);
+fs.mkdirSync(path.join(__dirname, '..', '_workshop', 'design-proofs'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'taskorg-layout.svg'), svg);
 console.log('canvas', W + 'x' + Math.round(H), '| min horizontal clearance between same-depth cards:', Math.round(minClear), 'px (should be >0)');
-console.log('-> _stark/taskorg-layout.svg');
+console.log('-> _workshop/design-proofs/taskorg-layout.svg');

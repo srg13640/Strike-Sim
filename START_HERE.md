@@ -16,13 +16,12 @@ any of them breaks it. This is why the root looks crowded — it's the engine ro
 `change-orders/` (specs for each change), `docs/` (architecture + model documents),
 `tools/` (the automated proof scripts that gate every change), `VERSION`, `README.md`.
 
-**3. The AI workshop — artifacts from Codex/Claude/Gemini sessions.**
-`loop-runs/`, `loop-specs/`, `loop.run.yaml`, `sandbox/`, `reviews/`, `_codex_review/`,
-`_stark/`, `_fable/`, `_CODEX Ideas/`, `_GEMINI Ideas/`, `program-briefs/`,
-`HANDOFF.md`, `CODEX_HANDOFF-*.md`, `REVIEW_PROMPT.md`, `Janus_Implementation_Plan.md`,
-`skills-lock.json`. None of this runs the game; it's the workshop's sawdust and
-blueprints. Tidying it into one `_workshop/` folder is possible but needs a proper
-change order, because some AI workflows write to these exact paths.
+**3. The AI workshop — all in one place now: `_workshop/`.**
+Every artifact from Codex/Claude/Gemini/Stark sessions — persona workspaces, reviews,
+idea catalogs, design proofs, the dormant balance loop, old briefs, and the superseded
+launchers — lives under `_workshop/` (organized by CO-010; see the README inside).
+None of it runs the game. `skills-lock.json` and the hidden `.agents/`/`.claude/`
+folders stay at root because live workflows read them.
 
 **4. The websites (separate projects).**
 `site/` and `site-preview/` — the public-site work. `site-preview` is its own Git

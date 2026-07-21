@@ -1,0 +1,1939 @@
+<!--
+  DESIGN RATIONALE: Variant C — Phosphor/CRT Command Post
+  This prototype channels the visual lineage of 1980s NORAD and SAGE-era command systems:
+  amber phosphor on near-black, monospaced type throughout (VT323 + Share Tech Mono),
+  and vector line-art graphics with a subtle bloom effect that makes the screen feel
+  genuinely luminous rather than merely dark-themed. The denial-focused MOE framework
+  keeps every metric anchored to the adversary's operational culmination — not attrition —
+  reinforcing Strategy of Denial doctrine at every level of the interface.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRIKESIM // C2 PROTOTYPE // NOTIONAL // UNCLASSIFIED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   RESET + ROOT
+═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --amber:        #FFB000;
+  --amber-bright: #FFD060;
+  --amber-dim:    #8B6000;
+  --amber-glow:   rgba(255,176,0,0.15);
+  --amber-glow2:  rgba(255,176,0,0.05);
+  --bg:           #080600;
+  --bg2:          #0D0A00;
+  --bg3:          #141000;
+  --border:       rgba(255,176,0,0.25);
+  --border-bright:rgba(255,176,0,0.55);
+  --red-ph:       #FF4400;
+  --blue-ph:      #00AAFF;
+  --green-ph:     #44FF88;
+  --mono:         'Share Tech Mono', monospace;
+  --display:      'VT323', monospace;
+  --text-dim:     rgba(255,176,0,0.45);
+  --text-mid:     rgba(255,176,0,0.72);
+  --text-full:    #FFB000;
+  --text-bright:  #FFD060;
+}
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--bg);
+  color: var(--text-full);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* CRT scanline overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px, transparent 2px,
+    rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 3px
+  );
+}
+
+/* Vignette */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 9998;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 55%,
+    rgba(0,0,0,0.65) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYOUT SHELL
+═══════════════════════════════════════════════════════════ */
+.shell {
+  display: grid;
+  grid-template-rows: 44px 1fr 22px;
+  grid-template-columns: 220px 1fr 300px;
+  grid-template-areas:
+    "cmdbar cmdbar cmdbar"
+    "rail-l hero   rail-r"
+    "footer footer footer";
+  width: 100vw; height: 100vh;
+  gap: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMMAND BAR
+═══════════════════════════════════════════════════════════ */
+.cmdbar {
+  grid-area: cmdbar;
+  display: flex; align-items: center;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border-bright);
+  padding: 0 12px;
+  gap: 0;
+  position: relative;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(255,176,0,0.08);
+}
+
+.brand {
+  font-family: var(--display);
+  font-size: 26px;
+  color: var(--amber-bright);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 12px var(--amber), 0 0 24px rgba(255,176,0,0.4);
+  white-space: nowrap;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+  margin-right: 16px;
+  line-height: 1;
+}
+
+.brand .bsub {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  display: block;
+  color: var(--text-mid);
+  text-shadow: none;
+  margin-top: -2px;
+}
+
+/* View switcher */
+.view-switcher {
+  display: flex; align-items: center; gap: 2px;
+  margin-right: 16px;
+  padding-right: 16px;
+  border-right: 1px solid var(--border);
+}
+
+.view-btn {
+  background: none; border: 1px solid transparent;
+  color: var(--text-mid); font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.1em;
+  padding: 4px 10px; cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.view-btn:hover { color: var(--amber-bright); border-color: var(--border); }
+.view-btn.active {
+  color: var(--bg); background: var(--amber);
+  border-color: var(--amber);
+  text-shadow: none;
+  box-shadow: 0 0 8px rgba(255,176,0,0.6);
+}
+
+/* Global actions */
+.global-actions {
+  display: flex; gap: 6px; align-items: center;
+  margin-right: 16px;
+  padding-right: 16px;
+  border-right: 1px solid var(--border);
+}
+
+.g-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-full); font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.1em;
+  padding: 4px 12px; cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+.g-btn:hover {
+  border-color: var(--amber-bright);
+  color: var(--amber-bright);
+  box-shadow: 0 0 6px rgba(255,176,0,0.3) inset, 0 0 4px rgba(255,176,0,0.2);
+}
+
+/* Live status */
+.live-status {
+  display: flex; align-items: center; gap: 18px;
+  flex: 1;
+}
+
+.status-item {
+  display: flex; flex-direction: column;
+  font-size: 9px;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  line-height: 1.3;
+}
+.status-item .val {
+  font-size: 12px; color: var(--text-bright);
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+}
+
+.posture-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,68,0,0.1);
+  border: 1px solid rgba(255,68,0,0.4);
+  padding: 3px 10px;
+  font-size: 10px;
+  color: #FF6622;
+  letter-spacing: 0.15em;
+}
+.posture-badge .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #FF4400;
+  box-shadow: 0 0 6px #FF4400;
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+/* Classification */
+.classmark {
+  margin-left: auto;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--amber-dim);
+  text-transform: uppercase;
+  border: 1px solid var(--amber-dim);
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITY: PANEL
+═══════════════════════════════════════════════════════════ */
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+.panel-hdr {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: var(--amber-bright);
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,176,0,0.04);
+}
+.panel-hdr .ph-icon {
+  width: 8px; height: 8px;
+  background: var(--amber-bright);
+  box-shadow: 0 0 6px var(--amber);
+  display: inline-block;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LEFT RAIL
+═══════════════════════════════════════════════════════════ */
+.rail-l {
+  grid-area: rail-l;
+  display: flex; flex-direction: column; gap: 0;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  height: 100%;
+}
+
+.filter-section {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-lbl {
+  font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 6px;
+}
+
+.toggle-row {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px;
+}
+
+.tog {
+  border: 1px solid var(--border);
+  padding: 2px 8px; font-size: 9px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.12s;
+  background: none; color: var(--text-mid); font-family: var(--mono);
+  user-select: none;
+}
+.tog.on {
+  background: var(--amber-glow);
+  border-color: var(--amber);
+  color: var(--amber-bright);
+  box-shadow: 0 0 4px rgba(255,176,0,0.2) inset;
+}
+.tog.on.blue { background: rgba(0,170,255,0.1); border-color: rgba(0,170,255,0.5); color: #80D8FF; }
+.tog.on.red  { background: rgba(255,68,0,0.1); border-color: rgba(255,68,0,0.5); color: #FF8866; }
+.tog.on.ntrl { background: rgba(170,170,170,0.08); border-color: rgba(170,170,170,0.3); color: #AAAAAA; }
+
+/* Domain toggles */
+.domain-tog {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px; letter-spacing: 0.12em;
+  color: var(--text-mid); cursor: pointer;
+  padding: 2px 0; text-transform: uppercase;
+  user-select: none;
+}
+.domain-tog input { display: none; }
+.domain-box {
+  width: 10px; height: 10px;
+  border: 1px solid var(--border);
+  position: relative; flex-shrink: 0;
+}
+.domain-box.checked::after {
+  content: ''; position: absolute;
+  inset: 2px; background: var(--amber);
+  box-shadow: 0 0 4px var(--amber);
+}
+
+/* Legend */
+.legend-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px;
+  padding: 8px 10px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px; color: var(--text-mid);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+/* Event log */
+.evt-log {
+  flex: 1; overflow-y: auto; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.evt-log::-webkit-scrollbar { width: 4px; }
+.evt-log::-webkit-scrollbar-track { background: var(--bg); }
+.evt-log::-webkit-scrollbar-thumb { background: var(--amber-dim); }
+
+.evt {
+  font-size: 9px; line-height: 1.5;
+  padding: 3px 6px;
+  border-left: 2px solid var(--border);
+  color: var(--text-mid);
+}
+.evt.new { border-color: var(--amber); color: var(--text-full); animation: fadeIn 0.4s; }
+.evt.alert { border-color: #FF4400; color: #FF6622; }
+.evt .ts { color: var(--text-dim); margin-right: 4px; }
+.evt .em { color: var(--amber-bright); }
+
+.io-btns {
+  display: flex; gap: 4px; padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.io-btn {
+  flex: 1; padding: 4px; font-family: var(--mono);
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-mid); cursor: pointer; transition: all 0.12s;
+}
+.io-btn:hover { border-color: var(--amber); color: var(--text-full); }
+
+/* ═══════════════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════════════ */
+.hero {
+  grid-area: hero;
+  position: relative; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 60%, rgba(255,176,0,0.03) 0%, var(--bg) 70%);
+}
+
+#battlespace {
+  width: 100%; height: 100%;
+  display: block;
+}
+
+.hero-overlay {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 10px 14px;
+  pointer-events: none;
+}
+
+.op-badge {
+  font-family: var(--display);
+  font-size: 16px; letter-spacing: 0.25em;
+  color: rgba(255,176,0,0.5);
+  text-transform: uppercase;
+}
+
+.coord-readout {
+  font-size: 9px; color: var(--text-dim);
+  letter-spacing: 0.15em; text-align: right;
+  line-height: 1.8;
+}
+
+/* View panels */
+.view-panel {
+  position: absolute; inset: 0;
+  display: none;
+}
+.view-panel.active { display: flex; align-items: center; justify-content: center; }
+
+/* ═══════════════════════════════════════════════════════════
+   RIGHT RAIL
+═══════════════════════════════════════════════════════════ */
+.rail-r {
+  grid-area: rail-r;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  height: 100%;
+}
+
+.rail-r .panel {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Team summary */
+.team-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1px; padding: 8px; gap: 6px;
+}
+.team-cell {
+  padding: 6px 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+.team-cell .tc-lbl {
+  font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 3px;
+}
+.team-cell .tc-val {
+  font-family: var(--display); font-size: 18px;
+  color: var(--amber-bright);
+  text-shadow: 0 0 8px rgba(255,176,0,0.4);
+  line-height: 1;
+}
+.team-cell.blue-cell { border-color: rgba(0,170,255,0.3); }
+.team-cell.blue-cell .tc-val { color: #80D8FF; text-shadow: 0 0 8px rgba(0,170,255,0.3); }
+.team-cell.red-cell { border-color: rgba(255,68,0,0.3); }
+.team-cell.red-cell .tc-val { color: #FF8866; text-shadow: 0 0 8px rgba(255,68,0,0.3); }
+
+/* COA Builder */
+.coa-section { padding: 8px; }
+
+.coa-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.coa-lbl { font-size: 9px; letter-spacing: 0.12em; color: var(--text-mid); text-transform: uppercase; }
+.coa-val { font-family: var(--display); font-size: 14px; color: var(--amber-bright); }
+
+.slider-wrap {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.slider-lbl { font-size: 9px; color: var(--text-dim); width: 70px; letter-spacing: 0.1em; flex-shrink: 0; }
+.ph-slider {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 3px; background: var(--border);
+  outline: none; cursor: pointer;
+}
+.ph-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  background: var(--amber-bright);
+  box-shadow: 0 0 6px var(--amber);
+  cursor: pointer;
+}
+.slider-pct { font-family: var(--display); font-size: 13px; color: var(--amber-bright); width: 32px; text-align: right; }
+
+.generate-btn {
+  width: 100%;
+  padding: 8px 0; font-family: var(--display);
+  font-size: 18px; letter-spacing: 0.3em; text-transform: uppercase;
+  background: rgba(255,176,0,0.08);
+  border: 1px solid var(--amber);
+  color: var(--amber-bright);
+  cursor: pointer; transition: all 0.15s;
+  text-align: center;
+  box-shadow: 0 0 8px rgba(255,176,0,0.1) inset;
+  margin-top: 6px;
+}
+.generate-btn:hover {
+  background: rgba(255,176,0,0.15);
+  box-shadow: 0 0 16px rgba(255,176,0,0.25) inset, 0 0 8px rgba(255,176,0,0.15);
+  color: #FFE080;
+}
+.generate-btn.running {
+  animation: genPulse 0.6s ease-in-out infinite alternate;
+}
+
+/* MOE Panel — the centerpiece */
+.moe-panel {
+  flex: 1; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.moe-panel::-webkit-scrollbar { width: 4px; }
+.moe-panel::-webkit-scrollbar-thumb { background: var(--amber-dim); }
+
+.denial-headline {
+  text-align: center;
+  padding: 10px 8px;
+  border: 1px solid var(--border-bright);
+  background: rgba(255,176,0,0.04);
+  position: relative;
+  overflow: hidden;
+}
+.denial-headline::before {
+  content: '';
+  position: absolute; top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,176,0,0.08), transparent);
+  animation: sweep 4s ease-in-out infinite;
+}
+
+.denial-verdict {
+  font-family: var(--display);
+  font-size: 28px; letter-spacing: 0.15em;
+  color: var(--amber-bright);
+  text-shadow: 0 0 12px rgba(255,176,0,0.5), 0 0 24px rgba(255,176,0,0.2);
+  line-height: 1;
+}
+.denial-sub {
+  font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim);
+  text-transform: uppercase; margin-top: 3px;
+}
+.denial-pct {
+  font-family: var(--display);
+  font-size: 52px; letter-spacing: -0.02em;
+  color: var(--amber-bright);
+  text-shadow: 0 0 20px rgba(255,176,0,0.6), 0 0 40px rgba(255,176,0,0.3);
+  line-height: 1;
+}
+.denial-ci {
+  font-size: 9px; color: var(--text-dim); letter-spacing: 0.15em;
+  margin-top: 2px;
+}
+.denial-ci span { color: var(--text-mid); }
+
+/* Effect breakdown */
+.effect-row {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.eff-item {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+}
+.eff-top { display: flex; justify-content: space-between; align-items: baseline; }
+.eff-lbl { font-size: 9px; color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase; }
+.eff-val { font-family: var(--display); font-size: 16px; color: var(--amber-bright); }
+.eff-bar-track {
+  height: 4px; background: rgba(255,176,0,0.1);
+  position: relative; overflow: hidden;
+}
+.eff-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber-bright));
+  box-shadow: 0 0 4px var(--amber);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.eff-bar-fill.red-fill {
+  background: linear-gradient(90deg, #AA2200, #FF4400);
+  box-shadow: 0 0 4px #FF4400;
+}
+.eff-bar-fill.green-fill {
+  background: linear-gradient(90deg, #006622, #44FF88);
+  box-shadow: 0 0 4px #44FF88;
+}
+
+/* Monte Carlo gauge */
+.mc-gauge-wrap {
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.mc-lbl { font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
+
+/* ═══════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════ */
+.footer {
+  grid-area: footer;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg3);
+  font-size: 9px; color: var(--text-dim); letter-spacing: 0.15em;
+}
+.footer .fc { display: flex; gap: 16px; align-items: center; }
+
+/* ═══════════════════════════════════════════════════════════
+   TABLE VIEW
+═══════════════════════════════════════════════════════════ */
+.target-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 10px;
+}
+.target-table th {
+  font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--text-dim); border-bottom: 1px solid var(--border);
+  padding: 5px 8px; text-align: left; white-space: nowrap;
+  background: rgba(255,176,0,0.03);
+}
+.target-table td {
+  padding: 4px 8px; border-bottom: 1px solid rgba(255,176,0,0.08);
+  color: var(--text-mid); white-space: nowrap;
+}
+.target-table tr:hover td { background: rgba(255,176,0,0.04); color: var(--text-full); }
+.target-table .val-bright { color: var(--amber-bright); font-family: var(--display); font-size: 13px; }
+.target-table .tag {
+  font-size: 8px; padding: 1px 5px;
+  border: 1px solid; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.tag-blue { border-color: rgba(0,170,255,0.5); color: #80D8FF; }
+.tag-red  { border-color: rgba(255,68,0,0.5); color: #FF8866; }
+.tag-ntrl { border-color: rgba(170,170,170,0.3); color: #AAAAAA; }
+
+/* TASK ORG VIEW */
+.taskorg-wrap {
+  padding: 20px; width: 100%; overflow-y: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════════════════ */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sweep {
+  0%   { left: -60%; }
+  100% { left: 160%; }
+}
+@keyframes genPulse {
+  from { box-shadow: 0 0 8px rgba(255,176,0,0.1) inset; }
+  to   { box-shadow: 0 0 20px rgba(255,176,0,0.4) inset, 0 0 12px rgba(255,176,0,0.2); }
+}
+@keyframes radarSweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes nodeGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.4); }
+}
+@keyframes confInt {
+  from { stroke-dashoffset: 200; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Scrollbar defaults */
+* { scrollbar-width: thin; scrollbar-color: var(--amber-dim) var(--bg); }
+
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ══════════════════════════════════════════
+       COMMAND BAR
+  ══════════════════════════════════════════ -->
+  <header class="cmdbar">
+    <div class="brand">
+      STRIKESIM
+      <span class="bsub">C2 ANALYSIS PLATFORM</span>
+    </div>
+
+    <div class="view-switcher" role="tablist">
+      <button class="view-btn active" onclick="switchView('graph')" role="tab">Force Graph</button>
+      <button class="view-btn" onclick="switchView('map')" role="tab">Map</button>
+      <button class="view-btn" onclick="switchView('table')" role="tab">Table</button>
+      <button class="view-btn" onclick="switchView('taskorg')" role="tab">Task Org</button>
+    </div>
+
+    <div class="global-actions">
+      <button class="g-btn" onclick="openPlanner()">&#9632; Campaign Planner</button>
+      <button class="g-btn" onclick="openWargame()">&#9670; War Game</button>
+    </div>
+
+    <div class="live-status">
+      <div class="status-item">
+        <span>Theater</span>
+        <span class="val">IND-PAC / TW</span>
+      </div>
+      <div class="status-item">
+        <span>UTC</span>
+        <span class="val" id="utc-clock">--:--:--</span>
+      </div>
+      <div class="status-item">
+        <span>Campaign Day</span>
+        <span class="val">D+03</span>
+      </div>
+      <div class="status-item">
+        <span>Scenario</span>
+        <span class="val">IRON TYPHOON</span>
+      </div>
+      <div class="posture-badge">
+        <span class="dot"></span>
+        DEFCON&nbsp;3
+      </div>
+    </div>
+
+    <div class="classmark">NOTIONAL // UNCLASSIFIED</div>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       LEFT RAIL
+  ══════════════════════════════════════════ -->
+  <aside class="rail-l">
+
+    <!-- Team filter -->
+    <div class="filter-section">
+      <div class="filter-lbl">Team</div>
+      <div class="toggle-row">
+        <button class="tog on blue" onclick="toggleFilter(this)">Blue Force</button>
+        <button class="tog on red" onclick="toggleFilter(this)">Red Force</button>
+        <button class="tog on ntrl" onclick="toggleFilter(this)">Neutral</button>
+      </div>
+    </div>
+
+    <!-- Domain filter -->
+    <div class="filter-section">
+      <div class="filter-lbl">Domain</div>
+      <label class="domain-tog" onclick="toggleDomain(this)">
+        <span class="domain-box checked" data-d="air"></span>
+        AIR
+      </label>
+      <label class="domain-tog" onclick="toggleDomain(this)">
+        <span class="domain-box checked" data-d="sea"></span>
+        MARITIME
+      </label>
+      <label class="domain-tog" onclick="toggleDomain(this)">
+        <span class="domain-box checked" data-d="land"></span>
+        LAND
+      </label>
+      <label class="domain-tog" onclick="toggleDomain(this)">
+        <span class="domain-box checked" data-d="space"></span>
+        SPACE/CYBER
+      </label>
+      <label class="domain-tog" onclick="toggleDomain(this)">
+        <span class="domain-box checked" data-d="info"></span>
+        INFO OPS
+      </label>
+    </div>
+
+    <!-- Highlight toggles -->
+    <div class="filter-section">
+      <div class="filter-lbl">Highlight</div>
+      <div class="toggle-row">
+        <button class="tog on" onclick="toggleFilter(this)">Kill Chains</button>
+        <button class="tog" onclick="toggleFilter(this)">Logistics</button>
+        <button class="tog on" onclick="toggleFilter(this)">A2/AD Arcs</button>
+        <button class="tog" onclick="toggleFilter(this)">EW Zones</button>
+        <button class="tog on" onclick="toggleFilter(this)">Denial MOEs</button>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="panel-hdr" style="font-size:10px;">
+      <span class="ph-icon"></span>LEGEND
+    </div>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <rect x="2" y="2" width="10" height="10" fill="none" stroke="#80D8FF" stroke-width="1.5"/>
+          <line x1="7" y1="2" x2="7" y2="0" stroke="#80D8FF" stroke-width="1.5"/>
+        </svg>
+        Friendly Unit
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <polygon points="7,1 13,13 1,13" fill="none" stroke="#FF8866" stroke-width="1.5"/>
+        </svg>
+        Hostile Unit
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <circle cx="7" cy="7" r="5" fill="none" stroke="#FFB000" stroke-width="1.5"/>
+        </svg>
+        HQ / C2 Node
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <polygon points="7,2 12,5 12,9 7,12 2,9 2,5" fill="none" stroke="#AAAAAA" stroke-width="1.5"/>
+        </svg>
+        Neutral / Joint
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <line x1="2" y1="7" x2="12" y2="7" stroke="#44FF88" stroke-width="1.5" stroke-dasharray="2,2"/>
+        </svg>
+        Kill Chain Link
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <line x1="2" y1="7" x2="12" y2="7" stroke="#FF4400" stroke-width="1.5"/>
+        </svg>
+        Threat Vector
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <circle cx="7" cy="7" r="5" fill="none" stroke="#FF4400" stroke-width="1" stroke-dasharray="3,2"/>
+        </svg>
+        A2/AD Arc
+      </div>
+      <div class="legend-item">
+        <svg width="14" height="14" viewBox="0 0 14 14">
+          <rect x="2" y="5" width="10" height="4" fill="rgba(255,176,0,0.15)" stroke="#FFB000" stroke-width="1"/>
+        </svg>
+        EW Zone
+      </div>
+    </div>
+
+    <!-- I/O -->
+    <div class="io-btns">
+      <button class="io-btn" onclick="fakeImport()">&#8613; Import</button>
+      <button class="io-btn" onclick="fakeExport()">&#8615; Export</button>
+      <button class="io-btn" onclick="fakeSave()">&#9632; Snapshot</button>
+    </div>
+
+    <!-- Event log -->
+    <div class="panel-hdr" style="font-size:10px;">
+      <span class="ph-icon" style="background:#FF4400; box-shadow:0 0 6px #FF4400;"></span>
+      LIVE EVENT LOG
+    </div>
+    <div class="evt-log" id="evt-log">
+      <div class="evt alert"><span class="ts">0347Z</span><span class="em">ALERT</span> PLAAF 4x J-20 sorties detected — Fuzhou AB</div>
+      <div class="evt new"><span class="ts">0349Z</span>USS Fitzgerald (DDG-62) CIC − TLAM fire solution updated</div>
+      <div class="evt"><span class="ts">0351Z</span>7th AF HQ — Blue air tasking order cycle begin</div>
+      <div class="evt"><span class="ts">0353Z</span>PLAN SSBN track lost — Bashi Channel — assess submerged</div>
+      <div class="evt"><span class="ts">0354Z</span>Red amphibious group: LST-083 departed Quanzhou</div>
+      <div class="evt alert"><span class="ts">0356Z</span><span class="em">ALERT</span> DF-21D radar lock detected — probable fire-control</div>
+      <div class="evt"><span class="ts">0358Z</span>ROC 542nd Bde confirmed defensive positions — Hsinchu</div>
+      <div class="evt"><span class="ts">0400Z</span>Blue SEAD package airborne — Kadena — TOT +38min</div>
+      <div class="evt new"><span class="ts">0402Z</span>Monte Carlo re-run complete — denial probability updated</div>
+      <div class="evt"><span class="ts">0403Z</span>Space: GEO-3 comms uplink nominal — no jamming detected</div>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════════════════
+       HERO BATTLESPACE
+  ══════════════════════════════════════════ -->
+  <main class="hero">
+    <!-- Force Graph View -->
+    <div class="view-panel active" id="view-graph">
+      <canvas id="battlespace" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+    </div>
+
+    <!-- Map View -->
+    <div class="view-panel" id="view-map">
+      <svg id="map-svg" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;"></svg>
+    </div>
+
+    <!-- Table View -->
+    <div class="view-panel" id="view-table" style="align-items:flex-start; padding:16px; overflow-y:auto;">
+      <div style="width:100%;">
+        <div class="panel-hdr" style="margin-bottom:8px; font-size:12px;">
+          <span class="ph-icon"></span>
+          TARGET / UNIT REGISTRY — SCENARIO: IRON TYPHOON — D+03
+        </div>
+        <table class="target-table">
+          <thead>
+            <tr>
+              <th>UNIT ID</th>
+              <th>NAME</th>
+              <th>TYPE</th>
+              <th>DOMAIN</th>
+              <th>TEAM</th>
+              <th>LOCATION</th>
+              <th>STATUS</th>
+              <th>DENIAL WEIGHT</th>
+              <th>COG LINK</th>
+              <th>LAST UPDATE</th>
+            </tr>
+          </thead>
+          <tbody id="unit-table-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Task Org View -->
+    <div class="view-panel" id="view-taskorg" style="align-items:flex-start; overflow-y:auto;">
+      <div class="taskorg-wrap" style="width:100%;">
+        <div class="panel-hdr" style="margin-bottom:12px; font-size:12px;">
+          <span class="ph-icon"></span>JOINT TASK FORCE PACIFIC — TASK ORGANIZATION — D+03
+        </div>
+        <svg id="taskorg-svg" width="100%" height="520" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+
+    <div class="hero-overlay">
+      <div class="op-badge">OP IRON TYPHOON // INDOPACOM // D+03</div>
+      <div class="coord-readout" id="coord-readout">
+        LAT: 24°08'N<br>
+        LON: 121°32'E<br>
+        GRID: PH4892<br>
+        ALT: SEA LEVEL
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════════════
+       RIGHT RAIL — MOE + COA
+  ══════════════════════════════════════════ -->
+  <aside class="rail-r">
+    <!-- Team Summary -->
+    <div class="panel">
+      <div class="panel-hdr"><span class="ph-icon"></span>FORCE SUMMARY</div>
+      <div class="team-grid">
+        <div class="team-cell blue-cell">
+          <div class="tc-lbl">Blue Sorties (24h)</div>
+          <div class="tc-val">142</div>
+        </div>
+        <div class="team-cell red-cell">
+          <div class="tc-lbl">Red Sorties (24h)</div>
+          <div class="tc-val">218</div>
+        </div>
+        <div class="team-cell blue-cell">
+          <div class="tc-lbl">Blue Ships</div>
+          <div class="tc-val">23</div>
+        </div>
+        <div class="team-cell red-cell">
+          <div class="tc-lbl">Red Amphibious</div>
+          <div class="tc-val">67</div>
+        </div>
+        <div class="team-cell">
+          <div class="tc-lbl">Joint C2 Links</div>
+          <div class="tc-val">84</div>
+        </div>
+        <div class="team-cell">
+          <div class="tc-lbl">EW Nodes Active</div>
+          <div class="tc-val">31</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COA Builder -->
+    <div class="panel">
+      <div class="panel-hdr"><span class="ph-icon"></span>COA BUILDER</div>
+      <div class="coa-section">
+        <div class="coa-row">
+          <span class="coa-lbl">Active COA</span>
+          <span class="coa-val" id="coa-name">COA-BRAVO-7</span>
+        </div>
+
+        <div class="slider-wrap">
+          <span class="slider-lbl">Strike Weight</span>
+          <input type="range" class="ph-slider" min="0" max="100" value="65" id="sl-strike" oninput="updateSlider(this,'sl-strike-pct')">
+          <span class="slider-pct" id="sl-strike-pct">65%</span>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-lbl">SEAD/DEAD</span>
+          <input type="range" class="ph-slider" min="0" max="100" value="80" id="sl-sead" oninput="updateSlider(this,'sl-sead-pct')">
+          <span class="slider-pct" id="sl-sead-pct">80%</span>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-lbl">ISR Alloc</span>
+          <input type="range" class="ph-slider" min="0" max="100" value="45" id="sl-isr" oninput="updateSlider(this,'sl-isr-pct')">
+          <span class="slider-pct" id="sl-isr-pct">45%</span>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-lbl">Capability</span>
+          <input type="range" class="ph-slider" min="0" max="100" value="70" id="sl-cap" oninput="updateSlider(this,'sl-cap-pct'); updateMOE()">
+          <span class="slider-pct" id="sl-cap-pct">70%</span>
+        </div>
+        <div class="slider-wrap">
+          <span class="slider-lbl">Cost Ceiling</span>
+          <input type="range" class="ph-slider" min="0" max="100" value="55" id="sl-cost" oninput="updateSlider(this,'sl-cost-pct')">
+          <span class="slider-pct" id="sl-cost-pct">55%</span>
+        </div>
+
+        <button class="generate-btn" id="gen-btn" onclick="generateCOA()">&#9654; GENERATE COA</button>
+        <div style="font-size:8px; color:var(--text-dim); text-align:center; margin-top:4px; letter-spacing:0.12em;">
+          FROM COMMANDER'S INTENT // IRON TYPHOON
+        </div>
+      </div>
+    </div>
+
+    <!-- Monte Carlo / MOE Panel -->
+    <div class="panel-hdr"><span class="ph-icon" style="background:#44FF88; box-shadow:0 0 6px #44FF88;"></span>MONTE CARLO // DENIAL MOE</div>
+    <div class="moe-panel">
+
+      <!-- Denial Headline -->
+      <div class="denial-headline">
+        <div class="denial-sub">Strategy of Denial — Op Culmination Assessment</div>
+        <div class="denial-verdict" id="denial-verdict">OP HALTED</div>
+        <div class="denial-pct" id="denial-pct">73<span style="font-size:28px;">%</span></div>
+        <div class="denial-sub">Probability Red Operation Culminates</div>
+        <div class="denial-ci">95% CI: <span id="ci-lo">66%</span> – <span id="ci-hi">81%</span> &nbsp;|&nbsp; n=<span id="mc-n">5,000</span></div>
+      </div>
+
+      <!-- MC Distribution gauge SVG -->
+      <div class="mc-gauge-wrap">
+        <div class="mc-lbl">Monte Carlo Distribution — Denial Probability</div>
+        <svg id="mc-dist" width="260" height="80" viewBox="0 0 260 80" xmlns="http://www.w3.org/2000/svg">
+          <!-- Axis -->
+          <line x1="20" y1="70" x2="250" y2="70" stroke="rgba(255,176,0,0.3)" stroke-width="0.5"/>
+          <!-- Distribution curve (bell, centered ~73%) -->
+          <path id="mc-curve" d="" fill="rgba(255,176,0,0.12)" stroke="none"/>
+          <path id="mc-curve-line" d="" fill="none" stroke="#FFB000" stroke-width="1.5"/>
+          <!-- CI shading -->
+          <path id="mc-ci-fill" d="" fill="rgba(255,176,0,0.08)" stroke="none"/>
+          <!-- Vertical markers -->
+          <line id="mc-lo-line" x1="0" y1="10" x2="0" y2="70" stroke="rgba(255,176,0,0.4)" stroke-width="1" stroke-dasharray="3,2"/>
+          <line id="mc-hi-line" x1="0" y1="10" x2="0" y2="70" stroke="rgba(255,176,0,0.4)" stroke-width="1" stroke-dasharray="3,2"/>
+          <line id="mc-mean-line" x1="0" y1="8" x2="0" y2="70" stroke="#FFD060" stroke-width="1.5"/>
+          <!-- Axis labels -->
+          <text x="20" y="78" fill="rgba(255,176,0,0.4)" font-family="Share Tech Mono" font-size="7">0%</text>
+          <text x="120" y="78" fill="rgba(255,176,0,0.4)" font-family="Share Tech Mono" font-size="7">50%</text>
+          <text x="230" y="78" fill="rgba(255,176,0,0.4)" font-family="Share Tech Mono" font-size="7">100%</text>
+          <!-- Mean label -->
+          <text id="mc-mean-lbl" x="0" y="6" fill="#FFD060" font-family="VT323" font-size="10" text-anchor="middle"></text>
+        </svg>
+      </div>
+
+      <!-- Effect Breakdown -->
+      <div class="panel-hdr" style="font-size:10px; border:none; padding:4px 0;">
+        <span class="ph-icon" style="width:6px;height:6px;"></span>EFFECT BREAKDOWN
+      </div>
+      <div class="effect-row">
+        <div class="eff-item">
+          <div class="eff-top">
+            <span class="eff-lbl">Red Amphibious Throughput</span>
+            <span class="eff-val" id="ef-amp">31% cap</span>
+          </div>
+          <div class="eff-bar-track"><div class="eff-bar-fill red-fill" id="ef-amp-bar" style="width:31%"></div></div>
+          <div style="font-size:8px; color:var(--text-dim); margin-top:2px; letter-spacing:0.1em;">
+            &#9660; Reduced from 100% — LST attrition + port denial
+          </div>
+        </div>
+        <div class="eff-item">
+          <div class="eff-top">
+            <span class="eff-lbl">OSVI — Op Viability Index</span>
+            <span class="eff-val" id="ef-osvi">24%</span>
+          </div>
+          <div class="eff-bar-track"><div class="eff-bar-fill red-fill" id="ef-osvi-bar" style="width:24%"></div></div>
+          <div style="font-size:8px; color:var(--text-dim); margin-top:2px; letter-spacing:0.1em;">
+            Operational Sustainability-Viability Index — Red forces
+          </div>
+        </div>
+        <div class="eff-item">
+          <div class="eff-top">
+            <span class="eff-lbl">Op-Halt Probability</span>
+            <span class="eff-val" id="ef-halt" style="color:#44FF88;">73%</span>
+          </div>
+          <div class="eff-bar-track"><div class="eff-bar-fill green-fill" id="ef-halt-bar" style="width:73%"></div></div>
+          <div style="font-size:8px; color:var(--text-dim); margin-top:2px; letter-spacing:0.1em;">
+            Probability adversary operation halts / culminates D+5–9
+          </div>
+        </div>
+        <div class="eff-item">
+          <div class="eff-top">
+            <span class="eff-lbl">Blue Survival Rate</span>
+            <span class="eff-val" id="ef-blue">87%</span>
+          </div>
+          <div class="eff-bar-track"><div class="eff-bar-fill" id="ef-blue-bar" style="width:87%"></div></div>
+          <div style="font-size:8px; color:var(--text-dim); margin-top:2px; letter-spacing:0.1em;">
+            Expected blue asset survivability over 7-day horizon
+          </div>
+        </div>
+        <div class="eff-item">
+          <div class="eff-top">
+            <span class="eff-lbl">Red C2 Degradation</span>
+            <span class="eff-val" id="ef-c2">61%</span>
+          </div>
+          <div class="eff-bar-track"><div class="eff-bar-fill red-fill" id="ef-c2-bar" style="width:61%"></div></div>
+          <div style="font-size:8px; color:var(--text-dim); margin-top:2px; letter-spacing:0.1em;">
+            Measured vs baseline — info ops + SEAD effect
+          </div>
+        </div>
+      </div>
+
+      <!-- Run info -->
+      <div style="font-size:8px; color:var(--text-dim); letter-spacing:0.12em; text-align:center; padding:4px 0;">
+        LAST RUN: 0402Z D+03 &nbsp;|&nbsp; MODEL: JICM-A v4.2 &nbsp;|&nbsp; NOTIONAL DATA
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════════════════
+       FOOTER
+  ══════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="fc">
+      <span>STRIKESIM C2 // PROTOTYPE v0.9.1</span>
+      <span>SCENARIO: IRON TYPHOON</span>
+      <span>THEATER: INDOPACOM // IND-PAC SECTOR 7</span>
+    </div>
+    <div class="fc">
+      <span>ALL DATA NOTIONAL // FOR ANALYSIS USE ONLY</span>
+      <span style="color:var(--amber-dim); border:1px solid var(--amber-dim); padding:0 6px;">UNCLASSIFIED</span>
+    </div>
+  </footer>
+
+</div><!-- .shell -->
+
+<script>
+function projAttr(la,lo){var p=proj(la,lo);return 'x="'+p.x+'" y="'+p.y+'"';}
+
+/* ══════════════════════════════════════════════════════════
+   MOCK DATA
+══════════════════════════════════════════════════════════ */
+const UNITS = [
+  // Blue
+  {id:'B-001', name:'JTF PAC HQ', type:'C2/HQ', domain:'LAND', team:'BLUE', loc:'Camp Smith, HI', status:'ACTIVE', dw:0.95, cog:'Strategic C2', ts:'0400Z'},
+  {id:'B-002', name:'USS Ronald Reagan (CVN-76)', type:'CV STRIKE GROUP', domain:'MARITIME', team:'BLUE', loc:'24°N 130°E', status:'ACTIVE', dw:0.88, cog:'Maritime Denial', ts:'0402Z'},
+  {id:'B-003', name:'USS Fitzgerald (DDG-62)', type:'DESTROYER', domain:'MARITIME', team:'BLUE', loc:'23°N 127°E', status:'ACTIVE', dw:0.72, cog:'TLAM Strike', ts:'0402Z'},
+  {id:'B-004', name:'USS Columbia (SSN-771)', type:'SUBMARINE', domain:'MARITIME', team:'BLUE', loc:'BASHI CHANNEL', status:'ACTIVE', dw:0.91, cog:'Undersea Denial', ts:'0401Z'},
+  {id:'B-005', name:'7th Air Force', type:'AIR HQ', domain:'AIR', team:'BLUE', loc:'Osan AB, ROK', status:'ACTIVE', dw:0.85, cog:'Air Superiority', ts:'0358Z'},
+  {id:'B-006', name:'18 WG Kadena', type:'FIGHTER WING', domain:'AIR', team:'BLUE', loc:'Kadena AB, JP', status:'SORTIE', dw:0.79, cog:'SEAD Package', ts:'0400Z'},
+  {id:'B-007', name:'ROC 542nd Bde', type:'ARMY BDE', domain:'LAND', team:'BLUE', loc:'Hsinchu, TW', status:'DEFENSIVE', dw:0.68, cog:'Land Denial', ts:'0358Z'},
+  {id:'B-008', name:'PACAF ISR Sqdn', type:'ISR/RECON', domain:'AIR', team:'BLUE', loc:'Andersen AFB, GU', status:'ACTIVE', dw:0.62, cog:'Surveillance', ts:'0403Z'},
+  {id:'B-009', name:'GEO-3 SATCOM', type:'SPACE/CYBER', domain:'SPACE', team:'BLUE', loc:'GEO ORBIT', status:'NOMINAL', dw:0.55, cog:'C2 Link', ts:'0403Z'},
+  // Red
+  {id:'R-001', name:'PLA Eastern TC HQ', type:'C2/HQ', domain:'LAND', team:'RED', loc:'Nanjing, PRC', status:'ACTIVE', dw:0.94, cog:'Adversary C2', ts:'0347Z'},
+  {id:'R-002', name:'PLAN Amphibious TF-41', type:'AMPHIB GROUP', domain:'MARITIME', team:'RED', loc:'22°N 120°E', status:'TRANSIT', dw:0.87, cog:'Red Center of Gravity', ts:'0354Z'},
+  {id:'R-003', name:'LST-083 Quanzhou', type:'LANDING SHIP', domain:'MARITIME', team:'RED', loc:'Quanzhou Port', status:'DEPARTED', dw:0.82, cog:'Sealift Throughput', ts:'0354Z'},
+  {id:'R-004', name:'PLAAF J-20 Regt', type:'FIGHTER REGT', domain:'AIR', team:'RED', loc:'Fuzhou AB', status:'SORTIE', dw:0.76, cog:'Air Denial', ts:'0347Z'},
+  {id:'R-005', name:'DF-21D Bde', type:'ASBM BRIG', domain:'LAND', team:'RED', loc:'Zhangzhou, PRC', status:'RADAR-LOCK', dw:0.93, cog:'A2/AD Layer 1', ts:'0356Z'},
+  {id:'R-006', name:'HHQ-9B SAM Batt', type:'SAM BATTERY', domain:'LAND', team:'RED', loc:'Fuzhou, PRC', status:'ACTIVE', dw:0.71, cog:'IADS Node', ts:'0349Z'},
+  {id:'R-007', name:'PLAN SSBN', type:'SUBMARINE', domain:'MARITIME', team:'RED', loc:'BASHI — LOST', status:'UNKNOWN', dw:0.88, cog:'Second Strike', ts:'0353Z'},
+  // Neutral
+  {id:'N-001', name:'JSDF 1st AW', type:'AIR WING', domain:'AIR', team:'NTRL', loc:'Naha AB, JP', status:'MONITORING', dw:0.35, cog:'Allied Coordination', ts:'0400Z'},
+];
+
+/* ══════════════════════════════════════════════════════════
+   UTC CLOCK
+══════════════════════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('utc-clock').textContent = `${h}:${m}:${s}Z`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ══════════════════════════════════════════════════════════
+   TOGGLE HELPERS
+══════════════════════════════════════════════════════════ */
+function toggleFilter(btn) {
+  btn.classList.toggle('on');
+  if (!btn.classList.contains('on')) {
+    btn.classList.remove('blue','red','ntrl');
+  }
+}
+function toggleDomain(lbl) {
+  const box = lbl.querySelector('.domain-box');
+  box.classList.toggle('checked');
+}
+
+/* ══════════════════════════════════════════════════════════
+   VIEW SWITCHER
+══════════════════════════════════════════════════════════ */
+function switchView(v) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.view-btn[onclick="switchView('${v}')"]`).classList.add('active');
+  document.getElementById(`view-${v}`).classList.add('active');
+  if (v === 'table') populateTable();
+  if (v === 'taskorg') drawTaskOrg();
+  if (v === 'map') drawMap();
+}
+
+/* ══════════════════════════════════════════════════════════
+   SLIDER
+══════════════════════════════════════════════════════════ */
+function updateSlider(el, targetId) {
+  document.getElementById(targetId).textContent = el.value + '%';
+}
+
+/* ══════════════════════════════════════════════════════════
+   GENERATE COA
+══════════════════════════════════════════════════════════ */
+const COA_NAMES = ['COA-ALPHA-3','COA-BRAVO-7','COA-DELTA-4','COA-ECHO-9','COA-FOXTROT-2'];
+let coaIdx = 1;
+function generateCOA() {
+  const btn = document.getElementById('gen-btn');
+  btn.classList.add('running');
+  btn.textContent = '  COMPUTING...';
+  setTimeout(() => {
+    coaIdx = (coaIdx + 1) % COA_NAMES.length;
+    document.getElementById('coa-name').textContent = COA_NAMES[coaIdx];
+    btn.classList.remove('running');
+    btn.textContent = '▶ GENERATE COA';
+    // randomize MOE slightly
+    updateMOE();
+    // add log entry
+    addLogEntry('COA', `Generated ${COA_NAMES[coaIdx]} — denial probability updated`);
+  }, 1800);
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOE UPDATER
+══════════════════════════════════════════════════════════ */
+function updateMOE() {
+  const cap = parseInt(document.getElementById('sl-cap').value);
+  const base = 45 + cap * 0.4;
+  const pct = Math.min(95, Math.max(40, base + (Math.random()*10 - 5)));
+  const lo  = Math.max(30, pct - 7 - Math.random()*3);
+  const hi  = Math.min(99, pct + 7 + Math.random()*3);
+
+  document.getElementById('denial-pct').innerHTML = `${Math.round(pct)}<span style="font-size:28px;">%</span>`;
+  document.getElementById('ci-lo').textContent = Math.round(lo) + '%';
+  document.getElementById('ci-hi').textContent = Math.round(hi) + '%';
+  document.getElementById('mc-n').textContent = (4500 + Math.round(Math.random()*1000)).toLocaleString();
+
+  // Effect bars
+  const amp = Math.round(100 - pct * 0.9 + Math.random()*8);
+  const osvi = Math.round(100 - pct * 1.05 + Math.random()*6);
+  const blue = Math.round(75 + pct * 0.18 + Math.random()*5);
+  const c2 = Math.round(pct * 0.83 + Math.random()*8);
+
+  setEff('ef-amp', amp+'% cap', amp, true);
+  setEff('ef-osvi', osvi+'%', osvi, true);
+  setEff('ef-halt', Math.round(pct)+'%', pct, false, '#44FF88');
+  setEff('ef-blue', Math.round(blue)+'%', blue, false);
+  setEff('ef-c2', Math.round(c2)+'%', c2, true);
+
+  drawMCDist(pct/100, lo/100, hi/100);
+}
+
+function setEff(id, label, pct, isRed, color) {
+  document.getElementById(id).textContent = label;
+  if (color) document.getElementById(id).style.color = color;
+  const bar = document.getElementById(id+'-bar');
+  bar.style.width = Math.max(2, pct) + '%';
+  if (isRed) {
+    bar.className = 'eff-bar-fill red-fill';
+  } else if (color) {
+    bar.className = 'eff-bar-fill green-fill';
+  } else {
+    bar.className = 'eff-bar-fill';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   MC DISTRIBUTION CHART
+══════════════════════════════════════════════════════════ */
+function drawMCDist(mean, lo, hi) {
+  const svg = document.getElementById('mc-dist');
+  const W = 260, H = 80, pad = 20, plotW = W - pad*2, plotH = 58;
+  const toX = p => pad + p * plotW;
+  const sigma = 0.07;
+
+  // Gaussian
+  function gauss(x) {
+    return Math.exp(-0.5 * Math.pow((x - mean) / sigma, 2));
+  }
+  const pts = [];
+  for (let i = 0; i <= 100; i++) {
+    const x = i / 100;
+    const y = gauss(x);
+    pts.push([toX(x), 10 + plotH - y * plotH * 0.9]);
+  }
+  const curvePath = 'M' + pts.map(p => p.join(',')).join('L');
+  // filled area
+  const fillPath = curvePath + `L${pts[pts.length-1][0]},70 L${pts[0][0]},70Z`;
+
+  // CI fill
+  const ciPts = pts.filter(p => {
+    const x = (p[0] - pad) / plotW;
+    return x >= lo && x <= hi;
+  });
+  let ciFill = '';
+  if (ciPts.length) {
+    ciFill = 'M' + ciPts.map(p=>p.join(',')).join('L') + `L${ciPts[ciPts.length-1][0]},70 L${ciPts[0][0]},70Z`;
+  }
+
+  document.getElementById('mc-curve').setAttribute('d', fillPath);
+  document.getElementById('mc-curve-line').setAttribute('d', curvePath);
+  document.getElementById('mc-ci-fill').setAttribute('d', ciFill);
+
+  const mx = toX(mean);
+  const lx = toX(lo);
+  const hx = toX(hi);
+  document.getElementById('mc-mean-line').setAttribute('x1', mx);
+  document.getElementById('mc-mean-line').setAttribute('x2', mx);
+  document.getElementById('mc-lo-line').setAttribute('x1', lx);
+  document.getElementById('mc-lo-line').setAttribute('x2', lx);
+  document.getElementById('mc-hi-line').setAttribute('x1', hx);
+  document.getElementById('mc-hi-line').setAttribute('x2', hx);
+  const lbl = document.getElementById('mc-mean-lbl');
+  lbl.setAttribute('x', mx);
+  lbl.textContent = Math.round(mean*100) + '%';
+}
+
+/* ══════════════════════════════════════════════════════════
+   TABLE VIEW
+══════════════════════════════════════════════════════════ */
+function populateTable() {
+  const tbody = document.getElementById('unit-table-body');
+  if (tbody.children.length > 0) return;
+  UNITS.forEach(u => {
+    const tr = document.createElement('tr');
+    const teamTag = u.team === 'BLUE' ? 'tag-blue' : u.team === 'RED' ? 'tag-red' : 'tag-ntrl';
+    const statusCol = u.status === 'ACTIVE' ? `<span style="color:var(--amber-bright);">${u.status}</span>` :
+                      u.status === 'SORTIE' ? `<span style="color:#44FF88;">${u.status}</span>` :
+                      u.status === 'RADAR-LOCK' ? `<span style="color:#FF4400;">${u.status}</span>` :
+                      u.status === 'UNKNOWN' ? `<span style="color:#FF8866;">${u.status}</span>` :
+                      `<span style="color:var(--text-mid);">${u.status}</span>`;
+    tr.innerHTML = `
+      <td class="val-bright">${u.id}</td>
+      <td style="color:var(--text-bright);">${u.name}</td>
+      <td>${u.type}</td>
+      <td>${u.domain}</td>
+      <td><span class="tag ${teamTag}">${u.team}</span></td>
+      <td style="font-size:9px;">${u.loc}</td>
+      <td>${statusCol}</td>
+      <td><span class="val-bright">${(u.dw*100).toFixed(0)}%</span></td>
+      <td style="font-size:9px; color:var(--text-dim);">${u.cog}</td>
+      <td style="color:var(--text-dim);">${u.ts}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   TASK ORG CHART
+══════════════════════════════════════════════════════════ */
+function drawTaskOrg() {
+  const svg = document.getElementById('taskorg-svg');
+  if (svg.children.length > 2) return;
+
+  const nodes = [
+    {id:'jtf',   label:'JTF PACIFIC', sub:'BGen Morrison', x:420, y:30, type:'hq'},
+    {id:'jflcc', label:'JFLCC', sub:'Land Component', x:180, y:130, type:'blue'},
+    {id:'jfacc', label:'JFACC', sub:'Air Component', x:380, y:130, type:'blue'},
+    {id:'jfmcc', label:'JFMCC', sub:'Maritime Component', x:580, y:130, type:'blue'},
+    {id:'jsoc',  label:'JSOC', sub:'SOF Component', x:780, y:130, type:'blue'},
+    {id:'roc',   label:'ROC 542 Bde', sub:'Hsinchu Sector', x:80, y:230, type:'blue'},
+    {id:'7af',   label:'7th Air Force', sub:'Osan AB, ROK', x:280, y:230, type:'blue'},
+    {id:'18wg',  label:'18 WG Kadena', sub:'SEAD Package', x:430, y:230, type:'blue'},
+    {id:'pacaf', label:'PACAF ISR', sub:'Andersen AFB', x:580, y:230, type:'blue'},
+    {id:'cvn76', label:'CVN-76 Strike Group', sub:'Reagan CSG', x:730, y:230, type:'blue'},
+    {id:'ssn771',label:'SSN-771 Columbia', sub:'Bashi Channel', x:850, y:230, type:'blue'},
+  ];
+  const edges = [
+    ['jtf','jflcc'],['jtf','jfacc'],['jtf','jfmcc'],['jtf','jsoc'],
+    ['jflcc','roc'],['jfacc','7af'],['jfacc','18wg'],['jfacc','pacaf'],
+    ['jfmcc','cvn76'],['jfmcc','ssn771'],
+  ];
+
+  let html = '';
+  // Edges
+  edges.forEach(([a,b]) => {
+    const na = nodes.find(n=>n.id===a);
+    const nb = nodes.find(n=>n.id===b);
+    html += `<line x1="${na.x+60}" y1="${na.y+24}" x2="${nb.x+60}" y2="${nb.y}" stroke="rgba(255,176,0,0.3)" stroke-width="1"/>`;
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const clr = n.type === 'hq' ? '#FFD060' : '#80D8FF';
+    const bg  = n.type === 'hq' ? 'rgba(255,208,96,0.08)' : 'rgba(0,170,255,0.06)';
+    const border = n.type === 'hq' ? '#FFB000' : 'rgba(0,170,255,0.4)';
+    html += `<g transform="translate(${n.x},${n.y})">
+      <rect width="120" height="50" rx="0" fill="${bg}" stroke="${border}" stroke-width="1"/>
+      <text x="60" y="18" text-anchor="middle" fill="${clr}" font-family="VT323" font-size="14" letter-spacing="1">${n.label}</text>
+      <text x="60" y="34" text-anchor="middle" fill="rgba(255,176,0,0.5)" font-family="Share Tech Mono" font-size="8">${n.sub}</text>
+    </g>`;
+  });
+
+  svg.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAP VIEW
+══════════════════════════════════════════════════════════ */
+function drawMap() {
+  const svg = document.getElementById('map-svg');
+  if (svg.children.length > 0) return;
+
+  const W = svg.parentElement.offsetWidth || 700;
+  const H = svg.parentElement.offsetHeight || 600;
+
+  // Coordinate mapping: Taiwan Strait area
+  // Lat 18–32N, Lon 115–135E
+  function proj(lat, lon) {
+    const x = (lon - 115) / 20 * W * 0.85 + W * 0.07;
+    const y = (32 - lat) / 14 * H * 0.85 + H * 0.05;
+    return { x, y };
+  }
+
+  let html = '';
+  // Grid lines
+  for (let lat = 18; lat <= 32; lat += 2) {
+    const { x: x0, y: y0 } = proj(lat, 115);
+    const { x: x1, y: y1 } = proj(lat, 135);
+    html += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,176,0,0.08)" stroke-width="0.5"/>`;
+    html += `<text x="${x0-4}" y="${y0+3}" fill="rgba(255,176,0,0.25)" font-family="Share Tech Mono" font-size="7" text-anchor="end">${lat}°N</text>`;
+  }
+  for (let lon = 115; lon <= 135; lon += 3) {
+    const { x: x0, y: y0 } = proj(32, lon);
+    const { x: x1, y: y1 } = proj(18, lon);
+    html += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="rgba(255,176,0,0.08)" stroke-width="0.5"/>`;
+    html += `<text x="${x0}" y="${y1+10}" fill="rgba(255,176,0,0.25)" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${lon}°E</text>`;
+  }
+
+  // Taiwan island outline (simplified polygon)
+  const tw = [
+    [25.3, 121.5],[25.1, 122.0],[24.8, 121.9],[24.3, 121.6],
+    [23.5, 121.5],[23.0, 121.4],[22.6, 120.8],[22.5, 120.4],
+    [22.8, 120.2],[23.3, 119.9],[24.0, 120.1],[24.8, 121.0],[25.3, 121.5]
+  ];
+  const twPts = tw.map(([lat,lon]) => { const p = proj(lat,lon); return `${p.x},${p.y}`; }).join(' ');
+  html += `<polygon points="${twPts}" fill="rgba(255,176,0,0.06)" stroke="rgba(255,176,0,0.4)" stroke-width="1.5"/>`;
+  html += `<text ${projAttr(23.7,121.0)} fill="rgba(255,176,0,0.6)" font-family="VT323" font-size="14" text-anchor="middle">TAIWAN</text>`;
+
+  // PRC coastline (simplified)
+  const prc = [
+    [32,121],[30.5,122],[29,122],[28,121.5],[27,120.5],[26.5,119.8],
+    [26,119.5],[25.5,119],[25,119.5],[24.5,118.5],[23.5,117],[22.5,114.5],
+    [22,114],[21.5,112]
+  ];
+  const prcPts = prc.map(([lat,lon]) => { const p = proj(lat,lon); return `${p.x},${p.y}`; }).join(' ');
+  html += `<polyline points="${prcPts}" fill="none" stroke="rgba(255,68,0,0.25)" stroke-width="1.5"/>`;
+  html += `<text ${projAttr(27,119)} fill="rgba(255,68,0,0.5)" font-family="VT323" font-size="13">FUJIAN PRC</text>`;
+
+  // Japan (Okinawa)
+  const { x: okx, y: oky } = proj(26.3, 127.8);
+  html += `<ellipse cx="${okx}" cy="${oky}" rx="12" ry="5" fill="rgba(255,176,0,0.06)" stroke="rgba(255,176,0,0.3)" stroke-width="1" transform="rotate(-30,${okx},${oky})"/>`;
+  html += `<text x="${okx}" y="${oky+16}" fill="rgba(255,176,0,0.5)" font-family="Share Tech Mono" font-size="8" text-anchor="middle">OKINAWA</text>`;
+
+  // A2/AD arc — DF-21D range ring
+  const dfOrigin = proj(24.5, 117.6);
+  const range = 140; // pixels, approximate
+  html += `<circle cx="${dfOrigin.x}" cy="${dfOrigin.y}" r="${range}" fill="none" stroke="rgba(255,68,0,0.2)" stroke-width="1.5" stroke-dasharray="6,4"/>`;
+  html += `<text x="${dfOrigin.x}" y="${dfOrigin.y+range+12}" fill="rgba(255,68,0,0.5)" font-family="Share Tech Mono" font-size="8" text-anchor="middle">DF-21D A2/AD ARC</text>`;
+
+  // SAM envelope
+  const samOrig = proj(26.1, 119.3);
+  html += `<circle cx="${samOrig.x}" cy="${samOrig.y}" r="40" fill="rgba(255,68,0,0.06)" stroke="rgba(255,68,0,0.3)" stroke-width="1" stroke-dasharray="3,2"/>`;
+
+  // Units on map
+  const mapUnits = [
+    {lat:24, lon:130.2, type:'blue-ship', label:'CVN-76 REAGAN'},
+    {lat:23.2, lon:127.1, type:'blue-ship', label:'DDG-62 FITZGERALD'},
+    {lat:22.5, lon:121.5, type:'blue-sub', label:'SSN-771'},
+    {lat:26.3, lon:127.8, type:'blue-air', label:'18 WG KADENA'},
+    {lat:25.0, lon:120.8, type:'blue-land', label:'ROC 542 BDE'},
+    {lat:26.1, lon:119.3, type:'red-air', label:'PLAAF J-20'},
+    {lat:24.5, lon:117.6, type:'red-land', label:'DF-21D BDE'},
+    {lat:25.1, lon:119.7, type:'red-land', label:'HHQ-9B SAM'},
+    {lat:22.4, lon:119.8, type:'red-ship', label:'TF-41 AMPHIB'},
+    {lat:24.8, lon:120.5, type:'red-ship', label:'LST-083'},
+  ];
+
+  mapUnits.forEach(u => {
+    const p = proj(u.lat, u.lon);
+    let symbol = '';
+    if (u.type.startsWith('blue')) {
+      const clr = '#80D8FF';
+      const shadow = 'rgba(0,170,255,0.4)';
+      if (u.type === 'blue-ship') {
+        symbol = `<rect x="${p.x-7}" y="${p.y-7}" width="14" height="14" fill="none" stroke="${clr}" stroke-width="1.5"/>
+          <line x1="${p.x}" y1="${p.y-7}" x2="${p.x}" y2="${p.y-12}" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+20}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      } else if (u.type === 'blue-air') {
+        symbol = `<polygon points="${p.x},${p.y-8} ${p.x+8},${p.y+6} ${p.x},${p.y+2} ${p.x-8},${p.y+6}" fill="none" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+20}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      } else if (u.type === 'blue-sub') {
+        symbol = `<ellipse cx="${p.x}" cy="${p.y}" rx="9" ry="5" fill="none" stroke="${clr}" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <text x="${p.x}" y="${p.y+16}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      } else {
+        symbol = `<rect x="${p.x-6}" y="${p.y-6}" width="12" height="12" fill="rgba(0,170,255,0.12)" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+18}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      }
+    } else {
+      const clr = '#FF8866';
+      if (u.type === 'red-ship') {
+        symbol = `<polygon points="${p.x},${p.y-8} ${p.x+8},${p.y+8} ${p.x-8},${p.y+8}" fill="none" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+20}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      } else if (u.type === 'red-air') {
+        symbol = `<polygon points="${p.x},${p.y-8} ${p.x+8},${p.y+8} ${p.x},${p.y+4} ${p.x-8},${p.y+8}" fill="rgba(255,68,0,0.1)" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+20}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      } else {
+        symbol = `<polygon points="${p.x},${p.y-8} ${p.x+9},${p.y+8} ${p.x-9},${p.y+8}" fill="rgba(255,68,0,0.08)" stroke="${clr}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${p.y+20}" fill="${clr}" font-family="Share Tech Mono" font-size="7" text-anchor="middle">${u.label}</text>`;
+      }
+    }
+    html += `<g style="cursor:pointer" onmouseover="this.style.filter='brightness(1.4)'" onmouseout="this.style.filter=''">${symbol}</g>`;
+  });
+
+  // Threat vectors — red to taiwan
+  const tvPairs = [
+    [proj(22.4,119.8), proj(23.5,120.5)],
+    [proj(24.5,117.6), proj(24.0,121.5)],
+  ];
+  tvPairs.forEach(([a,b]) => {
+    html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="rgba(255,68,0,0.5)" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowRed)"/>`;
+  });
+
+  // Blue kill chain links
+  const kcPairs = [
+    [proj(26.3,127.8), proj(24,130.2)],
+    [proj(24,130.2), proj(23.2,127.1)],
+  ];
+  kcPairs.forEach(([a,b]) => {
+    html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="rgba(68,255,136,0.35)" stroke-width="1" stroke-dasharray="3,2"/>`;
+  });
+
+  // Defs
+  html = `<defs>
+    <marker id="arrowRed" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="rgba(255,68,0,0.6)"/>
+    </marker>
+  </defs>` + html;
+
+  // Title
+  html += `<text x="20" y="30" fill="rgba(255,176,0,0.4)" font-family="VT323" font-size="16" letter-spacing="3">INDOPACOM // TAIWAN STRAIT SECTOR // D+03 // NOTIONAL</text>`;
+
+  svg.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════════
+   EVENT LOG HELPERS
+══════════════════════════════════════════════════════════ */
+function addLogEntry(type, msg) {
+  const log = document.getElementById('evt-log');
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const div = document.createElement('div');
+  div.className = 'evt new';
+  div.innerHTML = `<span class="ts">${h}${m}Z</span>${msg}`;
+  log.insertBefore(div, log.firstChild);
+  setTimeout(() => div.classList.remove('new'), 2000);
+}
+
+/* ══════════════════════════════════════════════════════════
+   FAKE ACTIONS
+══════════════════════════════════════════════════════════ */
+function fakeImport()  { addLogEntry('io','Data import initiated — awaiting MTDS feed'); }
+function fakeExport()  { addLogEntry('io','Export: IRON_TYPHOON_D03_snapshot.json — READY'); }
+function fakeSave()    { addLogEntry('io','Snapshot saved — 0402Z_D03_BRAVO7.coa'); }
+function openPlanner() { addLogEntry('sys','Campaign Planner module loading — IRON TYPHOON'); }
+function openWargame() { addLogEntry('sys','Wargame adjudication engine initializing — 2-sided'); }
+
+/* ══════════════════════════════════════════════════════════
+   FORCE GRAPH — Canvas
+══════════════════════════════════════════════════════════ */
+const GRAPH_NODES = [
+  // Blue (square markers)
+  {id:'JTF_HQ', label:'JTF HQ', domain:'C2', team:'blue', x:0.38, y:0.22},
+  {id:'CVN76',  label:'CVN-76', domain:'maritime', team:'blue', x:0.62, y:0.18},
+  {id:'DDG62',  label:'DDG-62', domain:'maritime', team:'blue', x:0.72, y:0.32},
+  {id:'SSN771', label:'SSN-771', domain:'maritime', team:'blue', x:0.68, y:0.52},
+  {id:'7AF',    label:'7th AF', domain:'air', team:'blue', x:0.28, y:0.32},
+  {id:'18WG',   label:'18 WG', domain:'air', team:'blue', x:0.20, y:0.48},
+  {id:'ROC542', label:'ROC 542', domain:'land', team:'blue', x:0.42, y:0.58},
+  {id:'GEO3',   label:'GEO-3', domain:'space', team:'blue', x:0.50, y:0.12},
+  // Red (triangle markers)
+  {id:'ETC_HQ', label:'ETC HQ', domain:'C2', team:'red', x:0.62, y:0.72},
+  {id:'TF41',   label:'TF-41 Amphib', domain:'maritime', team:'red', x:0.55, y:0.85},
+  {id:'J20',    label:'J-20 Regt', domain:'air', team:'red', x:0.78, y:0.62},
+  {id:'DF21D',  label:'DF-21D', domain:'land', team:'red', x:0.40, y:0.80},
+  {id:'HHQ9B',  label:'HHQ-9B', domain:'land', team:'red', x:0.25, y:0.70},
+  {id:'SSBN',   label:'SSBN', domain:'maritime', team:'red', x:0.75, y:0.78},
+  // Neutral
+  {id:'JSDF',   label:'JSDF 1st AW', domain:'air', team:'neutral', x:0.88, y:0.42},
+];
+
+const GRAPH_EDGES = [
+  // Blue C2 network
+  {from:'JTF_HQ', to:'CVN76', type:'c2', label:'C2 Link'},
+  {from:'JTF_HQ', to:'7AF', type:'c2'},
+  {from:'JTF_HQ', to:'ROC542', type:'c2'},
+  {from:'CVN76',  to:'DDG62', type:'c2'},
+  {from:'CVN76',  to:'SSN771', type:'c2'},
+  {from:'7AF',    to:'18WG', type:'c2'},
+  {from:'GEO3',   to:'JTF_HQ', type:'c2'},
+  // Kill chains
+  {from:'18WG', to:'DF21D', type:'killchain', label:'SEAD Kill Chain'},
+  {from:'DDG62', to:'TF41', type:'killchain', label:'TLAM Strike'},
+  {from:'SSN771', to:'TF41', type:'killchain'},
+  {from:'SSN771', to:'SSBN', type:'killchain'},
+  // Threat vectors
+  {from:'DF21D', to:'CVN76', type:'threat', label:'DF-21D Threat'},
+  {from:'J20',  to:'18WG', type:'threat'},
+  {from:'HHQ9B',to:'18WG', type:'threat'},
+  {from:'TF41', to:'ROC542', type:'threat', label:'Amphib Threat'},
+  // Red C2
+  {from:'ETC_HQ', to:'TF41', type:'red-c2'},
+  {from:'ETC_HQ', to:'J20', type:'red-c2'},
+  {from:'ETC_HQ', to:'DF21D', type:'red-c2'},
+  {from:'ETC_HQ', to:'SSBN', type:'red-c2'},
+];
+
+let canvas, ctx, animFrame, time = 0;
+let nodePositions = {};
+
+function initGraph() {
+  canvas = document.getElementById('battlespace');
+  if (!canvas) return;
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('mousemove', handleMouseMove);
+  computeNodePositions();
+  animateGraph();
+}
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  computeNodePositions();
+}
+
+function computeNodePositions() {
+  if (!canvas) return;
+  GRAPH_NODES.forEach(n => {
+    nodePositions[n.id] = {
+      x: n.x * canvas.width,
+      y: n.y * canvas.height,
+      hover: false,
+    };
+  });
+}
+
+let hoveredNode = null;
+function handleMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  hoveredNode = null;
+  GRAPH_NODES.forEach(n => {
+    const pos = nodePositions[n.id];
+    const dist = Math.hypot(mx - pos.x, my - pos.y);
+    pos.hover = dist < 20;
+    if (pos.hover) hoveredNode = n;
+  });
+}
+
+function animateGraph() {
+  time += 0.01;
+  draw();
+  animFrame = requestAnimationFrame(animateGraph);
+}
+
+function draw() {
+  if (!canvas || !ctx) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background gradient
+  const bg = ctx.createRadialGradient(W*0.5, H*0.55, 0, W*0.5, H*0.5, Math.max(W,H)*0.6);
+  bg.addColorStop(0, 'rgba(255,176,0,0.02)');
+  bg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw edges
+  GRAPH_EDGES.forEach(edge => {
+    const a = nodePositions[edge.from];
+    const b = nodePositions[edge.to];
+    if (!a || !b) return;
+    ctx.save();
+
+    if (edge.type === 'c2') {
+      ctx.strokeStyle = 'rgba(0,170,255,0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      // animated dash
+      ctx.lineDashOffset = -time * 8;
+    } else if (edge.type === 'killchain') {
+      ctx.strokeStyle = 'rgba(68,255,136,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6,3]);
+      ctx.lineDashOffset = -time * 12;
+    } else if (edge.type === 'threat') {
+      ctx.strokeStyle = 'rgba(255,68,0,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+    } else if (edge.type === 'red-c2') {
+      ctx.strokeStyle = 'rgba(255,68,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,4]);
+      ctx.lineDashOffset = -time * 6;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    // Arrow
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const arrowX = b.x - Math.cos(ang) * 16;
+    const arrowY = b.y - Math.sin(ang) * 16;
+    if (edge.type === 'threat' || edge.type === 'killchain') {
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX - Math.cos(ang - 0.4) * 8, arrowY - Math.sin(ang - 0.4) * 8);
+      ctx.lineTo(arrowX - Math.cos(ang + 0.4) * 8, arrowY - Math.sin(ang + 0.4) * 8);
+      ctx.closePath();
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  });
+
+  // Radar sweep on JTF_HQ node
+  const jtf = nodePositions['JTF_HQ'];
+  if (jtf) {
+    ctx.save();
+    const grad = ctx.createConicalGradient ? null : null;
+    // Simple sweep line
+    const sweepAngle = time * 1.2;
+    const sweepLen = 80;
+    ctx.strokeStyle = 'rgba(255,176,0,0.18)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(jtf.x, jtf.y);
+    ctx.lineTo(jtf.x + Math.cos(sweepAngle) * sweepLen, jtf.y + Math.sin(sweepAngle) * sweepLen);
+    ctx.stroke();
+    // sweep arc fade
+    ctx.strokeStyle = 'rgba(255,176,0,0.06)';
+    ctx.lineWidth = 40;
+    ctx.beginPath();
+    ctx.arc(jtf.x, jtf.y, sweepLen * 0.5, sweepAngle - 0.5, sweepAngle);
+    ctx.stroke();
+    // radar circle
+    ctx.strokeStyle = 'rgba(255,176,0,0.12)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath();
+    ctx.arc(jtf.x, jtf.y, sweepLen, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw nodes
+  GRAPH_NODES.forEach(n => {
+    const pos = nodePositions[n.id];
+    if (!pos) return;
+    const pulse = 1 + 0.12 * Math.sin(time * 2 + n.x * 10);
+    const hover = pos.hover;
+
+    ctx.save();
+
+    // Glow
+    const glowColor = n.team === 'blue' ? 'rgba(0,170,255,' :
+                      n.team === 'red' ? 'rgba(255,68,0,' : 'rgba(170,170,170,';
+    const coreColor = n.team === 'blue' ? '#80D8FF' :
+                      n.team === 'red' ? '#FF8866' : '#AAAAAA';
+
+    if (hover) {
+      ctx.shadowBlur = 30; ctx.shadowColor = coreColor;
+    } else {
+      ctx.shadowBlur = n.domain === 'C2' ? 18 : 10;
+      ctx.shadowColor = glowColor + '0.6)';
+    }
+
+    const sz = n.domain === 'C2' ? 12 : 8;
+
+    // Symbol by team
+    if (n.team === 'blue') {
+      // Square = friendly
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = hover ? 2 : 1.5;
+      ctx.fillStyle = glowColor + '0.12)';
+      ctx.beginPath();
+      const s = sz * pulse;
+      ctx.rect(pos.x - s, pos.y - s, s * 2, s * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Top tick (unit type indicator)
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y - s);
+      ctx.lineTo(pos.x, pos.y - s - 6);
+      ctx.stroke();
+    } else if (n.team === 'red') {
+      // Triangle = hostile
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = hover ? 2 : 1.5;
+      ctx.fillStyle = glowColor + '0.10)';
+      const s = sz * pulse * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y - s);
+      ctx.lineTo(pos.x + s, pos.y + s * 0.8);
+      ctx.lineTo(pos.x - s, pos.y + s * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      // Hexagon = neutral
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = 1.5;
+      ctx.fillStyle = 'rgba(170,170,170,0.08)';
+      const s = sz * pulse;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+        const px = pos.x + Math.cos(a) * s;
+        const py = pos.y + Math.sin(a) * s;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Label
+    ctx.save();
+    ctx.font = `${hover ? 10 : 9}px Share Tech Mono`;
+    ctx.fillStyle = hover ? coreColor : glowColor + '0.75)';
+    ctx.textAlign = 'center';
+    ctx.fillText(n.label, pos.x, pos.y + sz * pulse + 14);
+    ctx.restore();
+
+    // Domain indicator dot
+    if (n.domain !== 'C2') {
+      const domClr = {air:'rgba(255,220,100,0.7)', maritime:'rgba(0,170,255,0.7)', land:'rgba(100,220,100,0.6)', space:'rgba(200,150,255,0.7)'}[n.domain] || 'rgba(255,176,0,0.5)';
+      ctx.save();
+      ctx.fillStyle = domClr;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = domClr;
+      ctx.beginPath();
+      ctx.arc(pos.x + sz * 0.9, pos.y - sz * 0.9, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+
+  // Hover tooltip
+  if (hoveredNode) {
+    const pos = nodePositions[hoveredNode.id];
+    const unit = UNITS.find(u => u.name.includes(hoveredNode.label.split(' ')[0]));
+    const lines = [
+      hoveredNode.label,
+      `DOMAIN: ${hoveredNode.domain.toUpperCase()}`,
+      `TEAM: ${hoveredNode.team.toUpperCase()}`,
+      unit ? `STATUS: ${unit.status}` : '',
+      unit ? `DENIAL WT: ${(unit.dw*100).toFixed(0)}%` : '',
+    ].filter(Boolean);
+
+    const tw2 = 160, lh = 14, pad2 = 8;
+    const th = lines.length * lh + pad2 * 2;
+    const tx = Math.min(pos.x + 18, canvas.width - tw2 - 10);
+    const ty = Math.max(pos.y - th / 2, 10);
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,6,0,0.92)';
+    ctx.strokeStyle = 'rgba(255,176,0,0.5)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(tx, ty, tw2, th);
+    ctx.strokeRect(tx, ty, tw2, th);
+
+    ctx.font = '9px Share Tech Mono';
+    lines.forEach((line, i) => {
+      ctx.fillStyle = i === 0 ? '#FFD060' : 'rgba(255,176,0,0.7)';
+      ctx.fillText(line, tx + pad2, ty + pad2 + (i + 0.8) * lh);
+    });
+    ctx.restore();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   LIVE EVENTS TICKER
+══════════════════════════════════════════════════════════ */
+const RANDOM_EVENTS = [
+  'EW: Jamming detected on Blue Link-16 — partial degradation',
+  'INTEL: PLA PLAN LST-089 departing Fuzhou — D+03 0430Z',
+  'BLUE: USS Stethem (DDG-63) CIWS active — threat response',
+  'RED: PLAAF H-6K detected airborne — Wuhu AB',
+  'CYBER: Attempted intrusion on Blue C2 net — repelled',
+  'SPACE: GEO-3 uplink degraded 12% — solar interference',
+  'ROC: 584th Bde reports Red recon drone — Matsu area',
+  'BLUE: P-8A MAD contact — pos corr with PLAN SSBN track',
+  'RED: DF-21D radar emitting — fire control mode — assess EXERCISE',
+  'INTEL: OSVI assessment revised downward — Red sustainment risk',
+];
+let evtIdx = 0;
+setInterval(() => {
+  const log = document.getElementById('evt-log');
+  if (log && document.visibilityState === 'visible') {
+    const now = new Date();
+    const h = String(now.getUTCHours()).padStart(2,'0');
+    const m = String(now.getUTCMinutes()).padStart(2,'0');
+    const div = document.createElement('div');
+    const isAlert = RANDOM_EVENTS[evtIdx].includes('ALERT') || RANDOM_EVENTS[evtIdx].includes('DF-21D radar') || RANDOM_EVENTS[evtIdx].includes('Jamming');
+    div.className = 'evt new' + (isAlert ? ' alert' : '');
+    div.innerHTML = `<span class="ts">${h}${m}Z</span>${RANDOM_EVENTS[evtIdx]}`;
+    log.insertBefore(div, log.firstChild);
+    setTimeout(() => div.classList.remove('new'), 2000);
+    evtIdx = (evtIdx + 1) % RANDOM_EVENTS.length;
+    // trim log
+    while (log.children.length > 20) log.removeChild(log.lastChild);
+  }
+}, 7000);
+
+/* ══════════════════════════════════════════════════════════
+   COORD READOUT UPDATE
+══════════════════════════════════════════════════════════ */
+document.querySelector('.hero').addEventListener('mousemove', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const px = (e.clientX - rect.left) / rect.width;
+  const py = (e.clientY - rect.top) / rect.height;
+  const lat = (26 - py * 8).toFixed(4);
+  const lon = (118 + px * 18).toFixed(4);
+  const ns = lat >= 0 ? 'N' : 'S';
+  const ew = lon >= 0 ? 'E' : 'W';
+  const latD = Math.floor(Math.abs(lat));
+  const latM = ((Math.abs(lat) - latD) * 60).toFixed(1);
+  const lonD = Math.floor(Math.abs(lon));
+  const lonM = ((Math.abs(lon) - lonD) * 60).toFixed(1);
+  document.getElementById('coord-readout').innerHTML =
+    `LAT: ${latD}°${latM}'${ns}<br>LON: ${lonD}°${lonM}'${ew}<br>GRID: PH${String(Math.floor(px*9999)).padStart(4,'0')}<br>ALT: SEA LEVEL`;
+});
+
+/* ══════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initGraph();
+  drawMCDist(0.73, 0.66, 0.81);
+});
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
  * taskorg-proof.js — render a representative slice of the rebuilt Task Org cards
  * (team header + unit cards with real milsymbol icons, health bars, importance) so the
  * new card design can be eyeballed without a browser. Approximates the D3 layout.
- * Run: node tools/taskorg-proof.js -> _stark/taskorg-proof.svg
+ * Run: node tools/taskorg-proof.js -> _workshop/design-proofs/taskorg-proof.svg
  */
 const path = require('path'); const fs = require('fs');
 global.ms = require(path.join(__dirname, '..', 'vendor', 'milsymbol.js'));
@@ -66,6 +66,6 @@ cols.forEach((c, ci) => {
   });
 });
 out += '</svg>';
-fs.mkdirSync(path.join(__dirname, '..', '_stark'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'taskorg-proof.svg'), out);
-console.log('-> _stark/taskorg-proof.svg');
+fs.mkdirSync(path.join(__dirname, '..', '_workshop', 'design-proofs'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'taskorg-proof.svg'), out);
+console.log('-> _workshop/design-proofs/taskorg-proof.svg');

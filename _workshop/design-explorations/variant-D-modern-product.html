@@ -1,0 +1,1516 @@
+<!--
+  DESIGN RATIONALE: Variant D interprets C2 strike-planning through a 2025 SaaS editorial lens —
+  clean Inter typography, a warm slate neutral system with a single confident indigo accent, and
+  data-journalism chart craft that makes denial-MOE metrics legible without military "grime."
+  The layout privileges whitespace and hierarchy so analysts absorb the strategic picture in
+  seconds, not minutes.
+
+  NOTIONAL // UNCLASSIFIED — All data is synthetic and for design/demonstration purposes only.
+  Scenario: Indo-Pacific, Taiwan Strait — Blue (US/Allied) vs Red (PLA). NOT operational data.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRIKEPLAN // VARIANT-D — NOTIONAL UNCLASSIFIED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f8f7;
+  --surface:#ffffff;
+  --surface2:#f3f3f1;
+  --border:#e4e4e0;
+  --border2:#d0d0cc;
+  --text:#0f0f0e;
+  --text2:#5a5a56;
+  --text3:#9a9a94;
+  --accent:#4f46e5;
+  --accent-soft:#ede9fe;
+  --accent-mid:#7c73f0;
+  --blue:#2563eb;
+  --blue-soft:#dbeafe;
+  --red:#dc2626;
+  --red-soft:#fee2e2;
+  --green:#16a34a;
+  --green-soft:#dcfce7;
+  --amber:#d97706;
+  --amber-soft:#fef3c7;
+  --radius:8px;
+  --radius-lg:12px;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.06);
+  --font:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --rail-w:264px;
+  --cmd-h:52px;
+  --class-h:24px;
+}
+body.dark{
+  --bg:#0e0e0f;
+  --surface:#18181b;
+  --surface2:#222226;
+  --border:#2a2a2e;
+  --border2:#3a3a40;
+  --text:#f4f4f3;
+  --text2:#a0a09a;
+  --text3:#60605a;
+  --accent-soft:#1e1b4b;
+  --blue-soft:#1e3a5f;
+  --red-soft:#3f1212;
+  --green-soft:#052e16;
+  --amber-soft:#3f2a00;
+  --shadow:0 1px 3px rgba(0,0,0,.4);
+  --shadow-md:0 4px 12px rgba(0,0,0,.4);
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+
+/* ── CLASSIFICATION BAR ── */
+#classbar{
+  position:fixed;top:0;left:0;right:0;height:var(--class-h);
+  background:#15803d;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;
+  color:#fff;z-index:1000;user-select:none;
+}
+.classbar-tag{opacity:.7;margin:0 16px}
+
+/* ── COMMAND BAR ── */
+#cmdbar{
+  position:fixed;top:var(--class-h);left:0;right:0;height:var(--cmd-h);
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:0;z-index:100;
+  padding:0 16px;
+}
+.brand{display:flex;align-items:center;gap:8px;padding-right:20px;border-right:1px solid var(--border);margin-right:16px;flex-shrink:0}
+.brand-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.brand-name{font-weight:700;font-size:14px;letter-spacing:-.3px;color:var(--text)}
+.brand-sub{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;margin-top:-2px}
+
+.view-tabs{display:flex;gap:2px;margin-right:auto}
+.view-tab{
+  padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;
+  color:var(--text2);cursor:pointer;border:none;background:none;
+  transition:all .15s;display:flex;align-items:center;gap:5px;
+}
+.view-tab:hover{background:var(--surface2);color:var(--text)}
+.view-tab.active{background:var(--accent-soft);color:var(--accent)}
+.view-tab svg{opacity:.7}
+
+.cmd-actions{display:flex;align-items:center;gap:8px;padding-right:12px;border-right:1px solid var(--border);margin-right:12px}
+.btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;border-radius:6px;font-size:12px;font-weight:500;
+  cursor:pointer;border:1px solid transparent;transition:all .15s;
+}
+.btn-ghost{color:var(--text2);border-color:var(--border);background:none}
+.btn-ghost:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#4338ca;border-color:#4338ca}
+.btn-sm{padding:4px 9px;font-size:11px}
+
+.status-cluster{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.status-item{display:flex;flex-direction:column;align-items:flex-end}
+.status-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.status-val{font-size:11px;font-weight:600;color:var(--text);font-family:var(--mono)}
+.posture-badge{
+  padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600;
+  font-family:var(--mono);letter-spacing:.06em;
+}
+.posture-elevated{background:#fef3c7;color:#92400e}
+body.dark .posture-elevated{background:#3f2a00;color:#fcd34d}
+.dark-toggle{
+  width:28px;height:28px;border-radius:6px;border:1px solid var(--border);
+  background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text2);transition:all .15s;
+}
+.dark-toggle:hover{background:var(--surface2);color:var(--text)}
+
+/* ── LAYOUT SHELL ── */
+#shell{
+  position:fixed;
+  top:calc(var(--class-h) + var(--cmd-h));
+  left:0;right:0;
+  bottom:0;
+  display:flex;overflow:hidden;
+}
+
+/* ── LEFT RAIL ── */
+#left-rail{
+  width:var(--rail-w);flex-shrink:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.rail-section{padding:12px;border-bottom:1px solid var(--border)}
+.rail-section:last-child{border-bottom:none}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px;
+}
+.rail-title{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.rail-action{font-size:10px;color:var(--accent);cursor:pointer;font-weight:500}
+.rail-action:hover{text-decoration:underline}
+
+/* filter chips */
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.filter-row{display:flex;flex-wrap:wrap;gap:4px}
+.chip{
+  padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;
+  cursor:pointer;border:1px solid var(--border);color:var(--text2);
+  background:none;transition:all .12s;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip.blue-on{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+.chip.red-on{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+
+/* toggle rows */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 0;
+}
+.toggle-label{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.toggle-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.toggle{
+  position:relative;width:28px;height:16px;
+  background:var(--border2);border-radius:8px;cursor:pointer;
+  transition:background .15s;flex-shrink:0;border:none;
+}
+.toggle.on{background:var(--accent)}
+.toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:12px;height:12px;border-radius:6px;background:#fff;
+  transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.2);
+}
+.toggle.on::after{transform:translateX(12px)}
+
+/* legend */
+.legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.legend-sym{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+
+/* event log */
+.event-log{display:flex;flex-direction:column;gap:2px;max-height:180px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.event-item{
+  display:flex;gap:6px;padding:4px 6px;border-radius:5px;
+  font-size:11px;transition:background .1s;cursor:default;
+}
+.event-item:hover{background:var(--surface2)}
+.event-time{font-family:var(--mono);font-size:10px;color:var(--text3);flex-shrink:0;padding-top:1px}
+.event-text{color:var(--text2);line-height:1.4}
+.event-badge{
+  flex-shrink:0;padding:1px 5px;border-radius:3px;font-size:9px;
+  font-weight:600;font-family:var(--mono);letter-spacing:.04em;
+  align-self:flex-start;margin-top:2px;
+}
+.ev-info{background:var(--blue-soft);color:var(--blue)}
+.ev-warn{background:var(--amber-soft);color:var(--amber)}
+.ev-alert{background:var(--red-soft);color:var(--red)}
+
+/* ── MAIN CONTENT ── */
+#main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+#hero{flex:1;overflow:hidden;position:relative}
+
+/* ── RIGHT RAIL ── */
+#right-rail{
+  width:296px;flex-shrink:0;
+  background:var(--surface);border-left:1px solid var(--border);
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+
+/* Team summary cards */
+.team-card{
+  margin:0 12px 8px;padding:10px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--surface2);
+}
+.team-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.team-name{font-size:12px;font-weight:600}
+.team-blue{color:var(--blue)}
+.team-red{color:var(--red)}
+.team-stat-row{display:flex;gap:8px}
+.team-stat{flex:1;text-align:center;padding:6px 4px;border-radius:5px;background:var(--surface)}
+.team-stat-val{font-size:16px;font-weight:700;line-height:1}
+.team-stat-lbl{font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono);letter-spacing:.06em}
+
+/* COA Builder */
+.coa-block{padding:12px;border-bottom:1px solid var(--border)}
+.coa-title{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.coa-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.coa-lbl{font-size:12px;color:var(--text2)}
+.slider-wrap{display:flex;align-items:center;gap:8px;flex:1;margin-left:12px}
+.slider{
+  -webkit-appearance:none;appearance:none;
+  flex:1;height:4px;border-radius:2px;
+  background:var(--border2);outline:none;cursor:pointer;
+}
+.slider::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  border-radius:7px;background:var(--accent);
+  box-shadow:0 1px 3px rgba(79,70,229,.4);cursor:pointer;
+}
+.slider-val{font-size:11px;font-family:var(--mono);color:var(--accent);width:28px;text-align:right}
+
+.coa-options{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.coa-option{
+  display:flex;align-items:center;gap:7px;padding:6px 8px;
+  border-radius:6px;border:1px solid var(--border);
+  cursor:pointer;transition:all .12s;
+}
+.coa-option:hover{border-color:var(--accent);background:var(--accent-soft)}
+.coa-option.selected{border-color:var(--accent);background:var(--accent-soft)}
+.coa-option input[type=radio]{accent-color:var(--accent)}
+.coa-option-text{font-size:12px;color:var(--text2)}
+.coa-option.selected .coa-option-text{color:var(--accent);font-weight:500}
+
+/* ── MOE PANEL ── */
+.moe-panel{padding:12px;border-bottom:1px solid var(--border)}
+.moe-title{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+
+.denial-headline{
+  background:linear-gradient(135deg,var(--accent-soft) 0%,var(--blue-soft) 100%);
+  border:1px solid var(--accent);border-radius:var(--radius-lg);
+  padding:14px;margin-bottom:10px;text-align:center;
+}
+.denial-verdict{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.denial-pct{font-size:36px;font-weight:700;color:var(--accent);line-height:1;margin-bottom:2px;font-variant-numeric:tabular-nums}
+.denial-sub{font-size:11px;color:var(--text2)}
+.ci-bar-wrap{margin:4px 0 2px;background:var(--border);border-radius:3px;height:6px;position:relative}
+.ci-range{
+  position:absolute;top:0;height:6px;border-radius:3px;
+  background:linear-gradient(90deg,var(--accent-mid),var(--accent));
+}
+.ci-labels{display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);color:var(--text3)}
+
+.effect-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.effect-item{background:var(--surface2);border-radius:6px;padding:8px 10px;border:1px solid var(--border)}
+.effect-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.effect-name{font-size:11px;font-weight:600;color:var(--text)}
+.effect-val{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.effect-bar-bg{height:4px;background:var(--border);border-radius:2px}
+.effect-bar-fill{height:4px;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* confidence arc gauge — pure CSS/SVG inline approach */
+.gauge-wrap{display:flex;justify-content:center;padding:4px 0 8px}
+
+/* generate COA */
+.gen-coa{
+  border:1.5px dashed var(--border2);border-radius:var(--radius);
+  padding:12px;text-align:center;cursor:pointer;transition:all .18s;
+}
+.gen-coa:hover{border-color:var(--accent);background:var(--accent-soft)}
+.gen-coa-icon{font-size:18px;margin-bottom:4px}
+.gen-coa-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.gen-coa-sub{font-size:11px;color:var(--text3);margin-bottom:8px}
+
+/* ── FORCE GRAPH SVG CANVAS ── */
+#graph-canvas{width:100%;height:100%;display:block}
+#map-view,#table-view,#taskorg-view{
+  width:100%;height:100%;overflow:auto;display:none;
+  background:var(--bg);
+}
+#map-view.active,#table-view.active,#taskorg-view.active{display:block}
+#graph-view{width:100%;height:100%;display:flex;position:relative}
+#graph-view.hidden{display:none}
+
+/* hero overlay labels */
+.hero-overlay{
+  position:absolute;top:12px;left:12px;right:12px;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  pointer-events:none;
+}
+.hero-badge{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;font-size:11px;
+  box-shadow:var(--shadow);pointer-events:auto;
+}
+.hero-badge-title{font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px}
+.hero-badge-val{font-weight:600;color:var(--text)}
+
+/* node tooltip */
+#tooltip{
+  position:fixed;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;font-size:12px;
+  box-shadow:var(--shadow-lg);pointer-events:none;opacity:0;
+  transition:opacity .15s;z-index:200;min-width:160px;
+}
+.tt-name{font-weight:600;margin-bottom:4px}
+.tt-row{display:flex;justify-content:space-between;gap:16px;color:var(--text2);font-size:11px;margin-bottom:2px}
+
+/* table view */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{
+  text-align:left;padding:8px 12px;font-size:10px;font-weight:600;
+  color:var(--text3);letter-spacing:.07em;text-transform:uppercase;
+  border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:var(--surface);
+}
+.data-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2)}
+.data-table tr:hover td{background:var(--surface2)}
+.data-table td:first-child{font-weight:500;color:var(--text)}
+.status-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;font-family:var(--mono);
+}
+
+/* taskorg */
+.taskorg-wrap{padding:20px;font-size:12px;overflow:auto;height:100%}
+.taskorg-wrap svg{display:block;margin:0 auto}
+
+/* map */
+.map-wrap{position:relative;width:100%;height:100%;background:#e8f0f8;overflow:hidden}
+
+/* spinner for generate */
+.spin{
+  width:16px;height:16px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;
+  display:inline-block;vertical-align:middle;margin-right:6px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* pulse animation for live dot */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.live-dot{
+  width:6px;height:6px;background:var(--green);border-radius:3px;
+  animation:pulse 2s ease-in-out infinite;display:inline-block;margin-right:4px;
+}
+
+/* responsive nudge */
+@media(max-width:1200px){
+  :root{--rail-w:220px}
+  #right-rail{width:260px}
+}
+@media(max-width:960px){
+  #left-rail{display:none}
+  #right-rail{width:240px}
+}
+</style>
+</head>
+<body>
+
+<!-- CLASSIFICATION MARKING -->
+<div id="classbar">
+  <span class="classbar-tag">▸</span>
+  NOTIONAL // UNCLASSIFIED // FOR DESIGN PURPOSES ONLY — NOT OPERATIONAL DATA
+  <span class="classbar-tag">◂</span>
+</div>
+
+<!-- COMMAND BAR -->
+<div id="cmdbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z" stroke="white" stroke-width="1.5" fill="none"/>
+        <circle cx="8" cy="8" r="2" fill="white"/>
+        <path d="M8 4V6M8 10V12M4 6.5L5.7 7.5M10.3 8.5L12 9.5M4 9.5L5.7 8.5M10.3 7.5L12 6.5" stroke="white" stroke-width="1.2"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">StrikePlan</div>
+      <div class="brand-sub">C2 ANALYTICS // VARIANT-D</div>
+    </div>
+  </div>
+
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="switchView('graph',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1.5" fill="currentColor"/><circle cx="6" cy="2" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="6" cy="10" r="1.5" fill="currentColor"/><path d="M3.5 6H4.5M7.5 6H8.5M6 3.5V4.5M6 7.5V8.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      Force Graph
+    </button>
+    <button class="view-tab" onclick="switchView('map',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 1L1 2.5V11L4 9.5L8 11L11 9.5V1L8 2.5L4 1Z" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M4 1V9.5M8 2.5V11" stroke="currentColor" stroke-width="1.2"/></svg>
+      Map
+    </button>
+    <button class="view-tab" onclick="switchView('table',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="2" rx="1" fill="currentColor"/><rect x="1" y="5" width="10" height="2" rx="1" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="10" height="2" rx="1" fill="currentColor" opacity=".3"/></svg>
+      Table
+    </button>
+    <button class="view-tab" onclick="switchView('taskorg',this)">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="4" y="1" width="4" height="2.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="3" height="2.5" rx="1" fill="currentColor"/><rect x="4.5" y="8.5" width="3" height="2.5" rx="1" fill="currentColor"/><rect x="8" y="8.5" width="3" height="2.5" rx="1" fill="currentColor"/><path d="M6 3.5V7.5M6 7.5H2.5V8.5M6 7.5H6V8.5M6 7.5H9.5V8.5" stroke="currentColor" stroke-width="1.1"/></svg>
+      Task Org
+    </button>
+  </div>
+
+  <div class="cmd-actions">
+    <button class="btn btn-ghost btn-sm" onclick="showCampaignPlanner()">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1" y="2" width="9" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 1V3M7.5 1V3M1 5H10" stroke="currentColor" stroke-width="1.2"/></svg>
+      Campaign Planner
+    </button>
+    <button class="btn btn-ghost btn-sm">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L7 4H10L7.5 6L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6L1 4H4L5.5 1Z" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      War Game
+    </button>
+  </div>
+
+  <div class="status-cluster">
+    <div class="status-item">
+      <div class="status-label">Theater / Sector</div>
+      <div class="status-val">INDOPACOM / TW-STR</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">UTC</div>
+      <div class="status-val" id="utc-clock">--:--:--</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">Posture</div>
+      <div class="posture-badge posture-elevated">ELEVATED</div>
+    </div>
+    <button class="dark-toggle" onclick="toggleDark()" title="Toggle dark mode">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M10.5 7.5A4.5 4.5 0 015 2 4.5 4.5 0 1010.5 7.5z" fill="currentColor"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN SHELL -->
+<div id="shell">
+
+  <!-- LEFT RAIL -->
+  <div id="left-rail">
+
+    <!-- Filters -->
+    <div class="rail-section">
+      <div class="rail-head">
+        <span class="rail-title">Domain Filters</span>
+        <span class="rail-action" onclick="resetFilters()">Reset</span>
+      </div>
+      <div class="filter-group">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-family:var(--mono)">DOMAIN</div>
+        <div class="filter-row" id="domain-chips">
+          <button class="chip on" onclick="toggleChip(this)">Air</button>
+          <button class="chip on" onclick="toggleChip(this)">Maritime</button>
+          <button class="chip on" onclick="toggleChip(this)">Land</button>
+          <button class="chip on" onclick="toggleChip(this)">Cyber</button>
+          <button class="chip on" onclick="toggleChip(this)">Space</button>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin:6px 0 4px;font-family:var(--mono)">TEAM</div>
+        <div class="filter-row">
+          <button class="chip blue-on" onclick="toggleTeamChip(this,'blue')">Blue Force</button>
+          <button class="chip red-on" onclick="toggleTeamChip(this,'red')">Red Force</button>
+          <button class="chip on" onclick="toggleChip(this)">Neutral</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Highlights -->
+    <div class="rail-section">
+      <div class="rail-head"><span class="rail-title">Highlight Overlays</span></div>
+      <div>
+        <div class="toggle-row">
+          <span class="toggle-label">
+            <span class="toggle-dot" style="background:#2563eb"></span>Blue COA Routes
+          </span>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">
+            <span class="toggle-dot" style="background:#dc2626"></span>Red Threat Arcs
+          </span>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">
+            <span class="toggle-dot" style="background:#d97706"></span>Engagement Zones
+          </span>
+          <button class="toggle" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">
+            <span class="toggle-dot" style="background:#7c3aed"></span>Cyber/EW Nodes
+          </span>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">
+            <span class="toggle-dot" style="background:#0891b2"></span>ISR Coverage
+          </span>
+          <button class="toggle" onclick="this.classList.toggle('on')"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data I/O -->
+    <div class="rail-section">
+      <div class="rail-head"><span class="rail-title">Data</span></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M3 5l2.5 2 2.5-2M1 9h9" stroke="currentColor" stroke-width="1.3"/></svg>
+          Import
+        </button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 7V1M3 3l2.5-2 2.5 2M1 9h9" stroke="currentColor" stroke-width="1.3"/></svg>
+          Export
+        </button>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text3);font-family:var(--mono)">
+        <span class="live-dot"></span>ORBAT-NOTIONAL-v4.2 · synced 04:17Z
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="rail-section">
+      <div class="rail-head"><span class="rail-title">Legend</span></div>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><rect x="2" y="2" width="12" height="12" rx="2" fill="#2563eb" opacity=".15" stroke="#2563eb" stroke-width="1.5"/><text x="8" y="10.5" text-anchor="middle" font-size="7" fill="#2563eb" font-weight="600">✦</text></svg>
+          </div>
+          <span>Blue Unit</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><rect x="2" y="2" width="12" height="12" rx="2" fill="#dc2626" opacity=".15" stroke="#dc2626" stroke-width="1.5"/><path d="M8 5L11 11H5L8 5Z" fill="#dc2626"/></svg>
+          </div>
+          <span>Red Unit</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><circle cx="8" cy="8" r="5" fill="#d97706" opacity=".15" stroke="#d97706" stroke-width="1.5"/></svg>
+          </div>
+          <span>Neutral</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 3L13 8L8 13L3 8Z" fill="#7c3aed" opacity=".15" stroke="#7c3aed" stroke-width="1.5"/></svg>
+          </div>
+          <span>C2 Node</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 13L8 3L13 13H3Z" fill="none" stroke="#2563eb" stroke-width="1.5"/><path d="M6 13V10H10V13" stroke="#2563eb" stroke-width="1"/></svg>
+          </div>
+          <span>Air Asset</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><ellipse cx="8" cy="10" rx="5" ry="3" fill="none" stroke="#0891b2" stroke-width="1.5"/><path d="M3 10V8C3 5.8 5 4 8 4S13 5.8 13 8V10" stroke="#0891b2" stroke-width="1.5"/></svg>
+          </div>
+          <span>Maritime</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><path d="M2 14L8 4L14 14H2Z" fill="none" stroke="#dc2626" stroke-width="1.5"/></svg>
+          </div>
+          <span>Threat</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg viewBox="0 0 16 16" width="16" height="16"><rect x="3" y="8" width="10" height="6" rx="1" fill="none" stroke="#16a34a" stroke-width="1.5"/><path d="M5 8V5.5A3 3 0 0111 5.5V8" stroke="#16a34a" stroke-width="1.5"/></svg>
+          </div>
+          <span>Denied Zone</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="rail-section" style="flex:1">
+      <div class="rail-head">
+        <span class="rail-title">Event Log</span>
+        <span style="font-size:9px;font-family:var(--mono);color:var(--text3)"><span class="live-dot"></span>LIVE</span>
+      </div>
+      <div class="event-log" id="event-log">
+        <div class="event-item">
+          <span class="event-badge ev-alert">ALERT</span>
+          <span class="event-time">04:31Z</span>
+          <span class="event-text">PLAN-RED amphibious convoy detected departing Fuzhou staging area — 23 LSTs</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-info">INFO</span>
+          <span class="event-time">04:28Z</span>
+          <span class="event-text">COA-B "Island Chain Strike" recalculated — MOE confidence updated +3%</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-warn">WARN</span>
+          <span class="event-time">04:22Z</span>
+          <span class="event-text">USAF 18th Wing ISR coverage gap — 40-min window SCS southern quadrant</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-info">INFO</span>
+          <span class="event-time">04:15Z</span>
+          <span class="event-text">JMSDF Izumo task group confirmed at Yokosuka — +2 DDG escorts added ORBAT</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-info">INFO</span>
+          <span class="event-time">04:08Z</span>
+          <span class="event-text">Monte Carlo run #412 complete — 10,000 iterations, 17.4s runtime</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-warn">WARN</span>
+          <span class="event-time">03:57Z</span>
+          <span class="event-text">PLAN-AF Su-35 combat air patrol density elevated — Dongshan Island sector</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-info">INFO</span>
+          <span class="event-time">03:44Z</span>
+          <span class="event-text">USS Ronald Reagan (CVN-76) enters AO — 72 aircraft sorties available</span>
+        </div>
+        <div class="event-item">
+          <span class="event-badge ev-alert">ALERT</span>
+          <span class="event-time">03:38Z</span>
+          <span class="event-text">DF-21D ASBM battery activation signal — estimated 6 launchers × 2 missiles ready</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /left-rail -->
+
+  <!-- MAIN CONTENT -->
+  <div id="main">
+    <div id="hero">
+
+      <!-- FORCE GRAPH VIEW -->
+      <div id="graph-view">
+        <svg id="graph-canvas"></svg>
+        <div class="hero-overlay">
+          <div class="hero-badge">
+            <div class="hero-badge-title">View Mode</div>
+            <div class="hero-badge-val">Blue vs Red Force Network</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="hero-badge">
+              <div class="hero-badge-title">Blue Nodes</div>
+              <div class="hero-badge-val" style="color:var(--blue)">18 units</div>
+            </div>
+            <div class="hero-badge">
+              <div class="hero-badge-title">Red Nodes</div>
+              <div class="hero-badge-val" style="color:var(--red)">22 units</div>
+            </div>
+            <div class="hero-badge">
+              <div class="hero-badge-title">Neutral</div>
+              <div class="hero-badge-val" style="color:var(--amber)">3 units</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAP VIEW -->
+      <div id="map-view">
+        <div class="map-wrap">
+          <svg id="map-svg" width="100%" height="100%" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+      </div>
+
+      <!-- TABLE VIEW -->
+      <div id="table-view" style="overflow-y:auto">
+        <div style="padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div>
+              <div style="font-size:15px;font-weight:600;margin-bottom:2px">Force Order of Battle</div>
+              <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">NOTIONAL // 43 units across all domains</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm">Filter</button>
+              <button class="btn btn-ghost btn-sm">Sort</button>
+              <button class="btn btn-primary btn-sm">Export CSV</button>
+            </div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Unit / Asset</th>
+                <th>Team</th>
+                <th>Domain</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Threat Index</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TASK ORG VIEW -->
+      <div id="taskorg-view">
+        <div class="taskorg-wrap">
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px">Task Organization — Indo-Pacific Denial Force</div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:16px">NOTIONAL // COA-B "Island Chain Strike" structure</div>
+          <svg id="taskorg-svg" viewBox="0 0 820 500" width="820" height="500"></svg>
+        </div>
+      </div>
+
+    </div><!-- /hero -->
+  </div><!-- /main -->
+
+  <!-- RIGHT RAIL -->
+  <div id="right-rail">
+
+    <!-- Team Summary -->
+    <div style="padding:12px;border-bottom:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">Team Summary</div>
+
+      <div class="team-card">
+        <div class="team-card-head">
+          <span class="team-name team-blue">Blue Force (US/Allied)</span>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="#2563eb" stroke-width="1.5" fill="none"/><path d="M4 7l2 2 4-4" stroke="#2563eb" stroke-width="1.5"/></svg>
+        </div>
+        <div class="team-stat-row">
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--blue)">18</div><div class="team-stat-lbl">Units</div></div>
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--blue)">72</div><div class="team-stat-lbl">Sorties</div></div>
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--green)">91%</div><div class="team-stat-lbl">Readiness</div></div>
+        </div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-card-head">
+          <span class="team-name team-red">Red Force (PLAN/PLA)</span>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L10 5L13 4L11 7L13 10L10 9L7 13L4 9L1 10L3 7L1 4L4 5L7 1Z" stroke="#dc2626" stroke-width="1.3" fill="none"/></svg>
+        </div>
+        <div class="team-stat-row">
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--red)">22</div><div class="team-stat-lbl">Units</div></div>
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--red)">48</div><div class="team-stat-lbl">Vessels</div></div>
+          <div class="team-stat"><div class="team-stat-val" style="color:var(--amber)">67%</div><div class="team-stat-lbl">Throughput</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COA Builder -->
+    <div class="coa-block">
+      <div class="coa-title">COA Builder</div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px">COURSE OF ACTION</div>
+        <div class="coa-options">
+          <label class="coa-option selected">
+            <input type="radio" name="coa" value="B" checked onchange="selectCOA(this.parentElement)">
+            <div>
+              <div class="coa-option-text" style="font-weight:600">COA-B · Island Chain Strike</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:1px">Distributed lethality + cyber + maritime denial</div>
+            </div>
+          </label>
+          <label class="coa-option">
+            <input type="radio" name="coa" value="A" onchange="selectCOA(this.parentElement)">
+            <div>
+              <div class="coa-option-text">COA-A · Sea Control Classic</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:1px">CVN-centered battle group, TLAM strikes</div>
+            </div>
+          </label>
+          <label class="coa-option">
+            <input type="radio" name="coa" value="C" onchange="selectCOA(this.parentElement)">
+            <div>
+              <div class="coa-option-text">COA-C · Submarine + Cyber</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:1px">Undersea dominance + network degradation</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:8px">CAPABILITY ↔ COST EMPHASIS</div>
+      <div class="coa-row">
+        <span class="coa-lbl">Air/Missile</span>
+        <div class="slider-wrap">
+          <input type="range" class="slider" min="0" max="100" value="70" oninput="updateSlider(this)">
+          <span class="slider-val">70</span>
+        </div>
+      </div>
+      <div class="coa-row">
+        <span class="coa-lbl">Maritime</span>
+        <div class="slider-wrap">
+          <input type="range" class="slider" min="0" max="100" value="55" oninput="updateSlider(this)">
+          <span class="slider-val">55</span>
+        </div>
+      </div>
+      <div class="coa-row">
+        <span class="coa-lbl">Cyber/EW</span>
+        <div class="slider-wrap">
+          <input type="range" class="slider" min="0" max="100" value="40" oninput="updateSlider(this)">
+          <span class="slider-val">40</span>
+        </div>
+      </div>
+      <div class="coa-row">
+        <span class="coa-lbl">Space</span>
+        <div class="slider-wrap">
+          <input type="range" class="slider" min="0" max="100" value="30" oninput="updateSlider(this)">
+          <span class="slider-val">30</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOE Panel -->
+    <div class="moe-panel">
+      <div class="moe-title">Monte Carlo · Denial MOE</div>
+
+      <div class="denial-headline">
+        <div class="denial-verdict">Denial Achieved</div>
+        <div class="denial-pct" id="moe-pct">78%</div>
+        <div class="denial-sub">Chance Operation Halts / Culminates</div>
+        <div style="margin-top:8px">
+          <div class="ci-labels">
+            <span>62%</span><span>95% CI</span><span>91%</span>
+          </div>
+          <div class="ci-bar-wrap">
+            <div class="ci-range" style="left:24%;width:52%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arc gauge -->
+      <div class="gauge-wrap">
+        <svg viewBox="0 0 140 90" width="140" height="90">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#dc2626"/>
+              <stop offset="40%" stop-color="#d97706"/>
+              <stop offset="100%" stop-color="#16a34a"/>
+            </linearGradient>
+          </defs>
+          <!-- Track -->
+          <path d="M15 80 A55 55 0 0 1 125 80" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round"/>
+          <!-- Fill to 78% -->
+          <path id="gauge-arc" d="M15 80 A55 55 0 0 1 125 80" fill="none" stroke="url(#gaugeGrad)" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="173" stroke-dashoffset="38"/>
+          <!-- Needle -->
+          <line id="gauge-needle" x1="70" y1="80" x2="70" y2="30" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"
+            transform="rotate(-18 70 80)"/>
+          <circle cx="70" cy="80" r="4" fill="var(--accent)"/>
+          <!-- Labels -->
+          <text x="10" y="88" font-size="8" fill="var(--text3)" font-family="Inter,sans-serif">0%</text>
+          <text x="118" y="88" font-size="8" fill="var(--text3)" font-family="Inter,sans-serif" text-anchor="end">100%</text>
+          <text x="70" y="64" font-size="9" fill="var(--text2)" font-family="Inter,sans-serif" text-anchor="middle">78%</text>
+        </svg>
+      </div>
+
+      <!-- Effect breakdown -->
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.07em;margin-bottom:8px">EFFECT BREAKDOWN</div>
+      <div class="effect-list">
+        <div class="effect-item">
+          <div class="effect-head">
+            <span class="effect-name">Red Amphibious Throughput</span>
+            <span class="effect-val" style="color:var(--red)">31%</span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Reduced to 31% of full capacity</div>
+          <div class="effect-bar-bg">
+            <div class="effect-bar-fill" style="width:31%;background:var(--red)"></div>
+          </div>
+        </div>
+        <div class="effect-item">
+          <div class="effect-head">
+            <span class="effect-name">Op. Viability (OSVI)</span>
+            <span class="effect-val" style="color:var(--amber)">41%</span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Operational Sustainability Viability Index</div>
+          <div class="effect-bar-bg">
+            <div class="effect-bar-fill" style="width:41%;background:var(--amber)"></div>
+          </div>
+        </div>
+        <div class="effect-item">
+          <div class="effect-head">
+            <span class="effect-name">Operation-Halts Probability</span>
+            <span class="effect-val" style="color:var(--green)">78%</span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Adversary operation culminates before D+14</div>
+          <div class="effect-bar-bg">
+            <div class="effect-bar-fill" style="width:78%;background:var(--green)"></div>
+          </div>
+        </div>
+        <div class="effect-item">
+          <div class="effect-head">
+            <span class="effect-name">ISR Degradation (PLAN)</span>
+            <span class="effect-val" style="color:var(--accent)">64%</span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Red maritime sensor network effectiveness</div>
+          <div class="effect-bar-bg">
+            <div class="effect-bar-fill" style="width:64%;background:var(--accent)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate COA -->
+      <div class="gen-coa" id="gen-coa-btn" onclick="generateCOA()">
+        <div class="gen-coa-icon">✦</div>
+        <div class="gen-coa-title">Generate COA from Commander's Intent</div>
+        <div class="gen-coa-sub">AI-assisted course of action synthesis<br>Balances capability emphasis with resource cost</div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center">
+          Generate COA
+        </button>
+      </div>
+
+      <!-- Iterations note -->
+      <div style="padding:8px 0 0;text-align:center;font-size:10px;color:var(--text3);font-family:var(--mono)">
+        10,000 iterations · run #412 · Δ +3% vs prior
+      </div>
+    </div>
+
+    <!-- Spacer -->
+    <div style="padding:12px">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Scenario Parameters</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">Scenario</span>
+          <span style="color:var(--text);font-weight:500">TW-STRAIT-DENY-01</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">D-Day Assumption</span>
+          <span style="color:var(--text);font-weight:500;font-family:var(--mono)">D+0 H+06</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">Duration Model</span>
+          <span style="color:var(--text);font-weight:500">14-day campaign</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">Weather Model</span>
+          <span style="color:var(--text);font-weight:500">Spring / Sea State 3</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+          <span style="color:var(--text2)">Confidence Level</span>
+          <span style="color:var(--accent);font-weight:600">95% CI</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /right-rail -->
+
+</div><!-- /shell -->
+
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row"><span>Domain</span><span id="tt-domain"></span></div>
+  <div class="tt-row"><span>Team</span><span id="tt-team"></span></div>
+  <div class="tt-row"><span>Status</span><span id="tt-status"></span></div>
+  <div class="tt-row"><span>Threat Idx</span><span id="tt-threat"></span></div>
+</div>
+
+<script>
+// ── UTC CLOCK ──
+function updateClock(){
+  const now=new Date();
+  const h=String(now.getUTCHours()).padStart(2,'0');
+  const m=String(now.getUTCMinutes()).padStart(2,'0');
+  const s=String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('utc-clock').textContent=`${h}:${m}:${s}`;
+}
+setInterval(updateClock,1000);updateClock();
+
+// ── DARK TOGGLE ──
+function toggleDark(){document.body.classList.toggle('dark');drawGraph()}
+
+// ── VIEW SWITCHER ──
+function switchView(v,tab){
+  document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  const gv=document.getElementById('graph-view');
+  const mv=document.getElementById('map-view');
+  const tv=document.getElementById('table-view');
+  const ov=document.getElementById('taskorg-view');
+  gv.classList.add('hidden');mv.classList.remove('active');
+  tv.classList.remove('active');ov.classList.remove('active');
+  if(v==='graph'){gv.classList.remove('hidden');drawGraph();}
+  else if(v==='map'){mv.classList.add('active');drawMap();}
+  else if(v==='table'){tv.classList.add('active');buildTable();}
+  else if(v==='taskorg'){ov.classList.add('active');drawTaskOrg();}
+}
+
+// ── CHIP TOGGLES ──
+function toggleChip(el){el.classList.toggle('on')}
+function toggleTeamChip(el,team){
+  if(team==='blue')el.classList.toggle('blue-on');
+  else el.classList.toggle('red-on');
+}
+function resetFilters(){
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.className='chip on';
+  });
+  document.querySelectorAll('.chip[onclick*="blue"]').forEach(c=>c.classList.add('blue-on'));
+  document.querySelectorAll('.chip[onclick*="red"]').forEach(c=>c.classList.add('red-on'));
+}
+
+// ── SLIDER ──
+function updateSlider(el){el.nextElementSibling.textContent=el.value}
+
+// ── COA SELECT ──
+function selectCOA(label){
+  document.querySelectorAll('.coa-option').forEach(o=>o.classList.remove('selected'));
+  label.classList.add('selected');
+}
+
+// ── CAMPAIGN PLANNER ──
+function showCampaignPlanner(){
+  alert('Campaign Planner: NOTIONAL interface — open full workflow in production build.');
+}
+
+// ── GENERATE COA ──
+function generateCOA(){
+  const btn=document.getElementById('gen-coa-btn');
+  const orig=btn.querySelector('button').innerHTML;
+  btn.querySelector('button').innerHTML='<span class="spin"></span> Generating…';
+  setTimeout(()=>{
+    btn.querySelector('button').innerHTML=orig;
+    const pct=document.getElementById('moe-pct');
+    const newVal=74+Math.floor(Math.random()*10);
+    pct.textContent=newVal+'%';
+    // animate gauge needle
+    const needle=document.getElementById('gauge-needle');
+    const angle=-90+(newVal/100)*180;
+    needle.setAttribute('transform',`rotate(${angle-90} 70 80)`);
+  },2200);
+}
+
+// ── MOCK DATA ──
+const UNITS=[
+  {name:'CVN-76 Ronald Reagan',team:'Blue',domain:'Maritime',type:'Carrier',loc:'Pacific (OA-7)',status:'Active',threat:2},
+  {name:'18th Wing F-22 Det',team:'Blue',domain:'Air',type:'Fighter',loc:'Kadena AB',status:'Active',threat:3},
+  {name:'USS Missouri (SSN-780)',team:'Blue',domain:'Maritime',type:'Submarine',loc:'Submerged TW-S',status:'Active',threat:8},
+  {name:'JMSDF Izumo Task Grp',team:'Blue',domain:'Maritime',type:'DDG/CG',loc:'Yokosuka',status:'Transit',threat:3},
+  {name:'5th USAF HQ',team:'Blue',domain:'Air',type:'C2',loc:'Yokota AB',status:'Active',threat:1},
+  {name:'USMC 31 MEU',team:'Blue',domain:'Land',type:'Amphibious',loc:'White Beach',status:'Alert',threat:4},
+  {name:'Cyber Nat. Mission Tm 7',team:'Blue',domain:'Cyber',type:'Offensive Cyber',loc:'Virtual',status:'Active',threat:7},
+  {name:'GPS III Constellation',team:'Blue',domain:'Space',type:'PNT',loc:'MEO Orbit',status:'Active',threat:5},
+  {name:'USS Bunker Hill CG-52',team:'Blue',domain:'Maritime',type:'Cruiser',loc:'OA-5',status:'Active',threat:4},
+  {name:'ROCN Tuo Chiang FFL',team:'Blue',domain:'Maritime',type:'Corvette',loc:'Tsoying',status:'Alert',threat:5},
+  {name:'RC-135 SIGINT Flt',team:'Blue',domain:'Air',type:'ISR',loc:'Okinawa',status:'Active',threat:2},
+  {name:'MQ-9 Reaper Flt-3',team:'Blue',domain:'Air',type:'UCAV',loc:'Guam',status:'Active',threat:4},
+  {name:'HIMARS III-2 Btry',team:'Blue',domain:'Land',type:'Rocket Arty',loc:'Miyako-jima',status:'Active',threat:6},
+  {name:'P-8A Poseidon Flt',team:'Blue',domain:'Air',type:'ASW/ISR',loc:'Misawa NAS',status:'Active',threat:3},
+  {name:'AN/TPY-2 Radar (THAAD)',team:'Blue',domain:'Air',type:'BMD Sensor',loc:'Okinawa',status:'Active',threat:2},
+  {name:'PLAN EAF Carrier Fmtn',team:'Red',domain:'Maritime',type:'Carrier Battle Grp',loc:'E.China Sea',status:'Hostile',threat:9},
+  {name:'PLA Navy LST Convoy',team:'Red',domain:'Maritime',type:'Amphibious',loc:'Fuzhou Staging',status:'Hostile',threat:8},
+  {name:'PLAN SSBN Type-094A',team:'Red',domain:'Maritime',type:'SSBN',loc:'S. China Sea',status:'Hostile',threat:10},
+  {name:'PLAAF J-20 Regt',team:'Red',domain:'Air',type:'Stealth Fighter',loc:'Wugong AB',status:'Hostile',threat:9},
+  {name:'PLARF DF-21D Batt.',team:'Red',domain:'Air',type:'ASBM',loc:'Fujian Prov.',status:'Hostile',threat:10},
+  {name:'PLARF DF-26 Batt.',team:'Red',domain:'Air',type:'IRBM',loc:'Qinghai',status:'Hostile',threat:9},
+  {name:'PLA Strategic Cyber',team:'Red',domain:'Cyber',type:'Cyber Warfare',loc:'Virtual',status:'Hostile',threat:8},
+  {name:'PLAN Su-35 CAP Flt',team:'Red',domain:'Air',type:'Fighter',loc:'Dongshan',status:'Hostile',threat:7},
+  {name:'PLA EW Bn / Jamming',team:'Red',domain:'Cyber',type:'Electronic Warfare',loc:'Pingtan',status:'Hostile',threat:7},
+  {name:'PLAN Type-055 DDG',team:'Red',domain:'Maritime',type:'Destroyer',loc:'Taiwan Strait',status:'Hostile',threat:8},
+  {name:'PLAN Type-071 LPD ×4',team:'Red',domain:'Maritime',type:'Amphibious',loc:'Fuzhou',status:'Hostile',threat:7},
+  {name:'PLA Artillery Grp',team:'Red',domain:'Land',type:'Rocket Arty',loc:'Fujian Coast',status:'Hostile',threat:8},
+  {name:'Beidou-3 Constellation',team:'Red',domain:'Space',type:'PNT',loc:'MEO Orbit',status:'Hostile',threat:6},
+  {name:'MSC Commercial Vessel',team:'Neutral',domain:'Maritime',type:'Merchant',loc:'Taiwan Strait',status:'Transiting',threat:0},
+  {name:'RCMM Weather Station',team:'Neutral',domain:'Air',type:'Sensor',loc:'Penghu',status:'Monitoring',threat:0},
+];
+
+// ── TABLE BUILD ──
+function buildTable(){
+  const tbody=document.getElementById('table-body');
+  if(tbody.children.length>0)return;
+  UNITS.forEach(u=>{
+    const tr=document.createElement('tr');
+    const teamCol=u.team==='Blue'?`<span style="color:var(--blue);font-weight:500">${u.team}</span>`:
+      u.team==='Red'?`<span style="color:var(--red);font-weight:500">${u.team}</span>`:
+      `<span style="color:var(--amber)">${u.team}</span>`;
+    const statusColor=u.status==='Active'?'var(--green)':u.status==='Hostile'?'var(--red)':u.status==='Alert'?'var(--amber)':'var(--text2)';
+    const statusBg=u.status==='Active'?'var(--green-soft)':u.status==='Hostile'?'var(--red-soft)':u.status==='Alert'?'var(--amber-soft)':'var(--surface2)';
+    const threatColor=u.threat>=8?'var(--red)':u.threat>=5?'var(--amber)':u.threat>=2?'var(--text2)':'var(--text3)';
+    tr.innerHTML=`
+      <td>${u.name}</td>
+      <td>${teamCol}</td>
+      <td>${u.domain}</td>
+      <td>${u.type}</td>
+      <td style="font-family:var(--mono);font-size:11px">${u.loc}</td>
+      <td><span class="status-pill" style="background:${statusBg};color:${statusColor}">${u.status}</span></td>
+      <td style="font-family:var(--mono);font-weight:600;color:${threatColor}">${u.threat===0?'—':u.threat+'/10'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── FORCE GRAPH ──
+const GRAPH_NODES=[
+  // Blue
+  {id:'CVN-76',team:'blue',domain:'maritime',label:'CVN-76',x:0.18,y:0.35,size:14},
+  {id:'SSN-780',team:'blue',domain:'maritime',label:'SSN-780',x:0.22,y:0.55,size:10},
+  {id:'JMSDF',team:'blue',domain:'maritime',label:'JMSDF TG',x:0.12,y:0.22,size:10},
+  {id:'CG-52',team:'blue',domain:'maritime',label:'CG-52',x:0.14,y:0.42,size:9},
+  {id:'F22',team:'blue',domain:'air',label:'F-22 Det',x:0.28,y:0.18,size:11},
+  {id:'P8A',team:'blue',domain:'air',label:'P-8A',x:0.20,y:0.12,size:9},
+  {id:'MQ9',team:'blue',domain:'air',label:'MQ-9',x:0.32,y:0.10,size:8},
+  {id:'RC135',team:'blue',domain:'air',label:'RC-135',x:0.10,y:0.12,size:8},
+  {id:'5AFCMD',team:'blue',domain:'air',label:'5AF C2',x:0.24,y:0.28,size:12,isC2:true},
+  {id:'MEU31',team:'blue',domain:'land',label:'31 MEU',x:0.10,y:0.60,size:9},
+  {id:'HIMARS',team:'blue',domain:'land',label:'HIMARS',x:0.14,y:0.72,size:9},
+  {id:'THAAD',team:'blue',domain:'air',label:'THAAD',x:0.30,y:0.24,size:8},
+  {id:'CYBER7',team:'blue',domain:'cyber',label:'Cyber NMT7',x:0.26,y:0.45,size:9},
+  {id:'GPS3',team:'blue',domain:'space',label:'GPS-III',x:0.18,y:0.06,size:9},
+  {id:'ROCN',team:'blue',domain:'maritime',label:'ROCN FFL',x:0.20,y:0.68,size:8},
+  // Red
+  {id:'PLAN-CV',team:'red',domain:'maritime',label:'PLAN CV',x:0.68,y:0.30,size:14},
+  {id:'PLAN-LST',team:'red',domain:'maritime',label:'LST Convoy',x:0.78,y:0.52,size:12},
+  {id:'PLAN-SSBN',team:'red',domain:'maritime',label:'Type-094A',x:0.72,y:0.65,size:10},
+  {id:'J20',team:'red',domain:'air',label:'J-20',x:0.60,y:0.18,size:11},
+  {id:'SU35',team:'red',domain:'air',label:'Su-35 CAP',x:0.72,y:0.18,size:9},
+  {id:'DF21',team:'red',domain:'air',label:'DF-21D',x:0.62,y:0.38,size:11},
+  {id:'DF26',team:'red',domain:'air',label:'DF-26',x:0.55,y:0.28,size:10},
+  {id:'T055',team:'red',domain:'maritime',label:'Type-055',x:0.62,y:0.50,size:9},
+  {id:'T071',team:'red',domain:'maritime',label:'Type-071×4',x:0.80,y:0.40,size:10},
+  {id:'PLARTY',team:'red',domain:'land',label:'PLA Arty',x:0.70,y:0.72,size:9},
+  {id:'PLANEW',team:'red',domain:'cyber',label:'PLA EW Bn',x:0.58,y:0.58,size:9},
+  {id:'PLACY',team:'red',domain:'cyber',label:'PLA Cyber',x:0.52,y:0.45,size:9},
+  {id:'BEIDOU',team:'red',domain:'space',label:'Beidou-3',x:0.65,y:0.08,size:9},
+  {id:'PLAC2',team:'red',domain:'air',label:'PLAN C2',x:0.68,y:0.42,size:12,isC2:true},
+  // Neutral
+  {id:'MERCH',team:'neutral',domain:'maritime',label:'MSC Ship',x:0.44,y:0.55,size:7},
+  {id:'WX',team:'neutral',domain:'air',label:'WX Stn',x:0.42,y:0.35,size:7},
+  {id:'RCMM',team:'neutral',domain:'air',label:'RCMM',x:0.44,y:0.45,size:7},
+];
+const GRAPH_EDGES=[
+  // Blue internal
+  {a:'5AFCMD',b:'CVN-76',type:'cmd'},{a:'5AFCMD',b:'F22',type:'cmd'},
+  {a:'5AFCMD',b:'P8A',type:'cmd'},{a:'5AFCMD',b:'JMSDF',type:'cmd'},
+  {a:'CVN-76',b:'CG-52',type:'escort'},{a:'CVN-76',b:'SSN-780',type:'escort'},
+  {a:'CYBER7',b:'5AFCMD',type:'support'},{a:'GPS3',b:'5AFCMD',type:'support'},
+  {a:'THAAD',b:'5AFCMD',type:'support'},{a:'RC135',b:'5AFCMD',type:'intel'},
+  {a:'MQ9',b:'5AFCMD',type:'intel'},{a:'ROCN',b:'CVN-76',type:'allied'},
+  {a:'HIMARS',b:'MEU31',type:'support'},{a:'MEU31',b:'5AFCMD',type:'cmd'},
+  // Red internal
+  {a:'PLAC2',b:'PLAN-CV',type:'cmd'},{a:'PLAC2',b:'DF21',type:'cmd'},
+  {a:'PLAC2',b:'J20',type:'cmd'},{a:'PLAC2',b:'PLAN-LST',type:'cmd'},
+  {a:'PLAN-CV',b:'T055',type:'escort'},{a:'PLAN-LST',b:'T071',type:'escort'},
+  {a:'BEIDOU',b:'PLAC2',type:'support'},{a:'PLANEW',b:'PLAC2',type:'support'},
+  {a:'PLACY',b:'PLAC2',type:'support'},{a:'SU35',b:'PLAC2',type:'cmd'},
+  {a:'DF26',b:'PLAC2',type:'cmd'},{a:'PLAN-SSBN',b:'PLAC2',type:'cmd'},
+  {a:'PLARTY',b:'PLAC2',type:'cmd'},
+  // Cross (threat/engagement)
+  {a:'DF21',b:'CVN-76',type:'threat'},{a:'DF26',b:'5AFCMD',type:'threat'},
+  {a:'J20',b:'F22',type:'engagement'},{a:'PLANEW',b:'CYBER7',type:'engagement'},
+  {a:'PLAN-SSBN',b:'SSN-780',type:'engagement'},{a:'T055',b:'CG-52',type:'engagement'},
+  {a:'PLACY',b:'GPS3',type:'threat'},
+];
+
+function drawGraph(){
+  const svg=document.getElementById('graph-canvas');
+  if(!svg)return;
+  const W=svg.clientWidth||900,H=svg.clientHeight||600;
+  svg.innerHTML='';
+  const isDark=document.body.classList.contains('dark');
+  const COLORS={
+    blue:{fill:'#2563eb',stroke:'#1d4ed8',soft:'rgba(37,99,235,.12)'},
+    red:{fill:'#dc2626',stroke:'#b91c1c',soft:'rgba(220,38,38,.12)'},
+    neutral:{fill:'#d97706',stroke:'#b45309',soft:'rgba(217,119,6,.1)'},
+  };
+  const domShape={air:'triangle',maritime:'ship',land:'square',cyber:'diamond',space:'circle'};
+  const EDGE_STYLES={
+    cmd:{stroke:'#4f46e5',opacity:.5,dash:'none',width:1.5},
+    escort:{stroke:'#2563eb',opacity:.35,dash:'none',width:1},
+    support:{stroke:'#7c73f0',opacity:.28,dash:'4 3',width:1},
+    intel:{stroke:'#0891b2',opacity:.4,dash:'3 3',width:1},
+    allied:{stroke:'#16a34a',opacity:.35,dash:'5 2',width:1.5},
+    threat:{stroke:'#dc2626',opacity:.5,dash:'4 2',width:1.5},
+    engagement:{stroke:'#f97316',opacity:.4,dash:'3 2',width:1.2},
+  };
+
+  // Build position map
+  const pos={};
+  GRAPH_NODES.forEach(n=>{
+    pos[n.id]={x:n.x*W,y:n.y*H};
+  });
+
+  // Draw soft halos for clusters
+  const blueCenter={x:W*0.22,y:H*0.38};
+  const redCenter={x:W*0.67,y:H*0.42};
+  [blueCenter,redCenter].forEach((c,i)=>{
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',c.x);circle.setAttribute('cy',c.y);
+    circle.setAttribute('r',H*0.28);
+    circle.setAttribute('fill',i===0?'rgba(37,99,235,.04)':'rgba(220,38,38,.04)');
+    circle.setAttribute('stroke',i===0?'rgba(37,99,235,.08)':'rgba(220,38,38,.08)');
+    circle.setAttribute('stroke-width','1');
+    svg.appendChild(circle);
+  });
+
+  // Draw edges
+  GRAPH_EDGES.forEach(e=>{
+    const a=pos[e.a],b=pos[e.b];
+    if(!a||!b)return;
+    const s=EDGE_STYLES[e.type]||EDGE_STYLES.support;
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',a.x);line.setAttribute('y1',a.y);
+    line.setAttribute('x2',b.x);line.setAttribute('y2',b.y);
+    line.setAttribute('stroke',s.stroke);line.setAttribute('stroke-width',s.width);
+    line.setAttribute('stroke-opacity',s.opacity);
+    if(s.dash!=='none')line.setAttribute('stroke-dasharray',s.dash);
+    svg.appendChild(line);
+  });
+
+  // Draw nodes
+  const tt=document.getElementById('tooltip');
+  GRAPH_NODES.forEach(n=>{
+    const p=pos[n.id];
+    const c=COLORS[n.team];
+    const r=n.size;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.style.cursor='pointer';
+
+    // Soft glow
+    const glow=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    glow.setAttribute('cx',p.x);glow.setAttribute('cy',p.y);glow.setAttribute('r',r+5);
+    glow.setAttribute('fill',c.soft);glow.setAttribute('stroke','none');
+    g.appendChild(glow);
+
+    // Shape by domain
+    const shape=domShape[n.domain];
+    let shapeEl;
+    if(shape==='circle'){
+      shapeEl=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      shapeEl.setAttribute('cx',p.x);shapeEl.setAttribute('cy',p.y);shapeEl.setAttribute('r',r);
+    } else if(shape==='square'){
+      shapeEl=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      shapeEl.setAttribute('x',p.x-r);shapeEl.setAttribute('y',p.y-r);
+      shapeEl.setAttribute('width',r*2);shapeEl.setAttribute('height',r*2);shapeEl.setAttribute('rx',3);
+    } else if(shape==='triangle'){
+      const tx=p.x,ty=p.y;
+      shapeEl=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      shapeEl.setAttribute('points',`${tx},${ty-r} ${tx+r*.9},${ty+r*.7} ${tx-r*.9},${ty+r*.7}`);
+    } else if(shape==='ship'){
+      shapeEl=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+      shapeEl.setAttribute('cx',p.x);shapeEl.setAttribute('cy',p.y);
+      shapeEl.setAttribute('rx',r*1.4);shapeEl.setAttribute('ry',r*.7);
+    } else {
+      shapeEl=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      const d=r;
+      shapeEl.setAttribute('points',`${p.x},${p.y-d} ${p.x+d},${p.y} ${p.x},${p.y+d} ${p.x-d},${p.y}`);
+    }
+    shapeEl.setAttribute('fill',c.fill);
+    shapeEl.setAttribute('fill-opacity',n.isC2?'0.9':'0.7');
+    shapeEl.setAttribute('stroke',c.stroke);
+    shapeEl.setAttribute('stroke-width',n.isC2?'2':'1.5');
+    g.appendChild(shapeEl);
+
+    // Label
+    const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x',p.x);lbl.setAttribute('y',p.y+r+11);
+    lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('font-size','9');lbl.setAttribute('font-weight','500');
+    lbl.setAttribute('fill',isDark?'rgba(244,244,243,.7)':'rgba(15,15,14,.6)');
+    lbl.setAttribute('font-family','Inter,sans-serif');
+    lbl.textContent=n.label;
+    g.appendChild(lbl);
+
+    // Tooltip
+    const unit=UNITS.find(u=>u.name.toLowerCase().includes(n.id.toLowerCase().slice(0,4)))||
+      UNITS.find(u=>u.team.toLowerCase()===n.team&&u.domain.toLowerCase()===n.domain)||
+      {status:'Active',threat:n.size-4};
+    g.addEventListener('mouseenter',ev=>{
+      document.getElementById('tt-name').textContent=n.label;
+      document.getElementById('tt-domain').textContent=n.domain.charAt(0).toUpperCase()+n.domain.slice(1);
+      document.getElementById('tt-team').textContent=n.team.charAt(0).toUpperCase()+n.team.slice(1);
+      document.getElementById('tt-status').textContent=unit.status||'Unknown';
+      document.getElementById('tt-threat').textContent=unit.threat!=null?(unit.threat+'/10'):'—';
+      tt.style.opacity='1';
+      tt.style.left=(ev.clientX+14)+'px';tt.style.top=(ev.clientY-20)+'px';
+    });
+    g.addEventListener('mousemove',ev=>{
+      tt.style.left=(ev.clientX+14)+'px';tt.style.top=(ev.clientY-20)+'px';
+    });
+    g.addEventListener('mouseleave',()=>{tt.style.opacity='0'});
+
+    svg.appendChild(g);
+  });
+}
+
+// ── MAP VIEW ──
+function drawMap(){
+  const svg=document.getElementById('map-svg');
+  if(svg.children.length>2)return;
+  // Simple geographic sketch of Taiwan Strait region
+  const W=900,H=600;
+  svg.innerHTML='';
+
+  // Sea background
+  const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('width',W);bg.setAttribute('height',H);
+  bg.setAttribute('fill','#c8ddf0');svg.appendChild(bg);
+
+  // Grid lines (lat/lon suggestion)
+  for(let i=0;i<10;i++){
+    const gl=document.createElementNS('http://www.w3.org/2000/svg','line');
+    gl.setAttribute('x1',i*(W/10));gl.setAttribute('y1',0);gl.setAttribute('x2',i*(W/10));gl.setAttribute('y2',H);
+    gl.setAttribute('stroke','rgba(255,255,255,.3)');gl.setAttribute('stroke-width','0.5');svg.appendChild(gl);
+    const hl=document.createElementNS('http://www.w3.org/2000/svg','line');
+    hl.setAttribute('x1',0);hl.setAttribute('y1',i*(H/10));hl.setAttribute('x2',W);hl.setAttribute('y2',i*(H/10));
+    hl.setAttribute('stroke','rgba(255,255,255,.3)');hl.setAttribute('stroke-width','0.5');svg.appendChild(hl);
+  }
+
+  // Landmasses (stylized)
+  function land(pts,fill){
+    const p=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    p.setAttribute('points',pts);p.setAttribute('fill',fill||'#d4c9a8');
+    p.setAttribute('stroke','#b8a88a');p.setAttribute('stroke-width','1');svg.appendChild(p);
+  }
+  // China coast (left edge)
+  land('0,0 120,0 140,80 130,180 150,300 140,420 110,520 80,600 0,600','#c8be9d');
+  // Taiwan island
+  land('440,180 460,160 480,170 490,200 485,260 470,310 450,340 430,320 420,270 425,220','#d4c9a8');
+  // Okinawa
+  land('700,110 720,108 730,120 720,135 705,130','#d4c9a8');
+  // Ryukyu chain (dots)
+  [[630,150],[650,160],[660,175],[670,190]].forEach(([x,y])=>{
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',5);
+    c.setAttribute('fill','#d4c9a8');c.setAttribute('stroke','#b8a88a');c.setAttribute('stroke-width','1');
+    svg.appendChild(c);
+  });
+  // Guam (far right)
+  land('840,340 858,336 862,350 855,360 842,355','#d4c9a8');
+
+  // Threat arcs from China coast
+  function arc(cx,cy,rx,ry,color,dash){
+    const el=document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+    el.setAttribute('cx',cx);el.setAttribute('cy',cy);el.setAttribute('rx',rx);el.setAttribute('ry',ry);
+    el.setAttribute('fill','none');el.setAttribute('stroke',color);el.setAttribute('stroke-width','1.5');
+    el.setAttribute('stroke-dasharray',dash||'none');el.setAttribute('stroke-opacity','0.5');
+    svg.appendChild(el);
+  }
+  arc(130,300,260,220,'#dc2626','6 4');
+  arc(130,300,400,340,'#dc2626','4 6');
+  arc(130,300,560,480,'#f97316','3 8');
+
+  // Blue denial zone arc
+  const blueArc=document.createElementNS('http://www.w3.org/2000/svg','path');
+  blueArc.setAttribute('d','M 660 100 Q 580 300 640 520');
+  blueArc.setAttribute('fill','none');blueArc.setAttribute('stroke','#2563eb');
+  blueArc.setAttribute('stroke-width','2');blueArc.setAttribute('stroke-dasharray','8 4');
+  blueArc.setAttribute('stroke-opacity','0.6');svg.appendChild(blueArc);
+  // Label
+  const blbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+  blbl.setAttribute('x',674);blbl.setAttribute('y',300);blbl.setAttribute('fill','#2563eb');
+  blbl.setAttribute('font-size','10');blbl.setAttribute('font-family','Inter,sans-serif');
+  blbl.setAttribute('font-weight','600');blbl.setAttribute('transform','rotate(5 674 300)');
+  blbl.textContent='1st Island Chain Denial Zone';svg.appendChild(blbl);
+
+  // Unit markers on map
+  const MARKERS=[
+    {x:520,y:90,team:'blue',label:'CVN-76',size:14,domain:'maritime'},
+    {x:580,y:200,team:'blue',label:'SSN-780',size:9,domain:'maritime'},
+    {x:710,y:125,team:'blue',label:'JMSDF TG',size:10,domain:'maritime'},
+    {x:750,y:160,team:'blue',label:'F-22 Det',size:10,domain:'air'},
+    {x:850,y,label:'MQ-9',size:8,team:'blue',domain:'air'},
+    {x:465,y:340,team:'blue',label:'ROCN',size:8,domain:'maritime'},
+    {x:660,y:350,team:'blue',label:'HIMARS',size:9,domain:'land'},
+    {x:250,y:290,team:'red',label:'PLAN CV',size:14,domain:'maritime'},
+    {x:300,y:380,team:'red',label:'LST Convoy',size:12,domain:'maritime'},
+    {x:200,y:180,team:'red',label:'J-20 Regt',size:10,domain:'air'},
+    {x:220,y:230,team:'red',label:'DF-21D',size:10,domain:'air'},
+    {x:320,y:440,team:'red',label:'Type-055',size:9,domain:'maritime'},
+    {x:380,y:480,team:'red',label:'PLA Arty',size:9,domain:'land'},
+  ];
+  MARKERS.forEach(m=>{
+    if(m.x===undefined||m.y===undefined)return;
+    const col=m.team==='blue'?'#2563eb':'#dc2626';
+    const mg=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const mc=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    mc.setAttribute('cx',m.x);mc.setAttribute('cy',m.y);mc.setAttribute('r',m.size*0.7);
+    mc.setAttribute('fill',col);mc.setAttribute('fill-opacity','0.75');
+    mc.setAttribute('stroke',col);mc.setAttribute('stroke-width','1.5');mg.appendChild(mc);
+    const ml=document.createElementNS('http://www.w3.org/2000/svg','text');
+    ml.setAttribute('x',m.x);ml.setAttribute('y',m.y+m.size+8);
+    ml.setAttribute('text-anchor','middle');ml.setAttribute('font-size','8');
+    ml.setAttribute('font-family','Inter,sans-serif');ml.setAttribute('font-weight','500');
+    ml.setAttribute('fill',col);ml.textContent=m.label;mg.appendChild(ml);
+    svg.appendChild(mg);
+  });
+
+  // Labels
+  function mapLabel(x,y,txt,size,color,weight){
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x);t.setAttribute('y',y);t.setAttribute('fill',color||'rgba(15,15,14,.5)');
+    t.setAttribute('font-size',size||10);t.setAttribute('font-family','Inter,sans-serif');
+    t.setAttribute('font-weight',weight||'400');t.textContent=txt;svg.appendChild(t);
+  }
+  mapLabel(30,50,'FUJIAN',9,'rgba(100,80,60,.6)','600');
+  mapLabel(430,250,'TAIWAN',10,'rgba(80,70,50,.7)','600');
+  mapLabel(300,100,'EAST CHINA SEA',9,'rgba(30,60,120,.5)','500');
+  mapLabel(380,500,'SOUTH CHINA SEA',9,'rgba(30,60,120,.5)','500');
+  mapLabel(640,80,'OKINAWA',8,'rgba(80,70,50,.6)','500');
+  mapLabel(820,345,'GUAM',8,'rgba(80,70,50,.6)','500');
+  // Notional watermark
+  mapLabel(320,580,'NOTIONAL // UNCLASSIFIED — Not operational data',8,'rgba(80,60,60,.5)','400');
+}
+
+// ── TASK ORG ──
+function drawTaskOrg(){
+  const svg=document.getElementById('taskorg-svg');
+  if(svg.children.length>0)return;
+
+  function box(x,y,w,h,label,sub,color){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x',x);r.setAttribute('y',y);r.setAttribute('width',w);r.setAttribute('height',h);
+    r.setAttribute('rx','6');r.setAttribute('fill',color||'var(--surface2)');
+    r.setAttribute('stroke',color?color:'var(--border)');r.setAttribute('stroke-width','1.5');
+    r.setAttribute('fill-opacity','0.12');g.appendChild(r);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x+w/2);t.setAttribute('y',y+h/2-4);t.setAttribute('text-anchor','middle');
+    t.setAttribute('font-size','11');t.setAttribute('font-weight','600');t.setAttribute('fill',color||'#333');
+    t.setAttribute('font-family','Inter,sans-serif');t.textContent=label;g.appendChild(t);
+    if(sub){
+      const s=document.createElementNS('http://www.w3.org/2000/svg','text');
+      s.setAttribute('x',x+w/2);s.setAttribute('y',y+h/2+10);s.setAttribute('text-anchor','middle');
+      s.setAttribute('font-size','9');s.setAttribute('fill',color||'#888');
+      s.setAttribute('font-family','Inter,sans-serif');s.textContent=sub;g.appendChild(s);
+    }
+    svg.appendChild(g);
+  }
+  function conn(x1,y1,x2,y2,color){
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+    l.setAttribute('stroke',color||'var(--border2)');l.setAttribute('stroke-width','1.5');svg.appendChild(l);
+  }
+  // HQ
+  box(310,10,200,44,'INDOPACOM HQ','Joint Task Force — Denial Ops','#4f46e5');
+  // Lines down
+  conn(410,54,410,80);
+  conn(120,80,700,80);
+  // Level 2
+  [[120,80],[300,80],[500,80],[680,80]].forEach(([x])=>{
+    conn(x,80,x,100);
+  });
+  box(60,100,120,40,'CSFTF','Maritime Force','#2563eb');
+  box(240,100,120,40,'JFACC','Air Force','#2563eb');
+  box(440,100,120,40,'ARFOR-J','Land Force','#2563eb');
+  box(620,100,120,40,'JFCC-C','Cyber/Space','#7c3aed');
+  // Level 3 lines
+  [[120,140,'JMSDF TG','DDG×4,CVN','#2563eb'],
+   [120,185,'CVN-76 BG','CVN,CG,DDG×2','#2563eb']].forEach(([x,y2,l,s,c])=>{
+    conn(120,140,120,y2-10);
+    box(60,y2,120,36,l,s,c);
+  });
+  [[300,155,'18th Wing','F-22,F-35B','#2563eb'],
+   [300,200,'P-8A / MQ-9','ISR/ASW','#0891b2']].forEach(([x,y2,l,s,c])=>{
+    conn(300,140,300,y2-10);
+    box(240,y2,120,36,l,s,c);
+  });
+  [[500,155,'31 MEU','Amphib Ready','#2563eb'],
+   [500,200,'HIMARS Btry','Miyako-jima','#2563eb']].forEach(([x,y2,l,s,c])=>{
+    conn(500,140,500,y2-10);
+    box(440,y2,120,36,l,s,c);
+  });
+  [[680,155,'Cyber NMT-7','Offensive Cyber','#7c3aed'],
+   [680,200,'GPS-III/Sat','Space Support','#0891b2']].forEach(([x,y2,l,s,c])=>{
+    conn(680,140,680,y2-10);
+    box(620,y2,120,36,l,s,c);
+  });
+
+  // Bottom note
+  const note=document.createElementNS('http://www.w3.org/2000/svg','text');
+  note.setAttribute('x',410);note.setAttribute('y',270);note.setAttribute('text-anchor','middle');
+  note.setAttribute('font-size','9');note.setAttribute('fill','rgba(100,100,100,.6)');
+  note.setAttribute('font-family','Inter,sans-serif');
+  note.textContent='NOTIONAL // Task Organization — COA-B "Island Chain Strike" — Unclassified';
+  svg.appendChild(note);
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded',()=>{
+  // slight delay so SVG has dimensions
+  requestAnimationFrame(()=>setTimeout(drawGraph,120));
+});
+window.addEventListener('resize',()=>{
+  if(!document.getElementById('graph-view').classList.contains('hidden'))drawGraph();
+});
+</script>
+</body>
+</html>

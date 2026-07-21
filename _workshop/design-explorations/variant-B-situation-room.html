@@ -1,0 +1,1940 @@
+<!--
+  DESIGN RATIONALE: Variant B "Situation Room" takes its cue from the wall of a Joint Operations Center —
+  cartographic authority, deep navy ground with muted parchment-topo overlays, NATO APP-6-style symbology
+  in restrained ochre/slate, and a classic grotesque type hierarchy. The denial-MOE panel anchors the
+  strategic frame: success is measured by whether the adversary's operation culminates, not by attrition.
+  NOTIONAL // UNCLASSIFIED // FOR DESIGN REVIEW ONLY
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRATCOM JOINT PLANNING TOOL — NOTIONAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-deepest: #0a0e1a;
+  --navy-deep: #0d1424;
+  --navy-mid: #131d30;
+  --navy-surface: #192540;
+  --navy-border: #1e2d4a;
+  --navy-line: #243357;
+  --slate-dark: #2a3a56;
+  --slate-mid: #3d4f6e;
+  --slate-light: #5c6f8a;
+  --slate-lighter: #7a8fa8;
+  --slate-muted: #9dafc4;
+  --parchment: #c8bfa0;
+  --parchment-dim: #a09880;
+  --parchment-faint: #6b6248;
+  --amber: #c8943a;
+  --amber-dim: #a07828;
+  --amber-bright: #e0aa48;
+  --blue-friendly: #4a7fc0;
+  --blue-friendly-dim: #2d5a96;
+  --blue-friendly-bright: #6a9fd8;
+  --red-hostile: #b84040;
+  --red-hostile-dim: #8a2828;
+  --red-hostile-bright: #d05050;
+  --green-go: #4a8a60;
+  --green-go-bright: #60a878;
+  --yellow-warn: #c8a030;
+  --text-primary: #d4cbb8;
+  --text-secondary: #9dafc4;
+  --text-muted: #5c6f8a;
+  --text-label: #7a8fa8;
+  --text-bright: #e8e0cc;
+  --class-unclass: #4a8a60;
+  --rail-width: 260px;
+  --cmd-height: 52px;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-serif: 'Playfair Display', Georgia, serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--navy-deepest);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* ── CLASSIFICATION BAR ── */
+.classbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  height: 20px;
+  background: var(--navy-deepest);
+  border-bottom: 1px solid var(--class-unclass);
+  display: flex; align-items: center; justify-content: center;
+  gap: 24px;
+}
+.classbar-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--class-unclass);
+}
+
+/* ── COMMAND BAR ── */
+.cmdbar {
+  position: fixed; top: 20px; left: 0; right: 0; z-index: 999;
+  height: var(--cmd-height);
+  background: var(--navy-deep);
+  border-bottom: 1px solid var(--navy-line);
+  display: flex; align-items: center;
+  padding: 0 16px;
+  gap: 0;
+}
+
+.brand {
+  display: flex; align-items: baseline; gap: 8px;
+  padding-right: 20px;
+  border-right: 1px solid var(--navy-line);
+  flex-shrink: 0;
+}
+.brand-acronym {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--parchment);
+  letter-spacing: 0.06em;
+}
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--parchment-faint);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.view-switcher {
+  display: flex; align-items: center;
+  padding: 0 16px;
+  gap: 2px;
+  border-right: 1px solid var(--navy-line);
+}
+.view-btn {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--slate-lighter);
+  padding: 6px 12px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.view-btn:hover { background: var(--navy-surface); color: var(--text-primary); }
+.view-btn.active {
+  background: var(--slate-dark);
+  color: var(--parchment);
+  border: 1px solid var(--navy-line);
+}
+.view-btn svg { opacity: 0.7; }
+.view-btn.active svg { opacity: 1; }
+
+.cmdbar-spacer { flex: 1; }
+
+.global-actions {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 16px;
+  border-right: 1px solid var(--navy-line);
+}
+.action-btn {
+  background: none; border: 1px solid var(--navy-line); cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: var(--slate-lighter);
+  padding: 5px 12px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.action-btn:hover {
+  background: var(--navy-surface);
+  color: var(--text-primary);
+  border-color: var(--slate-mid);
+}
+.action-btn.primary {
+  background: var(--blue-friendly-dim);
+  border-color: var(--blue-friendly);
+  color: var(--text-bright);
+}
+.action-btn.primary:hover { background: var(--blue-friendly); }
+
+.live-status {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 16px;
+}
+.status-sector {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--slate-muted);
+  letter-spacing: 0.08em;
+}
+.status-sector span { color: var(--parchment-dim); }
+.clock {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--parchment);
+  letter-spacing: 0.1em;
+}
+.posture-badge {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--navy-surface);
+  border: 1px solid var(--amber-dim);
+  border-radius: 3px;
+  padding: 3px 8px;
+}
+.posture-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: pulse-amber 2s ease-in-out infinite;
+}
+@keyframes pulse-amber {
+  0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(200,148,58,0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(200,148,58,0); }
+}
+.posture-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 0.1em;
+}
+
+/* ── LAYOUT ── */
+.app-layout {
+  position: fixed;
+  top: calc(20px + var(--cmd-height));
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+}
+
+/* ── LEFT RAIL ── */
+.left-rail {
+  width: var(--rail-width);
+  background: var(--navy-deep);
+  border-right: 1px solid var(--navy-line);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.rail-section {
+  border-bottom: 1px solid var(--navy-border);
+  padding: 12px 14px;
+}
+.rail-section:last-child { border-bottom: none; flex: 1; overflow-y: auto; }
+
+.rail-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rail-label-action {
+  font-size: 9px; color: var(--blue-friendly); cursor: pointer;
+  letter-spacing: 0.06em;
+}
+.rail-label-action:hover { color: var(--blue-friendly-bright); }
+
+/* Domain filters */
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.filter-row:hover { background: var(--navy-surface); }
+.filter-check {
+  width: 13px; height: 13px;
+  border: 1px solid var(--slate-mid);
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.filter-check.checked {
+  background: var(--blue-friendly-dim);
+  border-color: var(--blue-friendly);
+}
+.filter-check.checked::after {
+  content: '';
+  width: 5px; height: 3px;
+  border-left: 1.5px solid white;
+  border-bottom: 1.5px solid white;
+  transform: rotate(-45deg) translateY(-1px);
+  display: block;
+}
+.filter-icon { font-size: 11px; width: 16px; text-align: center; }
+.filter-name {
+  font-size: 11px; color: var(--text-secondary); flex: 1;
+}
+.filter-count {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--text-muted);
+}
+
+/* Highlight toggles */
+.toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.toggle-pip {
+  width: 28px; height: 14px;
+  border-radius: 7px;
+  background: var(--navy-surface);
+  border: 1px solid var(--slate-dark);
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.toggle-pip.on { background: var(--blue-friendly-dim); border-color: var(--blue-friendly); }
+.toggle-pip::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--slate-mid);
+  transition: all 0.2s;
+}
+.toggle-pip.on::after { left: 16px; background: white; }
+.toggle-name { font-size: 11px; color: var(--text-secondary); }
+
+/* Import/Export */
+.io-row {
+  display: flex; gap: 6px;
+}
+.io-btn {
+  flex: 1;
+  background: var(--navy-surface);
+  border: 1px solid var(--navy-line);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.12s;
+}
+.io-btn:hover { border-color: var(--slate-mid); color: var(--text-primary); }
+
+/* Legend */
+.legend-grid { display: flex; flex-direction: column; gap: 5px; }
+.legend-row { display: flex; align-items: center; gap: 8px; }
+.legend-sym {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.legend-label { font-size: 10px; color: var(--text-secondary); }
+
+/* Event log */
+.event-log { display: flex; flex-direction: column; gap: 0; }
+.event-entry {
+  padding: 7px 0;
+  border-bottom: 1px solid var(--navy-border);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.event-entry:last-child { border-bottom: none; }
+.event-time {
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--text-muted);
+}
+.event-text { font-size: 11px; color: var(--text-secondary); line-height: 1.35; }
+.event-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-top: 2px;
+  width: fit-content;
+}
+.event-tag.intel { background: rgba(74,127,192,0.2); color: var(--blue-friendly-bright); border: 1px solid rgba(74,127,192,0.3); }
+.event-tag.warning { background: rgba(200,160,48,0.2); color: var(--yellow-warn); border: 1px solid rgba(200,160,48,0.3); }
+.event-tag.strike { background: rgba(184,64,64,0.2); color: var(--red-hostile-bright); border: 1px solid rgba(184,64,64,0.3); }
+.event-tag.logistics { background: rgba(74,138,96,0.2); color: var(--green-go-bright); border: 1px solid rgba(74,138,96,0.3); }
+
+/* ── MAIN VIEW ── */
+.main-view {
+  flex: 1;
+  background: var(--navy-mid);
+  position: relative;
+  overflow: hidden;
+}
+
+/* View panels */
+.view-panel {
+  position: absolute; inset: 0;
+  display: none;
+}
+.view-panel.active { display: flex; flex-direction: column; }
+
+/* Map view */
+#view-map {
+  background: #0f1826;
+}
+.map-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.map-svg {
+  width: 100%; height: 100%;
+}
+
+/* Map overlay controls */
+.map-controls {
+  position: absolute;
+  bottom: 16px; left: 16px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.map-ctrl-btn {
+  width: 28px; height: 28px;
+  background: var(--navy-deep);
+  border: 1px solid var(--navy-line);
+  color: var(--text-secondary);
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.map-ctrl-btn:hover { background: var(--navy-surface); color: var(--text-primary); }
+.map-ctrl-btn:first-child { border-radius: 3px 3px 0 0; }
+.map-ctrl-btn:last-child { border-radius: 0 0 3px 3px; }
+
+.map-scale {
+  position: absolute; bottom: 16px; right: 16px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+}
+.scale-bar {
+  width: 80px; height: 4px;
+  background: linear-gradient(to right, var(--parchment-dim) 50%, transparent 50%);
+  background-size: 20px 4px;
+  border: 1px solid var(--parchment-dim);
+}
+.scale-label {
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--parchment-faint);
+  letter-spacing: 0.06em;
+}
+
+.map-phase-bar {
+  height: 32px;
+  background: var(--navy-deep);
+  border-top: 1px solid var(--navy-line);
+  display: flex; align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+}
+.phase-label {
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--text-muted);
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+.phase-steps { display: flex; align-items: center; gap: 0; flex: 1; }
+.phase-step {
+  flex: 1;
+  height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border: 1px solid var(--navy-line);
+  border-right: none;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.phase-step:last-child { border-right: 1px solid var(--navy-line); }
+.phase-step:hover { background: var(--navy-surface); color: var(--text-secondary); }
+.phase-step.active { background: var(--slate-dark); color: var(--parchment); border-color: var(--slate-mid); }
+.phase-step.complete { background: rgba(74,138,96,0.15); color: var(--green-go); border-color: rgba(74,138,96,0.3); }
+
+/* Force graph view */
+#view-graph { background: var(--navy-mid); align-items: center; justify-content: center; }
+.graph-svg { width: 100%; height: 100%; }
+
+/* Table view */
+#view-table {
+  background: var(--navy-mid);
+  padding: 16px;
+  overflow-y: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.data-table th {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--navy-line);
+  background: var(--navy-deep);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--navy-border);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.data-table tr:hover td { background: var(--navy-surface); }
+.data-table .col-id { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.data-table .col-name { color: var(--text-primary); font-weight: 500; }
+.data-table .col-domain { }
+.data-table .col-status { }
+.status-pill {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+}
+.status-pill.ready { background: rgba(74,138,96,0.2); color: var(--green-go-bright); border: 1px solid rgba(74,138,96,0.3); }
+.status-pill.tasked { background: rgba(74,127,192,0.2); color: var(--blue-friendly-bright); border: 1px solid rgba(74,127,192,0.3); }
+.status-pill.degraded { background: rgba(200,160,48,0.2); color: var(--yellow-warn); border: 1px solid rgba(200,160,48,0.3); }
+.status-pill.unavail { background: rgba(184,64,64,0.15); color: var(--red-hostile-bright); border: 1px solid rgba(184,64,64,0.2); }
+
+/* Task org view */
+#view-taskorg { background: var(--navy-mid); padding: 16px; overflow: auto; }
+
+/* ── RIGHT RAIL ── */
+.right-rail {
+  width: 300px;
+  background: var(--navy-deep);
+  border-left: 1px solid var(--navy-line);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.r-section {
+  border-bottom: 1px solid var(--navy-border);
+  padding: 14px 14px;
+}
+.r-section:last-child { border-bottom: none; }
+.r-section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Team summary */
+.team-cards { display: flex; flex-direction: column; gap: 6px; }
+.team-card {
+  background: var(--navy-surface);
+  border: 1px solid var(--navy-line);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.team-card:hover { border-color: var(--slate-mid); background: var(--slate-dark); }
+.team-card-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.team-card-name { font-size: 11px; font-weight: 500; color: var(--text-primary); flex: 1; }
+.team-card-role { font-size: 10px; color: var(--text-muted); }
+.team-card-count {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--text-secondary);
+}
+
+/* COA Builder */
+.coa-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.coa-label {
+  font-size: 10px; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.coa-label-val {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--parchment-dim);
+}
+.coa-slider {
+  -webkit-appearance: none;
+  width: 100%; height: 3px;
+  background: var(--navy-line);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.coa-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--blue-friendly);
+  border: 2px solid var(--navy-deep);
+  cursor: pointer;
+}
+.coa-options { display: flex; flex-direction: column; gap: 4px; }
+.coa-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--navy-line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.coa-option:hover { border-color: var(--slate-mid); background: var(--navy-surface); }
+.coa-option.selected {
+  border-color: var(--blue-friendly-dim);
+  background: rgba(74,127,192,0.1);
+}
+.coa-option-radio {
+  width: 11px; height: 11px;
+  border: 1px solid var(--slate-mid);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.coa-option.selected .coa-option-radio {
+  border-color: var(--blue-friendly);
+  background: var(--blue-friendly);
+}
+.coa-option.selected .coa-option-radio::after {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: white;
+}
+.coa-option-name { font-size: 11px; color: var(--text-secondary); flex: 1; }
+.coa-option.selected .coa-option-name { color: var(--text-primary); }
+
+/* Intent input */
+.intent-box {
+  width: 100%;
+  background: var(--navy-surface);
+  border: 1px solid var(--navy-line);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  padding: 8px 10px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.intent-box:focus { border-color: var(--blue-friendly-dim); }
+.intent-box::placeholder { color: var(--text-muted); }
+
+.generate-btn {
+  width: 100%;
+  background: var(--blue-friendly-dim);
+  border: 1px solid var(--blue-friendly);
+  border-radius: 3px;
+  color: var(--text-bright);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.generate-btn:hover { background: var(--blue-friendly); }
+.generate-btn.running { background: var(--slate-dark); border-color: var(--slate-mid); color: var(--text-muted); }
+
+/* MOE Panel — CENTERPIECE */
+.moe-panel {
+  background: var(--navy-surface);
+  border: 1px solid var(--navy-line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.moe-headline {
+  background: var(--slate-dark);
+  border-bottom: 1px solid var(--navy-line);
+  padding: 10px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.moe-verdict {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.moe-verdict.success { color: var(--green-go-bright); }
+.moe-verdict.warn { color: var(--yellow-warn); }
+.moe-runs {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.moe-ci-row {
+  padding: 12px;
+  border-bottom: 1px solid var(--navy-border);
+}
+.moe-ci-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.moe-ci-track {
+  height: 20px;
+  background: var(--navy-mid);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.moe-ci-fill {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: rgba(74,138,96,0.35);
+  border-left: 2px solid var(--green-go);
+  border-right: 2px solid var(--green-go);
+}
+.moe-ci-median {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--green-go-bright);
+}
+.moe-ci-labels {
+  display: flex; justify-content: space-between;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--text-muted);
+}
+.moe-ci-center {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--green-go-bright);
+  font-weight: 500;
+}
+
+.moe-effects { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.moe-effect-row { display: flex; flex-direction: column; gap: 4px; }
+.moe-effect-label {
+  font-size: 10px; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.moe-effect-val {
+  font-family: var(--font-mono);
+  font-size: 11px; font-weight: 500;
+}
+.moe-effect-val.good { color: var(--green-go-bright); }
+.moe-effect-val.warn { color: var(--yellow-warn); }
+.moe-bar-track {
+  height: 4px;
+  background: var(--navy-mid);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.moe-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.8s ease;
+}
+.moe-bar-fill.good { background: var(--green-go); }
+.moe-bar-fill.partial { background: var(--yellow-warn); }
+.moe-bar-fill.bad { background: var(--red-hostile); }
+
+.moe-halt-row {
+  border-top: 1px solid var(--navy-border);
+  padding: 10px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.moe-halt-label { font-size: 10px; color: var(--text-secondary); }
+.moe-halt-pct {
+  font-family: var(--font-serif);
+  font-size: 20px; font-weight: 700;
+  color: var(--green-go-bright);
+}
+.moe-halt-sub {
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--navy-deepest); }
+::-webkit-scrollbar-thumb { background: var(--slate-dark); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--slate-mid); }
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  background: var(--navy-deep);
+  border: 1px solid var(--slate-mid);
+  border-radius: 4px;
+  padding: 8px 10px;
+  pointer-events: none;
+  z-index: 500;
+  font-size: 11px;
+  color: var(--text-primary);
+  opacity: 0;
+  transition: opacity 0.15s;
+  max-width: 200px;
+}
+.tooltip.visible { opacity: 1; }
+.tooltip-title { font-weight: 600; margin-bottom: 3px; }
+.tooltip-row { font-size: 10px; color: var(--text-secondary); }
+
+/* Task org tree */
+.taskorg-root { display: flex; flex-direction: column; gap: 0; }
+.taskorg-node {
+  display: flex;
+  flex-direction: column;
+}
+.taskorg-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--navy-line);
+  background: var(--navy-surface);
+  border-radius: 3px;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.taskorg-indent { padding-left: 20px; }
+.taskorg-sym { flex-shrink: 0; }
+.taskorg-name { font-size: 11px; font-weight: 500; color: var(--text-primary); flex: 1; }
+.taskorg-type { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.taskorg-strength { font-family: var(--font-mono); font-size: 9px; color: var(--text-secondary); }
+.taskorg-children { display: flex; flex-direction: column; gap: 2px; }
+
+/* Notification toast */
+.toast {
+  position: fixed;
+  bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--navy-deep);
+  border: 1px solid var(--blue-friendly);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-primary);
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* Progress bar (generate animation) */
+.progress-bar {
+  width: 100%; height: 2px;
+  background: var(--navy-line);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-top: 6px;
+  display: none;
+}
+.progress-bar.running { display: block; }
+.progress-fill {
+  height: 100%;
+  background: var(--blue-friendly);
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* Graticule overlay on map (decorative) */
+.graticule-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+}
+</style>
+</head>
+<body>
+
+<!-- Classification bar -->
+<div class="classbar">
+  <span class="classbar-text">NOTIONAL // UNCLASSIFIED // FOR DESIGN REVIEW ONLY // NOT OPERATIONAL DATA</span>
+</div>
+
+<!-- Command bar -->
+<div class="cmdbar">
+  <div class="brand">
+    <div>
+      <div class="brand-acronym">JPTS</div>
+      <div class="brand-sub">Joint Planning &amp; Target System</div>
+    </div>
+  </div>
+
+  <div class="view-switcher">
+    <button class="view-btn active" data-view="map" onclick="switchView('map')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1"/><path d="M1 4.5h10M1 7.5h10M4.5 1v10M7.5 1v10" stroke="currentColor" stroke-width="0.8" opacity="0.6"/></svg>
+      Map
+    </button>
+    <button class="view-btn" data-view="graph" onclick="switchView('graph')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1.5" stroke="currentColor" stroke-width="1"/><circle cx="10" cy="2" r="1.5" stroke="currentColor" stroke-width="1"/><circle cx="10" cy="10" r="1.5" stroke="currentColor" stroke-width="1"/><circle cx="6" cy="6" r="1.5" stroke="currentColor" stroke-width="1"/><path d="M3.5 6h1M7.5 6l1.3-3.3M7.5 6l1.3 3.3" stroke="currentColor" stroke-width="0.8"/></svg>
+      Force Graph
+    </button>
+    <button class="view-btn" data-view="table" onclick="switchView('table')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1"/><path d="M1 4h10M1 7h10M4 4v7" stroke="currentColor" stroke-width="0.8"/></svg>
+      Table
+    </button>
+    <button class="view-btn" data-view="taskorg" onclick="switchView('taskorg')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="4" y="1" width="4" height="2.5" rx="0.5" stroke="currentColor" stroke-width="1"/><rect x="1" y="8.5" width="3.5" height="2.5" rx="0.5" stroke="currentColor" stroke-width="1"/><rect x="7.5" y="8.5" width="3.5" height="2.5" rx="0.5" stroke="currentColor" stroke-width="1"/><path d="M6 3.5v2.5M3 6H9M3 6v2.5M9 6v2.5" stroke="currentColor" stroke-width="0.8"/></svg>
+      Task Org
+    </button>
+  </div>
+
+  <div class="cmdbar-spacer"></div>
+
+  <div class="global-actions">
+    <button class="action-btn" onclick="showToast('Campaign Planner — feature active')">Campaign Planner</button>
+    <button class="action-btn primary" onclick="showToast('War Game simulation initializing…')">⬡ War Game</button>
+  </div>
+
+  <div class="live-status">
+    <div class="status-sector"><span>INDOPACOM</span> · TAIWAN STRAIT</div>
+    <div class="clock" id="utcClock">--:--:-- Z</div>
+    <div class="posture-badge">
+      <div class="posture-dot"></div>
+      <span class="posture-label">WATCHCON II</span>
+    </div>
+  </div>
+</div>
+
+<!-- App layout -->
+<div class="app-layout">
+
+  <!-- ── LEFT RAIL ── -->
+  <div class="left-rail">
+    <div class="rail-section">
+      <div class="rail-label">Domain Filter</div>
+      <div class="filter-group" id="domainFilters">
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div class="filter-icon">✈</div>
+          <div class="filter-name">Air</div>
+          <div class="filter-count">24</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div class="filter-icon">⚓</div>
+          <div class="filter-name">Maritime</div>
+          <div class="filter-count">31</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div class="filter-icon">⬛</div>
+          <div class="filter-name">Land</div>
+          <div class="filter-count">18</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div class="filter-icon">🛰</div>
+          <div class="filter-name">Space</div>
+          <div class="filter-count">6</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div class="filter-icon">⚡</div>
+          <div class="filter-name">Cyber / EW</div>
+          <div class="filter-count">9</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label">Highlights</div>
+      <div class="filter-group">
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--red-hostile);flex-shrink:0;margin:0 3px"></div>
+          <div class="filter-name">Red Dispositions</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--blue-friendly);flex-shrink:0;margin:0 3px"></div>
+          <div class="filter-name">Blue Dispositions</div>
+        </div>
+        <div class="filter-row" onclick="toggleFilter(this)">
+          <div class="filter-check checked"></div>
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--amber);flex-shrink:0;margin:0 3px"></div>
+          <div class="filter-name">Threat Rings</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
+        <div class="toggle-row" onclick="toggleToggle(this)">
+          <div class="toggle-pip on"></div>
+          <span class="toggle-name">IADS Coverage</span>
+        </div>
+        <div class="toggle-row" onclick="toggleToggle(this)">
+          <div class="toggle-pip on"></div>
+          <span class="toggle-name">Sea-denial Zones</span>
+        </div>
+        <div class="toggle-row" onclick="toggleToggle(this)">
+          <div class="toggle-pip"></div>
+          <span class="toggle-name">SIGINT Overlay</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label">Data</div>
+      <div class="io-row">
+        <button class="io-btn" onclick="showToast('Import dialog — feature active')">↑ Import SIPR</button>
+        <button class="io-btn" onclick="showToast('Exporting OPORD package…')">↓ Export OPORD</button>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-label">Legend</div>
+      <div class="legend-grid">
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><rect x="4" y="4" width="14" height="14" fill="none" stroke="#4a7fc0" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-label">Friendly Unit</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 4 L18 18 L4 18 Z" fill="none" stroke="#b84040" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-label">Hostile Unit</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><rect x="5" y="7" width="12" height="8" rx="4" fill="none" stroke="#b84040" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-label">Hostile Naval</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="7" fill="none" stroke="#c8943a" stroke-width="1" stroke-dasharray="3,2"/></svg>
+          </div>
+          <span class="legend-label">Threat Envelope</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><line x1="4" y1="11" x2="18" y2="11" stroke="#4a8a60" stroke-width="1.5" stroke-dasharray="4,2"/></svg>
+          </div>
+          <span class="legend-label">COA Axis</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-sym">
+            <svg width="22" height="22" viewBox="0 0 22 22"><rect x="4" y="9" width="14" height="4" fill="rgba(184,64,64,0.25)" stroke="#b84040" stroke-width="0.8" stroke-dasharray="2,1"/></svg>
+          </div>
+          <span class="legend-label">Red Amphibious Zone</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail-section" style="flex:1;overflow-y:auto;">
+      <div class="rail-label">
+        Event Log
+        <span class="rail-label-action">Clear</span>
+      </div>
+      <div class="event-log" id="eventLog">
+        <div class="event-entry">
+          <div class="event-time">D+02 · 0312Z</div>
+          <div class="event-text">PLAN amphibious group SHANDONG departs Zhoushan anchorage, bearing 095°</div>
+          <span class="event-tag warning">WARNING</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+02 · 0248Z</div>
+          <div class="event-text">USS THEODORE ROOSEVELT (CVN-71) EMCON Alpha, proceeding to Battle Position KESTREL</div>
+          <span class="event-tag intel">INTEL</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+02 · 0201Z</div>
+          <div class="event-text">ROCAF CAP established N of Penghu Islands; ROE confirmed defensive</div>
+          <span class="event-tag logistics">STATUS</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+01 · 2347Z</div>
+          <div class="event-text">PLAAF J-20 package, 24 ac, departed Fuzhou; track 185° descending</div>
+          <span class="event-tag strike">STRIKE</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+01 · 2218Z</div>
+          <div class="event-text">LONGBOW ARCHER ATACMS fire mission — Hualien, notional strike, MOE PENDING</div>
+          <span class="event-tag strike">STRIKE</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+01 · 1940Z</div>
+          <div class="event-text">Satellite track: 14 PLAN LSTs underway from Ningbo — ETA landing window D+04</div>
+          <span class="event-tag intel">INTEL</span>
+        </div>
+        <div class="event-entry">
+          <div class="event-time">D+01 · 1412Z</div>
+          <div class="event-text">Cyber effects confirmed: Xiamen port logistics SCADA degraded -38%</div>
+          <span class="event-tag logistics">CYBER</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAIN VIEW ── -->
+  <div class="main-view">
+
+    <!-- MAP VIEW -->
+    <div id="view-map" class="view-panel active">
+      <div class="map-container">
+        <!-- SVG Map -->
+        <svg class="map-svg" id="theaterMap" viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" style="cursor:crosshair;">
+          <!-- Ocean base -->
+          <defs>
+            <pattern id="grat" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#243357" stroke-width="0.4"/>
+            </pattern>
+            <pattern id="gratFine" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1a2540" stroke-width="0.2"/>
+            </pattern>
+            <radialGradient id="threatGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#b84040" stop-opacity="0.12"/>
+              <stop offset="100%" stop-color="#b84040" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="blueGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#4a7fc0" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#4a7fc0" stop-opacity="0"/>
+            </radialGradient>
+            <filter id="glow-red">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="glow-blue">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- Ocean -->
+          <rect width="900" height="580" fill="#0c1420"/>
+          <!-- Graticule -->
+          <rect width="900" height="580" fill="url(#gratFine)"/>
+          <rect width="900" height="580" fill="url(#grat)"/>
+
+          <!-- MAINLAND CHINA landmass -->
+          <path d="M 0 0 L 420 0 L 420 30 L 380 50 L 340 80 L 310 120 L 280 160 L 260 200 L 250 240 L 240 280 L 235 320 L 225 340 L 215 360 L 205 380 L 190 400 L 175 420 L 160 440 L 0 440 Z"
+            fill="#1a2a18" stroke="#243f20" stroke-width="0.8"/>
+          <!-- China coast shading -->
+          <path d="M 420 0 L 420 30 L 380 50 L 340 80 L 310 120 L 280 160 L 260 200 L 250 240 L 240 280 L 235 320 L 225 340 L 215 360 L 205 380 L 190 400 L 175 420 L 160 440"
+            fill="none" stroke="#2a4a24" stroke-width="1.2"/>
+
+          <!-- TAIWAN island -->
+          <ellipse cx="480" cy="310" rx="22" ry="55" fill="#1d2a18" stroke="#2e4228" stroke-width="1"/>
+          <text x="480" y="308" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="9" fill="#7a9a6a" letter-spacing="0.06em">TAIWAN</text>
+          <text x="480" y="318" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="7" fill="#4a6a44">ROC</text>
+
+          <!-- TAIWAN STRAIT label -->
+          <text x="370" y="300" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#243357" letter-spacing="0.1em" transform="rotate(-15,370,300)">TAIWAN STRAIT</text>
+
+          <!-- RYUKYU chain (Japan) -->
+          <ellipse cx="600" cy="200" rx="8" ry="25" fill="#1a2a18" stroke="#2a3a24" stroke-width="0.8" transform="rotate(-20,600,200)"/>
+          <ellipse cx="640" cy="240" rx="5" ry="16" fill="#1a2a18" stroke="#2a3a24" stroke-width="0.8" transform="rotate(-20,640,240)"/>
+          <ellipse cx="670" cy="270" rx="4" ry="12" fill="#1a2a18" stroke="#2a3a24" stroke-width="0.8" transform="rotate(-25,670,270)"/>
+          <ellipse cx="695" cy="295" rx="3" ry="9" fill="#1a2a18" stroke="#2a3a24" stroke-width="0.8" transform="rotate(-25,695,295)"/>
+          <text x="665" y="182" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="8" fill="#4a6a44" letter-spacing="0.08em">RYUKYUS</text>
+
+          <!-- OKINAWA -->
+          <ellipse cx="605" cy="197" rx="9" ry="6" fill="#223022" stroke="#2e4228" stroke-width="0.8" transform="rotate(-15,605,197)"/>
+          <text x="605" y="185" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="7" fill="#5a7a54">OKINAWA</text>
+
+          <!-- PHILIPPINES (partial) -->
+          <ellipse cx="620" cy="430" rx="12" ry="30" fill="#1a2a18" stroke="#2a3a24" stroke-width="0.8" transform="rotate(-10,620,430)"/>
+          <text x="638" y="430" text-anchor="start" font-family="IBM Plex Sans,sans-serif" font-size="8" fill="#4a6a44" letter-spacing="0.06em">LUZON</text>
+
+          <!-- GUAM indicator (off edge) -->
+          <text x="840" y="370" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="8" fill="#3a5a7a" letter-spacing="0.1em">GUAM →</text>
+
+          <!-- SOUTH CHINA SEA label -->
+          <text x="450" y="500" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="11" fill="#162030" letter-spacing="0.14em">SOUTH CHINA SEA</text>
+
+          <!-- EAST CHINA SEA label -->
+          <text x="560" y="160" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#162030" letter-spacing="0.1em">EAST CHINA SEA</text>
+
+          <!-- PHILIPPINE SEA -->
+          <text x="760" y="280" text-anchor="middle" font-family="IBM Plex Sans,sans-serif" font-size="10" fill="#162030" letter-spacing="0.1em">PHILIPPINE SEA</text>
+
+          <!-- ═══ RED THREAT RINGS ═══ -->
+          <!-- DF-21 envelope (Fuzhou area) ~1500km radius representation -->
+          <circle cx="290" cy="240" r="160" fill="url(#threatGrad)" stroke="#b84040" stroke-width="0.6" stroke-dasharray="5,3" opacity="0.6"/>
+          <circle cx="290" cy="240" r="100" fill="none" stroke="#b84040" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.4"/>
+          <!-- DF-26 envelope (inland) -->
+          <circle cx="200" cy="180" r="230" fill="none" stroke="#8a2828" stroke-width="0.5" stroke-dasharray="6,4" opacity="0.3"/>
+          <!-- IADS ring (coastal) -->
+          <circle cx="310" cy="280" r="80" fill="rgba(184,64,64,0.05)" stroke="#b84040" stroke-width="0.8" stroke-dasharray="2,2" opacity="0.5"/>
+
+          <!-- Sea denial zone (amphibious approach) -->
+          <path d="M 300 250 L 460 260 L 470 380 L 290 370 Z"
+            fill="rgba(184,64,64,0.08)" stroke="#8a2828" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>
+          <text x="370" y="325" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#8a4040" letter-spacing="0.1em">AMPH OBJ AREA</text>
+
+          <!-- Blue defensive arc -->
+          <path d="M 560 100 Q 720 180 750 350 Q 700 480 580 510"
+            fill="none" stroke="#2d5a96" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.5"/>
+          <text x="700" y="200" font-family="IBM Plex Mono,monospace" font-size="8" fill="#2d5a96" letter-spacing="0.08em" transform="rotate(-30,700,200)">1ST ISL CHN DEFENSE</text>
+
+          <!-- ═══ RED UNITS (PLA) ═══ -->
+          <!-- PLAN Amphibious Fleet — Zhoushan -->
+          <g class="map-unit" transform="translate(245,195)" style="cursor:pointer;" onmouseenter="showTip(event,'PLAN AMPH GRP SHANDONG','Type: Amphibious Group&#10;Composition: 8× LST, 4× LPD, 2× LHD&#10;Status: UNDERWAY D+02&#10;Threat: High')" onmouseleave="hideTip()">
+            <rect x="-18" y="-9" width="36" height="18" rx="9" fill="#0c1420" stroke="#b84040" stroke-width="1.2"/>
+            <text x="0" y="4" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#d05050">♦ AMPH</text>
+          </g>
+          <!-- Amphibious movement arrow -->
+          <path d="M 265 204 Q 360 250 420 290" fill="none" stroke="#8a2828" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowRed)"/>
+
+          <!-- PLAAF Fuzhou AB -->
+          <g class="map-unit" transform="translate(255,265)" style="cursor:pointer;" onmouseenter="showTip(event,'PLAAF FZH COMPOSITE WING','Type: Air Superiority&#10;Composition: 24× J-20, 18× J-16&#10;Status: FORWARD DEPLOYED&#10;Threat: High')" onmouseleave="hideTip()">
+            <path d="M 0 -10 L 12 8 L -12 8 Z" fill="#0c1420" stroke="#b84040" stroke-width="1.2"/>
+            <text x="0" y="20" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#d05050">J-20 ×24</text>
+          </g>
+
+          <!-- PLAN Surface Action Group -->
+          <g class="map-unit" transform="translate(340,350)" style="cursor:pointer;" onmouseenter="showTip(event,'PLAN SAG BEIJING','Type: Surface Action Group&#10;Composition: 2× Type-55 DDG, 3× Type-52D, 2× Type-054A&#10;Status: AT SEA D+01&#10;Threat: High')" onmouseleave="hideTip()">
+            <rect x="-20" y="-8" width="40" height="16" rx="8" fill="#0c1420" stroke="#b84040" stroke-width="1.2"/>
+            <text x="0" y="4" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#d05050">SAG ×7</text>
+          </g>
+
+          <!-- DF-21D Battery -->
+          <g class="map-unit" transform="translate(190,270)" style="cursor:pointer;" onmouseenter="showTip(event,'2nd ARTILLERY DF-21D BN','Type: ASBM Battery&#10;Range: ~1,500 km&#10;Status: LAUNCH READY&#10;Threat: CRITICAL')" onmouseleave="hideTip()">
+            <rect x="-14" y="-10" width="28" height="20" fill="#0c1420" stroke="#8a2828" stroke-width="1"/>
+            <text x="0" y="-2" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#d05050">⬆</text>
+            <text x="0" y="10" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="6" fill="#8a4040">DF-21D</text>
+          </g>
+
+          <!-- ═══ BLUE UNITS (US/Allied) ═══ -->
+          <!-- Carrier Strike Group 5 — Philippine Sea -->
+          <g class="map-unit" transform="translate(720,290)" style="cursor:pointer;" onmouseenter="showTip(event,'CSG-5 / CVN-71 TR','Type: Carrier Strike Group&#10;CVN-71 Theodore Roosevelt + escorts&#10;Status: EMCON ALPHA · BP KESTREL&#10;Posture: STRIKE READY')" onmouseleave="hideTip()">
+            <rect x="-22" y="-10" width="44" height="20" fill="#0c1420" stroke="#4a7fc0" stroke-width="1.4"/>
+            <text x="0" y="5" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#6a9fd8">CVN-71</text>
+          </g>
+
+          <!-- USS NIMITZ (reserve position) -->
+          <g class="map-unit" transform="translate(800,200)" style="cursor:pointer;" onmouseenter="showTip(event,'CSG-11 / CVN-68 NIMITZ','Type: Carrier Strike Group&#10;Status: TRANSIT — 72hr ETA&#10;Posture: SURGE')" onmouseleave="hideTip()">
+            <rect x="-22" y="-10" width="44" height="20" fill="#0c1420" stroke="#2d5a96" stroke-width="1" stroke-dasharray="3,2"/>
+            <text x="0" y="5" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#4a7fc0">CVN-68</text>
+          </g>
+
+          <!-- Okinawa US Forces -->
+          <g class="map-unit" transform="translate(605,210)" style="cursor:pointer;" onmouseenter="showTip(event,'III MEF / OKINAWA','Type: Expeditionary Force&#10;Composition: MRF-D, HIMARS, F-35B Sqdn&#10;Status: READY 24hr NOTICE&#10;Posture: FORWARD')" onmouseleave="hideTip()">
+            <rect x="-16" y="-9" width="32" height="18" fill="#0c1420" stroke="#4a7fc0" stroke-width="1.2"/>
+            <text x="0" y="4" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#6a9fd8">III MEF</text>
+          </g>
+
+          <!-- JASDF / JASAF (Japan) -->
+          <g class="map-unit" transform="translate(650,155)" style="cursor:pointer;" onmouseenter="showTip(event,'JASDF 9th WING','Type: Air Defence Wing&#10;Composition: 24× F-35A/J&#10;Status: CAP ESTABLISHED&#10;Posture: DEFENSIVE')" onmouseleave="hideTip()">
+            <path d="M 0 -9 L 11 7 L -11 7 Z" fill="#0c1420" stroke="#4a7fc0" stroke-width="1.2"/>
+            <text x="0" y="18" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">F-35 ×24</text>
+          </g>
+
+          <!-- ROCAF Taiwan CAP -->
+          <g class="map-unit" transform="translate(490,255)" style="cursor:pointer;" onmouseenter="showTip(event,'ROCAF CAP PENGHU','Type: Combat Air Patrol&#10;Composition: 8× F-16V, 4× Mirage 2000&#10;Status: ACTIVE / DEFENSIVE&#10;ROE: DEFENSIVE ONLY')" onmouseleave="hideTip()">
+            <path d="M 0 -9 L 11 7 L -11 7 Z" fill="#0c1420" stroke="#6a9fd8" stroke-width="1"/>
+            <text x="0" y="18" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a8ab8">ROCAF</text>
+          </g>
+
+          <!-- ATACMS / HIMARS strike axis -->
+          <path d="M 605 218 Q 520 260 490 280" fill="none" stroke="#4a8a60" stroke-width="1" stroke-dasharray="5,3" opacity="0.6"/>
+          <text x="545" y="245" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a8a60" transform="rotate(-25,545,245)">ATACMS AXS</text>
+
+          <!-- P-8 Poseidon patrol track -->
+          <path d="M 720 180 Q 600 160 520 200 Q 480 220 500 260" fill="none" stroke="#4a7fc0" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.4"/>
+          <text x="620" y="155" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#2d5a96">P-8 PATROL</text>
+
+          <!-- SSN track (submarine) -->
+          <path d="M 760 380 Q 640 360 560 340 Q 510 330 490 360" fill="none" stroke="#4a7fc0" stroke-width="0.8" stroke-dasharray="2,4" opacity="0.35"/>
+          <text x="640" y="395" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#2d5a96">SSN TRACK (NOTIONAL)</text>
+
+          <!-- Arrow markers -->
+          <defs>
+            <marker id="arrowRed" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#8a2828"/>
+            </marker>
+            <marker id="arrowBlue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="#4a7fc0"/>
+            </marker>
+          </defs>
+
+          <!-- Geo labels -->
+          <text x="180" y="80" font-family="IBM Plex Sans,sans-serif" font-size="12" fill="#3a5030" font-weight="500" letter-spacing="0.1em">CHINA</text>
+          <text x="180" y="94" font-family="IBM Plex Sans,sans-serif" font-size="8" fill="#2a3820" letter-spacing="0.12em">FUJIAN PROVINCE</text>
+
+          <!-- Compass rose (bottom-right) -->
+          <g transform="translate(855,535)">
+            <circle r="18" fill="#0c1420" stroke="#243357" stroke-width="0.8"/>
+            <path d="M 0 -14 L 4 0 L 0 -4 L -4 0 Z" fill="#7a8fa8"/>
+            <path d="M 0 14 L 4 0 L 0 4 L -4 0 Z" fill="#3a4f68"/>
+            <path d="M -14 0 L 0 4 L -4 0 L 0 -4 Z" fill="#3a4f68"/>
+            <path d="M 14 0 L 0 4 L 4 0 L 0 -4 Z" fill="#3a4f68"/>
+            <text x="0" y="-17" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#9dafc4">N</text>
+          </g>
+
+          <!-- Classification watermark -->
+          <text x="450" y="295" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="48" fill="#131d30" letter-spacing="0.2em" opacity="0.3" transform="rotate(-30,450,295)">NOTIONAL</text>
+        </svg>
+
+        <!-- Tooltip -->
+        <div class="tooltip" id="mapTip">
+          <div class="tooltip-title" id="tipTitle"></div>
+          <div id="tipBody"></div>
+        </div>
+
+        <!-- Map controls -->
+        <div class="map-controls">
+          <button class="map-ctrl-btn" onclick="showToast('Zoom in')">+</button>
+          <button class="map-ctrl-btn" onclick="showToast('Zoom out')">−</button>
+          <button class="map-ctrl-btn" onclick="showToast('Reset view')">⊙</button>
+        </div>
+
+        <!-- Scale -->
+        <div class="map-scale">
+          <div class="scale-bar"></div>
+          <div class="scale-label">0 ——— 500 NM</div>
+        </div>
+      </div>
+
+      <!-- Phase bar -->
+      <div class="map-phase-bar">
+        <div class="phase-label">CAMPAIGN PHASE:</div>
+        <div class="phase-steps">
+          <div class="phase-step complete">I · SHAPING</div>
+          <div class="phase-step complete">II · DETERRENCE</div>
+          <div class="phase-step active">III · DENIAL</div>
+          <div class="phase-step">IV · CULMINATION</div>
+          <div class="phase-step">V · STABILIZE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORCE GRAPH VIEW -->
+    <div id="view-graph" class="view-panel">
+      <svg class="graph-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+        <rect width="900" height="540" fill="#0f1826"/>
+        <rect width="900" height="540" fill="url(#gratFine)"/>
+
+        <!-- Title -->
+        <text x="450" y="30" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#3d4f6e" letter-spacing="0.12em">FORCE NETWORK GRAPH — BLUE JOINT FORCE / NOTIONAL</text>
+
+        <!-- JFMCC hub -->
+        <circle cx="450" cy="270" r="32" fill="#132030" stroke="#4a7fc0" stroke-width="2"/>
+        <text x="450" y="267" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#6a9fd8" font-weight="500">JFMCC</text>
+        <text x="450" y="280" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">JTF-76</text>
+
+        <!-- CSG-5 -->
+        <line x1="450" y1="238" x2="310" y2="160" stroke="#2d5a96" stroke-width="1.5"/>
+        <circle cx="310" cy="150" r="22" fill="#132030" stroke="#4a7fc0" stroke-width="1.5"/>
+        <text x="310" y="147" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#6a9fd8">CSG-5</text>
+        <text x="310" y="158" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">CVN-71</text>
+        <!-- CSG-5 sub-nodes -->
+        <line x1="310" y1="128" x2="270" y2="80" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="260" cy="72" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="260" y="76" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">VFA-18</text>
+        <line x1="288" y1="134" x2="230" y2="120" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="218" cy="118" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="218" y="122" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">DDG-51</text>
+        <line x1="310" y1="172" x2="290" y2="210" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="282" cy="222" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="282" y="226" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">SSN-21</text>
+
+        <!-- III MEF -->
+        <line x1="450" y1="250" x2="590" y2="155" stroke="#2d5a96" stroke-width="1.5"/>
+        <circle cx="600" cy="145" r="22" fill="#132030" stroke="#4a7fc0" stroke-width="1.5"/>
+        <text x="600" y="142" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#6a9fd8">III MEF</text>
+        <text x="600" y="153" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">OKN</text>
+        <line x1="618" y1="128" x2="650" y2="88" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="660" cy="78" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="660" y="82" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">MRF-D</text>
+        <line x1="620" y1="134" x2="680" y2="125" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="692" cy="124" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="692" y="128" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">HIMARS</text>
+
+        <!-- PACAF (Air) -->
+        <line x1="450" y1="302" x2="590" y2="380" stroke="#2d5a96" stroke-width="1.5"/>
+        <circle cx="600" cy="392" r="22" fill="#132030" stroke="#4a7fc0" stroke-width="1.5"/>
+        <text x="600" y="389" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#6a9fd8">PACAF</text>
+        <text x="600" y="400" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">13AF</text>
+        <line x1="617" y1="408" x2="660" y2="442" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="670" cy="452" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="670" y="456" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">F-35A</text>
+        <line x1="622" y1="392" x2="690" y2="400" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="703" cy="400" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="703" y="404" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">B-21</text>
+
+        <!-- JFACC Cyber -->
+        <line x1="450" y1="302" x2="310" y2="395" stroke="#2d5a96" stroke-width="1.5"/>
+        <circle cx="300" cy="408" r="22" fill="#132030" stroke="#4a7fc0" stroke-width="1.5"/>
+        <text x="300" y="405" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#6a9fd8">CYBERCOM</text>
+        <text x="300" y="416" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">JCWA</text>
+        <line x1="280" y1="422" x2="230" y2="455" stroke="#1a3a60" stroke-width="1"/>
+        <circle cx="218" cy="465" r="14" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+        <text x="218" y="469" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7fc0">OPT-EW</text>
+        <line x1="278" y1="428" x2="230" y2="460" stroke="#1a3a60" stroke-width="1" style="display:none"/>
+
+        <!-- JASDF node (ally) -->
+        <line x1="462" y1="240" x2="520" y2="175" stroke="#1a3a50" stroke-width="1" stroke-dasharray="4,2"/>
+        <circle cx="525" cy="165" r="18" fill="#0f1826" stroke="#3a6090" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="525" y="162" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7090">JASDF</text>
+        <text x="525" y="172" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="6" fill="#3a5070">ALLY</text>
+
+        <!-- ROCN node (ally) -->
+        <line x1="440" y1="300" x2="390" y2="360" stroke="#1a3a50" stroke-width="1" stroke-dasharray="4,2"/>
+        <circle cx="382" cy="372" r="18" fill="#0f1826" stroke="#3a6090" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="382" y="369" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#4a7090">ROCN</text>
+        <text x="382" y="379" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="6" fill="#3a5070">ALLY</text>
+
+        <!-- Legend -->
+        <g transform="translate(50,460)">
+          <circle cx="0" cy="0" r="8" fill="#132030" stroke="#4a7fc0" stroke-width="1.5"/>
+          <text x="14" y="4" font-family="IBM Plex Mono,monospace" font-size="8" fill="#5c6f8a">HQ Component</text>
+          <circle cx="100" cy="0" r="6" fill="#0f1826" stroke="#2d5a96" stroke-width="1"/>
+          <text x="114" y="4" font-family="IBM Plex Mono,monospace" font-size="8" fill="#5c6f8a">Subordinate Unit</text>
+          <circle cx="230" cy="0" r="6" fill="#0f1826" stroke="#3a6090" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="244" y="4" font-family="IBM Plex Mono,monospace" font-size="8" fill="#5c6f8a">Allied Force</text>
+          <line x1="340" y1="0" x2="380" y2="0" stroke="#2d5a96" stroke-width="1.5"/>
+          <text x="390" y="4" font-family="IBM Plex Mono,monospace" font-size="8" fill="#5c6f8a">C2 Link</text>
+          <line x1="450" y1="0" x2="490" y2="0" stroke="#1a3a50" stroke-width="1" stroke-dasharray="4,2"/>
+          <text x="500" y="4" font-family="IBM Plex Mono,monospace" font-size="8" fill="#5c6f8a">Coord Link</text>
+        </g>
+
+        <text x="450" y="520" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1e2d4a" letter-spacing="0.1em">NOTIONAL FORCE STRUCTURE — NOT OPERATIONAL</text>
+      </svg>
+    </div>
+
+    <!-- TABLE VIEW -->
+    <div id="view-table" class="view-panel">
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:12px;">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;">JOINT FORCE ORDER OF BATTLE — NOTIONAL</span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);">88 units · D+02 · 0312Z</span>
+        <div style="flex:1"></div>
+        <input type="text" placeholder="Filter units…" style="background:var(--navy-surface);border:1px solid var(--navy-line);border-radius:3px;color:var(--text-primary);font-family:var(--font-sans);font-size:11px;padding:4px 8px;outline:none;width:160px;" oninput="filterTable(this.value)">
+      </div>
+      <table class="data-table" id="forceTable">
+        <thead>
+          <tr>
+            <th>UNIT ID</th>
+            <th>DESIGNATION</th>
+            <th>DOMAIN</th>
+            <th>TYPE</th>
+            <th>LOCATION</th>
+            <th>STATUS</th>
+            <th>C2 NODE</th>
+            <th>REMARKS</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- TASK ORG VIEW -->
+    <div id="view-taskorg" class="view-panel">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:4px;">JOINT TASK FORCE 76 — TASK ORGANIZATION — NOTIONAL</div>
+        <div style="font-size:10px;color:var(--text-muted);">Indo-Pacific Command · Taiwan Strait Theater · Campaign Phase III</div>
+      </div>
+      <div id="taskOrgTree" class="taskorg-root"></div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT RAIL ── -->
+  <div class="right-rail">
+
+    <!-- Team Summary -->
+    <div class="r-section">
+      <div class="r-section-title">
+        Team Summary
+        <span style="font-size:9px;color:var(--blue-friendly);cursor:pointer;" onclick="showToast('Team roster — feature active')">Roster →</span>
+      </div>
+      <div class="team-cards">
+        <div class="team-card">
+          <div class="team-card-dot" style="background:var(--blue-friendly)"></div>
+          <div>
+            <div class="team-card-name">Blue Cell</div>
+            <div class="team-card-role">Joint Force Commander</div>
+          </div>
+          <div class="team-card-count">8 analysts</div>
+        </div>
+        <div class="team-card">
+          <div class="team-card-dot" style="background:var(--red-hostile)"></div>
+          <div>
+            <div class="team-card-name">Red Cell</div>
+            <div class="team-card-role">OPFOR / PLA Replication</div>
+          </div>
+          <div class="team-card-count">5 analysts</div>
+        </div>
+        <div class="team-card">
+          <div class="team-card-dot" style="background:var(--parchment-dim)"></div>
+          <div>
+            <div class="team-card-name">White Cell</div>
+            <div class="team-card-role">Control / Adjudication</div>
+          </div>
+          <div class="team-card-count">3 controllers</div>
+        </div>
+        <div class="team-card">
+          <div class="team-card-dot" style="background:var(--green-go)"></div>
+          <div>
+            <div class="team-card-name">Intel Cell</div>
+            <div class="team-card-role">Intelligence / OSINT</div>
+          </div>
+          <div class="team-card-count">4 analysts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COA Builder -->
+    <div class="r-section">
+      <div class="r-section-title">COA Builder</div>
+
+      <div class="coa-row">
+        <div class="coa-label">
+          <span>Capability Emphasis</span>
+          <span class="coa-label-val" id="capVal">60% Stand-off</span>
+        </div>
+        <input type="range" class="coa-slider" min="0" max="100" value="60"
+          oninput="updateCap(this.value)">
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">
+          <span>Maneuver</span><span>Stand-off</span>
+        </div>
+      </div>
+
+      <div class="coa-row">
+        <div class="coa-label">
+          <span>Cost Tolerance</span>
+          <span class="coa-label-val" id="costVal">Medium</span>
+        </div>
+        <input type="range" class="coa-slider" min="0" max="100" value="50"
+          oninput="updateCost(this.value)">
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">
+          <span>Low</span><span>High</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <div class="rail-label" style="margin-bottom:6px;">COA Options</div>
+        <div class="coa-options" id="coaOptions">
+          <div class="coa-option selected" onclick="selectCOA(this,'COA A — Sea Denial + ISR saturation')">
+            <div class="coa-option-radio"></div>
+            <span class="coa-option-name">COA A — Sea Denial / ISR</span>
+          </div>
+          <div class="coa-option" onclick="selectCOA(this,'COA B — Decapitation + Logistics strike')">
+            <div class="coa-option-radio"></div>
+            <span class="coa-option-name">COA B — Logistics Strike</span>
+          </div>
+          <div class="coa-option" onclick="selectCOA(this,'COA C — Air Superiority + A2AD suppression')">
+            <div class="coa-option-radio"></div>
+            <span class="coa-option-name">COA C — A2AD Suppression</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:5px;">Commander's Intent</div>
+        <textarea class="intent-box" rows="3" placeholder="Deny PLA amphibious lodgement by attriting logistics throughput below operational viability threshold prior to D+6…"></textarea>
+      </div>
+
+      <button class="generate-btn" id="generateBtn" onclick="runGenerate()">
+        ⬡ Generate COA from Intent
+      </button>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- MOE Panel — CENTERPIECE -->
+    <div class="r-section">
+      <div class="r-section-title">
+        Denial MOE — Monte Carlo
+        <span style="font-size:9px;color:var(--text-muted);">n=10,000</span>
+      </div>
+
+      <div class="moe-panel">
+        <div class="moe-headline">
+          <div>
+            <div class="moe-verdict success" id="moeVerdict">OPERATION HALTS</div>
+            <div style="font-size:9px;color:var(--green-go);margin-top:1px;font-family:var(--font-mono);">Denial Strategy — Adversary Culminates D+7±2</div>
+          </div>
+          <div class="moe-runs">10,000 runs<br>D+02 posture</div>
+        </div>
+
+        <!-- Confidence interval track -->
+        <div class="moe-ci-row">
+          <div class="moe-ci-label">Chance of Denial — 95% Confidence Interval</div>
+          <div class="moe-ci-track">
+            <div class="moe-ci-fill" style="left:52%;width:28%;"></div>
+            <div class="moe-ci-median" style="left:65%;"></div>
+          </div>
+          <div class="moe-ci-labels">
+            <span>0%</span>
+            <span>25%</span>
+            <span>50%</span>
+            <span>75%</span>
+            <span>100%</span>
+          </div>
+          <div class="moe-ci-center" style="margin-top:4px;">
+            <span style="color:var(--text-muted);font-size:9px;">52% — </span>
+            <span style="font-size:14px;font-weight:600;">65%</span>
+            <span style="color:var(--text-muted);font-size:9px;"> — 80%</span>
+          </div>
+        </div>
+
+        <!-- Effect breakdown -->
+        <div class="moe-effects">
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-bottom:4px;text-transform:uppercase;">Effect Breakdown</div>
+
+          <div class="moe-effect-row">
+            <div class="moe-effect-label">
+              <span>Red Amphibious Throughput</span>
+              <span class="moe-effect-val good">28% of capacity</span>
+            </div>
+            <div class="moe-bar-track">
+              <div class="moe-bar-fill good" style="width:28%"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">Reduced from 100% → 28% · below viability floor (35%)</div>
+          </div>
+
+          <div class="moe-effect-row" style="margin-top:6px;">
+            <div class="moe-effect-label">
+              <span>Op. Sustainability Index (OSVI)</span>
+              <span class="moe-effect-val warn">41%</span>
+            </div>
+            <div class="moe-bar-track">
+              <div class="moe-bar-fill partial" style="width:41%"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">Logistics degraded · fuel/ammo 3.2 days remaining</div>
+          </div>
+
+          <div class="moe-effect-row" style="margin-top:6px;">
+            <div class="moe-effect-label">
+              <span>C2 Disruption Score</span>
+              <span class="moe-effect-val good">High</span>
+            </div>
+            <div class="moe-bar-track">
+              <div class="moe-bar-fill good" style="width:73%"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">EW + Cyber effects confirmed · 73rd percentile impact</div>
+          </div>
+
+          <div class="moe-effect-row" style="margin-top:6px;">
+            <div class="moe-effect-label">
+              <span>PLAN ISR Coverage (Strait)</span>
+              <span class="moe-effect-val warn">54% degraded</span>
+            </div>
+            <div class="moe-bar-track">
+              <div class="moe-bar-fill bad" style="width:46%"></div>
+            </div>
+            <div style="font-family:var(--font-mono);font-size:8px;color:var(--text-muted);margin-top:2px;">54% of sorties suppressed · blind windows exploitable</div>
+          </div>
+        </div>
+
+        <!-- Halt probability highlight -->
+        <div class="moe-halt-row">
+          <div>
+            <div class="moe-halt-label">Probability of Operational Halt</div>
+            <div class="moe-halt-sub" style="margin-top:2px;">Adversary operation culminates before lodgement</div>
+            <div style="margin-top:6px;">
+              <div style="width:100%;height:6px;background:var(--navy-mid);border-radius:3px;overflow:hidden;">
+                <div style="width:65%;height:100%;background:linear-gradient(to right,var(--green-go-bright),var(--green-go));border-radius:3px;"></div>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+            <div class="moe-halt-pct" id="haltPct">65%</div>
+            <div class="moe-halt-sub">median</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sensitivity note -->
+      <div style="margin-top:10px;padding:8px;background:rgba(74,127,192,0.08);border:1px solid rgba(74,127,192,0.2);border-radius:3px;">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-bottom:4px;">SENSITIVITY DRIVERS</div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;">
+            <span style="color:var(--text-secondary);">SSN submarine ops tempo</span>
+            <span style="font-family:var(--font-mono);color:var(--amber);">HIGH</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;">
+            <span style="color:var(--text-secondary);">Mine field density / placement</span>
+            <span style="font-family:var(--font-mono);color:var(--amber);">HIGH</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;">
+            <span style="color:var(--text-secondary);">B-21 sortie availability</span>
+            <span style="font-family:var(--font-mono);color:var(--yellow-warn);">MED</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;">
+            <span style="color:var(--text-secondary);">Japanese base access (ROE)</span>
+            <span style="font-family:var(--font-mono);color:var(--yellow-warn);">MED</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('utcClock').textContent = h+':'+m+':'+s+' Z';
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ── VIEW SWITCHER ──
+function switchView(name) {
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelector('[data-view="'+name+'"]').classList.add('active');
+  if (name === 'table') buildTable();
+  if (name === 'taskorg') buildTaskOrg();
+}
+
+// ── TOOLTIP ──
+function showTip(evt, title, body) {
+  const tip = document.getElementById('mapTip');
+  document.getElementById('tipTitle').textContent = title;
+  document.getElementById('tipBody').innerHTML = body.split('\n').map(l =>
+    '<div class="tooltip-row">'+l+'</div>').join('');
+  const rect = evt.currentTarget.closest('.map-container').getBoundingClientRect();
+  let x = evt.clientX - rect.left + 12;
+  let y = evt.clientY - rect.top + 12;
+  if (x + 220 > rect.width) x = evt.clientX - rect.left - 220;
+  if (y + 120 > rect.height) y = evt.clientY - rect.top - 100;
+  tip.style.left = x+'px';
+  tip.style.top = y+'px';
+  tip.classList.add('visible');
+}
+function hideTip() {
+  document.getElementById('mapTip').classList.remove('visible');
+}
+
+// ── FILTER TOGGLE ──
+function toggleFilter(row) {
+  const check = row.querySelector('.filter-check');
+  check.classList.toggle('checked');
+}
+function toggleToggle(row) {
+  const pip = row.querySelector('.toggle-pip');
+  pip.classList.toggle('on');
+}
+
+// ── TOAST ──
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── COA SLIDERS ──
+function updateCap(v) {
+  const labels = ['Maneuver', 'Mixed', 'Stand-off'];
+  const idx = v < 33 ? 0 : v < 66 ? 1 : 2;
+  document.getElementById('capVal').textContent = v+'% '+labels[idx];
+}
+function updateCost(v) {
+  const labels = ['Low', 'Low-Med', 'Medium', 'Med-High', 'High'];
+  const idx = Math.floor(v / 25);
+  document.getElementById('costVal').textContent = labels[Math.min(idx,4)];
+}
+
+// ── COA SELECT ──
+function selectCOA(el, label) {
+  document.querySelectorAll('.coa-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  showToast('Selected: '+label);
+}
+
+// ── GENERATE COA ──
+function runGenerate() {
+  const btn = document.getElementById('generateBtn');
+  const bar = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  btn.classList.add('running');
+  btn.textContent = 'Generating…';
+  bar.classList.add('running');
+  let pct = 0;
+  const interval = setInterval(() => {
+    pct += Math.random() * 12;
+    if (pct >= 100) {
+      pct = 100;
+      fill.style.width = '100%';
+      clearInterval(interval);
+      setTimeout(() => {
+        btn.classList.remove('running');
+        btn.innerHTML = '⬡ Generate COA from Intent';
+        bar.classList.remove('running');
+        fill.style.width = '0%';
+        showToast('COA generated — review options above');
+        animateMOE();
+      }, 400);
+    }
+    fill.style.width = pct+'%';
+  }, 120);
+}
+
+// ── ANIMATE MOE after generate ──
+function animateMOE() {
+  const pct = Math.round(58 + Math.random() * 14);
+  document.getElementById('haltPct').textContent = pct+'%';
+  document.getElementById('moeVerdict').textContent = pct >= 60 ? 'OPERATION HALTS' : 'UNCERTAIN OUTCOME';
+  document.getElementById('moeVerdict').className = 'moe-verdict ' + (pct >= 60 ? 'success' : 'warn');
+}
+
+// ── TABLE DATA ──
+const tableData = [
+  {id:'US-CSG-05',name:'CSG-5 / CVN-71 TR',domain:'Maritime',type:'Carrier Strike Group',loc:'Philippine Sea BP KESTREL',status:'ready',c2:'JFMCC',remarks:'EMCON Alpha · Strike Ready'},
+  {id:'US-CSG-11',name:'CSG-11 / CVN-68 NIMITZ',domain:'Maritime',type:'Carrier Strike Group',loc:'Pacific · 72hr ETA',status:'tasked',c2:'JFMCC',remarks:'Surge · Transit'},
+  {id:'US-MEF-III',name:'III MEF',domain:'Land',type:'Expeditionary Force',loc:'Okinawa, Japan',status:'ready',c2:'JFMCC',remarks:'24hr NTM · HIMARS FWD'},
+  {id:'US-JASDF1',name:'JASDF 9th Wing',domain:'Air',type:'Air Defense Wing',loc:'Naha AB, Okinawa',status:'ready',c2:'JFACC',remarks:'CAP Established · 24× F-35A/J'},
+  {id:'US-VFA18',name:'VFA-18 "Stingers"',domain:'Air',type:'Strike Fighter Sqdn',loc:'CVN-71 (embarked)',status:'tasked',c2:'JFACC',remarks:'Mission-capable 18/24 ac'},
+  {id:'US-P8-7',name:'VP-47 / P-8A Sqdn',domain:'Air',type:'Maritime Patrol',loc:'Kadena AB',status:'ready',c2:'JFMCC',remarks:'SONAR/ISR · 6 ac available'},
+  {id:'US-SSN-1',name:'SSN-21 Seawolf',domain:'Maritime',type:'Attack Submarine',loc:'Taiwan Strait (notional)',status:'tasked',c2:'JFMCC',remarks:'EMCON · ISR/Strike tasked'},
+  {id:'US-SSN-2',name:'SSN-774 Virginia',domain:'Maritime',type:'Attack Submarine',loc:'Philippine Sea',status:'ready',c2:'JFMCC',remarks:'Prepositioned · 72hr'},
+  {id:'US-ATACMS',name:'HIMARS / ATACMS Bty A',domain:'Land',type:'MLRS Battery',loc:'Okinawa (FWD)',status:'ready',c2:'JFLCC',remarks:'Range 300km · Strike Axis 2'},
+  {id:'US-B21',name:'B-21 Raider (2 ac)',domain:'Air',type:'Penetrating Strike',loc:'Andersen AFB Guam',status:'ready',c2:'JFACC',remarks:'PGM-configured · 24hr alert'},
+  {id:'US-F35B',name:'VMFA-311 / F-35B',domain:'Air',type:'STOVL Sqdn',loc:'USS America (LHA-6)',status:'ready',c2:'JFACC',remarks:'18 ac · LHA Fwd deployed'},
+  {id:'US-DDG1',name:'DDG-51 Arleigh Burke',domain:'Maritime',type:'Guided Missile Destroyer',loc:'CSG-5 screen',status:'ready',c2:'JFMCC',remarks:'BMD · Tomahawk tasked'},
+  {id:'US-DDG2',name:'DDG-89 Mustin',domain:'Maritime',type:'Guided Missile Destroyer',loc:'CSG-5 screen',status:'tasked',c2:'JFMCC',remarks:'IAMD posture'},
+  {id:'US-CYB1',name:'CYBERCOM OPT-EW Alpha',domain:'Cyber / EW',type:'Cyber Op Team',loc:'Remote (classified)',status:'ready',c2:'JCWA',remarks:'Xiamen Port SCADA targeted'},
+  {id:'US-ISR1',name:'RQ-4 Global Hawk Det',domain:'Space',type:'HALE ISR',loc:'Andersen AFB',status:'ready',c2:'JFACC',remarks:'24/7 coverage · Strait orbit'},
+  {id:'RC-ROCAF1',name:'ROCAF 5th TFW',domain:'Air',type:'Tactical Fighter Wing',loc:'Hsinchu AB, Taiwan',status:'degraded',c2:'ROCAF HQ',remarks:'CAP Established · Attrition 12%'},
+  {id:'RC-ROCN1',name:'ROCS Tso Ying (FFG)',domain:'Maritime',type:'Frigate Squadron',loc:'Zuoying Naval Base',status:'ready',c2:'ROCN HQ',remarks:'Hsiung Feng III armed'},
+  {id:'JP-JMSDF1',name:'JMSDF 3rd Escort Flt',domain:'Maritime',type:'Destroyer Flotilla',loc:'Sasebo, Japan',status:'ready',c2:'JFMCC coord',remarks:'Aegis BMD · Convoy escort'},
+];
+
+function buildTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  tableData.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-id">${row.id}</td>
+      <td class="col-name">${row.name}</td>
+      <td class="col-domain">${row.domain}</td>
+      <td>${row.type}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${row.loc}</td>
+      <td><span class="status-pill ${row.status}">${row.status.toUpperCase()}</span></td>
+      <td style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted)">${row.c2}</td>
+      <td style="font-size:10px;color:var(--text-muted)">${row.remarks}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterTable(q) {
+  const tbody = document.getElementById('tableBody');
+  Array.from(tbody.rows).forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ── TASK ORG ──
+const taskOrgData = {
+  name: 'JTF-76 · Joint Task Force', type: 'Joint HQ', sym: '🟦', strength: 'INDOPACOM', children: [
+    { name: 'JFMCC · Maritime Component', type: 'Maritime HQ', sym: '⬛', strength: '7th Fleet', children: [
+      { name: 'CSG-5 / CVN-71', type: 'CSG', sym: '▣', strength: '~7,500' },
+      { name: 'CSG-11 / CVN-68', type: 'CSG (Transit)', sym: '▣', strength: '~7,500' },
+      { name: 'SSN-21 Seawolf', type: 'Attack Sub', sym: '▤', strength: 'Classified' },
+      { name: 'SSN-774 Virginia', type: 'Attack Sub', sym: '▤', strength: 'Classified' },
+      { name: 'JMSDF 3rd Escort Flt', type: 'Allied Flotilla', sym: '○', strength: '~1,200' },
+    ]},
+    { name: 'JFACC · Air Component', type: 'Air HQ', sym: '▲', strength: '13AF', children: [
+      { name: 'VFA-18 Stingers (CVN-71)', type: 'Strike Sqdn', sym: '△', strength: '24 ac' },
+      { name: 'VMFA-311 / F-35B (LHA-6)', type: 'STOVL Sqdn', sym: '△', strength: '18 ac' },
+      { name: 'JASDF 9th Wing', type: 'Allied Wing', sym: '○△', strength: '24 ac' },
+      { name: 'VP-47 / P-8A', type: 'Patrol Sqdn', sym: '△', strength: '6 ac' },
+      { name: 'B-21 Raider Det (Guam)', type: 'Penetrating Strike', sym: '▲', strength: '2 ac' },
+      { name: 'RQ-4 Global Hawk Det', type: 'HALE ISR', sym: '△', strength: '3 ac' },
+    ]},
+    { name: 'JFLCC · Land Component', type: 'Land HQ', sym: '■', strength: 'III MEF', children: [
+      { name: 'III MEF (Okinawa)', type: 'Expeditionary Force', sym: '□', strength: '~19,000' },
+      { name: 'HIMARS / ATACMS Bty A', type: 'MLRS Battery', sym: '□', strength: '6 launchers' },
+    ]},
+    { name: 'JCWA · Cyber/EW', type: 'Cyber HQ', sym: '⚡', strength: 'CYBERCOM', children: [
+      { name: 'OPT-EW Alpha', type: 'Cyber Op Team', sym: '⚡', strength: 'Classified' },
+    ]},
+    { name: 'INTEL Cell', type: 'Intelligence', sym: 'I', strength: 'DIA/NSA coord', children: [] },
+  ]
+};
+
+function buildTaskOrg() {
+  const root = document.getElementById('taskOrgTree');
+  root.innerHTML = '';
+  root.appendChild(renderNode(taskOrgData, 0));
+}
+
+function renderNode(node, depth) {
+  const div = document.createElement('div');
+  div.className = 'taskorg-node';
+  if (depth > 0) div.style.paddingLeft = (depth * 18) + 'px';
+
+  const header = document.createElement('div');
+  header.className = 'taskorg-header';
+  header.style.borderLeftColor = depth === 0 ? 'var(--blue-friendly)' : depth === 1 ? 'var(--blue-friendly-dim)' : 'var(--slate-mid)';
+  header.style.borderLeftWidth = '3px';
+  header.style.borderLeftStyle = 'solid';
+  header.innerHTML = `
+    <span class="taskorg-sym" style="font-size:12px;color:var(--blue-friendly)">${node.sym}</span>
+    <span class="taskorg-name">${node.name}</span>
+    <span class="taskorg-type">${node.type}</span>
+    <span class="taskorg-strength">${node.strength}</span>
+  `;
+  div.appendChild(header);
+
+  if (node.children && node.children.length > 0) {
+    const children = document.createElement('div');
+    children.className = 'taskorg-children';
+    children.style.marginBottom = '4px';
+    node.children.forEach(child => children.appendChild(renderNode(child, depth + 1)));
+    div.appendChild(children);
+  }
+
+  return div;
+}
+
+// Init
+buildTable();
+</script>
+</body>
+</html>

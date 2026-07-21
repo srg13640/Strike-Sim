@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRIKESIM 2040 — GAME FEEL MOCKUP (CO-006 NORTH STAR)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04080c; --bg2:#050d14;
+  --cyan:#00d8ff; --cyan-dim:rgba(0,216,255,.38); --cyan-soft:rgba(0,216,255,.12);
+  --amber:#ffb000; --amber-dim:rgba(255,176,0,.35);
+  --red:#ff4d5e; --red-dim:rgba(255,77,94,.4);
+  --green:#51cf66; --muted:#8fa6bd; --text:#d7e6f4;
+  --display:'Orbitron','Oswald',system-ui,sans-serif;
+  --mono:'Share Tech Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--mono)}
+canvas#theater{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+/* ---------- global FX layers ---------- */
+.scanlines{position:fixed;inset:0;pointer-events:none;z-index:40;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:41;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:42;opacity:.05}
+.classif{position:fixed;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.35em;
+  color:var(--muted);z-index:60;padding:4px 0;text-transform:uppercase}
+.classif.top{top:0;border-bottom:1px solid rgba(143,166,189,.15);background:rgba(4,8,12,.6)}
+.classif.bot{bottom:0;border-top:1px solid rgba(143,166,189,.15);background:rgba(4,8,12,.6)}
+
+/* ---------- letterbox ---------- */
+.lbox{position:fixed;left:0;right:0;height:0;background:#000;z-index:50;transition:height 1.1s cubic-bezier(.77,0,.18,1)}
+.lbox.top{top:0}.lbox.bot{bottom:0}
+body.letterboxed .lbox{height:9vh}
+
+/* ---------- boot ---------- */
+#boot{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;cursor:pointer;transition:opacity .8s ease}
+#boot.gone{opacity:0;pointer-events:none}
+#bootlog{width:min(640px,86vw);font-size:12px;line-height:1.9;color:var(--muted);min-height:230px}
+#bootlog .ok{color:var(--green)} #bootlog .warn{color:var(--amber)}
+#bootPrompt{margin-top:34px;font-family:var(--display);font-size:13px;letter-spacing:.4em;
+  color:var(--amber);opacity:0;animation:pulse 1.6s ease-in-out infinite;text-transform:uppercase}
+#bootPrompt.show{opacity:1}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* ---------- title ---------- */
+#title{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;opacity:0;pointer-events:none;transition:opacity 1.4s ease}
+#title.show{opacity:1;pointer-events:auto}
+.kicker{font-size:11px;letter-spacing:.55em;color:var(--muted);text-transform:uppercase;margin-bottom:18px}
+.wordmark{font-family:var(--display);font-weight:900;font-size:clamp(44px,7.5vw,104px);
+  letter-spacing:.12em;color:#eaf6ff;line-height:1;
+  text-shadow:0 0 24px rgba(0,216,255,.45), .5px 0 0 rgba(255,77,94,.55), -.5px 0 0 rgba(0,216,255,.55)}
+.wordmark .yr{color:var(--cyan)}
+.tagline{margin-top:14px;font-size:12px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase}
+#menu{margin-top:7vh;display:flex;flex-direction:column;gap:6px;min-width:340px}
+.mitem{position:relative;padding:13px 22px;font-family:var(--display);font-weight:500;font-size:15px;
+  letter-spacing:.28em;color:var(--muted);text-transform:uppercase;cursor:pointer;text-align:center;
+  border:1px solid transparent;transition:all .18s ease;background:rgba(5,13,20,.35)}
+.mitem:hover,.mitem.focus{color:#fff;border-color:var(--amber-dim);background:rgba(255,176,0,.06);
+  box-shadow:0 0 18px rgba(255,176,0,.12), inset 0 0 18px rgba(255,176,0,.05)}
+.mitem:hover::before,.mitem.focus::before{content:'▸';position:absolute;left:14px;color:var(--amber)}
+.mitem.dis{opacity:.35;cursor:default}
+.mitem.dis:hover{color:var(--muted);border-color:transparent;background:rgba(5,13,20,.35);box-shadow:none}
+.mitem.dis:hover::before{content:''}
+.msub{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.25em;color:var(--muted);margin-top:4px}
+#buildtag{position:fixed;right:18px;bottom:26px;font-size:10px;letter-spacing:.2em;color:rgba(143,166,189,.6);z-index:35;text-align:right;line-height:1.8}
+
+/* ---------- HUD chrome ---------- */
+#hudbar{position:fixed;top:26px;left:0;right:0;z-index:45;display:flex;justify-content:space-between;
+  padding:10px 22px;font-size:11px;letter-spacing:.22em;color:var(--muted);opacity:0;transition:opacity 1s ease;text-transform:uppercase}
+#hudbar.show{opacity:1}
+#hudbar b{color:var(--cyan);font-weight:400}
+#sndToggle{position:fixed;top:30px;right:22px;z-index:70;cursor:pointer;font-size:11px;
+  letter-spacing:.2em;color:var(--muted);border:1px solid rgba(143,166,189,.25);padding:6px 12px;
+  background:rgba(4,8,12,.6);text-transform:uppercase}
+#sndToggle:hover{color:var(--amber);border-color:var(--amber-dim)}
+
+/* ---------- brief ---------- */
+#brief{position:fixed;inset:0;z-index:32;display:none;opacity:0;transition:opacity .9s ease}
+#brief.show{display:block;opacity:1}
+.briefwrap{position:absolute;top:11vh;bottom:13vh;left:6vw;width:min(560px,44vw);display:flex;flex-direction:column}
+.opstamp{font-family:var(--display);font-weight:700;font-size:clamp(22px,2.6vw,34px);letter-spacing:.14em;
+  color:#eaf6ff;border:2px solid var(--amber-dim);padding:10px 18px;display:inline-block;align-self:flex-start;
+  background:rgba(255,176,0,.05);transform:scale(1.6);opacity:0;text-transform:uppercase}
+.opstamp.stamped{animation:stamp .38s cubic-bezier(.2,1.6,.35,1) forwards}
+@keyframes stamp{to{transform:scale(1);opacity:1}}
+.opmeta{margin-top:10px;font-size:11px;letter-spacing:.28em;color:var(--amber);text-transform:uppercase;opacity:0;transition:opacity .6s}
+.opmeta.show{opacity:1}
+#briefbody{margin-top:22px;flex:1;overflow:hidden;font-size:13px;line-height:1.85;color:var(--text);
+  background:linear-gradient(180deg,rgba(5,13,20,.72),rgba(5,13,20,.5));border:1px solid rgba(0,216,255,.14);
+  border-left:2px solid var(--cyan-dim);padding:20px 24px;backdrop-filter:blur(3px)}
+#briefbody h4{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:.32em;color:var(--cyan);
+  margin:16px 0 6px;text-transform:uppercase}
+#briefbody h4:first-child{margin-top:0}
+#briefbody .cur::after{content:'▊';color:var(--cyan);animation:pulse 1s infinite}
+.dbar{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:11px;letter-spacing:.14em}
+.dbar .lbl{width:130px;color:var(--muted);text-transform:uppercase}
+.dbar .track{flex:1;height:6px;background:rgba(143,166,189,.12);position:relative;overflow:hidden}
+.dbar .fill{position:absolute;inset:0 auto 0 0;width:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.dbar .pct{width:38px;text-align:right;color:var(--text)}
+.tgtline{margin:4px 0;font-size:12px;letter-spacing:.08em}
+.tgtline .tag{color:var(--amber);letter-spacing:.18em}
+#armBtn{margin-top:16px;align-self:flex-start;font-family:var(--display);font-weight:700;font-size:14px;
+  letter-spacing:.34em;padding:15px 34px;color:rgba(255,176,0,.35);background:transparent;
+  border:1px solid rgba(255,176,0,.2);cursor:default;transition:all .5s ease;text-transform:uppercase}
+#armBtn.armed{color:var(--amber);border-color:var(--amber);cursor:pointer;
+  box-shadow:0 0 24px rgba(255,176,0,.22), inset 0 0 20px rgba(255,176,0,.07);animation:armPulse 2.2s ease-in-out infinite}
+#armBtn.armed:hover{background:rgba(255,176,0,.12);color:#ffd668}
+@keyframes armPulse{0%,100%{box-shadow:0 0 14px rgba(255,176,0,.15),inset 0 0 14px rgba(255,176,0,.05)}
+  50%{box-shadow:0 0 30px rgba(255,176,0,.3),inset 0 0 24px rgba(255,176,0,.1)}}
+
+/* ---------- comms feed ---------- */
+#comms{position:fixed;left:0;right:0;bottom:26px;z-index:44;padding:8px 22px;font-size:11px;
+  letter-spacing:.12em;color:rgba(81,207,102,.85);white-space:nowrap;overflow:hidden;opacity:0;transition:opacity .8s;
+  background:linear-gradient(0deg,rgba(4,8,12,.85),transparent);text-transform:uppercase}
+#comms.show{opacity:1}
+#comms .cs{color:var(--cyan)}
+
+/* ---------- placard ---------- */
+#placard{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+  background:rgba(2,4,7,.88);opacity:0;transition:opacity .8s}
+#placard.show{display:flex;opacity:1}
+.placardbox{max-width:620px;padding:44px 52px;border:1px solid var(--cyan-dim);background:rgba(5,13,20,.9);text-align:center}
+.placardbox h2{font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:.3em;color:var(--cyan);margin-bottom:18px;text-transform:uppercase}
+.placardbox p{font-size:13px;line-height:2;color:var(--muted)}
+.placardbox .k{color:var(--amber)}
+.placardbox .back{margin-top:26px;display:inline-block;font-size:11px;letter-spacing:.3em;color:var(--amber);
+  border:1px solid var(--amber-dim);padding:10px 22px;cursor:pointer;text-transform:uppercase}
+.placardbox .back:hover{background:rgba(255,176,0,.1)}
+
+/* glitch cut */
+@keyframes glitch{0%{filter:none}20%{filter:hue-rotate(12deg) contrast(1.6);transform:translateX(2px)}
+  40%{filter:none;transform:none}60%{filter:hue-rotate(-14deg) saturate(2);transform:translateX(-2px)}100%{filter:none;transform:none}}
+body.glitching #theater{animation:glitch .28s steps(2) 1}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01s !important;transition-duration:.01s !important}
+}
+</style>
+</head>
+<body>
+<canvas id="theater"></canvas>
+<canvas id="grainC" class="grain"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+<div class="lbox top"></div><div class="lbox bot"></div>
+<div class="classif top">Unclassified // Notional Research Tool — Aesthetic Mockup (CO-006 North Star)</div>
+<div class="classif bot">Unclassified // Notional — no real-world operational data</div>
+
+<div id="boot">
+  <div id="bootlog"></div>
+  <div id="bootPrompt">Click to initialize console</div>
+</div>
+
+<div id="hudbar">
+  <span>CJTF-INDOPAC · <b>Theater: Western Pacific</b></span>
+  <span id="utc"></span>
+</div>
+<div id="sndToggle">Audio: On</div>
+
+<div id="title">
+  <div class="kicker">Joint Operations Center · Decision Wargame</div>
+  <div class="wordmark">STRIKESIM <span class="yr">2040</span></div>
+  <div class="tagline">You don't play the battle. You play the plan.</div>
+  <nav id="menu">
+    <div class="mitem" data-act="new">New Operation</div>
+    <div class="mitem dis">Continue Operation<span class="msub">No saved operations on this console</span></div>
+    <div class="mitem" data-act="archive">Operation Archive</div>
+    <div class="mitem" data-act="settings">Settings</div>
+  </nav>
+</div>
+<div id="buildtag">BUILD 2040.7.11 · SEED VISIBLE IN-GAME<br>MOCKUP — DEFINES FEEL, NOT FUNCTION</div>
+
+<div id="brief">
+  <div class="briefwrap">
+    <div class="opstamp" id="opstamp">Operation Iron Halt</div>
+    <div class="opmeta" id="opmeta">CJTF-INDOPACIFIC · D+0 · Turn 0 of 8 · Fait-accompli window: 8 turns</div>
+    <div id="briefbody"></div>
+    <button id="armBtn">Proceed to Planning</button>
+  </div>
+</div>
+
+<div id="comms"><span id="commsline"></span></div>
+
+<div id="placard">
+  <div class="placardbox">
+    <h2 id="placTitle">Simulation Handoff</h2>
+    <p id="placBody">This is where the mockup ends and the game begins.<br><br>
+    Everything you just felt — the boot, the score, the letterboxing, the typed brief,
+    the radio floor, the armed commit — is the <span class="k">presentation contract</span> for
+    <span class="k">Change Order CO-006</span>. CODEX wires this exact feel onto the live
+    Operation Loop: PLAN on the real map, WATCH as the war film, AAR as the debrief ceremony.</p>
+    <span class="back" id="placBack">Return to Console</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   STRIKESIM 2040 — GAME FEEL MOCKUP
+   Boot → Title → Cinematic Brief. All audio procedural (Web Audio).
+   No external assets except Google Fonts. UNCLASSIFIED // NOTIONAL.
+   ============================================================ */
+
+/* ---------------- AUDIO ENGINE (procedural) ---------------- */
+const AudioFX = (() => {
+  let ctx = null, master = null, droneNodes = [], muted = false, pulseTimer = null;
+  function ensure() {
+    if (ctx) return true;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);
+      return true;
+    } catch (e) { return false; }
+  }
+  function noiseBuffer(sec) {
+    const b = ctx.createBuffer(1, ctx.sampleRate * sec, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function startDrone() {
+    if (!ensure() || droneNodes.length) return;
+    const g = ctx.createGain(); g.gain.value = 0.0;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160; lp.Q.value = 0.7;
+    [55, 55.7, 110.4].forEach((f, i) => {
+      const o = ctx.createOscillator(); o.type = i === 2 ? 'sine' : 'sawtooth'; o.frequency.value = f;
+      const og = ctx.createGain(); og.gain.value = i === 2 ? 0.12 : 0.2;
+      o.connect(og); og.connect(lp); o.start(); droneNodes.push(o);
+    });
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 40;
+    lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start(); droneNodes.push(lfo);
+    lp.connect(g); g.connect(master);
+    g.gain.linearRampToValueAtTime(0.30, ctx.currentTime + 4);
+    // slow heartbeat pulse under the title
+    pulseTimer = setInterval(() => { if (!muted) thump(0.05); }, 2600);
+  }
+  function env(node, peak, a, r) {
+    const g = ctx.createGain(); g.gain.value = 0;
+    node.connect(g); g.connect(master);
+    const t = ctx.currentTime;
+    g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + r);
+    return g;
+  }
+  function tick(vol) { // UI hover / typing tick
+    if (!ctx || muted) return;
+    const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 1800 + Math.random() * 900;
+    env(o, vol || 0.03, 0.001, 0.03); o.start(); o.stop(ctx.currentTime + 0.05);
+  }
+  function beep(freq, vol, dur) { // confirm
+    if (!ctx || muted) return;
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq || 880;
+    env(o, vol || 0.08, 0.005, dur || 0.25); o.start(); o.stop(ctx.currentTime + (dur || 0.25) + 0.05);
+  }
+  function thump(vol) { // low impact / heartbeat
+    if (!ctx || muted) return;
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(90, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(38, ctx.currentTime + 0.18);
+    env(o, vol || 0.22, 0.004, 0.35); o.start(); o.stop(ctx.currentTime + 0.4);
+  }
+  function stamp() { thump(0.3); tick(0.06); }
+  function radioBurst(dur, vol) { // comms static
+    if (!ctx || muted) return;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer(dur || 0.12);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 2.5;
+    src.connect(bp);
+    const g = ctx.createGain(); g.gain.value = vol || 0.04; bp.connect(g); g.connect(master);
+    src.start();
+  }
+  function whoosh(dir) { // letterbox sweep
+    if (!ctx || muted) return;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer(1.2);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.2;
+    const t = ctx.currentTime;
+    lp.frequency.setValueAtTime(dir === 'in' ? 120 : 2400, t);
+    lp.frequency.exponentialRampToValueAtTime(dir === 'in' ? 2400 : 120, t + 1.0);
+    src.connect(lp);
+    const g = ctx.createGain(); g.gain.value = 0;
+    lp.connect(g); g.connect(master);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.35);
+    g.gain.linearRampToValueAtTime(0.0001, t + 1.15);
+    src.start();
+  }
+  function toggleMute() {
+    muted = !muted;
+    if (master) master.gain.value = muted ? 0 : 0.55;
+    return muted;
+  }
+  return { ensure, startDrone, tick, beep, thump, stamp, radioBurst, whoosh, toggleMute, get muted() { return muted; } };
+})();
+
+/* ---------------- THEATER CANVAS ---------------- */
+const cv = document.getElementById('theater'), cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize); resize();
+
+/* stylized theater geography (lon, lat) — notional */
+const TAIWAN = [[121.0,25.3],[121.6,25.15],[121.95,24.85],[121.85,24.35],[121.55,23.8],[121.45,23.1],[121.05,22.35],[120.85,21.95],[120.65,22.45],[120.2,23.05],[120.05,23.6],[120.1,24.25],[120.5,24.85],[121.0,25.3]];
+const CHINA = [[116.4,22.9],[117.3,23.55],[118.05,24.4],[118.6,24.55],[119.0,25.0],[119.55,25.65],[120.2,26.4],[120.65,27.3],[120.9,28.1]];
+const ISLANDS = [
+  {n:'KINMEN', p:[118.32,24.45]}, {n:'MATSU', p:[119.95,26.15]}, {n:'PENGHU', p:[119.58,23.55]}
+];
+const CITIES = [
+  {n:'TAIPEI', p:[121.56,25.04], side:'blue'}, {n:'TAOYUAN', p:[121.2,25.0], side:'blue'},
+  {n:'XIAMEN', p:[118.08,24.48], side:'red'}, {n:'FUZHOU', p:[119.3,26.08], side:'red'}
+];
+const MEDIAN = [[119.3,22.2],[120.2,24.2],[120.9,26.0]];
+const TARGETS = [
+  {tag:'TGT-01', n:'RED LIFT CONCENTRATION', p:[118.25,24.3]},
+  {tag:'TGT-02', n:'JOINT C2 NODE', p:[119.3,26.08]},
+  {tag:'TGT-03', n:'ASSESSED LODGMENT', p:[121.05,25.05]}
+];
+
+/* camera: interpolates between title and brief framings */
+const cam = { cx0:119.9, cy0:24.2, scale:64, t:0, mode:'title' };
+function project(lon, lat, drift) {
+  const k = cam.scale * (1 + cam.t * 0.55);
+  const ox = cam.cx0 + (cam.mode === 'brief' ? Math.sin(perfNow() * 0.00004) * 0.35 : 0);
+  const oy = cam.cy0 + (cam.mode === 'brief' ? 0.5 : 0);
+  const x = W / 2 + (lon - ox) * k * 0.92 + (drift || 0);
+  const y = H / 2 - (lat - oy) * k;
+  return [x, y];
+}
+let _pn = performance.now();
+function perfNow() { return _pn; }
+
+/* red contact tracks drifting across the strait */
+const rng = (() => { let s = 20400711; return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648; })();
+const tracks = [];
+for (let i = 0; i < 14; i++) {
+  tracks.push({
+    lon: 117.6 + rng() * 1.6, lat: 23.3 + rng() * 3.2,
+    v: 0.00001 + rng() * 0.000018, red: true, ph: rng() * 6.28
+  });
+}
+for (let i = 0; i < 7; i++) {
+  tracks.push({ lon: 121.9 + rng() * 1.6, lat: 22.6 + rng() * 3.0, v: 0.000006 + rng() * 0.00001, red: false, ph: rng() * 6.28 });
+}
+let pings = [];
+
+function drawPoly(pts, close) {
+  cx.beginPath();
+  pts.forEach((p, i) => { const [x, y] = project(p[0], p[1]); i ? cx.lineTo(x, y) : cx.moveTo(x, y); });
+  if (close) cx.closePath();
+}
+function label(txt, lon, lat, color, dx, dy) {
+  const [x, y] = project(lon, lat);
+  cx.fillStyle = color; cx.font = '9px "Share Tech Mono", monospace';
+  cx.fillText(txt, x + (dx || 8), y + (dy || -6));
+}
+
+function drawTheater(dt) {
+  _pn = performance.now();
+  cx.clearRect(0, 0, W, H);
+  const g = cx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#04080c'); g.addColorStop(1, '#050d14');
+  cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+
+  /* graticule */
+  cx.strokeStyle = 'rgba(0,216,255,0.05)'; cx.lineWidth = 1;
+  for (let lon = 115; lon <= 125; lon += 1) { drawPoly([[lon, 20], [lon, 29]]); cx.stroke(); }
+  for (let lat = 20; lat <= 29; lat += 1) { drawPoly([[114, lat], [126, lat]]); cx.stroke(); }
+
+  /* coastlines */
+  cx.strokeStyle = 'rgba(0,216,255,0.5)'; cx.lineWidth = 1.6;
+  cx.shadowColor = 'rgba(0,216,255,0.5)'; cx.shadowBlur = 9;
+  drawPoly(TAIWAN, true); cx.stroke();
+  cx.fillStyle = 'rgba(0,216,255,0.05)'; cx.fill();
+  cx.strokeStyle = 'rgba(255,77,94,0.42)';
+  cx.shadowColor = 'rgba(255,77,94,0.4)';
+  drawPoly(CHINA); cx.stroke();
+  cx.shadowBlur = 0;
+
+  /* strait median line */
+  cx.setLineDash([6, 7]); cx.strokeStyle = 'rgba(143,166,189,0.35)'; cx.lineWidth = 1;
+  drawPoly(MEDIAN); cx.stroke(); cx.setLineDash([]);
+  label('STRAIT MEDIAN', 120.15, 24.15, 'rgba(143,166,189,0.5)');
+
+  /* range rings from red coast */
+  const t = _pn * 0.001;
+  [[118.08, 24.48], [119.3, 26.08]].forEach((c, ci) => {
+    const [x, y] = project(c[0], c[1]);
+    for (let r = 0; r < 3; r++) {
+      const ph = ((t * 0.12 + r / 3 + ci * 0.2) % 1);
+      cx.beginPath(); cx.arc(x, y, ph * 200 * (1 + cam.t * 0.5), 0, 6.283);
+      cx.strokeStyle = `rgba(255,77,94,${0.16 * (1 - ph)})`; cx.lineWidth = 1; cx.stroke();
+    }
+  });
+
+  /* islands + cities */
+  ISLANDS.forEach(o => {
+    const [x, y] = project(o.p[0], o.p[1]);
+    cx.fillStyle = 'rgba(0,216,255,0.7)'; cx.fillRect(x - 1.5, y - 1.5, 3, 3);
+    label(o.n, o.p[0], o.p[1], 'rgba(143,166,189,0.6)');
+  });
+  CITIES.forEach(o => {
+    const [x, y] = project(o.p[0], o.p[1]);
+    cx.strokeStyle = o.side === 'red' ? 'rgba(255,77,94,0.8)' : 'rgba(0,216,255,0.85)';
+    cx.strokeRect(x - 3, y - 3, 6, 6);
+    label(o.n, o.p[0], o.p[1], o.side === 'red' ? 'rgba(255,77,94,0.7)' : 'rgba(0,216,255,0.75)');
+  });
+
+  /* contact tracks */
+  tracks.forEach(k => {
+    if (k.red) { k.lon += k.v * dt; if (k.lon > 120.3) k.lon = 117.5 + rng() * 0.6; }
+    else { k.lat += Math.sin(t * 0.15 + k.ph) * 0.00001 * dt; }
+    const [x, y] = project(k.lon, k.lat);
+    cx.save(); cx.translate(x, y);
+    if (k.red) {
+      cx.rotate(1.5708);
+      cx.beginPath(); cx.moveTo(5, 0); cx.lineTo(-4, 4); cx.lineTo(-4, -4); cx.closePath();
+      cx.strokeStyle = 'rgba(255,77,94,0.85)'; cx.lineWidth = 1.2; cx.stroke();
+      cx.restore();
+      cx.strokeStyle = 'rgba(255,77,94,0.3)';
+      cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x + 14, y); cx.stroke(); // velocity leader east
+    } else {
+      cx.beginPath(); cx.arc(0, 0, 4, 0, 6.283);
+      cx.strokeStyle = 'rgba(0,216,255,0.85)'; cx.lineWidth = 1.2; cx.stroke();
+      cx.restore();
+    }
+  });
+
+  /* random detection pings */
+  if (rng() < 0.004) {
+    const k = tracks[Math.floor(rng() * tracks.length)];
+    pings.push({ lon: k.lon, lat: k.lat, born: _pn, red: k.red });
+    AudioFX.radioBurst(0.08, 0.02);
+  }
+  pings = pings.filter(p => _pn - p.born < 1600);
+  pings.forEach(p => {
+    const a = (_pn - p.born) / 1600;
+    const [x, y] = project(p.lon, p.lat);
+    cx.beginPath(); cx.arc(x, y, a * 34, 0, 6.283);
+    cx.strokeStyle = p.red ? `rgba(255,77,94,${0.5 * (1 - a)})` : `rgba(0,216,255,${0.5 * (1 - a)})`;
+    cx.lineWidth = 1; cx.stroke();
+  });
+
+  /* target designators (brief mode) */
+  if (cam.mode === 'brief' && briefState.tgtShown > 0) {
+    TARGETS.slice(0, briefState.tgtShown).forEach(tg => {
+      const [x, y] = project(tg.p[0], tg.p[1]);
+      const pu = 1 + Math.sin(t * 3) * 0.08;
+      cx.strokeStyle = 'rgba(255,176,0,0.9)'; cx.lineWidth = 1.4;
+      const s = 13 * pu;
+      [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(c => {
+        cx.beginPath();
+        cx.moveTo(x + c[0] * s, y + c[1] * s * 0.55);
+        cx.lineTo(x + c[0] * s, y + c[1] * s);
+        cx.lineTo(x + c[0] * s * 0.55, y + c[1] * s);
+        cx.stroke();
+      });
+      cx.fillStyle = 'rgba(255,176,0,0.95)'; cx.font = '10px "Share Tech Mono", monospace';
+      cx.fillText(tg.tag, x + s + 6, y + 3);
+    });
+  }
+}
+
+/* grain layer */
+const gr = document.getElementById('grainC'), gx = gr.getContext('2d');
+function grain() {
+  gr.width = 220; gr.height = 140;
+  const id = gx.createImageData(220, 140);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = Math.random() * 255; id.data[i] = id.data[i+1] = id.data[i+2] = v; id.data[i+3] = 22;
+  }
+  gx.putImageData(id, 0, 0);
+}
+setInterval(grain, 90); grain();
+
+/* ---------------- STATE MACHINE ---------------- */
+const S = { screen: 'boot' };
+const $ = id => document.getElementById(id);
+
+/* boot sequence */
+const BOOTLINES = [
+  ['JOC CONSOLE 04 — POWER-ON SELF TEST', 'ok'],
+  ['CRYPTO LOADED · KEYMAT CURRENT', 'ok'],
+  ['THEATER DATA LINK ......... SYNCED', 'ok'],
+  ['FORCE NETWORKS: BLUE 90 NODES / RED 150 NODES', 'ok'],
+  ['DETERMINISTIC KERNEL ...... SEEDED', 'ok'],
+  ['FORECAST ENSEMBLE ......... 200 WORLDS READY', 'ok'],
+  ['AUDIO SUBSYSTEM ........... AWAITING OPERATOR', 'warn']
+];
+let bootIdx = 0;
+function bootType() {
+  if (bootIdx < BOOTLINES.length) {
+    const [txt, cls] = BOOTLINES[bootIdx++];
+    const d = document.createElement('div');
+    d.className = cls; d.textContent = '> ' + txt;
+    $('bootlog').appendChild(d);
+    setTimeout(bootType, 240 + Math.random() * 260);
+  } else {
+    $('bootPrompt').classList.add('show');
+  }
+}
+setTimeout(bootType, 500);
+
+$('boot').addEventListener('click', () => {
+  if (bootIdx < BOOTLINES.length) return;
+  AudioFX.ensure(); AudioFX.startDrone(); AudioFX.beep(660, 0.07, 0.3);
+  $('boot').classList.add('gone');
+  S.screen = 'title';
+  setTimeout(() => { $('title').classList.add('show'); $('hudbar').classList.add('show'); $('comms').classList.add('show'); }, 600);
+});
+
+/* UTC clock */
+setInterval(() => {
+  const d = new Date();
+  $('utc').innerHTML = 'DTG <b>' + d.toISOString().slice(11, 19) + 'Z</b> · POSTURE <b style="color:var(--amber)">BALANCED</b>';
+}, 500);
+
+/* sound toggle */
+$('sndToggle').addEventListener('click', () => {
+  const m = AudioFX.toggleMute();
+  $('sndToggle').textContent = 'Audio: ' + (m ? 'Off' : 'On');
+});
+
+/* comms chatter */
+const CHATTER = [
+  ['HAWKEYE', 'TRACK B-117 CROSSING MEDIAN LINE, 14 KTS'],
+  ['WATCH SUP', 'COMMS CHECK GREEN ACROSS ALL STATIONS'],
+  ['SIGINT', 'ELEVATED TRAFFIC — EASTERN THEATER COMMAND'],
+  ['OSPREY 2-1', 'ON STATION, ANGELS TWO-FIVE'],
+  ['J2', 'DOCTRINE PRIOR HOLDS — ATTRITION LEANING'],
+  ['PATRIOT CP', 'SLEW COMPLETE, SECTOR NORTH QUIET'],
+  ['J35', 'FAIT-ACCOMPLI WINDOW ASSESSED AT EIGHT TURNS'],
+  ['LINK-16', 'PICTURE STABLE · 224 TRACKS HELD']
+];
+let chIdx = 0;
+function nextChatter() {
+  const [cs, msg] = CHATTER[chIdx++ % CHATTER.length];
+  const el = $('commsline');
+  el.innerHTML = '<span class="cs">' + cs + ':</span> ';
+  AudioFX.radioBurst(0.1, 0.035);
+  let i = 0;
+  const iv = setInterval(() => {
+    el.innerHTML = '<span class="cs">' + cs + ':</span> ' + msg.slice(0, ++i);
+    if (i % 3 === 0) AudioFX.tick(0.012);
+    if (i >= msg.length) clearInterval(iv);
+  }, 22);
+  setTimeout(nextChatter, 5200 + Math.random() * 2400);
+}
+setTimeout(nextChatter, 3500);
+
+/* menu */
+document.querySelectorAll('.mitem').forEach(mi => {
+  mi.addEventListener('mouseenter', () => { if (!mi.classList.contains('dis')) AudioFX.tick(0.04); });
+  mi.addEventListener('click', () => {
+    if (mi.classList.contains('dis')) return;
+    const act = mi.dataset.act;
+    AudioFX.beep(760, 0.08, 0.2);
+    if (act === 'new') startBrief();
+    else showPlacard(act === 'archive' ? 'Operation Archive' : 'Settings',
+      act === 'archive'
+        ? 'Career history lives here: every operation, seed, calibration record and<br>Brier trend — the <span class="k">perpetual beta</span> screen. Built in CO-005/CO-006.'
+        : 'Master · Music · Comms · SFX sliders, reduced-motion toggle,<br>performance mode, operator callsign. Specified in <span class="k">CO-006</span>.');
+  });
+});
+
+function showPlacard(title, body) {
+  $('placTitle').textContent = title;
+  $('placBody').innerHTML = body;
+  $('placard').classList.add('show');
+}
+$('placBack').addEventListener('click', () => {
+  AudioFX.tick(0.05);
+  $('placard').classList.remove('show');
+});
+
+/* ---------------- BRIEF SEQUENCE ---------------- */
+const briefState = { tgtShown: 0 };
+const BRIEF_SECTIONS = [
+  { h: '1. Situation', t: 'Red amphibious and air-assault echelons are massing across the strait. Lift concentration confirmed at Xiamen anchorage. The fait-accompli window is assessed at eight turns. Allied commitment is uncertain; escalation posture is BALANCED.' },
+  { h: '2. Mission', t: 'Deny Red a viable lodgment. Drive amphibious throughput below 30% of requirement before D+8 while preserving your own command tempo. Attrition is descriptive. Denial is decisive.' },
+  { h: '3. Execution', t: 'You are the Blue operational planner. Each turn you commit strikes, hardening and repairs in blind simultaneity with Red. The forecast shows a range, not a promise. The world will draw one outcome.' },
+  { h: '4. Intel Assessment — Red Doctrine Prior', bars: true },
+  { h: '5. Designated Targets', targets: true }
+];
+
+function startBrief() {
+  S.screen = 'brief';
+  AudioFX.whoosh('in');
+  document.body.classList.add('letterboxed', 'glitching');
+  setTimeout(() => document.body.classList.remove('glitching'), 300);
+  $('title').classList.remove('show');
+  cam.mode = 'brief';
+  const zoomIv = setInterval(() => { cam.t = Math.min(1, cam.t + 0.02); if (cam.t >= 1) clearInterval(zoomIv); }, 40);
+  setTimeout(() => {
+    $('brief').classList.add('show');
+    AudioFX.stamp();
+    $('opstamp').classList.add('stamped');
+    setTimeout(() => { $('opmeta').classList.add('show'); typeSections(0); }, 700);
+  }, 1300);
+}
+
+function typeSections(si) {
+  const body = $('briefbody');
+  if (si >= BRIEF_SECTIONS.length) { armCommit(); return; }
+  const sec = BRIEF_SECTIONS[si];
+  const h = document.createElement('h4'); h.textContent = sec.h; body.appendChild(h);
+  AudioFX.radioBurst(0.09, 0.03);
+
+  if (sec.bars) {
+    [['Attrition', 50, 'var(--red)'], ['Decapitation', 30, 'var(--amber)'], ['Denial', 20, 'var(--cyan)']].forEach((b, i) => {
+      const row = document.createElement('div'); row.className = 'dbar';
+      row.innerHTML = '<span class="lbl">' + b[0] + '</span><span class="track"><span class="fill" style="background:' + b[2] + '"></span></span><span class="pct">' + b[1] + '%</span>';
+      body.appendChild(row);
+      setTimeout(() => { row.querySelector('.fill').style.width = b[1] + '%'; AudioFX.beep(420 + i * 140, 0.05, 0.15); }, 250 + i * 350);
+    });
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-top:6px;font-size:11px;color:var(--muted);letter-spacing:.08em';
+    note.textContent = 'Posterior updates as Red behavior is observed. Intel shows belief — never truth.';
+    body.appendChild(note);
+    setTimeout(() => typeSections(si + 1), 1700);
+    return;
+  }
+  if (sec.targets) {
+    TARGETS.forEach((tg, i) => {
+      setTimeout(() => {
+        const d = document.createElement('div'); d.className = 'tgtline';
+        d.innerHTML = '<span class="tag">' + tg.tag + '</span> — ' + tg.n;
+        body.appendChild(d);
+        briefState.tgtShown = i + 1;
+        AudioFX.beep(980, 0.06, 0.12); AudioFX.thump(0.1);
+      }, 350 * (i + 1));
+    });
+    setTimeout(() => typeSections(si + 1), 350 * (TARGETS.length + 1) + 400);
+    return;
+  }
+  /* typed paragraph */
+  const p = document.createElement('div'); p.className = 'cur'; body.appendChild(p);
+  let i = 0;
+  const iv = setInterval(() => {
+    i += 2;
+    p.textContent = sec.t.slice(0, i);
+    if (i % 6 === 0) AudioFX.tick(0.015);
+    body.scrollTop = body.scrollHeight;
+    if (i >= sec.t.length) {
+      clearInterval(iv); p.classList.remove('cur');
+      setTimeout(() => typeSections(si + 1), 420);
+    }
+  }, 12);
+}
+
+function armCommit() {
+  const b = $('armBtn');
+  b.classList.add('armed');
+  AudioFX.beep(520, 0.09, 0.5); AudioFX.thump(0.2);
+  b.addEventListener('click', () => {
+    if (!b.classList.contains('armed')) return;
+    AudioFX.whoosh('out'); AudioFX.thump(0.3);
+    showPlacard('Simulation Handoff',
+      'This is where the mockup ends and the game begins.<br><br>Everything you just felt — the boot, the drone, the letterboxing, the typed brief, the radio floor, the armed commit — is the <span class="k">presentation contract</span> for <span class="k">Change Order CO-006</span>. CODEX wires this exact feel onto the live Operation Loop: PLAN on the real map, WATCH as the war film, AAR as the debrief ceremony.');
+  }, { once: true });
+}
+
+/* ---------------- RENDER LOOP ---------------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(50, now - last); last = now;
+  drawTheater(dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

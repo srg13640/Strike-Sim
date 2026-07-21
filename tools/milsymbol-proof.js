@@ -52,6 +52,6 @@ nodes.forEach(n => {
   out += di.html.replace(/^<svg /, `<svg x="${(x - w / 2).toFixed(1)}" y="${(y - h / 2).toFixed(1)}" `);
 });
 out += '</svg>';
-fs.mkdirSync(path.join(__dirname, '..', '_stark'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'milsymbol-proof.svg'), out);
-console.log('-> _stark/milsymbol-proof.svg');
+fs.mkdirSync(path.join(__dirname, '..', '_workshop', 'design-proofs'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'milsymbol-proof.svg'), out);
+console.log('-> _workshop/design-proofs/milsymbol-proof.svg');

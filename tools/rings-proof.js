@@ -2,7 +2,7 @@
  * rings-proof.js — approximate render of the engagement-zone overlay (top-N rings) plus
  * milsymbol symbols, to sanity-check density/look before a browser refresh.
  * Rings drawn as lat/lon ellipses (km->deg); the live map uses geodesic L.circle.
- * Run: node tools/rings-proof.js  -> _stark/rings-proof.svg
+ * Run: node tools/rings-proof.js  -> _workshop/design-proofs/rings-proof.svg
  */
 const path = require('path'); const fs = require('fs');
 global.ms = require(path.join(__dirname, '..', 'vendor', 'milsymbol.js'));
@@ -55,6 +55,6 @@ nodes.forEach(n => {
   out += di.html.replace(/^<svg /, `<svg x="${(x - w / 2).toFixed(1)}" y="${(y - h / 2).toFixed(1)}" `);
 });
 out += '</svg>';
-fs.mkdirSync(path.join(__dirname, '..', '_stark'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'rings-proof.svg'), out);
-console.log('rings:', cand.length, '-> _stark/rings-proof.svg');
+fs.mkdirSync(path.join(__dirname, '..', '_workshop', 'design-proofs'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'rings-proof.svg'), out);
+console.log('rings:', cand.length, '-> _workshop/design-proofs/rings-proof.svg');

@@ -2,7 +2,7 @@
  * console-mockup.js — design mock of the rebuilt "operations console" chrome:
  * a top command bar (brand + view switcher + global actions), docked left/right rails,
  * a center map with real milsymbol symbols + a range ring, and a DOCKED node-detail panel
- * (no more floating overlap). SVG -> _stark/console-mockup.svg. Design reference only.
+ * (no more floating overlap). SVG -> _workshop/design-proofs/console-mockup.svg. Design reference only.
  */
 const path = require('path'); const fs = require('fs');
 global.ms = require(path.join(__dirname, '..', 'vendor', 'milsymbol.js')); global.window = global;
@@ -88,5 +88,5 @@ const acts = [['▣ Campaign', '#15324a', '#2c6f9b'], ['⚔ War Game', '#1d4e30'
 let ax = W - 16;
 acts.slice().reverse().forEach(a => { const w = a[0].length * 8 + 26; ax -= w; s += `<rect x="${ax}" y="12" width="${w}" height="30" rx="7" fill="${a[1]}" stroke="${a[2]}"/><text x="${ax + w / 2}" y="31" text-anchor="middle" fill="#dff1ff" font-size="12" font-weight="600">${a[0]}</text>`; ax -= 8; });
 s += '</svg>';
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'console-mockup.svg'), s);
-console.log('-> _stark/console-mockup.svg');
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'console-mockup.svg'), s);
+console.log('-> _workshop/design-proofs/console-mockup.svg');

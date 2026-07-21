@@ -1,0 +1,1786 @@
+<!--
+  DESIGN RATIONALE: Terminal-Pro / Analyst Light — a Bloomberg-meets-Apple aesthetic for defense analysts. Warm off-white base (#F5F3EF), charcoal text, IBM Plex Sans + IBM Plex Mono pairing for precision density. Two restrained accents: USAF Blue (#1B4F8C) and Alert Crimson (#C0392B), with hairline dividers and a modular 4-column grid. The denial-MOE panel anchors the right rail as the product's strategic centerpiece.
+  NOTIONAL // UNCLASSIFIED // FOR DEMONSTRATION PURPOSES ONLY — all data is synthetic and does not represent real operational information.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>STRIKE SIM — C2 WARGAME TOOL · NOTIONAL / UNCLASSIFIED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F5F3EF;
+  --bg-panel: #FAFAF8;
+  --bg-inset: #EEECEA;
+  --bg-deep: #E6E3DE;
+  --text-primary: #1A1917;
+  --text-secondary: #4A4743;
+  --text-muted: #7A7672;
+  --text-faint: #A8A39D;
+  --accent-blue: #1B4F8C;
+  --accent-blue-lt: #2B6BC4;
+  --accent-blue-bg: #EBF1FA;
+  --accent-red: #C0392B;
+  --accent-red-lt: #E74C3C;
+  --accent-red-bg: #FDECEA;
+  --accent-green: #196E3B;
+  --accent-green-bg: #E8F5EE;
+  --accent-amber: #8B5E00;
+  --accent-amber-bg: #FDF6E3;
+  --divider: #D8D4CE;
+  --divider-lt: #E8E4DF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.09);
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --radius: 3px;
+  --radius-md: 5px;
+}
+html, body {
+  height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── LAYOUT ── */
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 36px 1fr;
+  grid-template-columns: 220px 1fr 280px;
+  grid-template-areas:
+    "topbar topbar topbar"
+    "classbar classbar classbar"
+    "lrail main rrail";
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── CLASSIFICATION BAR ── */
+.classbar {
+  grid-area: classbar;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--divider);
+  border-bottom: 2px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+.classbar-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  color: var(--accent-green);
+  text-transform: uppercase;
+}
+.classbar-separator { color: var(--divider); font-size: 10px; }
+
+/* ── TOP BAR ── */
+.topbar {
+  grid-area: topbar;
+  background: var(--text-primary);
+  color: #F5F3EF;
+  height: 52px;
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #2A2826;
+  position: relative;
+  z-index: 100;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-right: 1px solid #2A2826;
+  min-width: 220px;
+  flex-shrink: 0;
+}
+.brand-icon {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-text { line-height: 1.1; }
+.brand-name {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: .06em;
+  color: #F5F3EF;
+}
+.brand-sub {
+  font-size: 9px; font-weight: 400;
+  letter-spacing: .18em;
+  color: #8A8682;
+  text-transform: uppercase;
+}
+.topbar-views {
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  gap: 2px;
+  border-right: 1px solid #2A2826;
+}
+.view-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 14px;
+  background: none; border: none; cursor: pointer;
+  color: #8A8682;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  letter-spacing: .02em;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  margin-bottom: -1px;
+}
+.view-btn:hover { color: #F5F3EF; }
+.view-btn.active {
+  color: #F5F3EF;
+  border-bottom-color: var(--accent-blue-lt);
+}
+.view-btn svg { opacity: .6; }
+.view-btn.active svg { opacity: 1; }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-right: 1px solid #2A2826;
+}
+.action-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: var(--radius);
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  cursor: pointer; border: 1px solid transparent;
+  transition: all .15s;
+}
+.action-btn-primary {
+  background: var(--accent-blue);
+  color: #fff; border-color: var(--accent-blue-lt);
+}
+.action-btn-primary:hover { background: var(--accent-blue-lt); }
+.action-btn-ghost {
+  background: none; color: #A8A39D; border-color: #2A2826;
+}
+.action-btn-ghost:hover { color: #F5F3EF; border-color: #4A4743; }
+.topbar-status {
+  display: flex; align-items: center; gap: 20px;
+  padding: 0 16px; margin-left: auto;
+}
+.status-group { display: flex; flex-direction: column; align-items: flex-end; }
+.status-label {
+  font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+  color: #5A5652; font-weight: 600;
+}
+.status-value {
+  font-family: var(--mono); font-size: 11px; color: #D8D4CE;
+}
+.posture-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 8px; border-radius: var(--radius);
+  background: rgba(192,57,43,.15); border: 1px solid rgba(192,57,43,.3);
+}
+.posture-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-red-lt);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.8); }
+}
+.posture-text {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  color: var(--accent-red-lt); letter-spacing: .06em;
+}
+.clock-display {
+  font-family: var(--mono); font-size: 13px;
+  color: #F5F3EF; font-weight: 400; letter-spacing: .04em;
+}
+
+/* ── LEFT RAIL ── */
+.lrail {
+  grid-area: lrail;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--divider);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.rail-section {
+  border-bottom: 1px solid var(--divider-lt);
+  flex-shrink: 0;
+}
+.rail-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px 8px;
+  cursor: pointer;
+}
+.rail-section-title {
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.rail-section-body { padding: 0 14px 10px; }
+.filter-group { margin-bottom: 10px; }
+.filter-group-label {
+  font-size: 9px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-faint);
+  margin-bottom: 5px;
+}
+.filter-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border-radius: 2px;
+  font-size: 10px; font-weight: 500; letter-spacing: .03em;
+  cursor: pointer; border: 1px solid var(--divider);
+  background: var(--bg); color: var(--text-secondary);
+  transition: all .12s; user-select: none;
+}
+.chip.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.chip.active-red { background: var(--accent-red); color: #fff; border-color: var(--accent-red); }
+.chip-dot { width: 5px; height: 5px; border-radius: 50%; }
+.highlight-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0;
+}
+.highlight-label { font-size: 11px; color: var(--text-secondary); }
+.toggle {
+  width: 28px; height: 16px; border-radius: 8px;
+  background: var(--bg-deep); position: relative; cursor: pointer;
+  border: 1px solid var(--divider); transition: background .2s;
+}
+.toggle.on { background: var(--accent-blue); border-color: var(--accent-blue); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: white; top: 2px; left: 2px;
+  transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.toggle.on::after { transform: translateX(12px); }
+
+/* ── LEGEND ── */
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-sym {
+  width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.legend-text { font-size: 10px; color: var(--text-secondary); }
+
+/* ── EVENT LOG ── */
+.event-log {
+  flex: 1; overflow-y: auto; padding: 6px 0;
+  scrollbar-width: thin; scrollbar-color: var(--divider) transparent;
+}
+.event-item {
+  padding: 5px 14px;
+  border-left: 2px solid transparent;
+  transition: background .1s;
+}
+.event-item:hover { background: var(--bg-inset); }
+.event-item.ev-alert { border-left-color: var(--accent-red); }
+.event-item.ev-info { border-left-color: var(--accent-blue); }
+.event-item.ev-success { border-left-color: var(--accent-green); }
+.event-item.ev-warn { border-left-color: var(--accent-amber); }
+.event-time {
+  font-family: var(--mono); font-size: 9px; color: var(--text-faint);
+  letter-spacing: .04em;
+}
+.event-text { font-size: 10px; color: var(--text-secondary); line-height: 1.3; margin-top: 1px; }
+.event-badge {
+  display: inline-block; padding: 1px 4px; border-radius: 1px;
+  font-size: 9px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; margin-right: 4px;
+}
+.badge-alert { background: var(--accent-red-bg); color: var(--accent-red); }
+.badge-info { background: var(--accent-blue-bg); color: var(--accent-blue); }
+.badge-green { background: var(--accent-green-bg); color: var(--accent-green); }
+
+/* ── MAIN AREA ── */
+.main-area {
+  grid-area: main;
+  display: flex; flex-direction: column;
+  overflow: hidden; position: relative;
+  background: var(--bg);
+}
+.main-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.main-toolbar-label {
+  font-size: 9px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.scenario-badge {
+  font-family: var(--mono); font-size: 10px;
+  padding: 2px 7px; border-radius: var(--radius);
+  background: var(--accent-blue-bg); color: var(--accent-blue);
+  border: 1px solid rgba(27,79,140,.15);
+}
+.spacer { flex: 1; }
+.tool-btn {
+  padding: 4px 9px; border-radius: var(--radius);
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  border: 1px solid var(--divider); background: var(--bg);
+  color: var(--text-secondary); cursor: pointer;
+  transition: all .12s;
+}
+.tool-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.battlespace-canvas {
+  flex: 1; position: relative; overflow: hidden;
+}
+#forceGraph { width: 100%; height: 100%; }
+
+/* ── RIGHT RAIL ── */
+.rrail {
+  grid-area: rrail;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--divider);
+  display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin; scrollbar-color: var(--divider) transparent;
+}
+.rrail-section {
+  border-bottom: 1px solid var(--divider-lt);
+  flex-shrink: 0;
+}
+.rrail-header {
+  padding: 10px 14px 8px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rrail-title {
+  font-size: 9px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.rrail-body { padding: 0 14px 12px; }
+
+/* ── TEAM SUMMARY ── */
+.team-summary-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.team-card {
+  padding: 8px; border-radius: var(--radius-md);
+  border: 1px solid var(--divider);
+}
+.team-card-blue { background: var(--accent-blue-bg); border-color: rgba(27,79,140,.15); }
+.team-card-red { background: var(--accent-red-bg); border-color: rgba(192,57,43,.15); }
+.team-card-header {
+  display: flex; align-items: center; gap: 5px;
+  margin-bottom: 7px;
+}
+.team-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.team-name {
+  font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+}
+.team-name-blue { color: var(--accent-blue); }
+.team-name-red { color: var(--accent-red); }
+.team-stat { margin-bottom: 4px; }
+.team-stat-label { font-size: 9px; color: var(--text-faint); letter-spacing: .04em; }
+.team-stat-value {
+  font-family: var(--mono); font-size: 12px; font-weight: 500;
+  color: var(--text-primary);
+}
+.team-stat-sub { font-size: 9px; color: var(--text-muted); }
+.mini-bar {
+  height: 3px; border-radius: 2px; margin-top: 2px;
+  background: var(--bg-inset); overflow: hidden;
+}
+.mini-bar-fill { height: 100%; border-radius: 2px; }
+
+/* ── COA BUILDER ── */
+.coa-phase-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.coa-phase {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 8px; border-radius: var(--radius);
+  border: 1px solid var(--divider); background: var(--bg);
+  cursor: pointer; transition: border-color .12s;
+}
+.coa-phase:hover { border-color: var(--accent-blue); }
+.coa-phase.selected { border-color: var(--accent-blue); background: var(--accent-blue-bg); }
+.coa-num {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  color: var(--accent-blue); background: rgba(27,79,140,.1);
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.coa-text { font-size: 11px; color: var(--text-secondary); line-height: 1.35; }
+.coa-phase-label { font-weight: 600; color: var(--text-primary); }
+.intent-box {
+  background: var(--bg-inset); border-radius: var(--radius);
+  padding: 8px; margin-bottom: 8px;
+  border: 1px dashed var(--divider);
+}
+.intent-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.intent-text { font-size: 10px; color: var(--text-secondary); font-style: italic; line-height: 1.4; }
+.capability-sliders { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.cap-row { }
+.cap-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.cap-label { font-size: 10px; color: var(--text-secondary); }
+.cap-value { font-family: var(--mono); font-size: 10px; color: var(--accent-blue); font-weight: 500; }
+.cap-slider {
+  width: 100%; height: 4px; border-radius: 2px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--bg-inset); outline: none; cursor: pointer;
+}
+.cap-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--accent-blue);
+  border: 2px solid var(--bg-panel); box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  cursor: pointer;
+}
+.generate-btn {
+  width: 100%; padding: 9px 12px;
+  background: var(--accent-blue); color: #fff;
+  border: none; border-radius: var(--radius-md);
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  transition: background .15s;
+}
+.generate-btn:hover { background: var(--accent-blue-lt); }
+
+/* ── DENIAL MOE PANEL ── */
+.moe-panel { }
+.moe-headline {
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #0E2D52 0%, #1B4F8C 100%);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin: 0 14px 0;
+  margin-bottom: 0;
+}
+.moe-verdict {
+  font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255,255,255,.5); margin-bottom: 3px;
+}
+.moe-result {
+  font-size: 18px; font-weight: 700;
+  color: #fff; letter-spacing: -.01em; line-height: 1.1;
+}
+.moe-result-sub {
+  font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,.6);
+  margin-top: 2px; letter-spacing: .02em;
+}
+.moe-ci {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 9px; padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.moe-ci-label { font-size: 9px; color: rgba(255,255,255,.45); letter-spacing: .06em; text-transform: uppercase; }
+.moe-ci-value { font-family: var(--mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,.85); }
+.ci-bar-wrap { flex: 1; position: relative; height: 6px; }
+.ci-bar-bg { width: 100%; height: 100%; background: rgba(255,255,255,.1); border-radius: 3px; }
+.ci-bar-fill { position: absolute; top: 0; height: 100%; border-radius: 3px; background: rgba(255,255,255,.5); }
+.ci-bar-center { position: absolute; top: -3px; width: 2px; height: 12px; background: #fff; border-radius: 1px; }
+
+.moe-effects {
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-top: none;
+  margin: 0 14px 10px;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+.effect-row { display: flex; flex-direction: column; margin-bottom: 8px; }
+.effect-row:last-child { margin-bottom: 0; }
+.effect-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+.effect-label { font-size: 10px; color: var(--text-secondary); }
+.effect-value { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+.ev-red { color: var(--accent-red); }
+.ev-green { color: var(--accent-green); }
+.ev-blue { color: var(--accent-blue); }
+.effect-bar { height: 4px; border-radius: 2px; background: var(--bg-inset); overflow: hidden; }
+.effect-bar-fill { height: 100%; border-radius: 2px; transition: width .8s ease; }
+.effect-sub { font-family: var(--mono); font-size: 9px; color: var(--text-faint); margin-top: 2px; }
+.moe-halts-box {
+  margin: 0 14px 12px;
+  padding: 10px 12px;
+  background: var(--accent-green-bg);
+  border: 1px solid rgba(25,110,59,.15);
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; gap: 10px;
+}
+.halts-icon { font-size: 18px; flex-shrink: 0; }
+.halts-text-group { }
+.halts-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-green); }
+.halts-value { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent-green); }
+.halts-sub { font-size: 9px; color: var(--text-muted); }
+
+/* ── MINI SPARKLINE ── */
+.sparkline-wrap { padding: 0 14px 10px; }
+.spark-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+
+/* ── UTILITY ── */
+.section-collapse-icon {
+  font-size: 9px; color: var(--text-faint); transition: transform .2s;
+}
+.import-export-row {
+  display: flex; gap: 5px; padding: 0 14px 10px;
+}
+.ie-btn {
+  flex: 1; padding: 5px 0; border-radius: var(--radius);
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  border: 1px solid var(--divider); background: var(--bg);
+  color: var(--text-secondary); cursor: pointer; text-align: center;
+  transition: all .12s;
+}
+.ie-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+/* ── TOOLTIP ── */
+.node-tooltip {
+  position: absolute; pointer-events: none;
+  background: var(--text-primary); color: #F5F3EF;
+  border-radius: var(--radius-md); padding: 8px 10px;
+  font-size: 11px; line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  opacity: 0; transition: opacity .15s;
+  max-width: 200px; z-index: 200;
+}
+.tooltip-id { font-family: var(--mono); font-size: 9px; color: #8A8682; margin-bottom: 2px; }
+.tooltip-name { font-weight: 600; margin-bottom: 4px; }
+.tooltip-row { font-size: 10px; color: #A8A39D; }
+.tooltip-val { color: #F5F3EF; font-family: var(--mono); }
+
+/* ── VIEW PANELS ── */
+.view-panel { display: none; width: 100%; height: 100%; }
+.view-panel.active { display: flex; flex-direction: column; }
+
+/* ── TABLE VIEW ── */
+.data-table-wrap { overflow: auto; flex: 1; }
+table.data-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 11px;
+}
+table.data-table th {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg-panel);
+  font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-muted); padding: 8px 12px;
+  border-bottom: 2px solid var(--divider);
+  text-align: left; cursor: pointer;
+}
+table.data-table th:hover { color: var(--accent-blue); }
+table.data-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--divider-lt);
+  color: var(--text-secondary);
+}
+table.data-table tr:hover td { background: var(--bg-inset); }
+.td-mono { font-family: var(--mono); font-size: 10px; }
+.td-badge {
+  display: inline-block; padding: 1px 5px; border-radius: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+}
+.td-friendly { background: var(--accent-blue-bg); color: var(--accent-blue); }
+.td-hostile { background: var(--accent-red-bg); color: var(--accent-red); }
+.td-neutral { background: var(--accent-amber-bg); color: var(--accent-amber); }
+.td-status-active { color: var(--accent-green); }
+.td-status-degraded { color: var(--accent-amber); }
+.td-status-destroyed { color: var(--accent-red); }
+
+/* ── TASK ORG VIEW ── */
+.taskorg-wrap {
+  flex: 1; overflow: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; align-items: center;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 3px; }
+
+/* ── MAP VIEW ── */
+.map-placeholder {
+  flex: 1; position: relative;
+  background: #E8E4DC;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-icon">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="4" fill="#1B4F8C"/>
+        <polygon points="14,5 23,22 5,22" fill="none" stroke="#fff" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="2.5" fill="#fff"/>
+        <line x1="14" y1="5" x2="14" y2="11" stroke="rgba(255,255,255,.4)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <div class="brand-name">STRIKESIM</div>
+      <div class="brand-sub">C2 Wargame · v3.4.1</div>
+    </div>
+  </div>
+
+  <nav class="topbar-views">
+    <button class="view-btn active" data-view="graph" onclick="switchView('graph')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/>
+        <circle cx="1.5" cy="1.5" r="1.5" fill="currentColor" opacity=".6"/>
+        <circle cx="10.5" cy="1.5" r="1.5" fill="currentColor" opacity=".6"/>
+        <circle cx="10.5" cy="10.5" r="1.5" fill="currentColor" opacity=".6"/>
+        <circle cx="1.5" cy="10.5" r="1.5" fill="currentColor" opacity=".6"/>
+        <line x1="2.5" y1="2.5" x2="4.5" y2="4.5" stroke="currentColor" stroke-width=".8"/>
+        <line x1="9.5" y1="2.5" x2="7.5" y2="4.5" stroke="currentColor" stroke-width=".8"/>
+      </svg>
+      Force Graph
+    </button>
+    <button class="view-btn" data-view="map" onclick="switchView('map')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M4 1v10M1 5l3-1.5L8 5l3-1.5" stroke="currentColor" stroke-width=".8"/>
+      </svg>
+      Map
+    </button>
+    <button class="view-btn" data-view="table" onclick="switchView('table')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="1" y="1" width="10" height="10" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" stroke-width=".8"/>
+        <line x1="1" y1="7.5" x2="11" y2="7.5" stroke="currentColor" stroke-width=".8"/>
+        <line x1="5" y1="4.5" x2="5" y2="11" stroke="currentColor" stroke-width=".8"/>
+      </svg>
+      Table
+    </button>
+    <button class="view-btn" data-view="taskorg" onclick="switchView('taskorg')">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <rect x="4.5" y="1" width="3" height="2.5" rx=".5" stroke="currentColor" stroke-width="1"/>
+        <rect x="1" y="8.5" width="3" height="2.5" rx=".5" stroke="currentColor" stroke-width="1"/>
+        <rect x="4.5" y="8.5" width="3" height="2.5" rx=".5" stroke="currentColor" stroke-width="1"/>
+        <rect x="8" y="8.5" width="3" height="2.5" rx=".5" stroke="currentColor" stroke-width="1"/>
+        <line x1="6" y1="3.5" x2="6" y2="6" stroke="currentColor" stroke-width=".8"/>
+        <line x1="2.5" y1="6" x2="9.5" y2="6" stroke="currentColor" stroke-width=".8"/>
+        <line x1="2.5" y1="6" x2="2.5" y2="8.5" stroke="currentColor" stroke-width=".8"/>
+        <line x1="6" y1="6" x2="6" y2="8.5" stroke="currentColor" stroke-width=".8"/>
+        <line x1="9.5" y1="6" x2="9.5" y2="8.5" stroke="currentColor" stroke-width=".8"/>
+      </svg>
+      Task Org
+    </button>
+  </nav>
+
+  <div class="topbar-actions">
+    <button class="action-btn action-btn-primary" onclick="triggerGenerate()">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+        <path d="M5.5 1L7 4H10.5L7.8 6.2L8.9 9.5L5.5 7.5L2.1 9.5L3.2 6.2L.5 4H4L5.5 1Z" fill="currentColor"/>
+      </svg>
+      Campaign Planner
+    </button>
+    <button class="action-btn action-btn-ghost">War Game</button>
+  </div>
+
+  <div class="topbar-status">
+    <div class="status-group">
+      <span class="status-label">Theater</span>
+      <span class="status-value">INDOPACOM · SECTOR 7</span>
+    </div>
+    <div class="status-group">
+      <span class="status-label">Phase</span>
+      <span class="status-value">D+12 / PHASE II</span>
+    </div>
+    <div class="posture-badge">
+      <div class="posture-dot"></div>
+      <span class="posture-text">DEFCON 2</span>
+    </div>
+    <div class="clock-display" id="utcClock">00:00:00Z</div>
+  </div>
+</header>
+
+<!-- CLASSIFICATION BAR -->
+<div class="classbar">
+  <span class="classbar-label">UNCLASSIFIED // NOTIONAL</span>
+  <span class="classbar-separator">·</span>
+  <span class="classbar-label">FOR DEMONSTRATION PURPOSES ONLY</span>
+  <span class="classbar-separator">·</span>
+  <span class="classbar-label">NOT FOR OPERATIONAL USE</span>
+  <span class="classbar-separator">·</span>
+  <span class="classbar-label">SYNTHETIC DATA</span>
+</div>
+
+<!-- LEFT RAIL -->
+<aside class="lrail">
+  <div class="rail-section">
+    <div class="rail-section-header">
+      <span class="rail-section-title">Filters</span>
+      <span class="section-collapse-icon">▲</span>
+    </div>
+    <div class="rail-section-body">
+      <div class="filter-group">
+        <div class="filter-group-label">Domain</div>
+        <div class="filter-chips">
+          <div class="chip active" onclick="toggleChip(this)">
+            <div class="chip-dot" style="background:#1B4F8C"></div>All
+          </div>
+          <div class="chip" onclick="toggleChip(this)">✈ Air</div>
+          <div class="chip" onclick="toggleChip(this)">⚓ Sea</div>
+          <div class="chip" onclick="toggleChip(this)">🛡 Land</div>
+          <div class="chip" onclick="toggleChip(this)">★ Space</div>
+          <div class="chip" onclick="toggleChip(this)">⚡ Cyber</div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-label">Team</div>
+        <div class="filter-chips">
+          <div class="chip active" style="background:var(--accent-blue);color:#fff;border-color:var(--accent-blue)">● Blue</div>
+          <div class="chip active-red" style="background:var(--accent-red);color:#fff;border-color:var(--accent-red)">● Red</div>
+          <div class="chip" onclick="toggleChip(this)">◆ Neutral</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rail-section">
+    <div class="rail-section-header">
+      <span class="rail-section-title">Highlights</span>
+      <span class="section-collapse-icon">▲</span>
+    </div>
+    <div class="rail-section-body">
+      <div class="highlight-row"><span class="highlight-label">High-Value Targets</span><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="highlight-row"><span class="highlight-label">C2 Links</span><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="highlight-row"><span class="highlight-label">Supply Chains</span><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+      <div class="highlight-row"><span class="highlight-label">Denial Corridors</span><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="highlight-row"><span class="highlight-label">Attrition Paths</span><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+  </div>
+
+  <div class="rail-section">
+    <div class="rail-section-header">
+      <span class="rail-section-title">Legend</span>
+      <span class="section-collapse-icon">▲</span>
+    </div>
+    <div class="rail-section-body">
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" fill="none" stroke="#1B4F8C" stroke-width="1.5"/><line x1="7" y1="2" x2="7" y2="0" stroke="#1B4F8C" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-text">Friendly</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L12 12H2L7 2Z" fill="none" stroke="#C0392B" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-text">Hostile</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2L12 7L7 12L2 7Z" fill="none" stroke="#8B5E00" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-text">Neutral</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="#196E3B" stroke-width="1.5"/></svg>
+          </div>
+          <span class="legend-text">HVT Node</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="2" fill="none" stroke="#1B4F8C" stroke-width="1.2" stroke-dasharray="2 1"/></svg>
+          </div>
+          <span class="legend-text">C2 Link</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-sym">
+            <svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="#C0392B" stroke-width="1.5"/><polygon points="12,4 12,10 14,7" fill="#C0392B"/></svg>
+          </div>
+          <span class="legend-text">Strike Vector</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="import-export-row">
+    <button class="ie-btn">↑ Import</button>
+    <button class="ie-btn">↓ Export</button>
+    <button class="ie-btn">⧉ Share</button>
+  </div>
+
+  <div class="rail-section" style="flex:1;display:flex;flex-direction:column;border-bottom:none;">
+    <div class="rail-section-header">
+      <span class="rail-section-title">Event Log</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--accent-red);letter-spacing:.04em;animation:pulse 2s infinite;">● LIVE</span>
+    </div>
+    <div class="event-log" id="eventLog"></div>
+  </div>
+</aside>
+
+<!-- MAIN BATTLESPACE -->
+<main class="main-area">
+  <div class="main-toolbar">
+    <span class="main-toolbar-label">Scenario</span>
+    <span class="scenario-badge">OPL-PACIFIC-DENIAL-2027 · REV 14</span>
+    <span style="width:1px;height:16px;background:var(--divider);margin:0 4px;"></span>
+    <span class="main-toolbar-label">Mode</span>
+    <span class="scenario-badge" style="background:var(--accent-amber-bg);color:var(--accent-amber);border-color:rgba(139,94,0,.15)">ANALYSIS · D+12</span>
+    <div class="spacer"></div>
+    <button class="tool-btn">⊕ Add Node</button>
+    <button class="tool-btn">⚡ Sim Step</button>
+    <button class="tool-btn">↺ Reset</button>
+    <button class="tool-btn" style="border-color:var(--accent-blue);color:var(--accent-blue)">▶ Run Monte Carlo</button>
+  </div>
+
+  <div class="battlespace-canvas">
+    <!-- GRAPH VIEW -->
+    <div id="view-graph" class="view-panel active">
+      <canvas id="forceGraph"></canvas>
+      <div class="node-tooltip" id="nodeTooltip">
+        <div class="tooltip-id" id="tt-id">NODE-001</div>
+        <div class="tooltip-name" id="tt-name">--</div>
+        <div class="tooltip-row">Type: <span class="tooltip-val" id="tt-type">--</span></div>
+        <div class="tooltip-row">Domain: <span class="tooltip-val" id="tt-domain">--</span></div>
+        <div class="tooltip-row">Status: <span class="tooltip-val" id="tt-status">--</span></div>
+        <div class="tooltip-row">Coord: <span class="tooltip-val" id="tt-coord">--</span></div>
+      </div>
+    </div>
+
+    <!-- MAP VIEW -->
+    <div id="view-map" class="view-panel">
+      <div class="map-placeholder">
+        <svg width="100%" height="100%" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+          <!-- Ocean base -->
+          <rect width="900" height="600" fill="#D4DEEB"/>
+          <!-- Grid lines (lat/lon) -->
+          <g stroke="#C0CAD9" stroke-width="0.5" opacity="0.6">
+            <line x1="0" y1="150" x2="900" y2="150"/><line x1="0" y1="300" x2="900" y2="300"/>
+            <line x1="0" y1="450" x2="900" y2="450"/>
+            <line x1="150" y1="0" x2="150" y2="600"/><line x1="300" y1="0" x2="300" y2="600"/>
+            <line x1="450" y1="0" x2="450" y2="600"/><line x1="600" y1="0" x2="600" y2="600"/>
+            <line x1="750" y1="0" x2="750" y2="600"/>
+          </g>
+          <!-- Taiwan island -->
+          <path d="M520 240 C530 225 548 215 555 230 C565 250 560 285 548 300 C535 315 515 310 510 290 Z" fill="#D4C9A8" stroke="#B8A882" stroke-width="1.5"/>
+          <text x="537" y="268" font-size="9" fill="#4A4743" font-family="IBM Plex Sans,sans-serif" font-weight="600" text-anchor="middle">TAIWAN</text>
+          <!-- China coast -->
+          <path d="M0 0 L320 0 L330 80 L320 150 L290 180 L280 230 L310 290 L330 350 L300 420 L280 500 L250 600 L0 600 Z" fill="#C8C0A8" stroke="#B0A888" stroke-width="1"/>
+          <text x="180" y="280" font-size="10" fill="#4A4743" font-family="IBM Plex Sans,sans-serif" font-weight="600">PRC MAINLAND</text>
+          <!-- Philippines -->
+          <ellipse cx="650" cy="420" rx="18" ry="40" fill="#D4C9A8" stroke="#B8A882" stroke-width="1" transform="rotate(-10 650 420)"/>
+          <text x="680" y="420" font-size="8" fill="#4A4743" font-family="IBM Plex Sans,sans-serif">LUZON</text>
+          <!-- Japan / Ryukyu chain -->
+          <path d="M700 80 C720 90 730 100 740 120 C730 110 715 105 700 115 C685 105 680 95 690 80 Z" fill="#D4C9A8" stroke="#B8A882" stroke-width="1"/>
+          <text x="720" y="100" font-size="8" fill="#4A4743" font-family="IBM Plex Sans,sans-serif">OKINAWA</text>
+          <!-- Okinawa to Taiwan island chain -->
+          <circle cx="640" cy="180" r="5" fill="#D4C9A8" stroke="#B8A882" stroke-width="1"/>
+          <circle cx="610" cy="210" r="4" fill="#D4C9A8" stroke="#B8A882" stroke-width="1"/>
+          <circle cx="575" cy="225" r="4" fill="#D4C9A8" stroke="#B8A882" stroke-width="1"/>
+
+          <!-- BLUE FORCES -->
+          <!-- CSG-70 carrier group -->
+          <g transform="translate(680,300)">
+            <rect x="-14" y="-14" width="28" height="28" fill="none" stroke="#1B4F8C" stroke-width="2"/>
+            <line x1="0" y1="-14" x2="0" y2="-22" stroke="#1B4F8C" stroke-width="2"/>
+            <text x="0" y="5" text-anchor="middle" font-size="8" fill="#1B4F8C" font-weight="600" font-family="IBM Plex Mono,monospace">CVN</text>
+          </g>
+          <text x="680" y="330" text-anchor="middle" font-size="8" fill="#1B4F8C" font-family="IBM Plex Sans,sans-serif" font-weight="600">CSG-70</text>
+
+          <!-- Guam USAF base -->
+          <g transform="translate(800,380)">
+            <rect x="-12" y="-12" width="24" height="24" fill="none" stroke="#1B4F8C" stroke-width="2"/>
+            <line x1="0" y1="-12" x2="0" y2="-20" stroke="#1B4F8C" stroke-width="2"/>
+            <text x="0" y="4" text-anchor="middle" font-size="7" fill="#1B4F8C" font-weight="600" font-family="IBM Plex Mono,monospace">USAF</text>
+          </g>
+          <text x="800" y="410" text-anchor="middle" font-size="8" fill="#1B4F8C" font-family="IBM Plex Sans,sans-serif" font-weight="600">ANDERSEN</text>
+
+          <!-- USN sub -->
+          <g transform="translate(570,360)">
+            <rect x="-10" y="-10" width="20" height="20" fill="none" stroke="#1B4F8C" stroke-width="2"/>
+            <line x1="0" y1="-10" x2="0" y2="-18" stroke="#1B4F8C" stroke-width="2"/>
+            <text x="0" y="4" text-anchor="middle" font-size="7" fill="#1B4F8C" font-weight="600" font-family="IBM Plex Mono,monospace">SSN</text>
+          </g>
+          <text x="570" y="385" text-anchor="middle" font-size="8" fill="#1B4F8C" font-family="IBM Plex Sans,sans-serif">USS HAWAII</text>
+
+          <!-- JSDF Okinawa -->
+          <g transform="translate(730,130)">
+            <rect x="-10" y="-10" width="20" height="20" fill="none" stroke="#1B4F8C" stroke-width="2" stroke-dasharray="3 1"/>
+            <line x1="0" y1="-10" x2="0" y2="-18" stroke="#1B4F8C" stroke-width="2"/>
+            <text x="0" y="4" text-anchor="middle" font-size="7" fill="#1B4F8C" font-weight="600" font-family="IBM Plex Mono,monospace">JSDF</text>
+          </g>
+          <text x="730" y="155" text-anchor="middle" font-size="8" fill="#1B4F8C" font-family="IBM Plex Sans,sans-serif">CZT-7</text>
+
+          <!-- RED FORCES -->
+          <!-- PLAN amphibious group -->
+          <g transform="translate(380,290)">
+            <path d="M0,-16 L16,16 L-16,16 Z" fill="none" stroke="#C0392B" stroke-width="2"/>
+            <text x="0" y="10" text-anchor="middle" font-size="7" fill="#C0392B" font-weight="600" font-family="IBM Plex Mono,monospace">AMPH</text>
+          </g>
+          <text x="380" y="320" text-anchor="middle" font-size="8" fill="#C0392B" font-family="IBM Plex Sans,sans-serif" font-weight="600">PLAN ARG-3</text>
+
+          <!-- PLAAF base -->
+          <g transform="translate(220,200)">
+            <path d="M0,-14 L14,14 L-14,14 Z" fill="none" stroke="#C0392B" stroke-width="2"/>
+            <text x="0" y="8" text-anchor="middle" font-size="7" fill="#C0392B" font-weight="600" font-family="IBM Plex Mono,monospace">PLAAF</text>
+          </g>
+          <text x="220" y="228" text-anchor="middle" font-size="8" fill="#C0392B" font-family="IBM Plex Sans,sans-serif">FUZHOU AB</text>
+
+          <!-- DF-21 missile battery -->
+          <g transform="translate(160,320)">
+            <path d="M0,-14 L14,14 L-14,14 Z" fill="none" stroke="#C0392B" stroke-width="2"/>
+            <text x="0" y="8" text-anchor="middle" font-size="7" fill="#C0392B" font-weight="600" font-family="IBM Plex Mono,monospace">A2AD</text>
+          </g>
+          <text x="160" y="348" text-anchor="middle" font-size="8" fill="#C0392B" font-family="IBM Plex Sans,sans-serif">DF-21 BTY</text>
+
+          <!-- Strike vectors: PLAN ARG to Taiwan -->
+          <line x1="394" y1="277" x2="512" y2="255" stroke="#C0392B" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.7"/>
+          <polygon points="512,255 502,249 504,261" fill="#C0392B" opacity="0.7"/>
+
+          <!-- Blue interdiction arc -->
+          <path d="M680 286 Q620 260 555 258" stroke="#1B4F8C" stroke-width="1.5" stroke-dasharray="4 2" fill="none" opacity="0.6"/>
+          <polygon points="555,258 566,252 565,265" fill="#1B4F8C" opacity="0.6"/>
+
+          <!-- A2AD threat rings -->
+          <circle cx="160" cy="320" r="120" fill="none" stroke="#C0392B" stroke-width="1" stroke-dasharray="4 3" opacity="0.25"/>
+          <circle cx="160" cy="320" r="70" fill="rgba(192,57,43,.04)" stroke="#C0392B" stroke-width="1" opacity="0.3"/>
+
+          <!-- CSG-70 patrol radius -->
+          <circle cx="680" cy="300" r="100" fill="none" stroke="#1B4F8C" stroke-width="1" stroke-dasharray="3 3" opacity="0.2"/>
+
+          <!-- Coord labels -->
+          <text x="855" y="590" font-size="8" fill="#7A7672" font-family="IBM Plex Mono,monospace">125°E</text>
+          <text x="5" y="590" font-size="8" fill="#7A7672" font-family="IBM Plex Mono,monospace">118°E</text>
+          <text x="860" y="10" font-size="8" fill="#7A7672" font-family="IBM Plex Mono,monospace">28°N</text>
+          <text x="860" y="305" font-size="8" fill="#7A7672" font-family="IBM Plex Mono,monospace">23°N</text>
+
+          <!-- Map legend -->
+          <rect x="20" y="520" width="200" height="70" rx="3" fill="rgba(245,243,239,.85)" stroke="#D8D4CE" stroke-width="1"/>
+          <text x="30" y="537" font-size="8" fill="#4A4743" font-family="IBM Plex Sans,sans-serif" font-weight="700" letter-spacing="1">NOTIONAL FORCE POSITIONS</text>
+          <rect x="30" y="546" width="10" height="10" fill="none" stroke="#1B4F8C" stroke-width="1.5"/>
+          <line x1="35" y1="546" x2="35" y2="541" stroke="#1B4F8C" stroke-width="1.5"/>
+          <text x="45" y="555" font-size="8" fill="#1B4F8C" font-family="IBM Plex Sans,sans-serif">Blue (US/Allied)</text>
+          <path d="M35,563 L43,578 L27,578 Z" fill="none" stroke="#C0392B" stroke-width="1.5"/>
+          <text x="45" y="573" font-size="8" fill="#C0392B" font-family="IBM Plex Sans,sans-serif">Red (PLA)</text>
+          <line x1="30" y1="582" x2="43" y2="582" stroke="#C0392B" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="45" y="585" font-size="8" fill="#C0392B" font-family="IBM Plex Sans,sans-serif">Strike vector</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- TABLE VIEW -->
+    <div id="view-table" class="view-panel">
+      <div class="data-table-wrap">
+        <table class="data-table" id="orderOfBattle"></table>
+      </div>
+    </div>
+
+    <!-- TASK ORG VIEW -->
+    <div id="view-taskorg" class="view-panel">
+      <div class="taskorg-wrap">
+        <svg id="taskOrgSvg" width="820" height="440" viewBox="0 0 820 440"></svg>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- RIGHT RAIL -->
+<aside class="rrail">
+
+  <!-- TEAM SUMMARY -->
+  <div class="rrail-section">
+    <div class="rrail-header">
+      <span class="rrail-title">Team Summary · D+12</span>
+    </div>
+    <div class="rrail-body">
+      <div class="team-summary-grid">
+        <div class="team-card team-card-blue">
+          <div class="team-card-header">
+            <div class="team-dot" style="background:var(--accent-blue)"></div>
+            <span class="team-name team-name-blue">Blue Force</span>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">Combat Effectiveness</div>
+            <div class="team-stat-value">84<span style="font-size:9px;color:var(--text-muted)">%</span></div>
+            <div class="mini-bar"><div class="mini-bar-fill" style="width:84%;background:var(--accent-blue)"></div></div>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">Sorties Available</div>
+            <div class="team-stat-value">142</div>
+            <div class="team-stat-sub">of 170 planned</div>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">ISR Coverage</div>
+            <div class="team-stat-value">73<span style="font-size:9px;color:var(--text-muted)">%</span></div>
+          </div>
+        </div>
+        <div class="team-card team-card-red">
+          <div class="team-card-header">
+            <div class="team-dot" style="background:var(--accent-red)"></div>
+            <span class="team-name team-name-red">Red Force</span>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">Amphibious Readiness</div>
+            <div class="team-stat-value">61<span style="font-size:9px;color:var(--text-muted)">%</span></div>
+            <div class="mini-bar"><div class="mini-bar-fill" style="width:61%;background:var(--accent-red)"></div></div>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">LST / Lift Capacity</div>
+            <div class="team-stat-value">24<span style="font-size:9px;color:var(--text-muted)">/40</span></div>
+            <div class="team-stat-sub">8 attrited, 8 held</div>
+          </div>
+          <div class="team-stat">
+            <div class="team-stat-label">Air Superiority</div>
+            <div class="team-stat-value">Contested</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COA BUILDER -->
+  <div class="rrail-section">
+    <div class="rrail-header">
+      <span class="rrail-title">COA Builder</span>
+      <span style="font-size:9px;color:var(--accent-blue);font-family:var(--mono);cursor:pointer">+ New</span>
+    </div>
+    <div class="rrail-body">
+      <div class="intent-box">
+        <div class="intent-label">Commander's Intent</div>
+        <div class="intent-text">"Deny PLA amphibious throughput below operational viability threshold while preserving allied forward presence and avoiding escalation to strategic nuclear threshold."</div>
+      </div>
+      <div class="coa-phase-list">
+        <div class="coa-phase selected" onclick="selectCOA(this)">
+          <div class="coa-num">1</div>
+          <div class="coa-text"><span class="coa-phase-label">ISR + Shaping</span> — Persistent ISR, EW suppression of PLAN C2, mining of key straits. D+0 to D+4.</div>
+        </div>
+        <div class="coa-phase" onclick="selectCOA(this)">
+          <div class="coa-num">2</div>
+          <div class="coa-text"><span class="coa-phase-label">Maritime Interdiction</span> — Strike PLAN LST concentrations at Pingtan / Xiamen; SSGN strike packages. D+5 to D+14.</div>
+        </div>
+        <div class="coa-phase" onclick="selectCOA(this)">
+          <div class="coa-num">3</div>
+          <div class="coa-text"><span class="coa-phase-label">Culmination / Hold</span> — Sustain attrition above PLAN culmination threshold; deny reinforcement, compel halt. D+15+.</div>
+        </div>
+      </div>
+
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;">Capability ↔ Cost Emphasis</div>
+      <div class="capability-sliders">
+        <div class="cap-row">
+          <div class="cap-header">
+            <span class="cap-label">Long-Range Precision Strike</span>
+            <span class="cap-value" id="cv-strike">78%</span>
+          </div>
+          <input type="range" class="cap-slider" min="0" max="100" value="78" oninput="updateCap(this,'cv-strike')">
+        </div>
+        <div class="cap-row">
+          <div class="cap-header">
+            <span class="cap-label">Electronic Warfare / SEAD</span>
+            <span class="cap-value" id="cv-ew">65%</span>
+          </div>
+          <input type="range" class="cap-slider" min="0" max="100" value="65" oninput="updateCap(this,'cv-ew')">
+        </div>
+        <div class="cap-row">
+          <div class="cap-header">
+            <span class="cap-label">Undersea Warfare</span>
+            <span class="cap-value" id="cv-usw">82%</span>
+          </div>
+          <input type="range" class="cap-slider" min="0" max="100" value="82" oninput="updateCap(this,'cv-usw')">
+        </div>
+        <div class="cap-row">
+          <div class="cap-header">
+            <span class="cap-label">Logistics / Sustainment</span>
+            <span class="cap-value" id="cv-log">45%</span>
+          </div>
+          <input type="range" class="cap-slider" min="0" max="100" value="45" oninput="updateCap(this,'cv-log')">
+        </div>
+      </div>
+
+      <button class="generate-btn" id="generateBtn" onclick="triggerGenerate()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M6 1L7.5 4.5H11L8.3 6.8L9.5 10.5L6 8.3L2.5 10.5L3.7 6.8L1 4.5H4.5L6 1Z" fill="currentColor"/>
+        </svg>
+        Generate COA from Commander's Intent
+      </button>
+    </div>
+  </div>
+
+  <!-- MONTE CARLO / DENIAL MOE -->
+  <div class="rrail-section">
+    <div class="rrail-header">
+      <span class="rrail-title">Monte Carlo · Denial MOE</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">n=10,000</span>
+    </div>
+
+    <div class="moe-headline" style="margin:0 14px 0;border-radius:5px 5px 0 0;">
+      <div class="moe-verdict">Operation Halt Verdict</div>
+      <div class="moe-result">DENIAL ACHIEVED</div>
+      <div class="moe-result-sub">P(success) = 0.76 · COA-2 MARITIME INTERDICTION</div>
+      <div class="moe-ci">
+        <span class="moe-ci-label">95% CI</span>
+        <div class="ci-bar-wrap">
+          <div class="ci-bar-bg"></div>
+          <div class="ci-bar-fill" style="left:18%;width:42%"></div>
+          <div class="ci-bar-center" style="left:52%"></div>
+        </div>
+        <span class="moe-ci-value">0.58 — 0.89</span>
+      </div>
+    </div>
+
+    <div class="moe-effects">
+      <div class="effect-row">
+        <div class="effect-header">
+          <span class="effect-label">Red Amphibious Throughput</span>
+          <span class="effect-value ev-red">31% of capacity</span>
+        </div>
+        <div class="effect-bar"><div class="effect-bar-fill" style="width:31%;background:var(--accent-red)"></div></div>
+        <div class="effect-sub">Target: &lt;40% · Achieved D+14</div>
+      </div>
+      <div class="effect-row">
+        <div class="effect-header">
+          <span class="effect-label">Operational Viability (OSVI)</span>
+          <span class="effect-value ev-red">0.24</span>
+        </div>
+        <div class="effect-bar"><div class="effect-bar-fill" style="width:24%;background:var(--accent-amber)"></div></div>
+        <div class="effect-sub">Threshold: ≤0.35 to force culmination</div>
+      </div>
+      <div class="effect-row">
+        <div class="effect-header">
+          <span class="effect-label">PLAN Sealift Attrition</span>
+          <span class="effect-value ev-green">−62%</span>
+        </div>
+        <div class="effect-bar"><div class="effect-bar-fill" style="width:62%;background:var(--accent-green)"></div></div>
+        <div class="effect-sub">LST + RO-RO · 38 of 62 hulls disrupted</div>
+      </div>
+      <div class="effect-row">
+        <div class="effect-header">
+          <span class="effect-label">PLAN Air Support Degraded</span>
+          <span class="effect-value ev-green">−48%</span>
+        </div>
+        <div class="effect-bar"><div class="effect-bar-fill" style="width:48%;background:var(--accent-green-bg);border:1px solid var(--accent-green)"></div></div>
+        <div class="effect-sub">SEAD + EW · 2nd PLAAF fighter rgt suppressed</div>
+      </div>
+    </div>
+
+    <div class="moe-halts-box">
+      <div class="halts-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" fill="var(--accent-green-bg)" stroke="var(--accent-green)" stroke-width="1.5"/>
+          <path d="M7 12.5L10.5 16L17 9" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="halts-text-group">
+        <div class="halts-label">Operation Halts / Culminates</div>
+        <div class="halts-value">P = 0.76</div>
+        <div class="halts-sub">Adversary op cannot sustain — Strategy of Denial effective at current COA investment level</div>
+      </div>
+    </div>
+
+    <!-- Sparkline: throughput over time -->
+    <div class="sparkline-wrap">
+      <div class="spark-label">Red Throughput Degradation (D+0 → D+20)</div>
+      <svg width="100%" height="56" viewBox="0 0 252 56" preserveAspectRatio="none" id="sparklineSvg">
+        <!-- Grid -->
+        <line x1="0" y1="14" x2="252" y2="14" stroke="var(--divider-lt)" stroke-width=".5"/>
+        <line x1="0" y1="28" x2="252" y2="28" stroke="var(--divider-lt)" stroke-width=".5"/>
+        <line x1="0" y1="42" x2="252" y2="42" stroke="var(--divider-lt)" stroke-width=".5"/>
+        <!-- Threshold line -->
+        <line x1="0" y1="22" x2="252" y2="22" stroke="var(--accent-red)" stroke-width=".8" stroke-dasharray="3 2" opacity=".4"/>
+        <!-- Red throughput area -->
+        <path d="M0 8 L12 10 L26 12 L38 15 L50 19 L65 24 L80 30 L95 35 L110 38 L126 40 L140 42 L155 44 L170 46 L185 47 L200 48 L215 48 L230 49 L252 50 L252 56 L0 56 Z"
+          fill="rgba(192,57,43,.08)" stroke="none"/>
+        <path d="M0 8 L12 10 L26 12 L38 15 L50 19 L65 24 L80 30 L95 35 L110 38 L126 40 L140 42 L155 44 L170 46 L185 47 L200 48 L215 48 L230 49 L252 50"
+          fill="none" stroke="var(--accent-red)" stroke-width="1.5"/>
+        <!-- Blue interdiction onset markers -->
+        <line x1="65" y1="0" x2="65" y2="56" stroke="var(--accent-blue)" stroke-width=".8" stroke-dasharray="2 2" opacity=".5"/>
+        <text x="67" y="11" font-size="6" fill="var(--accent-blue)" font-family="IBM Plex Mono,monospace">D+5</text>
+        <!-- Axis labels -->
+        <text x="2" y="55" font-size="6" fill="var(--text-faint)" font-family="IBM Plex Mono,monospace">100%</text>
+        <text x="2" y="27" font-size="6" fill="var(--text-faint)" font-family="IBM Plex Mono,monospace">40%</text>
+        <text x="2" y="14" font-size="6" fill="var(--text-faint)" font-family="IBM Plex Mono,monospace">tgt</text>
+      </svg>
+    </div>
+
+    <div style="padding:8px 14px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);">Sensitivity</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text-faint);">top drivers</span>
+      </div>
+      <div id="sensitivityBars"></div>
+    </div>
+  </div>
+
+</aside>
+
+</div><!-- .app-shell -->
+
+<script>
+// ── UTC CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('utcClock').textContent = h+':'+m+':'+s+'Z';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── VIEW SWITCHER ──
+function switchView(v) {
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelector('[data-view="'+v+'"]').classList.add('active');
+  if(v === 'graph') initGraph();
+  if(v === 'table') buildTable();
+  if(v === 'taskorg') buildTaskOrg();
+}
+
+// ── CHIP TOGGLE ──
+function toggleChip(el) {
+  el.classList.toggle('active');
+}
+
+// ── CAP SLIDERS ──
+function updateCap(el, id) {
+  document.getElementById(id).textContent = el.value + '%';
+}
+
+// ── COA SELECT ──
+function selectCOA(el) {
+  document.querySelectorAll('.coa-phase').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// ── GENERATE ANIMATION ──
+function triggerGenerate() {
+  const btn = document.getElementById('generateBtn');
+  btn.textContent = '⟳ Generating COA…';
+  btn.style.background = 'var(--accent-amber)';
+  setTimeout(() => {
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5H11L8.3 6.8L9.5 10.5L6 8.3L2.5 10.5L3.7 6.8L1 4.5H4.5L6 1Z" fill="currentColor"/></svg> COA Generated — Phase II Variant B';
+    btn.style.background = 'var(--accent-green)';
+    addEvent('info', 'COA generated: Maritime Interdiction Phase II Variant B — 3 maneuver options surfaced');
+    setTimeout(() => {
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5H11L8.3 6.8L9.5 10.5L6 8.3L2.5 10.5L3.7 6.8L1 4.5H4.5L6 1Z" fill="currentColor"/></svg> Generate COA from Commander\'s Intent';
+      btn.style.background = 'var(--accent-blue)';
+    }, 3000);
+  }, 1800);
+}
+
+// ── EVENT LOG ──
+const events = [
+  { type:'alert', time:'11:42:17Z', text:'PLAN ARG-3 sortied from Pingtan — 14 LSTs, 6 amphibious escorts detected' },
+  { type:'info', time:'11:38:04Z', text:'USS HAWAII (SSN-776) in contact — tracking 3 PLAN submarines in strait approach' },
+  { type:'success', time:'11:31:52Z', text:'JASSM-ER salvo — PLAAF Fuzhou AB runway cratered; 6-hr closure assessed' },
+  { type:'warn', time:'11:28:11Z', text:'DF-21D launch event detected — possible ASBM inbound to CSG-70 operating area' },
+  { type:'info', time:'11:22:39Z', text:'ISR update: PLAN C2 node at Xiamen assessed degraded 40%; comms disrupted' },
+  { type:'alert', time:'11:18:05Z', text:'Blue MSN-447 lost — F-35C downed, aircrew status unknown, SAR activated' },
+  { type:'success', time:'11:14:28Z', text:'Monte Carlo run complete — P(denial) updated to 0.76 (prev 0.71)' },
+  { type:'info', time:'11:09:55Z', text:'JSDF CZT-7 confirms Miyako Strait mining complete — effective D+12 0600Z' },
+];
+function renderEventLog() {
+  const log = document.getElementById('eventLog');
+  log.innerHTML = events.map(e => `
+    <div class="event-item ev-${e.type}">
+      <div class="event-time">${e.time}</div>
+      <div class="event-text"><span class="event-badge badge-${e.type==='alert'?'alert':e.type==='success'?'green':'info'}">${e.type.toUpperCase()}</span>${e.text}</div>
+    </div>
+  `).join('');
+}
+function addEvent(type, text) {
+  const now = new Date();
+  const t = now.getUTCHours().toString().padStart(2,'0')+':'+now.getUTCMinutes().toString().padStart(2,'0')+':'+now.getUTCSeconds().toString().padStart(2,'0')+'Z';
+  events.unshift({ type, time:t, text });
+  renderEventLog();
+}
+renderEventLog();
+setInterval(() => {
+  const msgs = [
+    { type:'info', text:'ISR pass complete — PLAN LST positions updated in ops picture' },
+    { type:'warn', text:'Electronic jamming detected on IFF frequencies — tactical comms impacted' },
+    { type:'success', text:'Anti-ship missile hit confirmed — PLAN Type 071 LPD mobility killed' },
+  ];
+  const m = msgs[Math.floor(Math.random()*msgs.length)];
+  addEvent(m.type, m.text);
+}, 18000);
+
+// ── SENSITIVITY BARS ──
+const sensData = [
+  { label: 'PLAN LST Availability', impact: 0.34, dir: 'positive' },
+  { label: 'Blue sortie rate sustained', impact: 0.28, dir: 'positive' },
+  { label: 'A2AD penetration success', impact: 0.22, dir: 'positive' },
+  { label: 'Weather / sea state', impact: 0.11, dir: 'negative' },
+  { label: 'PLAN C2 reconstitution', impact: 0.09, dir: 'negative' },
+];
+function renderSensitivity() {
+  const wrap = document.getElementById('sensitivityBars');
+  wrap.innerHTML = sensData.map(d => `
+    <div style="margin-bottom:5px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span style="font-size:9px;color:var(--text-secondary);">${d.label}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:${d.dir==='positive'?'var(--accent-green)':'var(--accent-red)'};">${d.dir==='positive'?'+':'-'}${(d.impact*100).toFixed(0)}%</span>
+      </div>
+      <div style="height:3px;border-radius:2px;background:var(--bg-inset);overflow:hidden;">
+        <div style="width:${d.impact*100}%;height:100%;background:${d.dir==='positive'?'var(--accent-green)':'var(--accent-red)'};border-radius:2px;"></div>
+      </div>
+    </div>
+  `).join('');
+}
+renderSensitivity();
+
+// ── ORDER OF BATTLE TABLE ──
+const oobData = [
+  { id:'BLU-001', name:'USS Gerald R. Ford (CVN-78)', team:'Blue', domain:'Sea', type:'Carrier Strike Group', status:'Active', coord:'24.2°N 127.1°E', readiness:94 },
+  { id:'BLU-002', name:'USS Hawaii (SSN-776)', team:'Blue', domain:'Sea', type:'Attack Submarine', status:'Active', coord:'23.7°N 122.4°E', readiness:91 },
+  { id:'BLU-003', name:'Andersen AFB Fwd Det', team:'Blue', domain:'Air', type:'B-21 Strike Cell', status:'Active', coord:'13.6°N 144.9°E', readiness:88 },
+  { id:'BLU-004', name:'JSDF CZT-7 (Miyako)', team:'Blue', domain:'Land', type:'Anti-Ship Missile Bty', status:'Active', coord:'24.8°N 125.3°E', readiness:100 },
+  { id:'BLU-005', name:'USAF 18th Wing Kadena', team:'Blue', domain:'Air', type:'F-15EX Squadron', status:'Degraded', coord:'26.4°N 127.8°E', readiness:67 },
+  { id:'BLU-006', name:'Space TF INDOPACOM', team:'Blue', domain:'Space', type:'Sat C2 / ISR', status:'Active', coord:'GEO SLOT 128°E', readiness:100 },
+  { id:'BLU-007', name:'CYBERCOM TF-PACIFIC', team:'Blue', domain:'Cyber', type:'Offensive Cyber Ops', status:'Active', coord:'VIRTUAL', readiness:80 },
+  { id:'RED-001', name:'PLAN ARG-3 Amphibious Gp', team:'Red', domain:'Sea', type:'Amphibious Ready Group', status:'Active', coord:'25.1°N 120.0°E', readiness:61 },
+  { id:'RED-002', name:'PLAAF 2nd Fighter Rgt', team:'Red', domain:'Air', type:'J-20 Air Superiority', status:'Degraded', coord:'26.1°N 119.3°E', readiness:52 },
+  { id:'RED-003', name:'PLARF DF-21 BTY Fuzhou', team:'Red', domain:'Land', type:'ASBM Battery', status:'Active', coord:'25.9°N 119.1°E', readiness:85 },
+  { id:'RED-004', name:'PLAN Type 094A SSBN', team:'Red', domain:'Sea', type:'Ballistic Missile Sub', status:'Active', coord:'22.0°N 114.5°E', readiness:100 },
+  { id:'RED-005', name:'PLAN EW Rgt Xiamen', team:'Red', domain:'Cyber', type:'EW / Signal Jamming', status:'Degraded', coord:'24.5°N 118.1°E', readiness:40 },
+  { id:'NEU-001', name:'PH Coastguard', team:'Neutral', domain:'Sea', type:'Patrol Vessel', status:'Active', coord:'14.6°N 120.4°E', readiness:70 },
+];
+function buildTable() {
+  const tbl = document.getElementById('orderOfBattle');
+  const headers = ['ID','Unit','Team','Domain','Type','Readiness','Status','Coordinates'];
+  tbl.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
+  const tbody = document.createElement('tbody');
+  oobData.forEach(r => {
+    const tr = document.createElement('tr');
+    const teamCls = r.team==='Blue'?'td-friendly':r.team==='Red'?'td-hostile':'td-neutral';
+    const stCls = r.status==='Active'?'td-status-active':r.status==='Degraded'?'td-status-degraded':'td-status-destroyed';
+    tr.innerHTML = `
+      <td class="td-mono" style="color:var(--text-faint)">${r.id}</td>
+      <td style="font-weight:500;color:var(--text-primary)">${r.name}</td>
+      <td><span class="td-badge ${teamCls}">${r.team}</span></td>
+      <td>${r.domain}</td>
+      <td style="color:var(--text-muted)">${r.type}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:40px;height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden;">
+            <div style="width:${r.readiness}%;height:100%;background:${r.readiness>70?'var(--accent-green)':r.readiness>40?'var(--accent-amber)':'var(--accent-red)'};"></div>
+          </div>
+          <span class="td-mono" style="font-size:10px;">${r.readiness}%</span>
+        </div>
+      </td>
+      <td class="${stCls}" style="font-weight:500">${r.status}</td>
+      <td class="td-mono" style="font-size:9px;color:var(--text-muted)">${r.coord}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody);
+}
+buildTable();
+
+// ── TASK ORG VIEW ──
+function buildTaskOrg() {
+  const svg = document.getElementById('taskOrgSvg');
+  const nodes = [
+    { id:'JTF-PACIFIC', label:'JTF-PACIFIC', sub:'LTG Rhodes', x:410, y:30, color:'var(--accent-blue)', type:'hq' },
+    { id:'JFMCC', label:'JFMCC', sub:'VADM Chen', x:200, y:120, color:'var(--accent-blue)', type:'cmd' },
+    { id:'JFACC', label:'JFACC', sub:'MG Patel', x:410, y:120, color:'var(--accent-blue)', type:'cmd' },
+    { id:'JFLCC', label:'JFLCC', sub:'BG Kim', x:620, y:120, color:'var(--accent-blue)', type:'cmd' },
+    { id:'CSG70', label:'CSG-70', sub:'CVN-78', x:80, y:230, color:'var(--accent-blue)', type:'unit' },
+    { id:'DESRON', label:'DESRON-21', sub:'Escort', x:200, y:230, color:'var(--accent-blue)', type:'unit' },
+    { id:'SUBGP', label:'Sub Gp 7', sub:'SSN x3', x:320, y:230, color:'var(--accent-blue)', type:'unit' },
+    { id:'PACAF', label:'PACAF Det', sub:'B-21/F-35', x:410, y:230, color:'var(--accent-blue)', type:'unit' },
+    { id:'JSDF', label:'JSDF CZT-7', sub:'ASCM Bty', x:530, y:230, color:'rgba(27,79,140,.6)', type:'unit' },
+    { id:'JFLCC2', label:'USMC MEF-3', sub:'Fwd Presence', x:640, y:230, color:'var(--accent-blue)', type:'unit' },
+    { id:'CYBER', label:'CYBERCOM TF', sub:'OCA/DCA', x:760, y:230, color:'var(--accent-blue)', type:'unit' },
+  ];
+  const links = [
+    ['JTF-PACIFIC','JFMCC'],['JTF-PACIFIC','JFACC'],['JTF-PACIFIC','JFLCC'],
+    ['JFMCC','CSG70'],['JFMCC','DESRON'],['JFMCC','SUBGP'],
+    ['JFACC','PACAF'],['JFLCC','JSDF'],['JFLCC','JFLCC2'],['JFLCC','CYBER'],
+  ];
+  let html = '';
+  // Draw links first
+  links.forEach(([a,b]) => {
+    const na = nodes.find(n=>n.id===a), nb = nodes.find(n=>n.id===b);
+    if(!na||!nb) return;
+    html += `<line x1="${na.x}" y1="${na.y+22}" x2="${nb.x}" y2="${nb.y-22}" stroke="var(--divider)" stroke-width="1.5"/>`;
+  });
+  // Draw nodes
+  nodes.forEach(n => {
+    const isHQ = n.type==='hq';
+    const w = isHQ ? 100 : 90, h = 44;
+    html += `
+      <g transform="translate(${n.x-w/2},${n.y-h/2})" style="cursor:pointer">
+        <rect width="${w}" height="${h}" rx="3" fill="var(--bg-panel)" stroke="${n.color}" stroke-width="${isHQ?2:1.5}"/>
+        ${isHQ ? `<rect width="${w}" height="5" rx="3" fill="${n.color}" y="0"/>` : ''}
+        <text x="${w/2}" y="${isHQ?20:16}" text-anchor="middle" font-size="${isHQ?11:10}" font-weight="600" font-family="IBM Plex Sans,sans-serif" fill="var(--text-primary)">${n.label}</text>
+        <text x="${w/2}" y="${isHQ?33:30}" text-anchor="middle" font-size="8" font-family="IBM Plex Mono,monospace" fill="var(--text-muted)">${n.sub}</text>
+      </g>
+    `;
+  });
+  svg.innerHTML = html;
+}
+
+// ── FORCE GRAPH (CANVAS) ──
+const graphNodes = [
+  // Blue
+  { id:'BLU-CVN', label:'CVN-78', team:'blue', domain:'sea', x:0, y:0, vx:0, vy:0, r:16, status:'active' },
+  { id:'BLU-SSN1', label:'SSN-776', team:'blue', domain:'sea', x:0, y:0, vx:0, vy:0, r:11, status:'active' },
+  { id:'BLU-SSN2', label:'SSN-801', team:'blue', domain:'sea', x:0, y:0, vx:0, vy:0, r:11, status:'active' },
+  { id:'BLU-ANDERSEN', label:'Andersen', team:'blue', domain:'air', x:0, y:0, vx:0, vy:0, r:13, status:'active' },
+  { id:'BLU-KADENA', label:'Kadena', team:'blue', domain:'air', x:0, y:0, vx:0, vy:0, r:12, status:'degraded' },
+  { id:'BLU-JSDF', label:'JSDF CZT', team:'blue', domain:'land', x:0, y:0, vx:0, vy:0, r:10, status:'active' },
+  { id:'BLU-SPACE', label:'Sat-ISR', team:'blue', domain:'space', x:0, y:0, vx:0, vy:0, r:9, status:'active' },
+  { id:'BLU-CYBER', label:'CYBERCOM', team:'blue', domain:'cyber', x:0, y:0, vx:0, vy:0, r:9, status:'active' },
+  { id:'BLU-DEP1', label:'DDG-119', team:'blue', domain:'sea', x:0, y:0, vx:0, vy:0, r:8, status:'active' },
+  { id:'BLU-DEP2', label:'DDG-121', team:'blue', domain:'sea', x:0, y:0, vx:0, vy:0, r:8, status:'active' },
+  // Red
+  { id:'RED-ARG', label:'ARG-3', team:'red', domain:'sea', x:0, y:0, vx:0, vy:0, r:15, status:'active' },
+  { id:'RED-PLAAF', label:'2nd Rgt', team:'red', domain:'air', x:0, y:0, vx:0, vy:0, r:13, status:'degraded' },
+  { id:'RED-DF21', label:'DF-21 Bty', team:'red', domain:'land', x:0, y:0, vx:0, vy:0, r:12, status:'active' },
+  { id:'RED-SSBN', label:'Type 094A', team:'red', domain:'sea', x:0, y:0, vx:0, vy:0, r:11, status:'active' },
+  { id:'RED-EW', label:'EW Rgt', team:'red', domain:'cyber', x:0, y:0, vx:0, vy:0, r:10, status:'degraded' },
+  { id:'RED-LST1', label:'LST Sqn-1', team:'red', domain:'sea', x:0, y:0, vx:0, vy:0, r:9, status:'active' },
+  { id:'RED-LST2', label:'LST Sqn-2', team:'red', domain:'sea', x:0, y:0, vx:0, vy:0, r:8, status:'degraded' },
+  { id:'RED-C2', label:'PLAN C2', team:'red', domain:'land', x:0, y:0, vx:0, vy:0, r:12, status:'degraded' },
+  // Neutral
+  { id:'NEU-PH', label:'PH CG', team:'neutral', domain:'sea', x:0, y:0, vx:0, vy:0, r:8, status:'active' },
+];
+const graphLinks = [
+  { source:'BLU-CVN', target:'BLU-SSN1', type:'c2' },
+  { source:'BLU-CVN', target:'BLU-SSN2', type:'c2' },
+  { source:'BLU-CVN', target:'BLU-DEP1', type:'c2' },
+  { source:'BLU-CVN', target:'BLU-DEP2', type:'c2' },
+  { source:'BLU-CVN', target:'BLU-SPACE', type:'isr' },
+  { source:'BLU-ANDERSEN', target:'BLU-CVN', type:'coord' },
+  { source:'BLU-ANDERSEN', target:'BLU-KADENA', type:'c2' },
+  { source:'BLU-JSDF', target:'BLU-CVN', type:'coord' },
+  { source:'BLU-CYBER', target:'RED-EW', type:'strike' },
+  { source:'BLU-CYBER', target:'RED-C2', type:'strike' },
+  { source:'BLU-SSN1', target:'RED-ARG', type:'threat' },
+  { source:'BLU-SSN2', target:'RED-LST1', type:'threat' },
+  { source:'RED-ARG', target:'RED-LST1', type:'c2' },
+  { source:'RED-ARG', target:'RED-LST2', type:'c2' },
+  { source:'RED-C2', target:'RED-ARG', type:'c2' },
+  { source:'RED-C2', target:'RED-PLAAF', type:'c2' },
+  { source:'RED-C2', target:'RED-DF21', type:'c2' },
+  { source:'RED-DF21', target:'BLU-CVN', type:'threat' },
+  { source:'RED-PLAAF', target:'BLU-KADENA', type:'threat' },
+  { source:'NEU-PH', target:'BLU-CVN', type:'coord' },
+];
+
+let canvas, ctx, animFrame, hoveredNode = null, graphInited = false;
+let simRunning = true;
+
+function initGraph() {
+  canvas = document.getElementById('forceGraph');
+  if(!canvas) return;
+  const container = canvas.parentElement;
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  ctx = canvas.getContext('2d');
+
+  if(!graphInited) {
+    const cx = canvas.width/2, cy = canvas.height/2;
+    graphNodes.forEach((n,i) => {
+      const isBlue = n.team==='blue', isRed = n.team==='red';
+      const angle = (i/graphNodes.length)*Math.PI*2;
+      if(isBlue) {
+        n.x = cx - 180 + Math.cos(angle)*140 + (Math.random()-0.5)*40;
+        n.y = cy + Math.sin(angle)*120 + (Math.random()-0.5)*40;
+      } else if(isRed) {
+        n.x = cx + 160 + Math.cos(angle)*130 + (Math.random()-0.5)*40;
+        n.y = cy + Math.sin(angle)*110 + (Math.random()-0.5)*40;
+      } else {
+        n.x = cx + (Math.random()-0.5)*80;
+        n.y = cy + (Math.random()-0.5)*80;
+      }
+    });
+    graphInited = true;
+  }
+
+  canvas.addEventListener('mousemove', onGraphMouseMove);
+  canvas.addEventListener('mouseleave', () => {
+    hoveredNode = null;
+    document.getElementById('nodeTooltip').style.opacity = '0';
+  });
+
+  if(animFrame) cancelAnimationFrame(animFrame);
+  simLoop();
+}
+
+function nodeColor(n) {
+  if(n.team==='blue') return '#1B4F8C';
+  if(n.team==='red') return '#C0392B';
+  return '#8B5E00';
+}
+function nodeFill(n) {
+  if(n.status==='degraded') {
+    if(n.team==='blue') return '#EBF1FA';
+    if(n.team==='red') return '#FDECEA';
+    return '#FDF6E3';
+  }
+  if(n.team==='blue') return '#1B4F8C';
+  if(n.team==='red') return '#C0392B';
+  return '#8B5E00';
+}
+function nodeTxtColor(n) {
+  return n.status==='degraded' ? nodeColor(n) : '#fff';
+}
+
+function drawNode(n) {
+  ctx.save();
+  const fill = nodeFill(n);
+  const stroke = nodeColor(n);
+  const isHovered = hoveredNode && hoveredNode.id===n.id;
+
+  if(isHovered) {
+    ctx.shadowColor = stroke;
+    ctx.shadowBlur = 8;
+  }
+
+  if(n.team==='blue') {
+    // MIL-STD-2525 friendly: rectangle with direction tick
+    const hw = n.r*1.1, hh = n.r;
+    ctx.beginPath();
+    ctx.rect(n.x - hw, n.y - hh, hw*2, hh*2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = isHovered ? 2.5 : 1.8;
+    ctx.stroke();
+    // tick on top
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y-hh);
+    ctx.lineTo(n.x, n.y-hh-6);
+    ctx.stroke();
+  } else if(n.team==='red') {
+    // hostile: inverted triangle
+    const r2 = n.r*1.15;
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y+r2);
+    ctx.lineTo(n.x+r2*0.9, n.y-r2*0.7);
+    ctx.lineTo(n.x-r2*0.9, n.y-r2*0.7);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = isHovered ? 2.5 : 1.8;
+    ctx.stroke();
+  } else {
+    // neutral: diamond
+    const r2 = n.r*1.1;
+    ctx.beginPath();
+    ctx.moveTo(n.x, n.y-r2);
+    ctx.lineTo(n.x+r2, n.y);
+    ctx.lineTo(n.x, n.y+r2);
+    ctx.lineTo(n.x-r2, n.y);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+
+  // Domain indicator (small top-right dot)
+  const domColors = { air:'#4A9ECC', sea:'#1B4F8C', land:'#196E3B', space:'#6B35A8', cyber:'#C06010' };
+  ctx.beginPath();
+  ctx.arc(n.x + n.r*0.75, n.y - n.r*0.75, 3.5, 0, Math.PI*2);
+  ctx.fillStyle = domColors[n.domain] || '#888';
+  ctx.shadowBlur = 0;
+  ctx.fill();
+
+  // Label
+  ctx.font = `500 ${Math.max(8,n.r*0.62)}px 'IBM Plex Mono', monospace`;
+  ctx.fillStyle = n.status==='degraded' ? nodeColor(n) : '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 0;
+  ctx.fillText(n.label.length > 8 ? n.label.substring(0,7)+'…' : n.label, n.x, n.y + (n.team==='red' ? 2 : 0));
+
+  // Degraded cross-hatch
+  if(n.status==='degraded') {
+    ctx.save();
+    ctx.clip && ctx.save();
+    ctx.strokeStyle = nodeColor(n);
+    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = 0.25;
+    const step = 6, sz = n.r * 1.5;
+    for(let d=-sz; d<sz; d+=step) {
+      ctx.beginPath();
+      ctx.moveTo(n.x+d-sz, n.y-sz);
+      ctx.lineTo(n.x+d+sz, n.y+sz);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawLink(link) {
+  const s = graphNodes.find(n=>n.id===link.source);
+  const t = graphNodes.find(n=>n.id===link.target);
+  if(!s||!t) return;
+  ctx.save();
+  const typeStyles = {
+    c2:    { color:'rgba(27,79,140,.35)', dash:[], width:1.2 },
+    coord: { color:'rgba(27,79,140,.2)', dash:[4,3], width:.8 },
+    isr:   { color:'rgba(75,158,200,.4)', dash:[2,3], width:.8 },
+    strike:{ color:'rgba(192,57,43,.5)', dash:[], width:1.5 },
+    threat:{ color:'rgba(192,57,43,.3)', dash:[5,3], width:1 },
+  };
+  const st = typeStyles[link.type] || typeStyles.c2;
+  ctx.strokeStyle = st.color;
+  ctx.lineWidth = st.width;
+  ctx.setLineDash(st.dash);
+  ctx.beginPath();
+  ctx.moveTo(s.x, s.y);
+  ctx.lineTo(t.x, t.y);
+  ctx.stroke();
+  // Arrow for strike/threat
+  if(link.type==='strike'||link.type==='threat') {
+    const angle = Math.atan2(t.y-s.y, t.x-s.x);
+    const mx = (s.x+t.x)/2, my = (s.y+t.y)/2;
+    ctx.setLineDash([]);
+    ctx.fillStyle = st.color;
+    ctx.beginPath();
+    ctx.moveTo(mx + Math.cos(angle)*6, my + Math.sin(angle)*6);
+    ctx.lineTo(mx + Math.cos(angle+2.4)*5, my + Math.sin(angle+2.4)*5);
+    ctx.lineTo(mx + Math.cos(angle-2.4)*5, my + Math.sin(angle-2.4)*5);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function simStep() {
+  const W = canvas.width, H = canvas.height;
+  const repulsion = 2800, linkLen = 120, damping = 0.85, gravity = 0.04;
+
+  graphNodes.forEach(a => {
+    graphNodes.forEach(b => {
+      if(a===b) return;
+      const dx = a.x-b.x, dy = a.y-b.y;
+      const d = Math.sqrt(dx*dx+dy*dy) || 1;
+      const f = repulsion/(d*d);
+      a.vx += dx/d*f*0.5;
+      a.vy += dy/d*f*0.5;
+    });
+  });
+
+  graphLinks.forEach(l => {
+    const s = graphNodes.find(n=>n.id===l.source);
+    const t = graphNodes.find(n=>n.id===l.target);
+    if(!s||!t) return;
+    const dx = t.x-s.x, dy = t.y-s.y;
+    const d = Math.sqrt(dx*dx+dy*dy) || 1;
+    const f = (d-linkLen)*0.04;
+    s.vx += dx/d*f; s.vy += dy/d*f;
+    t.vx -= dx/d*f; t.vy -= dy/d*f;
+  });
+
+  // Team clustering
+  const bcx = W*0.35, bcy = H*0.5;
+  const rcx = W*0.65, rcy = H*0.5;
+  graphNodes.forEach(n => {
+    const tx = n.team==='blue' ? bcx : n.team==='red' ? rcx : W*0.5;
+    const ty = n.team==='neutral' ? H*0.5 : n.team==='blue' ? bcy : rcy;
+    n.vx += (tx-n.x)*gravity;
+    n.vy += (ty-n.y)*gravity;
+    n.vx *= damping; n.vy *= damping;
+    n.x += n.vx; n.y += n.vy;
+    n.x = Math.max(30, Math.min(W-30, n.x));
+    n.y = Math.max(30, Math.min(H-30, n.y));
+  });
+}
+
+let simSteps = 0;
+function simLoop() {
+  if(simSteps < 200) { simStep(); simSteps++; }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background grid
+  ctx.strokeStyle = 'rgba(0,0,0,.04)';
+  ctx.lineWidth = 1;
+  for(let x=0; x<canvas.width; x+=40) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+  }
+  for(let y=0; y<canvas.height; y+=40) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
+
+  // Team zone labels
+  ctx.font = '700 11px IBM Plex Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(27,79,140,.08)';
+  ctx.font = '700 48px IBM Plex Sans';
+  ctx.fillText('BLUE', canvas.width*0.28, canvas.height*0.55);
+  ctx.fillStyle = 'rgba(192,57,43,.07)';
+  ctx.fillText('RED', canvas.width*0.72, canvas.height*0.55);
+
+  // Zone divider
+  ctx.strokeStyle = 'rgba(0,0,0,.06)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  ctx.moveTo(canvas.width/2, 20);
+  ctx.lineTo(canvas.width/2, canvas.height-20);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  graphLinks.forEach(drawLink);
+  graphNodes.forEach(drawNode);
+
+  animFrame = requestAnimationFrame(simLoop);
+}
+
+function onGraphMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  let found = null;
+  graphNodes.forEach(n => {
+    const d = Math.sqrt((n.x-mx)**2 + (n.y-my)**2);
+    if(d < n.r + 8) found = n;
+  });
+  hoveredNode = found;
+  const tt = document.getElementById('nodeTooltip');
+  if(found) {
+    document.getElementById('tt-id').textContent = found.id;
+    document.getElementById('tt-name').textContent = oobData.find(o=>o.id===found.id.replace('BLU-','BLU-').replace('RED-','RED-'))?.name || found.label;
+    document.getElementById('tt-type').textContent = oobData.find(o=>o.id.startsWith(found.team.toUpperCase().slice(0,3)) && o.id.includes(found.label.split(' ')[0]))?.type || found.domain.toUpperCase();
+    document.getElementById('tt-domain').textContent = found.domain.charAt(0).toUpperCase()+found.domain.slice(1);
+    document.getElementById('tt-status').textContent = found.status.charAt(0).toUpperCase()+found.status.slice(1);
+    document.getElementById('tt-coord').textContent = oobData.find(o=>o.id===found.id)?.coord || '–';
+    tt.style.opacity = '1';
+    tt.style.left = (mx+14)+'px';
+    tt.style.top = (my-10)+'px';
+  } else {
+    tt.style.opacity = '0';
+  }
+}
+
+// Init graph on load
+window.addEventListener('load', () => {
+  setTimeout(initGraph, 100);
+  buildTable();
+});
+window.addEventListener('resize', () => {
+  if(canvas) {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    simSteps = 0;
+  }
+});
+</script>
+</body>
+</html>

@@ -61,14 +61,12 @@ Strike Sim/
 ├── inline-datasets.js      # Startup auto-loader for bundled Red/Blue networks
 ├── scenarios/ + schemas/   # Scenario JSON variants + JSON schema
 ├── tools/                  # Proof harnesses, balance gate/eval, replay-verify, builders
-├── loop.run.yaml + loop-runs/ + loop-specs/  # Balance-calibration loop config & runs
 │
 │  # Docs & workflow
 ├── docs/                   # Design spine, model docs, METHODOLOGY + TRIP docs (1-plans…6-memo)
-├── change-orders/          # CO-001…CO-007: plan-of-record change orders + progress ledgers
-├── program-briefs/ reviews/ sandbox/  # Program framing, persona reviews, experiments
+├── change-orders/          # CO-001…CO-010: plan-of-record change orders + progress ledgers
 ├── site/ site-preview/     # Nested repo: parked hosted layer (NEVER deploy until hosting decision)
-├── _codex_review/ _CODEX Ideas/ _GEMINI Ideas/ _stark/ _fable/  # Agent workspaces & catalogs
+├── _workshop/              # ALL AI-session artifacts (CO-010): agents/ (codex_review, reviews, fable, idea catalogs), design-proofs/ (tool SVG output, was _stark), design-explorations/, loop/ (dormant balance loop + yaml), sandbox/, briefs/, superseded-launchers/
 ├── .agents/skills/         # TRIP + codex skills (.claude/skills → symlinks here)
 ├── assets/ vendor/ milsymbol/    # Earth textures/geojson; vendored libraries
 └── skills-lock.json        # TRIP workflow install pin (PiLastDigit/TRIP-workflow)

@@ -1,6 +1,6 @@
 /*
  * symbol-proof.js — headless verification + visual proof sheet for symbols.js.
- * Run: node tools/symbol-proof.js   (writes _stark/symbol-proof.svg)
+ * Run: node tools/symbol-proof.js   (writes _workshop/design-proofs/symbol-proof.svg)
  * Pure Node, no deps. Asserts structural invariants, then emits a proof grid.
  */
 const Sym = require('../symbols.js');
@@ -82,9 +82,9 @@ TYPES.forEach((ty, r) => {
 });
 svg += '</svg>';
 
-const outDir = path.join(__dirname, '..', '_stark');
+const outDir = path.join(__dirname, '..', '_workshop', 'design-proofs');
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, 'symbol-proof.svg'), svg);
 
-console.log(failures === 0 ? `\nALL CHECKS PASSED (${TYPES.length * TEAMS.length + 12} assertions). Proof sheet -> _stark/symbol-proof.svg` : `\n${failures} CHECK(S) FAILED`);
+console.log(failures === 0 ? `\nALL CHECKS PASSED (${TYPES.length * TEAMS.length + 12} assertions). Proof sheet -> _workshop/design-proofs/symbol-proof.svg` : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

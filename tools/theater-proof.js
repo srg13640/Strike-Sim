@@ -1,7 +1,7 @@
 /*
  * theater-proof.js — render the REAL bundled OOB (grok*.json) through symbols.js
  * onto a simple equirectangular theater frame, to verify the data->symbol pipeline
- * on actual scenario nodes (not synthetic). Writes _stark/theater-proof.svg.
+ * on actual scenario nodes (not synthetic). Writes _workshop/design-proofs/theater-proof.svg.
  */
 const Sym = require('../symbols.js');
 const fs = require('fs');
@@ -37,7 +37,7 @@ nodes.forEach(n => {
 });
 svg += '</svg>';
 
-fs.mkdirSync(path.join(__dirname, '..', '_stark'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', '_stark', 'theater-proof.svg'), svg);
+fs.mkdirSync(path.join(__dirname, '..', '_workshop', 'design-proofs'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', '_workshop', 'design-proofs', 'theater-proof.svg'), svg);
 console.log('Rendered', nodes.length, 'real nodes. Function mix:', JSON.stringify(counts));
-console.log('-> _stark/theater-proof.svg');
+console.log('-> _workshop/design-proofs/theater-proof.svg');
