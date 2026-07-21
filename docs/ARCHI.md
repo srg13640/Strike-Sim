@@ -43,6 +43,7 @@ Strike Sim/
 ├── red-mind.js             # Red policy primitives: Harsanyi types, level-k/QRE, regret matching
 ├── forecasting.js          # Measured-judgment primitives (ghost forecasts, Brier/BSS)
 ├── moe.js                  # Denial MOE victory engine (halt/culminate/capitulate)
+├── cofm.js                 # Correlation of Forces & Means net assessment (CO-009; docs/COFM_MODEL.md)
 ├── counterfactual.js/-worker.js  # AAR matched-pair & ensemble machinery
 ├── logistics.js            # Deterministic contested-logistics adapter (stocks/hubs/routes/DDIL)
 │

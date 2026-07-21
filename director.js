@@ -316,15 +316,26 @@ window.DirectorModule = (function () {
       '.dir-skip{float:right;min-height:32px;padding:5px 9px;font-size:10px;}',
       '.dir-btn.danger{border-color:#7a2f2f;color:#ffb0a8;}',
       '.dir-note{font-size:12px;color:#6d8ca4;font-style:italic;}',
-      '.dir-coach{border:1px solid #2f88b8;background:linear-gradient(135deg,rgba(8,57,79,.96),rgba(9,28,42,.96));border-radius:12px;padding:13px 15px;margin:0 0 14px;box-shadow:inset 3px 0 0 #63dcff,0 8px 24px rgba(0,0,0,.2);}',
-      '.dir-coach .step{font:700 10px Oswald,system-ui;letter-spacing:.2em;color:#74dfff;margin-bottom:4px;}',
-      '.dir-coach b{display:block;color:#effbff;font:700 15px Oswald,system-ui;letter-spacing:.05em;margin-bottom:3px;}',
-      '.dir-coach p{margin:0;color:#c7e6f4;font-size:12.5px;line-height:1.45;}',
+      '.dir-coach{border:1px solid #fdba74;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-radius:12px;padding:13px 15px;margin:0 0 14px;box-shadow:inset 4px 0 0 #ea580c,0 8px 24px rgba(0,0,0,.35);}',
+      '.dir-coach .step{font:700 12px Oswald,system-ui;letter-spacing:.18em;color:#9a3412;margin-bottom:4px;}',
+      '.dir-coach b{display:block;color:#9a3412;font:700 17px Oswald,system-ui;letter-spacing:.05em;margin-bottom:3px;}',
+      '.dir-coach p{margin:0;color:#7c2d12;font-size:14px;line-height:1.5;}',
       '.dir-coach .dir-btn{margin-top:10px;}',
       '#dir-dock .dir-coach{margin:3px 0 8px;padding:9px 12px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:center;}',
-      '#dir-dock .dir-coach .step{grid-row:1;padding-right:12px;border-right:1px solid rgba(99,220,255,.32);white-space:nowrap;}',
-      '#dir-dock .dir-coach b{font-size:13px;margin:0;}#dir-dock .dir-coach p{font-size:11.5px;}',
-      '#dir-feed .dir-coach{margin:4px 0 9px;padding:9px 11px;}#dir-feed .dir-coach b{font-size:13px;}',
+      '#dir-dock .dir-coach .step{grid-row:1;padding-right:12px;border-right:1px solid rgba(234,88,12,.35);white-space:nowrap;}',
+      '#dir-dock .dir-coach b{font-size:15px;margin:0;}#dir-dock .dir-coach p{font-size:13px;}',
+      '#dir-feed .dir-coach{margin:4px 0 9px;padding:9px 11px;}#dir-feed .dir-coach b{font-size:15px;}',
+      '.dir-cofm-card{border:1px solid #1e3d54;background:linear-gradient(135deg,rgba(10,30,44,.92),rgba(8,22,34,.92));border-radius:12px;padding:12px 15px;margin:0 0 14px;}',
+      '.dir-cofm-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}',
+      '.dir-cofm-head>span{font:700 10px Oswald,system-ui;letter-spacing:.18em;color:#70c9e9;}',
+      '.dir-cofm-chip{display:inline-block;border:1px solid;border-radius:999px;padding:3px 10px;font:700 11px Oswald,system-ui;letter-spacing:.12em;white-space:nowrap;background:rgba(6,18,28,.65);}',
+      '.dir-cofm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}',
+      '.dir-cofm-side h4{margin:0 0 5px;font:700 10px Oswald,system-ui;letter-spacing:.16em;color:#8fb3c9;}',
+      '.dir-cofm-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#c7e6f4;border-bottom:1px dotted #16354a;padding:2px 0;}',
+      '.dir-cofm-row b{color:#effbff;}',
+      '.dir-cofm-quals{margin:8px 0 0;font-size:11px;color:#6d8ca4;}',
+      '.dir-cofm-note{margin:4px 0 0;font-size:11px;color:#6d8ca4;font-style:italic;}',
+      '@media(max-width:760px){.dir-cofm-grid{grid-template-columns:1fr}}',
       '.dir-chips{display:flex;gap:6px;flex-wrap:wrap;min-width:0;max-width:100%;}',
       '.dir-chip{appearance:none;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.25;background:#0b1a26;border:1px solid #1d3a52;color:#8fb2ca;border-radius:7px;padding:5px 11px;cursor:pointer;font:600 12px Inter;}',
       '.dir-chip.on{background:#0e3a55;color:#c9f2ff;border-color:#2f88b8;}',
@@ -496,9 +507,37 @@ window.DirectorModule = (function () {
 
   function tutorialCoach(step, title, body, actionHtml) {
     if (!op.tutorial) return '';
-    return '<div class="dir-coach" role="status"><span class="step">COMPUTER COACH · STEP ' + esc(step) + ' OF 5</span>' +
+    return '<div class="dir-coach" role="status"><span class="step">🎓 COMPUTER COACH · STEP ' + esc(step) + ' OF 5</span>' +
       '<div><b>' + esc(title) + '</b><p>' + esc(body) + '</p>' + (actionHtml || '') + '</div></div>';
   }
+
+  // ---- COFM (CO-009) ----------------------------------------------------------------
+  // Live Correlation of Forces & Means readout. Pure read: scenario graph nodes with
+  // match health overlaid via GM.boardNode; logistics postures from public state.
+  // Pre-match (BRIEF before start) it reports the opening correlation at full health.
+  function cofmReport() {
+    try {
+      if (!window.CofmModule || !window.AppState || !AppState.activeGraph) return null;
+      var graphNodes = (AppState.activeGraph().nodes || []);
+      if (!graphNodes.length) return null;
+      var st = GM.getState ? GM.getState() : null;
+      var nodes = graphNodes.map(function (n) {
+        var b = st && GM.boardNode ? GM.boardNode(n.id) : null;
+        return b ? Object.assign({}, n, {
+          health: b.health, healthMax: b.healthMax || n.healthMax, alive: b.alive, status: b.status
+        }) : n;
+      });
+      var sides = (st && st.logistics && st.logistics.sides) || {};
+      return CofmModule.assess(nodes, {
+        logistics: {
+          blue: (sides.blue && sides.blue.decision && sides.blue.decision.id) || null,
+          red: (sides.red && sides.red.decision && sides.red.decision.id) || null
+        }
+      });
+    } catch (e) { return null; }
+  }
+  function cofmCardHtml() { var r = cofmReport(); return r ? CofmModule.formatCard(r) : ''; }
+  function cofmChipHtml() { var r = cofmReport(); return r ? CofmModule.formatChip(r) : ''; }
 
   // ---- BRIEF ------------------------------------------------------------------------
   var briefOpts = { turnLimit: 8, redDiff: 'hard', roeId: 'denial', variantId: null };
@@ -689,7 +728,9 @@ window.DirectorModule = (function () {
       '<div class="dir-kicker">OPERATION BRIEF · ' + esc(title) + '</div>' +
       '<h1 class="dir-h1">Deny the lodgment before the window closes.</h1>' +
       '<div class="dir-sub">You are the Blue Joint Force operational planner. ' + st.cfg.turnLimit + ' turns / ' + horizon + ' notional days of simultaneous commitment against a doctrine-driven Red.</div>' +
-      tutorialCoach('1', 'I’ll guide the next two turns.', 'Turn 1 teaches a strike, forecast, and resolution. Turn 2 adds a logistics allocation decision. Follow the cyan coach card; the expert tools remain available after the tutorial.') +
+      tutorialCoach('1', 'I’ll guide the next two turns.', 'Turn 1 teaches a strike, forecast, and resolution. Turn 2 adds a logistics allocation decision. Follow the orange coach card; the expert tools remain available after the tutorial.') +
+
+      cofmCardHtml() +
 
       '<div class="dir-card">' +
       '<div class="dir-badges"><span class="dir-badge">' + esc(ctx.classification || 'SCENARIO DATA') + '</span>' +
@@ -989,6 +1030,7 @@ window.DirectorModule = (function () {
       '<span class="stat">OBJ <b>' + st.objectives.blue.held + '/' + st.objectives.blue.total + ' held</b></span>' +
       '<span class="stat">RED OBJ <b>' + st.objectives.red.held + '/' + st.objectives.red.total + ' standing</b></span>' +
       '<span class="spacer"></span>' +
+      cofmChipHtml() +
       '<span class="stat">' + operationalStatus + '</span>' +
       '</div>' +
       intelAssessmentHtml(st) +
@@ -2118,6 +2160,8 @@ window.DirectorModule = (function () {
       '<div class="dir-metric"><b>' + (lastDenial.osvi == null ? '—' : Math.round(lastDenial.osvi * 100) + '%') + '</b><span>RED SYSTEM COHERENCE</span></div>' +
       '<div class="dir-metric"><b>' + Math.round(lodgment * 100) + '%</b><span>LODGMENT ACCUMULATED</span></div>' +
       '<div class="dir-metric"><b>' + esc(result.at && result.at.dday != null ? 'D+' + result.at.dday : '—') + '</b><span>DECISION POINT</span></div></div>' + projectionLine + '</div>' +
+
+      cofmCardHtml() +
 
       (op.tutorial ? '' : predictabilityCardHtml(st) + doctrineTrajectoryHtml(aar.redMind) + strategicAarHtml(aar.strategic)) +
       logisticsAarHtml(aar.logistics) +
