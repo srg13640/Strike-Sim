@@ -11,7 +11,7 @@
  * This module is the single authority for "render the active surface at the current
  * size, and survive the GPU dropping out." Every size-changing event — window resize,
  * panel collapse, view switch, entering/leaving fullscreen — is funnelled through one
- * rAF-debounced apply() that re-sizes whichever surface is currently visible and guards
+ * cancelable active-surface apply() that re-sizes whichever surface is currently visible and guards
  * against the 0x0 size that corrupts canvases mid-transition.
  *
  * Self-contained and defensive: it reads EngineModule/MapModule/showToast at call time
@@ -22,8 +22,15 @@ window.StageModule = (function () {
   'use strict';
 
   var resizeTimer = null;
+  var resizeVersion = 0;
+  var pendingView = null;
+  var pendingForce = false;
+  var pendingImmediate = false;
   var webglAttached = false;
   var ro = null;
+  var lastGraphSize = { width: 0, height: 0 };
+  var lastMapSize = { width: 0, height: 0 };
+  var sizingPasses = { '3d': 0, map: 0, table: 0, org: 0 };
 
   function graphEl() { return document.getElementById('graph'); }
   function mapEl() { return document.getElementById('map'); }
@@ -41,25 +48,58 @@ window.StageModule = (function () {
   // to 0x0 is exactly what corrupts it.
   function live(el) { return !!(el && el.offsetParent !== null && el.clientWidth > 0 && el.clientHeight > 0); }
 
-  // Debounce with setTimeout rather than requestAnimationFrame: rAF is fully PAUSED when
-  // the tab is backgrounded, which would silently drop a resize that happened while hidden
-  // (and then never re-apply on return). setTimeout still fires, so the active surface is
-  // always eventually reconciled to its container.
-  function schedule() {
-    if (resizeTimer) return;
-    resizeTimer = setTimeout(function () { resizeTimer = null; apply(); }, 60);
+  function activeView() {
+    try { if (window.AppShell && AppShell.state) return AppShell.state.view; } catch (e) {}
+    var m = mapEl(), o = document.getElementById('org-chart'), t = document.getElementById('table');
+    if (live(m)) return 'map';
+    if (live(t)) return 'table';
+    if (live(o)) return 'org';
+    return '3d';
   }
 
-  function apply() {
+  // One cancelable task owns each sizing pass. A rapid Map -> Table -> Task Org -> Map
+  // sequence continually replaces the pending task, so an obsolete callback can never
+  // invalidate, fit, or rebuild a surface that is no longer active. setTimeout is used
+  // rather than rAF because rAF pauses in a hidden tab; visibility resume schedules a new
+  // foreground pass below.
+  function schedule(options) {
+    options = options && !Array.isArray(options) && typeof options === 'object' ? options : {};
+    var version = ++resizeVersion;
+    pendingView = options.view || pendingView || activeView();
+    pendingForce = pendingForce || !!options.force;
+    pendingImmediate = pendingImmediate || !!options.immediate;
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      resizeTimer = null;
+      if (version !== resizeVersion) return;
+      if (document.hidden) return;
+      var view = pendingView || activeView();
+      var force = pendingForce;
+      pendingView = null;
+      pendingForce = false;
+      pendingImmediate = false;
+      apply(view, force);
+    }, pendingImmediate ? 0 : 48);
+  }
+
+  function activate(view) {
+    schedule({ view: view, force: true, immediate: true });
+  }
+
+  function apply(view, force) {
+    sizingPasses[view] = (sizingPasses[view] || 0) + 1;
     var inst = gi();
 
     // 3D surface: drive the renderer + camera explicitly from the container box. Setting
     // width/height on the ForceGraph3D instance resizes its WebGLRenderer and updates the
     // camera aspect/projection — the step that was missing and caused node misalignment.
     var g = graphEl();
-    if (inst && live(g)) {
+    if (view === '3d' && inst && live(g)) {
       var w = g.clientWidth, h = g.clientHeight;
-      if (w > 0 && h > 0) { try { inst.width(w); inst.height(h); } catch (e) {} }
+      if (w > 0 && h > 0 && (force || w !== lastGraphSize.width || h !== lastGraphSize.height)) {
+        lastGraphSize = { width: w, height: h };
+        try { inst.width(w); inst.height(h); } catch (e) {}
+      }
     }
 
     // First time we have a real renderer, wire up context-loss survival.
@@ -69,8 +109,18 @@ window.StageModule = (function () {
     // changed, or tiles/overlays/markers position for the old size (the "satellite stuck
     // in a corner, units floating" symptom).
     var m = mapEl();
-    if (m && m.style.display !== 'none' && window.MapModule && MapModule.getMap && MapModule.getMap()) {
-      try { MapModule.invalidateSize(); } catch (e) {}
+    if (view === 'map' && live(m) && window.MapModule && MapModule.getMap && MapModule.getMap()) {
+      var mw = m.clientWidth, mh = m.clientHeight;
+      if (force || mw !== lastMapSize.width || mh !== lastMapSize.height) {
+        lastMapSize = { width: mw, height: mh };
+        try { MapModule.invalidateSize(); } catch (e) {}
+      }
+    }
+
+    // Task Org is the only DOM renderer whose geometry depends on its container size.
+    // ViewsModule performs its own dimension comparison and skips an unchanged return.
+    if (view === 'org' && window.ViewsModule && ViewsModule.resizeOrg) {
+      try { ViewsModule.resizeOrg(); } catch (e) {}
     }
   }
 
@@ -90,7 +140,7 @@ window.StageModule = (function () {
     }, false);
     canvas.addEventListener('webglcontextrestored', function () {
       try { if (window.showToast) showToast('3D view restored.', 'success', 2500); } catch (e) {}
-      schedule();
+      schedule({ view: activeView(), force: true });
       try { if (inst.refresh) inst.refresh(); } catch (e) {}
     }, false);
   }
@@ -152,16 +202,20 @@ window.StageModule = (function () {
     injectButton();
     reparentOverlays();
 
-    // Canonical browser-game render gate. The expensive 3D scene is alive only while
-    // it is the visible, unobstructed foreground surface; EngineModule additionally
-    // idles between interactions after the force layout settles.
+    // EngineModule is the sole owner of renderer pause/wake. Stage subscribes only for
+    // sizing: a foreground view or visibility change replaces any obsolete pending pass.
     if (window.AppShell && AppShell.subscribe) {
-      AppShell.subscribe(function (state) {
-        try {
-          if (window.EngineModule && EngineModule.setRenderActive) {
-            EngineModule.setRenderActive(state.view === '3d' && !state.hidden && !state.overlayOpen);
+      AppShell.subscribe(function (state, changed) {
+        if (changed.indexOf('view') !== -1 || changed.indexOf('hidden') !== -1) {
+          if (!state.hidden) activate(state.view);
+          else {
+            resizeVersion++;
+            if (resizeTimer) { clearTimeout(resizeTimer); resizeTimer = null; }
+            pendingView = null;
+            pendingForce = false;
+            pendingImmediate = false;
           }
-        } catch (e) {}
+        }
       });
     }
 
@@ -208,5 +262,10 @@ window.StageModule = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { resize: schedule, toggleFullscreen: toggleFullscreen };
+  return {
+    resize: schedule,
+    activate: activate,
+    toggleFullscreen: toggleFullscreen,
+    snapshot: function () { return { passes: Object.assign({}, sizingPasses), activeView: activeView() }; }
+  };
 })();

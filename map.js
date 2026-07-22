@@ -793,7 +793,8 @@ window.MapModule = (function () {
     }
   }
 
-  function highlightSelectedOnMap() {
+  function highlightSelectedOnMap(options) {
+    options = options || {};
     if (!leafletMap) return;
     const selectedNode = ctx.getSelectedNode();
     const nodes = graph().nodes;
@@ -806,7 +807,7 @@ window.MapModule = (function () {
     if (selectedNode && mapMarkers.has(selectedNode.id)) {
       const m = mapMarkers.get(selectedNode.id);
       m.bindPopup(capabilityPopupHtml(selectedNode), { autoPan: true, maxWidth: 380 }).openPopup();
-      if (selectedNode.lat != null && selectedNode.lon != null) {
+      if (options.pan !== false && selectedNode.lat != null && selectedNode.lon != null) {
         // C-017: pan to the marker's display coordinate (which may be offset by declutter)
         // so the map recenters on where the symbol is actually drawn, not a hidden true pos.
         let viewPos;
@@ -1117,6 +1118,7 @@ window.MapModule = (function () {
       '  .mil-blip::after,.mil-blip.mil-selected::after,.mil-blip.mil-hi::after{animation:none;opacity:.35}',
       '}',
       'html.cin-rm .mil-blip::after,html.cin-rm .mil-blip.mil-selected::after,html.cin-rm .mil-blip.mil-hi::after{animation:none;opacity:.35}',
+      'html.cin-perf .mil-blip::after,html.cin-perf .mil-blip.mil-selected::after,html.cin-perf .mil-blip.mil-hi::after{animation:none;opacity:.32;box-shadow:none}',
 
       // ---- Objective marker ------------------------------------------------------
       '@keyframes mapObjPulse{',
@@ -1141,6 +1143,7 @@ window.MapModule = (function () {
       '}',
       '@media(prefers-reduced-motion:reduce){.map-obj-marker{animation:none}}',
       'html.cin-rm .map-obj-marker{animation:none}',
+      'html.cin-perf .map-obj-marker{animation:none;box-shadow:none}',
 
       // ---- Radar-sweep FX --------------------------------------------------------
       // A single rotating conic-gradient div in its own pane. Cheap: one element,
@@ -1164,6 +1167,7 @@ window.MapModule = (function () {
       '}',
       '@media(prefers-reduced-motion:reduce){#map-radar-sweep{animation:none;display:none}}',
       'html.cin-rm #map-radar-sweep{animation:none;display:none}',
+      'html.cin-perf #map-radar-sweep{animation:none;display:none}',
 
       // ---- Strike FX (existing arc + new cinematic tracer/shockwave) ------------
       '@keyframes wgTracer{from{stroke-dashoffset:160}to{stroke-dashoffset:0}}',

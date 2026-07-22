@@ -50,6 +50,12 @@ window.CinematicsModule = (function () {
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
   function getCallsign() { return settings.callsign; }
 
+  function setConsoleOverlay(open) {
+    try {
+      if (window.AppShell && window.AppShell.setOverlay) AppShell.setOverlay('cinematics', !!open);
+    } catch (e) {}
+  }
+
   // Effective reduced motion = the system media query OR the operator's forced toggle.
   // The toggle can only ADD restraint — it never disables a system-level preference.
   function reduceMotion() {
@@ -64,7 +70,11 @@ window.CinematicsModule = (function () {
       root.classList.toggle('cin-rm', eff);
       root.classList.toggle('cin-perf', !!settings.perfMode);
     }
-    try { if (window.AppShell && window.AppShell.set) window.AppShell.set({ reducedMotion: eff }); } catch (e) {}
+    try {
+      if (window.AppShell && window.AppShell.set) {
+        window.AppShell.set({ reducedMotion: eff, perfMode: !!settings.perfMode });
+      }
+    } catch (e) {}
   }
   try {
     if (mqRM) {
@@ -191,10 +201,17 @@ window.CinematicsModule = (function () {
       'html.cin-rm #dir-wrap.cin-deal .dir-card{animation:none;opacity:1;transform:none;}',
       'html.cin-rm .cin-typing::after{animation:none;}',
       // W6 performance mode: one dial to zero — scanlines/grain out, glow tokens out,
-      // text-shadow glows out, the alert vignette out. Structural box-shadows stay.
+      // text-shadow glows out, the alert vignette out. Expensive glass filters and
+      // decorative HUD animation also stop; controls, labels, status and focus remain.
       'html.cin-perf{--fx-scanline-opacity:0;--fx-grain-opacity:0;--glow-cyan:none;--glow-amber:none;--glow-alert:none;}',
       'html.cin-perf *{text-shadow:none !important;}',
-      'html.cin-perf #fx-vignette{display:none !important;}'
+      'html.cin-perf #fx-vignette{display:none !important;}',
+      'html.cin-perf .modal,html.cin-perf .modal-backdrop,html.cin-perf .toast,html.cin-perf #node-popup,',
+      'html.cin-perf #hud-ticker,html.cin-perf .leaflet-control{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}',
+      'html.cin-perf #hud-radar canvas{filter:none !important;}',
+      'html.cin-perf #hud-ticker .ht-track{animation:none !important;transform:none !important;will-change:auto !important;}',
+      'html.cin-perf .cin-typing::after,html.cin-perf #cin-bootprompt,html.cin-perf #dir-wrap.cin-deal .dir-card{animation:none !important;}',
+      'html.cin-perf :focus-visible{outline:2px solid var(--amber,#ffb000);outline-offset:2px;}'
     ].join('\n');
     document.head.appendChild(st);
   }
@@ -218,6 +235,7 @@ window.CinematicsModule = (function () {
 
   function showBoot() {
     injectCss();
+    setConsoleOverlay(true);
     var wrap = document.createElement('div');
     wrap.id = 'cin-boot';
     wrap.innerHTML =
@@ -280,6 +298,7 @@ window.CinematicsModule = (function () {
       wrap.classList.add('gone');
       S.bootDone = true;
       S.screen = null;
+      setConsoleOverlay(false);
       wrap.removeEventListener('click', enter);
       window.removeEventListener('keydown', enter);
       setTimeout(function () { try { wrap.remove(); } catch (e) {} }, reduceMotion() ? 0 : 180);
@@ -291,6 +310,7 @@ window.CinematicsModule = (function () {
   // ---------- title ----------
   function showTitle() {
     injectCss();
+    setConsoleOverlay(true);
     var existing = $('cin-title');
     if (existing) { existing.classList.remove('gone'); S.screen = 'title'; startTitleBed(); return; }
     var wrap = document.createElement('div');
@@ -347,6 +367,7 @@ window.CinematicsModule = (function () {
     var t = $('cin-title');
     if (t) t.classList.add('gone');
     S.screen = null;
+    setConsoleOverlay(false);
     var a = sfx(); if (a) a.stopBed(1.0);
   }
   function openConsole() { showTitle(); }
@@ -421,7 +442,7 @@ window.CinematicsModule = (function () {
       tog('cin-set-perf', 'Effects', settings.perfMode ? 'Performance mode' : 'Full FX') +
       tog('cin-set-boot', 'Boot', settings.bootFast ? 'Fast after first' : 'Full every time') +
       '<div class="cin-row"><label>Callsign</label><input type="text" id="cin-set-cs" maxlength="14" placeholder="E.G. RAVEN 6" value="' + esc(settings.callsign) + '" spellcheck="false" autocomplete="off"></div>' +
-      '<p>Your callsign appears in comms addressing. Reduced motion honors your system preference; the toggle forces it on this console regardless. Performance mode disables scanlines, grain and glow effects for older hardware. Settings apply immediately and persist on this console.</p>';
+      '<p>Your callsign appears in comms addressing. Reduced motion honors your system preference; the toggle forces it on this console regardless. Performance mode also slows decorative radar work and disables scanlines, grain, glass blur, pulses and glow while retaining labels, controls, warnings and focus. Settings apply immediately and persist on this console.</p>';
   }
   function bindSettings() {
     var panel = $('cin-panel');

@@ -715,6 +715,7 @@ window.ViewsModule = (function () {
   // tabindex="0"; all others get "-1". The user Tab-ins to the focused node and
   // then uses Arrow/Enter/Space/Escape to navigate/activate.
   let _orgFocusedNodeId = null;  // data-id of the currently keyboard-focused org node
+  let _orgRenderedSize = { width: 0, height: 0 };
 
   function renderOrgChart() {
     const wrap = document.getElementById('org-chart');
@@ -723,6 +724,7 @@ window.ViewsModule = (function () {
     const { visibleNodes, visibleLinks } = currentVisible();
     const width = wrap.clientWidth || 900;
     const height = wrap.clientHeight || 700;
+    _orgRenderedSize = { width, height };
     svg.attr('width', width).attr('height', height);
     svg.selectAll('*').remove();
 
@@ -734,8 +736,13 @@ window.ViewsModule = (function () {
         });
     }
     svg.call(orgZoomBehavior);
+    const previousZoom = d3.zoomTransform(svg.node());
 
     const zoomLayer = svg.append('g').attr('id', 'org-zoom');
+    // D3 stores the zoom transform on the SVG, not on the content group. Rebuilding
+    // after expansion or a real resize replaces that group, so explicitly restore the
+    // operator's current pan/zoom until the one-time initial framing runs below.
+    if (orgFramed && previousZoom) zoomLayer.attr('transform', previousZoom.toString());
 
     // C-051: derive teams dynamically from visible nodes
     const teams = _deriveTeams(visibleNodes);
@@ -863,6 +870,30 @@ window.ViewsModule = (function () {
   }
   let orgFramed = false;
   function resetOrgFraming() { orgFramed = false; }
+
+  // Selection is a cheap state change, not a reason to reconstruct 250 rows or the full
+  // D3 hierarchy. Keep both hidden and visible cached screens synchronized in place.
+  function syncSelection() {
+    const selected = ctx.getSelectedNode && ctx.getSelectedNode();
+    const selectedId = selected == null ? null : String(selected.id);
+    document.querySelectorAll('#nodes-table tbody tr[data-id]').forEach(row => {
+      row.setAttribute('aria-selected', String(selectedId !== null && row.getAttribute('data-id') === selectedId));
+    });
+    document.querySelectorAll('#org-chart-svg .org-node[data-org-nid]').forEach(group => {
+      const box = group.querySelector('.mil-box');
+      if (box) box.classList.toggle('selected', selectedId !== null && group.getAttribute('data-org-nid') === selectedId);
+    });
+  }
+
+  // Stage calls this once per active-surface sizing pass. An unchanged return to Task Org
+  // preserves its SVG and the user's zoom/pan; a real container resize rebuilds once.
+  function resizeOrg() {
+    const wrap = document.getElementById('org-chart');
+    if (!wrap || wrap.offsetParent === null || wrap.clientWidth <= 0 || wrap.clientHeight <= 0) return false;
+    const changed = wrap.clientWidth !== _orgRenderedSize.width || wrap.clientHeight !== _orgRenderedSize.height;
+    if (changed) renderOrgChart();
+    return changed;
+  }
 
   // C-026: set up roving-tabindex keyboard navigation for org-chart nodes
   function _setupOrgKeyboard(allOrgNodes) {
@@ -1105,6 +1136,7 @@ window.ViewsModule = (function () {
   window.renderOrgChart = renderOrgChart;
   window.buildOrgTree = buildOrgTree;
   window.resetOrgFraming = resetOrgFraming;
+  window.syncViewSelection = syncSelection;
 
-  return { init, refreshTable, displayStatusForRow, renderOrgChart, buildOrgTree, resetOrgFraming };
+  return { init, refreshTable, displayStatusForRow, renderOrgChart, buildOrgTree, resetOrgFraming, syncSelection, resizeOrg };
 })();

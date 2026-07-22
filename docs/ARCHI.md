@@ -144,7 +144,9 @@ flowchart LR
 - `engine.js` — 3D force graph (3d-force-graph/Three r128): lifecycle, Blue→Red opening camera shot, geo-mode globe layout.
 - `map.js` — Leaflet 2D map: markers, links, popups, offline-tile detection, and `MapModule.flyToNode` war-film camera cuts (throttled on the pacing clock).
 - `views.js` — data table + D3 task-org chart. `symbols.js` — inline-SVG 2525 symbology from scenario node fields.
-- `stage.js` — Stage Manager: the resize/reliability foundation for every renderer (Three aspect, Leaflet invalidate, layout).
+- The shell maintains explicit dirty flags for Map, Table, and Task Org. Unchanged view returns reuse their existing layers/rows/SVG; source, filter, highlight, expansion, and size changes invalidate only the affected presentation. Node selection updates Map/Table/Task Org highlights in place rather than rebuilding a screen.
+- `stage.js` — Stage Manager: the single cancelable active-surface sizing authority (Three aspect, Leaflet invalidate, Task Org resize). A newer view request replaces an older pending pass; Map invalidation waits for a visible non-zero container and ordinary returns preserve operator framing.
+- 3D dependencies load only on the first explicit 3D request. After loading, `engine.js` wakes the renderer only for visible, unobstructed 3D interaction/settling and pauses it in other views, behind overlays, and while the tab is hidden.
 - `wargame.js` — self-contained War Game HUD (injects its own stylesheet/DOM; talks only to `GameModule` + a few globals).
 - Shell owns view switching (3D / Geo / Map / Table / Task Org), filters, modals, COA panels.
 
@@ -174,6 +176,8 @@ Posture: **offline-complete, online-enhanced.** The game must be 100% playable f
 ## 16. Workers & Concurrency
 
 Heavy ensembles run off the main thread: `sim-worker.js` (Monte Carlo trials, spawned from the shell) and `counterfactual-worker.js` (AAR Colosseum ensembles, spawned from `director.js`). Workers receive plain-data snapshots, run the same deterministic math, and post results back; UI stays at interactive framerate. No SharedArrayBuffer, no network in workers.
+
+View-transition concurrency is latest-request-wins: the shell versions 3D startup requests and Stage replaces pending sizing work, so delayed dependency loads, force-layout settles, or resize callbacks cannot reactivate/refit a screen that is no longer requested.
 
 ## 17. Data Flow
 
@@ -211,9 +215,11 @@ No test framework — **proof-contract harnesses**: plain Node scripts in `tools
 
 Conventions: load `strategic-state.js` before `game.js` (§6 harness law); byte-identical eval slices across repeat runs are the determinism check; new engine-touching work adds/extends a proof contract rather than a unit test. Coverage debt, when accepted, is ledgered in `docs/4-unit-tests/COVERAGE-DEBT.md`.
 
+Rendering regressions have focused contracts in `tools/runtime-performance-proof.js` and `tools/performance-layer-proof.js` for dirty-screen reuse, latest-request sizing, inactive-view pausing, cinematic overlays, and Performance Mode ambient coverage. These static/deterministic guards protect the lifecycle contract; they do not substitute for rendered-browser transition recordings.
+
 ## 20. Performance Considerations
 
-First 3D settle ~5 s (communicated by the boot ritual). Levers: workers for ensembles (§16), throttled camera cuts and ≤3 BDA confirms/turn during WATCH, perf mode (`html.cin-perf`) zeroing scanlines/glow/vignette, boot-fast setting, Three r128 geometry constraints. Balance-gate runs are the heaviest compute in the repo — chunk them (§19).
+The default Map startup does not load Three.js or 3d-force-graph; first 3D dependency load + settle remains an intentionally separate cold-path cost from repeated view transitions. Repeated static-screen returns reuse authored DOM/layers, Stage coalesces sizing, and loaded 3D sleeps outside its short interaction/settling window. Performance Mode (`html.cin-perf`) additionally removes expensive backdrop filters, marker pulses, sweep/glow/text effects, limits the visible tactical radar to 1 Hz, and stops hidden radar/ticker work; reduced motion remains an independent persisted setting. Other levers: workers for ensembles (§16), throttled camera cuts and ≤3 BDA confirms/turn during WATCH, boot-fast, and Three r128 geometry constraints. Balance-gate runs are the heaviest compute in the repo — chunk them (§19).
 
 ## 21. Security & IP Considerations
 

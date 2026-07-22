@@ -21,7 +21,9 @@ const ROOT = path.resolve(__dirname, '..');
 const FILES = {
   engine: path.join(ROOT, 'engine.js'),
   shell: path.join(ROOT, 'StrikeSim2040.html'),
-  stage: path.join(ROOT, 'stage.js')
+  stage: path.join(ROOT, 'stage.js'),
+  map: path.join(ROOT, 'map.js'),
+  views: path.join(ROOT, 'views.js')
 };
 
 const source = Object.fromEntries(
@@ -86,7 +88,7 @@ check(
 // AppShell is the canonical owner of view + document visibility. The integration may
 // live in the shell or StageModule, but it must subscribe to AppShell and compute active
 // rendering as exactly: 3D view AND visible tab.
-const orchestration = `${source.shell}\n${source.stage}`;
+const orchestration = `${source.engine}\n${source.shell}\n${source.stage}`;
 const subscriptions = [];
 let cursor = 0;
 while ((cursor = orchestration.indexOf('AppShell.subscribe', cursor)) !== -1) {
@@ -102,8 +104,57 @@ check(
 );
 check(
   'Only visible 3D state resumes rendering',
-  /\.view\s*===?\s*['"]3d['"]\s*&&\s*!\s*[A-Za-z_$][\w$]*\.hidden/.test(renderSubscription),
-  'Expected setRenderActive(state.view === "3d" && !state.hidden) semantics'
+  /\.view\s*===?\s*['"]3d['"]\s*&&\s*!\s*[A-Za-z_$][\w$]*\.hidden\s*&&\s*!\s*[A-Za-z_$][\w$]*\.overlayOpen/.test(renderSubscription),
+  'Expected 3D AND visible tab AND no overlay semantics'
+);
+
+// Repeated static-screen transitions must reuse authored DOM/layers, while true data
+// changes keep a small explicit invalidation surface.
+const cacheSection = section(source.shell, 'const screenDirty', 2800);
+check(
+  'Static Map/Table/Task Org renderers use dirty-screen caching',
+  /screenDirty\s*=\s*\{\s*map:\s*true,\s*table:\s*true,\s*org:\s*true\s*\}/.test(cacheSection) &&
+    /function\s+renderScreenIfDirty/.test(cacheSection) && /function\s+invalidateScreens/.test(cacheSection)
+);
+check(
+  'Unchanged Map return performs targeted selection sync',
+  /highlightSelectedOnMap\s*\(\s*\{\s*pan:\s*false\s*\}\s*\)/.test(cacheSection) &&
+    /ViewsModule\?\.syncSelection/.test(cacheSection)
+);
+const selectSection = section(source.shell, 'function selectNode(node)', 1500);
+check(
+  'Selection does not reconstruct static screens',
+  /ViewsModule\?\.syncSelection/.test(selectSection) &&
+    !/refreshMapMarkers\s*\(/.test(selectSection) && !/renderOrgChart\s*\(/.test(selectSection)
+);
+const initUiSection = section(source.shell, 'function initUI()', 700);
+check(
+  'Graph replacement and reset paths invalidate every cached static screen',
+  /invalidateScreens\s*\(\s*\)/.test(initUiSection)
+);
+const highlightSection = section(source.shell, 'function applyHighlight(options)', 4400);
+check(
+  'Highlight changes invalidate cached Table before the optional 3D guard',
+  highlightSection.indexOf("invalidateScreens('table')") !== -1 &&
+    highlightSection.indexOf("invalidateScreens('table')") < highlightSection.indexOf('if (!graphInstance)')
+);
+check(
+  'Task Org rebuilds restore the current D3 zoom transform',
+  /previousZoom\s*=\s*d3\.zoomTransform/.test(source.views) &&
+    /zoomLayer\.attr\(\s*['"]transform['"]\s*,\s*previousZoom\.toString\(\)\s*\)/.test(source.views)
+);
+
+// Stage is the sole sizing coordinator: a newer view request cancels an obsolete pass,
+// hidden/zero-size surfaces are skipped, and returning to Map never auto-fits bounds.
+check(
+  'Stage coalesces sizing into one cancelable active-surface pass',
+  /clearTimeout\s*\(\s*resizeTimer\s*\)/.test(source.stage) &&
+    /version\s*!==\s*resizeVersion/.test(source.stage) && /function\s+activeView/.test(source.stage)
+);
+check(
+  'Stage sizes only non-zero visible surfaces and never auto-fits Map bounds',
+  /clientWidth\s*>\s*0\s*&&\s*el\.clientHeight\s*>\s*0/.test(source.stage) &&
+    !/fitMapToMarkers\s*\(/.test(source.stage)
 );
 
 // In three-force-graph, a truthy linkWidth creates CylinderGeometry; zero/undefined uses

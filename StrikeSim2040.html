@@ -36,12 +36,12 @@
        milsymbol (or built-in fallback), and injects marker CSS. Loads before map.js. -->
   <script src="symbols.js?v=p4"></script>
   <!-- Leaflet 2D map rendering module (depends on state.js + the Leaflet global). -->
-  <script src="map.js?v=p17"></script>
+  <script src="map.js?v=p18"></script>
   <!-- Core 3D engine module (depends on the ForceGraph3D + THREE globals). -->
-  <script src="engine.js?v=p8"></script>
+  <script src="engine.js?v=p9"></script>
   <!-- Stage Manager: the resize / fullscreen / WebGL-context-loss reliability layer.
        Owns sizing the active surface and surviving GPU context drops. -->
-  <script src="stage.js?v=p7"></script>
+  <script src="stage.js?v=p8"></script>
   <!-- Simulation foundation: RNG, profiles, stats, sim-context (depends on state.js). -->
   <script src="sim.js?v=p8"></script>
   <!-- Denial Measures-of-Effectiveness engine (Strategy of Denial). Pure/offline; used by
@@ -76,9 +76,9 @@
        (boot ritual → title screen front door). Presentation only — reads public
        state, drives #dir-launch, never touches match state or seeded RNG. -->
   <script src="audio.js?v=co006-p4"></script>
-  <script src="cinematics.js?v=co009-p2"></script>
+  <script src="cinematics.js?v=co009-p3"></script>
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
-  <script src="views.js?v=p8"></script>
+  <script src="views.js?v=p9"></script>
   <script src="inline-datasets.js?v=p9"></script>
   <style>
     :root {
@@ -1226,6 +1226,7 @@
     table.mdsc-table thead th[aria-sort] .sort-caret { color:var(--amber); }
     table.mdsc-table tbody tr { transition:background .12s ease, box-shadow .12s ease; }
     table.mdsc-table tbody tr:hover { background:rgba(0,216,255,.07); box-shadow:inset 3px 0 0 var(--cyan); }
+    table.mdsc-table tbody tr[aria-selected="true"] { background:rgba(0,216,255,.11); box-shadow:inset 3px 0 0 var(--amber); }
 
     /* Task-org cards glow */
     .org-node .org-title { font-family:var(--display) !important; }
@@ -1341,6 +1342,7 @@
       wargameOpen: false,
       hidden: !!document.hidden,
       reducedMotion: !!(mqMotion && mqMotion.matches),
+      perfMode: false,
       overlayOpen: false
     };
     var subs = [];
@@ -2358,6 +2360,40 @@
     // Legend state
     let legendVisible = true;
     let legendWasVisibleBeforeTable = true;
+    // Static-screen cache: a renderer is dirty only when its source or presentation
+    // inputs change. View switches reuse the existing Leaflet layers, table rows, and
+    // Task Org SVG; explicit data/filter/highlight/size changes invalidate what they use.
+    const screenDirty = { map: true, table: true, org: true };
+    const screenRenderCounts = { map: 0, table: 0, org: 0 };
+    function invalidateScreens(names) {
+      const list = names == null ? ['map', 'table', 'org'] : (Array.isArray(names) ? names : [names]);
+      list.forEach(name => { if (Object.prototype.hasOwnProperty.call(screenDirty, name)) screenDirty[name] = true; });
+    }
+    function renderScreenIfDirty(name, force) {
+      if (!force && !screenDirty[name]) {
+        if (name === 'map' && window.MapModule?.highlightSelectedOnMap) MapModule.highlightSelectedOnMap({ pan: false });
+        if ((name === 'table' || name === 'org') && window.ViewsModule?.syncSelection) ViewsModule.syncSelection();
+        return false;
+      }
+      if (name === 'map') refreshMapMarkers();
+      else if (name === 'table') refreshTable();
+      else if (name === 'org') renderOrgChart();
+      else return false;
+      screenDirty[name] = false;
+      screenRenderCounts[name]++;
+      return true;
+    }
+    function renderActiveScreen() {
+      if (mapModeEnabled) return renderScreenIfDirty('map');
+      if (tableModeEnabled) return renderScreenIfDirty('table');
+      if (orgModeEnabled) return renderScreenIfDirty('org');
+      return false;
+    }
+    // Focused diagnostic surface used by regression proofs and browser verification.
+    window.__ssScreenCache = {
+      invalidate: invalidateScreens,
+      snapshot: () => ({ dirty: { ...screenDirty }, renders: { ...screenRenderCounts } })
+    };
     // Track last import to allow post-fix of team assignment
     let lastImportIds = new Set();
     let lastImportMode = null; // 'add' | 'replace'
@@ -2612,6 +2648,7 @@
         };
         node.resourceGenByType = updated;
         node.resourceGen = Object.values(updated).reduce((a,b)=>a+b,0);
+        invalidateScreens('table');
         recalcTeamResources();
         showToast(`Updated resources for ${node.id}`, 'success');
         showNodePopup(node); // refresh view
@@ -2683,17 +2720,58 @@
 
     // Command-bar view switcher: set the app to exactly one view. Reuses the existing
     // toggle functions (which already turn the other views off).
-    function setView(v) {
-      if (v === '3d') {
-        if (!graphInstance) { open3DOnDemand(); return; }
-        if (mapModeEnabled) toggleMapMode();
-        if (tableModeEnabled) toggleTableMode();
-        if (orgModeEnabled) toggleOrgMode();
+    let requestedView = 'map';
+    let viewRequestVersion = 0;
+
+    function activateView(v, options) {
+      options = options || {};
+      const wasTable = tableModeEnabled;
+      mapModeEnabled = v === 'map';
+      tableModeEnabled = v === 'table';
+      orgModeEnabled = v === 'org';
+
+      if (!wasTable && tableModeEnabled) {
+        legendWasVisibleBeforeTable = legendVisible;
+        setLegendVisible(false);
+      } else if (wasTable && !tableModeEnabled && legendWasVisibleBeforeTable) {
+        setLegendVisible(true);
       }
-      else if (v === 'map' && !mapModeEnabled) toggleMapMode();
-      else if (v === 'table' && !tableModeEnabled) toggleTableMode();
-      else if (v === 'org' && !orgModeEnabled) toggleOrgMode();
+
+      document.getElementById('map').style.display = mapModeEnabled ? 'block' : 'none';
+      document.getElementById('table').style.display = tableModeEnabled ? 'block' : 'none';
+      document.getElementById('org-chart').style.display = orgModeEnabled ? 'block' : 'none';
+      document.getElementById('graph').style.display = v === '3d' ? 'block' : 'none';
+      const loader = document.getElementById('graph-loading');
+      if (loader && v !== '3d') loader.style.display = 'none';
+
+      const mapBtn = document.getElementById('map-btn'); if (mapBtn) mapBtn.textContent = mapModeEnabled ? '3D' : 'Map';
+      const tableBtn = document.getElementById('table-btn'); if (tableBtn) tableBtn.textContent = tableModeEnabled ? '3D' : 'Table';
+      const orgBtn = document.getElementById('org-btn'); if (orgBtn) orgBtn.textContent = orgModeEnabled ? '3D' : 'Task Org';
+
+      if (mapModeEnabled) {
+        ensureMap();
+        hideNodePopup();
+        if (!options.deferRender) renderScreenIfDirty('map');
+        if (window.MapModule?.replayHiddenStrikes) MapModule.replayHiddenStrikes();
+      } else if (tableModeEnabled) {
+        hideNodePopup();
+        if (!options.deferRender) renderScreenIfDirty('table');
+      } else if (orgModeEnabled && !options.deferRender) {
+        renderScreenIfDirty('org');
+      }
+
       updateViewStatus();
+      if (window.StageModule?.activate) StageModule.activate(v);
+      else if (window.StageModule?.resize) StageModule.resize({ view: v, force: true });
+    }
+
+    function setView(v) {
+      if (!['3d', 'map', 'table', 'org'].includes(v)) return Promise.resolve(false);
+      requestedView = v;
+      const requestVersion = ++viewRequestVersion;
+      if (v === '3d') return open3DOnDemand(requestVersion);
+      activateView(v);
+      return Promise.resolve(true);
     }
 
     // Re-home the modules' floating top buttons (Campaign / War Game / Fullscreen / Retry 3D)
@@ -2716,7 +2794,7 @@
     geoModeEnabled = true;
     document.getElementById('geo-mode-btn').textContent = "Exit Geo";
     addEvent({ type: 'View', text: 'Geo Mode enabled.' });
-    refreshGraph();
+    refreshGraph({ invalidateScreens: false });
     updateViewStatus();
     }
 
@@ -2888,7 +2966,9 @@
     return { visibleNodes, visibleLinks };
     }
 
-    function refreshGraph() {
+    function refreshGraph(options) {
+      options = options || {};
+      if (options.invalidateScreens !== false) invalidateScreens();
       const { visibleNodes, visibleLinks } = currentVisible();
       if (graphInstance) {
         if (window.EngineModule?.wake) EngineModule.wake(1800);
@@ -2897,7 +2977,7 @@
           EngineModule.applyGeoLayout(visibleNodes);
         }
         // Always re-apply colors to ensure they're correct
-        applyHighlight();
+        applyHighlight({ invalidateTable: options.invalidateScreens !== false });
         // Force a re-render of node colors
         if (visibleNodes.length > 0) {
           graphInstance.nodeColor(n => {
@@ -2922,9 +3002,7 @@
       }
     computeCounts();
     updateTeamSummary();
-    if (mapModeEnabled) refreshMapMarkers();
-    if (tableModeEnabled) refreshTable();
-    if (orgModeEnabled) renderOrgChart();
+    renderActiveScreen();
     }
 
     function updateDetails(node) {
@@ -2961,8 +3039,8 @@
     } else {
     closeMapPopup();
     }
-    // Reflect selection in the Task Org view (so the selected card highlights).
-    if (orgModeEnabled && typeof renderOrgChart === 'function') renderOrgChart();
+    // Selection is a targeted highlight update; cached Table/Task Org DOM stays intact.
+    if (window.ViewsModule?.syncSelection) ViewsModule.syncSelection();
     }
 
     function cycleVisibleSelection(step) {
@@ -3132,7 +3210,7 @@
     highlightSet = (highlightMode === 'payoff') ? computeHighPayoffSet() : new Set();
     addEvent({ type: 'View', text: `Highlighting ${highlightSet.size} high-payoff targets` });
     applyHighlight();
-    if (mapModeEnabled) refreshMapMarkers();
+    if (mapModeEnabled) highlightSelectedOnMap();
     }
 
     function computeHighPayoffSet() {
@@ -3152,7 +3230,7 @@
     highlightSet = (highlightMode === 'risk') ? computeHighRiskSet() : new Set();
     addEvent({ type: 'View', text: `Highlighting ${highlightSet.size} high-risk targets` });
     applyHighlight();
-    if (mapModeEnabled) refreshMapMarkers();
+    if (mapModeEnabled) highlightSelectedOnMap();
     }
 
     function computeHighRiskSet() {
@@ -3164,8 +3242,9 @@
     function toggleHighContrast() {
     document.body.classList.toggle('high-contrast');
     updateLegendSwatches();
+    invalidateScreens();
     applyHighlight();
-    refreshMapMarkers();
+    renderActiveScreen();
     }
 
     function updateLegendSwatches() {
@@ -3233,7 +3312,7 @@
           graphInstance.graphData(data);
           if (!geoModeEnabled) graphInstance.d3ReheatSimulation();
         }
-        if (mapModeEnabled) refreshMapMarkers();
+        if (mapModeEnabled) renderScreenIfDirty('map');
         addEvent({ type: 'Sim', text: `Undo: restored state from before ${snap.label}.` });
         showToast(`Restored state from before ${snap.label}.`, 'success');
       } catch (e) {
@@ -3257,7 +3336,7 @@
     graphInstance.d3ReheatSimulation();
     }
     addEvent({ type: 'Sim', text: 'Simulation reset' });
-    if (mapModeEnabled) refreshMapMarkers();
+    if (mapModeEnabled) renderScreenIfDirty('map');
     }
 
     function openSummary() {
@@ -3457,7 +3536,7 @@
     closeImportModal();
     fileInput.value = '';
     setImportBusy(false);
-    if (mapModeEnabled) refreshMapMarkers();
+    if (mapModeEnabled) renderScreenIfDirty('map');
     }
     };
     reader.onerror = () => {
@@ -3531,7 +3610,7 @@
     applyTeamFilters();
     updateTeamSummary();
     recalcTeamResources();
-    if (mapModeEnabled) refreshMapMarkers();
+    if (mapModeEnabled) renderScreenIfDirty('map');
     }
 
     function applyFilters() {
@@ -3596,7 +3675,8 @@
     // frameBlueToRed (the Blue-perspective opening shot) now lives in EngineModule
     // (engine.js); init() passes it as the onFirstSettle hook, and Reset View reuses it.
 
-    function applyHighlight() {
+    function applyHighlight(options) {
+    options = options || {};
     const legendModeEl = document.getElementById('legend-mode');
     const hc = document.body.classList.contains('high-contrast');
 
@@ -3620,6 +3700,14 @@
     else if (highlightMode === 'risk') modeLabel = 'High Risk';
     else if (highlightMode === 'coa') modeLabel = 'COA Outcome';
     legendModeEl.textContent = `Mode: ${modeLabel}`;
+    }
+    // Table presentation depends on highlight mode even before the on-demand 3D
+    // engine exists. Mark it dirty before the renderer guard so Map -> Table stays
+    // correct on the lightweight startup path.
+    const refreshCachedTable = options.invalidateTable !== false;
+    if (refreshCachedTable) {
+      invalidateScreens('table');
+      if (tableModeEnabled) renderScreenIfDirty('table');
     }
     if (!graphInstance) return;
 
@@ -3657,11 +3745,14 @@
     } catch (e) {
       /* ignore */
     }
-    // Keep table in sync with highlight/COA outcomes
-    if (tableModeEnabled) refreshTable();
+    // Keep table in sync with highlight/COA outcomes. Highlight changes are a real
+    // presentation invalidation; selection-only changes use syncSelection() instead.
     }
 
     function initUI() {
+    // initUI follows graph replacement/reset/import paths. Those paths change the
+    // authored source for every static screen, so no cached DOM/layer may survive it.
+    invalidateScreens();
     computeCounts();
     populateFilters();
     populateTeamFilters();
@@ -3752,36 +3843,7 @@
     // wireMapModule() so existing call sites keep working.
 
     function toggleMapMode() {
-    if (mapModeEnabled && !graphInstance) { open3DOnDemand(); return; }
-    mapModeEnabled = !mapModeEnabled;
-    if (mapModeEnabled && orgModeEnabled) {
-      orgModeEnabled = false;
-      document.getElementById('org-chart').style.display = 'none';
-      const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
-    }
-    // If switching to Map, ensure Table is off
-    if (mapModeEnabled && tableModeEnabled) {
-      const restoreLegend = legendWasVisibleBeforeTable;
-      tableModeEnabled = false;
-      document.getElementById('table').style.display = 'none';
-      const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = 'Table';
-      if (restoreLegend) setLegendVisible(true);
-    }
-    document.getElementById('map').style.display = mapModeEnabled ? 'block' : 'none';
-    document.getElementById('graph').style.display = mapModeEnabled ? 'none' : 'block';
-    document.getElementById('map-btn').textContent = mapModeEnabled ? '3D' : 'Map';
-
-    if (mapModeEnabled) {
-    const loader = document.getElementById('graph-loading');
-    if (loader) loader.style.display = 'none';
-    ensureMap();
-    refreshMapMarkers();
-    hideNodePopup();
-    setTimeout(() => { MapModule.invalidateSize(); fitMapToMarkers(); }, 60);
-    } else {
-    resetView();
-    }
-    updateViewStatus();
+      return setView(mapModeEnabled ? '3d' : 'map');
     }
 
     // --- TABLE HELPERS ---
@@ -3789,37 +3851,7 @@
     // (views.js); aliased to globals at load.
 
     function toggleTableMode() {
-      tableModeEnabled = !tableModeEnabled;
-      if (tableModeEnabled && orgModeEnabled) {
-        orgModeEnabled = false;
-        document.getElementById('org-chart').style.display = 'none';
-        const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
-      }
-      if (tableModeEnabled && mapModeEnabled) {
-        // turn off map if switching to table
-        mapModeEnabled = false;
-        document.getElementById('map').style.display = 'none';
-        const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = 'Map';
-      }
-      if (tableModeEnabled) hideNodePopup();
-      // Auto-hide legend in table view, remember prior visibility
-      if (tableModeEnabled) {
-        legendWasVisibleBeforeTable = legendVisible;
-        setLegendVisible(false);
-      } else {
-        if (legendWasVisibleBeforeTable) setLegendVisible(true);
-      }
-      if (!tableModeEnabled && !graphInstance) {
-        mapModeEnabled = true;
-        document.getElementById('map').style.display = 'block';
-        const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
-        ensureMap();
-      }
-      document.getElementById('table').style.display = tableModeEnabled ? 'block' : 'none';
-      document.getElementById('graph').style.display = tableModeEnabled ? 'none' : (mapModeEnabled ? 'none' : 'block');
-      const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = tableModeEnabled ? '3D' : 'Table';
-      if (tableModeEnabled) refreshTable();
-      updateViewStatus();
+      return setView(tableModeEnabled ? '3d' : 'table');
     }
 
     function setLegendVisible(vis) {
@@ -3842,47 +3874,15 @@
     // drawSymbol) now live in ViewsModule (views.js); aliased to globals at load.
 
     function toggleOrgMode() {
-      orgModeEnabled = !orgModeEnabled;
-      if (orgModeEnabled) {
-        if (mapModeEnabled) {
-          mapModeEnabled = false;
-          document.getElementById('map').style.display = 'none';
-          const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = 'Map';
-        }
-        if (tableModeEnabled) {
-          const restoreLegend = legendWasVisibleBeforeTable;
-          tableModeEnabled = false;
-          document.getElementById('table').style.display = 'none';
-          const tbtn = document.getElementById('table-btn'); if (tbtn) tbtn.textContent = 'Table';
-          if (restoreLegend) setLegendVisible(true);
-        }
-        document.getElementById('org-chart').style.display = 'block';
-        document.getElementById('graph').style.display = 'none';
-        document.getElementById('map').style.display = 'none';
-        document.getElementById('table').style.display = 'none';
-        const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = '3D';
-        if (typeof resetOrgFraming === 'function') resetOrgFraming();   // re-frame each time the view opens
-        renderOrgChart();
-      } else {
-        document.getElementById('org-chart').style.display = 'none';
-        const obtn = document.getElementById('org-btn'); if (obtn) obtn.textContent = 'Task Org';
-        if (mapModeEnabled) document.getElementById('map').style.display = 'block';
-        else if (tableModeEnabled) document.getElementById('table').style.display = 'block';
-        else if (graphInstance) document.getElementById('graph').style.display = 'block';
-        else {
-          mapModeEnabled = true;
-          document.getElementById('map').style.display = 'block';
-          const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D';
-          ensureMap();
-        }
-        resetView();
-      }
-      updateViewStatus();
+      return setView(orgModeEnabled ? '3d' : 'org');
     }
 
     function toggleOrgTeam(team) {
       if (orgExpandedTeams.has(team)) orgExpandedTeams.delete(team); else orgExpandedTeams.add(team);
+      invalidateScreens('org');
       renderOrgChart();
+      screenDirty.org = false;
+      screenRenderCounts.org++;
     }
 
     // --- Bindings & Init ---
@@ -4176,9 +4176,7 @@
     if (!resizeRaf) {
       resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; applyResponsiveShell(); });
     }
-    if (mapModeEnabled && MapModule.getMap()) setTimeout(() => MapModule.invalidateSize(), 50);
     if (selectedNode && !mapModeEnabled) setTimeout(() => updateNodePopupPosition(selectedNode), 30);
-    if (orgModeEnabled) setTimeout(renderOrgChart, 80);
     });
 
     // COA Generator
@@ -4421,8 +4419,8 @@
         onNodeClick: selectNode,
         onBackgroundClick: () => selectNode(null),
         onFirstSettle: () => {
-          if (geoModeEnabled || mapModeEnabled || tableModeEnabled) resetView();
-          else EngineModule.frameBlueToRed(1200);
+          // A late force-layout settle must never refit a Map/Table/Task Org screen.
+          if (requestedView === '3d' && AppShell.state.view === '3d') EngineModule.frameBlueToRed(1200);
         }
       };
       if (rendererConfig) o.rendererConfig = rendererConfig;
@@ -4473,51 +4471,35 @@
 
     // Allocate WebGL only after an explicit player request. This keeps the default Map
     // and the entire guided operation on the inexpensive 2D path.
-    function open3DOnDemand() {
-      if (graphInstance) {
-        mapModeEnabled = false;
-        tableModeEnabled = false;
-        orgModeEnabled = false;
-        document.getElementById('map').style.display = 'none';
-        document.getElementById('table').style.display = 'none';
-        document.getElementById('org-chart').style.display = 'none';
-        document.getElementById('graph').style.display = 'block';
-        document.getElementById('map-btn').textContent = 'Map';
-        updateViewStatus();
-        refreshGraph();
-        if (window.StageModule?.resize) StageModule.resize();
-        if (window.EngineModule?.wake) EngineModule.wake(1500);
-        return Promise.resolve(true);
-      }
-      if (graph3dStartupPromise) return graph3dStartupPromise;
-      set3DButtonsBusy(true);
-      const loader = document.getElementById('graph-loading');
-      if (loader) { loader.style.display = 'block'; loader.textContent = 'Starting 3D view on demand…'; }
-      graph3dStartupPromise = loadGraph3DDependencies()
-        .then(() => {
-          if (!tryInitGraph3D()) return false;
-          mapModeEnabled = false;
-          tableModeEnabled = false;
-          orgModeEnabled = false;
-          document.getElementById('map').style.display = 'none';
-          document.getElementById('table').style.display = 'none';
-          document.getElementById('org-chart').style.display = 'none';
-          document.getElementById('graph').style.display = 'block';
+    function open3DOnDemand(requestVersion) {
+      const showWhenReady = ok => {
+        if (ok && requestedView === '3d' && requestVersion === viewRequestVersion) {
+          activateView('3d');
           const rb = document.getElementById('retry-3d-btn'); if (rb) rb.style.display = 'none';
-          document.getElementById('map-btn').textContent = 'Map';
-          updateViewStatus();
-          refreshGraph();
-          EngineModule.frameBlueToRed(900);
-          if (window.StageModule?.resize) StageModule.resize();
-          addEvent({ type: 'View', text: '3D engine loaded on demand; idle rendering sleeps automatically.' });
-          return true;
-        })
-        .catch(err => { handleGraph3DFailure(err); return false; })
-        .finally(() => {
-          set3DButtonsBusy(false);
-          graph3dStartupPromise = null;
-        });
-      return graph3dStartupPromise;
+        }
+        return ok;
+      };
+
+      if (graphInstance) return Promise.resolve(true).then(showWhenReady);
+      if (!graph3dStartupPromise) {
+        set3DButtonsBusy(true);
+        const loader = document.getElementById('graph-loading');
+        if (loader) { loader.style.display = 'block'; loader.textContent = 'Starting 3D view on demand…'; }
+        graph3dStartupPromise = loadGraph3DDependencies()
+          .then(() => {
+            if (!tryInitGraph3D()) return false;
+            // Populate the new engine without invalidating unchanged static screens.
+            refreshGraph({ invalidateScreens: false });
+            addEvent({ type: 'View', text: '3D engine loaded on demand; idle rendering sleeps automatically.' });
+            return true;
+          })
+          .catch(err => { handleGraph3DFailure(err); return false; })
+          .finally(() => {
+            set3DButtonsBusy(false);
+            graph3dStartupPromise = null;
+          });
+      }
+      return graph3dStartupPromise.then(showWhenReady);
     }
 
     function handleGraph3DFailure(err) {
@@ -4535,7 +4517,7 @@
       } else {
         addEvent({ type: 'View', text: '3D still unavailable (no WebGL context).' });
       }
-      degradeToMap();
+      if (requestedView === '3d') degradeToMap();
     }
 
     // Switch the app into the Map view (the full operational picture) — used both as the
@@ -4545,7 +4527,8 @@
     // stranded without a way back to 3D.
     function degradeToMap(offer3dRetry) {
       if (offer3dRetry !== false) showRetry3dButton();
-      mapModeEnabled = true;
+      requestedView = 'map';
+      const frameRequest = ++viewRequestVersion;
       try { const gloader = document.getElementById('graph-loading'); if (gloader) gloader.style.display = 'none'; } catch (e) {}
       try { document.getElementById('graph').style.display = 'none'; } catch (e) {}
       const mapEl = document.getElementById('map');
@@ -4555,15 +4538,16 @@
         // creating a map in a 0x0 box can throw "infinite tiles".
         void mapEl.offsetHeight;
       } catch (e) {}
-      try { const mbtn = document.getElementById('map-btn'); if (mbtn) mbtn.textContent = '3D'; } catch (e) {}
       try { ensureMap(); } catch (e) { console.error('Map fallback ensureMap failed', e); }
-      // Size first, THEN draw markers, so neither runs against a 0-size container.
+      try { activateView('map', { deferRender: true }); } catch (e) {}
+      // Initial/failure framing is the one automatic fit. Returning to a cached Map does
+      // not pass this gate, so operator framing survives ordinary view switches.
       setTimeout(() => {
-        try { MapModule.invalidateSize(); } catch (e) {}
-        try { refreshMapMarkers(); } catch (e) { console.error('Map fallback markers failed', e); }
+        if (frameRequest !== viewRequestVersion || requestedView !== 'map' || AppShell.state.view !== 'map') return;
+        try { if (window.StageModule?.activate) StageModule.activate('map'); } catch (e) {}
+        try { renderScreenIfDirty('map'); } catch (e) { console.error('Map fallback markers failed', e); }
         try { fitMapToMarkers(); } catch (e) {}
       }, 90);
-      try { updateViewStatus(); } catch (e) {}
     }
 
     function showRetry3dButton() {
@@ -4594,7 +4578,7 @@
       }
       try { EngineModule.dispose(); } catch (e) {}
       document.getElementById('graph').innerHTML = '';
-      open3DOnDemand().then(ok => { if (ok) showToast('3D view started.', 'success', 3000); });
+      setView('3d').then(ok => { if (ok) showToast('3D view started.', 'success', 3000); });
     }
 
     async function init() {
@@ -5349,7 +5333,7 @@
         highlightMode = 'coa';
         highlightSet = new Set(likely.map(l => l.id));
         applyHighlight();
-        if (mapModeEnabled) refreshMapMarkers();
+        if (mapModeEnabled) highlightSelectedOnMap();
 
         mcLastResults = {
           trials: effectiveTrials,
@@ -6061,7 +6045,7 @@
       highlightMode = 'coa';
       highlightSet = new Set(Array.from(result.redNeutralized));
       applyHighlight();
-      if (mapModeEnabled) refreshMapMarkers();
+      if (mapModeEnabled) highlightSelectedOnMap();
 
       const modal = document.getElementById('mc-report-modal');
       const body = document.getElementById('mc-report-body');
@@ -6357,7 +6341,10 @@
         '#hud-ticker .ht-sep{padding:0 12px;color:var(--cyan);opacity:.55}',
         '@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}',
         '@media (prefers-reduced-motion: reduce){#hud-ticker .ht-track{animation:none}}',
-        'html.cin-rm #hud-ticker .ht-track{animation:none}'
+        'html.cin-rm #hud-ticker .ht-track{animation:none}',
+        'html.cin-perf #hud-radar canvas{filter:none}',
+        'html.cin-perf #hud-ticker{-webkit-backdrop-filter:none;backdrop-filter:none}',
+        'html.cin-perf #hud-ticker .ht-track{animation:none;transform:none;will-change:auto}'
       ].join('\n');
       document.head.appendChild(css);
 
@@ -6368,12 +6355,14 @@
       // C-032: the scope's loop is owned by the shell lifecycle — it runs only while
       // a view that shows the radar is active AND the tab is visible. Reduced motion
       // drops to a static 1 Hz picture with no sweep.
-      var rAng=0, radarOn=false, radarTimer=0, radarRaf=0;
+      var rAng=0, radarOn=false, radarTimer=0, radarRaf=0, radarPaints=0;
       function radarNodes(){ try{ var g=window.AppState&&AppState.activeGraph&&AppState.activeGraph(); return (g&&g.nodes)||[]; }catch(e){ return []; } }
       function radarReduced(){ return window.AppShell ? AppShell.prefersReducedMotion() : false; }
+      function radarLight(){ return radarReduced() || !!(window.AppShell && AppShell.state.perfMode); }
       function paintRadar(){
         if(!radarOn) return;
-        var reduced=radarReduced();
+        radarPaints++;
+        var reduced=radarLight();
         var wrap=document.getElementById('hud-radar');
         var cv=wrap&&wrap.querySelector('canvas'); var ctx=cv&&cv.getContext('2d');
         if(!ctx){ scheduleRadar(); return; }
@@ -6417,7 +6406,7 @@
       }
       function scheduleRadar(){
         if(!radarOn) return;
-        radarTimer=setTimeout(function(){ radarTimer=0; radarRaf=requestAnimationFrame(paintRadar); }, radarReduced()?1000:33);
+        radarTimer=setTimeout(function(){ radarTimer=0; radarRaf=requestAnimationFrame(paintRadar); }, radarLight()?1000:33);
       }
       function startRadar(){ if(radarOn) return; radarOn=true; paintRadar(); }
       function stopRadar(){
@@ -6427,7 +6416,7 @@
       }
       function syncRadar(){
         var s=window.AppShell?AppShell.state:{view:'3d',hidden:document.hidden};
-        var wants=(s.view==='3d'||s.view==='map')&&!s.hidden;
+        var wants=(s.view==='3d'||s.view==='map')&&!s.hidden&&!s.overlayOpen;
         if(wants) startRadar(); else stopRadar();
       }
 
@@ -6435,7 +6424,7 @@
       var ticker=document.createElement('div'); ticker.id='hud-ticker';
       ticker.innerHTML='<div class="ht-tag">LIVE INTEL</div><div class="ht-view"><div class="ht-track" id="ht-track"></div></div>';
       document.body.appendChild(ticker);
-      var feed=[];
+      var feed=[], tickerOn=false, tickerTimer=0, tickerRenders=0;
       function esc(s){ return String(s).replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
       function ambient(){
         var counts=((document.getElementById('counts')||{}).textContent||'').trim();
@@ -6443,14 +6432,25 @@
         return ['SECTOR INDO-PAC // WATCH STANDING', counts?('FORCE LAYDOWN '+counts):'FORCE LAYDOWN NOMINAL', 'THREAT POSTURE DEFCON '+dc, 'C2 DATALINK STABLE', 'ISR FEED LIVE'];
       }
       function renderTrack(){
+        if(!tickerOn) return;
+        tickerRenders++;
         var tr=document.getElementById('ht-track'); if(!tr) return;
         var items=ambient().concat(feed);
         var html=items.map(function(s){ return '<span class="ht-item">&#9656; '+esc(s)+'</span>'; }).join('<span class="ht-sep">//</span>');
         tr.innerHTML=html+'<span class="ht-sep">//</span>'+html;
       }
-      function pushFeed(t){ t=(t||'').replace(/\s+/g,' ').trim(); if(!t) return; feed.unshift(t.slice(0,90)); if(feed.length>10) feed.pop(); renderTrack(); }
-      renderTrack();
-      if (window.AppShell) AppShell.every(6000, renderTrack); else setInterval(renderTrack, 6000); // pauses on hidden tab (C-050)
+      function scheduleTicker(){
+        if(!tickerOn) return;
+        var slow=!!(window.AppShell&&AppShell.state.perfMode);
+        tickerTimer=setTimeout(function(){ tickerTimer=0; if(!tickerOn) return; renderTrack(); scheduleTicker(); },slow?12000:6000);
+      }
+      function startTicker(){ if(tickerOn) return; tickerOn=true; renderTrack(); scheduleTicker(); }
+      function stopTicker(){ tickerOn=false; if(tickerTimer){ clearTimeout(tickerTimer); tickerTimer=0; } }
+      function syncTicker(){
+        var s=window.AppShell?AppShell.state:{view:'3d',hidden:document.hidden,overlayOpen:false};
+        if(s.view==='3d'&&!s.hidden&&!s.overlayOpen) startTicker(); else stopTicker();
+      }
+      function pushFeed(t){ t=(t||'').replace(/\s+/g,' ').trim(); if(!t) return; feed.unshift(t.slice(0,90)); if(feed.length>10) feed.pop(); if(tickerOn) renderTrack(); }
       var elist=document.getElementById('event-list');
       if(elist && window.MutationObserver){
         new MutationObserver(function(muts){ muts.forEach(function(m){ Array.prototype.forEach.call(m.addedNodes||[],function(nd){ if(nd && nd.nodeType===1) pushFeed(nd.textContent); }); }); }).observe(elist,{childList:true});
@@ -6460,25 +6460,27 @@
       // C-025: chrome follows AppShell state — no more setView monkey-patching.
       // updateViewStatus() publishes the canonical view; hidden/reduced-motion
       // changes re-sync the radar loop through the same subscription.
-      function applyViewChrome(view){
+      function applyViewChrome(state){
+        var view=state.view;
         var r=document.getElementById('hud-radar'), t=document.getElementById('hud-ticker');
-        if(r) r.style.display=(view==='map'||view==='3d')?'block':'none';
-        if(t) t.style.display=(view==='3d')?'flex':'none';
+        if(r) r.style.display=((view==='map'||view==='3d')&&!state.overlayOpen)?'block':'none';
+        if(t) t.style.display=(view==='3d'&&!state.overlayOpen)?'flex':'none';
         syncRadar();
+        syncTicker();
       }
       if (window.AppShell) {
         AppShell.subscribe(function(s, changed){
-          if (changed.indexOf('view') !== -1) applyViewChrome(s.view);
-          else if (changed.indexOf('hidden') !== -1 || changed.indexOf('reducedMotion') !== -1) syncRadar();
+          if (changed.some(function(k){ return k==='view'||k==='hidden'||k==='reducedMotion'||k==='perfMode'||k==='overlayOpen'; })) applyViewChrome(s);
         });
-        applyViewChrome(AppShell.state.view);
+        applyViewChrome(AppShell.state);
       } else {
         // resilience fallback (AppShell lives in this same document, so this
         // branch only runs if that script somehow failed): hook setView.
         (function hook(){ var tries=0; (function go(){ var orig=window.setView;
-          if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome(v); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome('3d'); return; }
+          if(typeof orig==='function' && !window.__ssViewHooked){ window.setView=function(v){ var rv=orig.apply(this,arguments); try{ applyViewChrome({view:v,hidden:document.hidden,overlayOpen:false}); }catch(e){} return rv; }; window.__ssViewHooked=true; applyViewChrome({view:'3d',hidden:document.hidden,overlayOpen:false}); return; }
           if(++tries<50) setTimeout(go,120); })(); })();
       }
+      window.__ssAmbientLifecycle={snapshot:function(){return{radarOn:radarOn,radarPaints:radarPaints,tickerOn:tickerOn,tickerRenders:tickerRenders,perfMode:!!(window.AppShell&&AppShell.state.perfMode)};}};
     } catch(e){ /* HUD III layer must never break the app */ }
   })();
   </script>

@@ -106,8 +106,8 @@ window.EngineModule = (function () {
 
     if (window.AppShell && AppShell.subscribe) {
       shellUnsubscribe = AppShell.subscribe(function (s) {
-        setRenderActive(s.view === '3d' && !s.hidden && !s.overlayOpen);
         if (s.view === '3d' && !s.hidden && !s.overlayOpen) wake(1000);
+        else setRenderActive(false);
       });
       const s = AppShell.state;
       setRenderActive(s.view === '3d' && !s.hidden && !s.overlayOpen);

@@ -326,6 +326,19 @@ check('P4: performance mode is one dial to zero — scanlines consumed then kill
   assert.ok(cinSrc.includes('--glow-cyan:none'), 'perf disables the glow tokens');
   assert.ok(cinSrc.includes('html.cin-perf *{text-shadow:none !important;}'), 'perf strips text-shadow glows');
   assert.ok(cinSrc.includes('html.cin-perf #fx-vignette{display:none'), 'perf drops the alert vignette');
+  assert.ok(cinSrc.includes('backdrop-filter:none !important'), 'perf disables expensive glass filters');
+  assert.ok(mapSrc.includes('html.cin-perf .mil-blip::after'), 'perf stops marker pulses');
+  assert.ok(mapSrc.includes('html.cin-perf #map-radar-sweep'), 'perf stops the map sweep');
+  assert.ok(cinSrc.includes('html.cin-perf :focus-visible'), 'keyboard focus remains explicit');
+});
+
+check('P4: Performance Mode covers ambient HUD work, including hidden surfaces', () => {
+  assert.ok(shell.includes('function radarLight()'), 'radar has a performance-aware cadence');
+  assert.ok(shell.includes('radarLight()?1000:33'), 'performance/reduced radar is deliberately limited to 1 Hz');
+  assert.ok(shell.includes("!s.hidden&&!s.overlayOpen"), 'radar stops for hidden tabs and overlays');
+  assert.ok(shell.includes('function stopTicker()'), 'ticker owns a stoppable timer');
+  assert.ok(shell.includes("s.view==='3d'&&!s.hidden&&!s.overlayOpen"), 'ticker schedules only on its visible surface');
+  assert.ok(shell.includes("k==='perfMode'"), 'live Performance Mode changes resync ambient work');
 });
 
 check('P4: callsign is sanitized at the boundary and the Director reads it over the guarded bridge', () => {
@@ -348,8 +361,14 @@ check('P4: boot honors the operator — fast path requires the toggle, full POST
 check('P4: settings apply live — root classes reapplied on change, media-query listener wired, AppShell mirrored', () => {
   assert.ok(cinSrc.includes('function applySettings()'), 'one apply point');
   assert.ok(cinSrc.includes("mqRM.addEventListener('change'"), 'media-query changes reapply');
-  assert.ok(cinSrc.includes('AppShell.set({ reducedMotion: eff })'), 'shell ambient loops see the effective value');
+  assert.ok(cinSrc.includes('reducedMotion: eff, perfMode: !!settings.perfMode'), 'shell ambient loops see both effective settings');
   assert.ok(cinSrc.includes('saveSettings(); applySettings();'), 'toggles persist and apply in the same gesture');
+});
+
+check('P4: the cinematic console participates in the renderer overlay lifecycle', () => {
+  assert.ok(cinSrc.includes("AppShell.setOverlay('cinematics', !!open)"), 'console owns a named overlay source');
+  assert.ok(cinSrc.includes('setConsoleOverlay(true)'), 'boot/title surfaces pause background rendering');
+  assert.ok(cinSrc.includes('setConsoleOverlay(false)'), 'closing the console releases its overlay source');
 });
 
 check('P4: the settings panel is complete and honest — sliders, mute, motion, effects, boot, callsign', () => {
