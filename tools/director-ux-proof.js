@@ -139,6 +139,24 @@ function verifyStaticContract() {
     has(game, 'function lockOrders(side)') && has(game, 'orders-locked'));
   check('three event calls are must-touch before blind submit',
     has(director, 'card.set.questions.every') && has(director, 'card.touched[beliefId] = true'));
+  // CO-011: the required pre-mortem is named, flagged, and given a direct keyboard route so
+  // the manual path never depends on the tutorial coach.
+  check('the required pre-mortem is named and given a direct, keyboard-reachable route',
+    has(director, 'id="dir-premortem-card"') && has(director, 'id="dir-pm-flag"') &&
+    has(director, 'data-act="focus-premortem"') && has(director, "act === 'focus-premortem'") &&
+    has(director, "pmCard.querySelector('[data-premortem]')"));
+  check('one readiness predicate gates render, live update, and the submit-blind click',
+    (director.match(/cardIsReady\(/g) || []).length >= 4 &&
+    has(director, "data-act=\"submit-blind\"' + (cardIsReady(card) ? '' : ' disabled')") &&
+    has(director, 'if (!cardIsReady(op.commitCard)) return;'));
+  check('the live gate status enumerates every required call, pre-mortem included',
+    has(director, 'event calls') && has(director, 'pre-mortem (drag one cause)') && has(director, 'LOWER below UPPER'));
+  // CO-011: a modal Director overlay (BRIEF/COMMIT/AAR) stands the fixed comms floor down, so
+  // it can neither cover the COFM note / AAR actions nor sit visible while the overlay
+  // isolation marks it aria-hidden.
+  check('a modal Director overlay stands the comms floor down (no overlap, no inert-but-visible)',
+    has(director, "classList.toggle('dir-overlay-active', overlayActive)") &&
+    has(director, 'isolateForOverlay(overlayActive)'));
   check('final action commits forecasts and executes', has(director, 'COMMIT FORECASTS &amp; EXECUTE ▶'));
   check('Red timing is described honestly', has(director, 'Orders lock blind; Red commits when you execute.'));
   check('obsolete commit wording is absent',
@@ -224,8 +242,64 @@ async function verifyInlineReadinessAtRuntime() {
     !!readyEvent && readyEvent.detail.nodeCount === 2 && readyEvent.detail.context === windowMock.StrikeSimScenario);
 }
 
+// CO-011: behavioral proof of the blind-forecast readiness contract. The predicate and its
+// plain-language status are pure functions of the commit card, so we extract them straight
+// from director.js and exercise the real transitions — manual, coach, and invalid states —
+// instead of trusting source strings. This is the regression that would have caught the
+// "manual forecast never unlocks without the coach" report.
+function verifyReadinessBehavior() {
+  const slice = (a, b) => {
+    const s = director.indexOf('function ' + a), e = director.indexOf('function ' + b);
+    assert.ok(s >= 0 && e > s, 'slice ' + a + '..' + b);
+    return director.slice(s, e);
+  };
+  const predicateSrc = slice('cardIsReady', 'beliefControl');
+  const src = predicateSrc + '\n' + slice('forecastGateProgress', 'renderHybridCommit') +
+    '\n({ cardIsReady: cardIsReady, forecastGateProgress: forecastGateProgress })';
+  const api = vm.runInNewContext(src, {});
+  const mk = (o) => {
+    o = o || {};
+    return {
+      step: o.step || 'blind',
+      set: { questions: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] },
+      touched: Object.assign({}, o.touched),
+      values: { lower: o.lower != null ? o.lower : 0.25, upper: o.upper != null ? o.upper : 0.75 },
+      final: { lower: o.flower != null ? o.flower : 0.25, upper: o.fupper != null ? o.fupper : 0.75 }
+    };
+  };
+  const ev3 = { a: true, b: true, c: true };
+  const full = Object.assign({ premortem: true }, ev3);
+
+  check('readiness: a fresh card is not ready (LOCK disabled, click guard rejects)',
+    api.cardIsReady(mk({})) === false);
+  check('readiness: partial manual input (2/3 events, no pre-mortem) stays gated',
+    api.cardIsReady(mk({ touched: { a: true, b: true } })) === false);
+  check('readiness: all three event calls but no pre-mortem stays gated (the reported bug)',
+    api.cardIsReady(mk({ touched: ev3 })) === false);
+  check('readiness: full manual input (events + pre-mortem + valid range) unlocks WITHOUT the coach',
+    api.cardIsReady(mk({ touched: full })) === true);
+  check('readiness: coach-equivalent input reaches the same ready state as manual',
+    api.cardIsReady(mk({ touched: full })) === true);
+  check('readiness: invalid interval (LOWER >= UPPER) blocks even when every call is touched',
+    api.cardIsReady(mk({ touched: full, lower: 0.8, upper: 0.5 })) === false);
+  check('readiness: submit-blind guard shares the predicate and rejects an incomplete card',
+    api.cardIsReady(mk({ touched: ev3 })) === false && has(director, 'if (!cardIsReady(op.commitCard)) return;'));
+  check('readiness: the predicate is state-only — it never consults the tutorial flag',
+    !/tutorial/.test(predicateSrc));
+
+  const gPartial = api.forecastGateProgress(mk({ touched: ev3 }));
+  check('gate text names the pre-mortem when it is the one remaining blocker',
+    /pre-mortem/.test(gPartial) && /event calls 3\/3/.test(gPartial));
+  const gInterval = api.forecastGateProgress(mk({ touched: full, lower: 0.8, upper: 0.5 }));
+  check('gate text flags the interval when LOWER is not below UPPER', /LOWER below UPPER/.test(gInterval));
+  const gReady = api.forecastGateProgress(mk({ touched: full }));
+  check('gate text reports Ready exactly when the predicate is satisfied',
+    /Ready/.test(gReady) && api.cardIsReady(mk({ touched: full })) === true);
+}
+
 async function main() {
   verifyStaticContract();
+  verifyReadinessBehavior();
   verifyStateNameAtRuntime();
   await verifyInlineReadinessAtRuntime();
   console.log(`Director UX proof: PASS (${passed.length} checks)`);

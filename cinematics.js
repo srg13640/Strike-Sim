@@ -170,11 +170,17 @@ window.CinematicsModule = (function () {
       '#cin-stamp.gone{transition:opacity .4s ease;opacity:0 !important;}',
       '#cin-stamp.static{animation:none;opacity:1;transform:translate(-50%,-50%) scale(1);}',
       '@keyframes cinStamp{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6);}60%{opacity:1;transform:translate(-50%,-50%) scale(.96);}100%{opacity:1;transform:translate(-50%,-50%) scale(1);}}',
-      '#cin-comms{position:fixed;left:16px;bottom:14px;z-index:5150;width:min(430px,calc(100vw - 32px));pointer-events:none;',
+      // CO-011: below the Director overlay (z 5000) so it can never paint over modal content,
+      // still above the operational HUD/dock (≤1900) during PLAN/WATCH.
+      '#cin-comms{position:fixed;left:16px;bottom:14px;z-index:3000;width:min(430px,calc(100vw - 32px));pointer-events:none;',
       '  font-family:var(--mono);font-size:12px;line-height:1.5;color:#bfe0f2;display:flex;flex-direction:column;gap:3px;}',
       '#cin-comms.hidden{display:none;}',
       'body:not(.operation-active) #cin-comms{display:none;}',
-      '.cc-line{background:rgba(4,10,16,.72);border-left:2px solid rgba(0,216,255,.4);padding:3px 9px;opacity:.94;}',
+      // CO-011: a Director modal overlay (BRIEF/COMMIT/AAR) owns the screen — the comms floor
+      // stands down so it never covers the COFM note or AAR actions and is never left visible
+      // while the overlay isolation has marked it aria-hidden. WATCH hides it via executeCinematic.
+      'body.dir-overlay-active #cin-comms{display:none;}',
+      '.cc-line{background:rgba(4,10,16,.72);border-left:2px solid rgba(0,216,255,.4);padding:3px 9px;opacity:.94;overflow-wrap:anywhere;}',
       '.cc-line .cc-cs{color:var(--cyan,#00d8ff);letter-spacing:.12em;}',
       '.cc-line.j2{border-left-color:rgba(255,176,0,.45);} .cc-line.j2 .cc-cs{color:var(--amber,#ffb000);}',
       '.cc-line.bda{border-left-color:rgba(81,207,102,.45);} .cc-line.bda .cc-cs{color:var(--success,#51cf66);}',

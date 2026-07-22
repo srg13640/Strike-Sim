@@ -318,6 +318,12 @@ window.DirectorModule = (function () {
       '.dir-note{font-size:12px;color:#6d8ca4;font-style:italic;}',
       '.dir-note.is-gate{color:#ffd166;font-style:normal;font-weight:700;}',
       '.dir-note.is-gate.is-ready{color:#38ef7d;}',
+      // CO-011: the pre-mortem is a required, easy-to-miss fourth call — name it and route to it.
+      '.dir-req{display:inline-block;border:1px solid #765f2d;background:#2a210d;color:#ffd791;border-radius:999px;padding:1px 8px;margin-left:6px;font:700 10px Oswald,system-ui;letter-spacing:.12em;vertical-align:middle;}',
+      '.dir-req.done{border-color:#2c6b3f;background:#0e2417;color:#7ff0a8;}',
+      '.dir-jump{margin-right:auto;background:#241a06;border-color:#6b5320;color:#ffd791;}',
+      '.dir-jump:hover{border-color:#a07d2c;color:#fff2cf;}',
+      '.dir-jump[hidden]{display:none;}',
       '.dir-coach{border:1px solid #fdba74;background:linear-gradient(135deg,#fff7ed 0%,#ffedd5 100%);border-radius:12px;padding:13px 15px;margin:0 0 14px;box-shadow:inset 4px 0 0 #ea580c,0 8px 24px rgba(0,0,0,.35);}',
       '.dir-coach .step{font:700 12px Oswald,system-ui;letter-spacing:.18em;color:#9a3412;margin-bottom:4px;}',
       '.dir-coach b{display:block;color:#9a3412;font:700 17px Oswald,system-ui;letter-spacing:.05em;margin-bottom:3px;}',
@@ -502,6 +508,11 @@ window.DirectorModule = (function () {
     $('dir-feed').style.display = (p === 'watch') ? 'block' : 'none';
     $('dir-launch').style.display = p === 'idle' ? '' : 'none';
     document.body.classList.toggle('operation-active', p !== 'idle');
+    // CO-011: a modal Director overlay (BRIEF/COMMIT/AAR) owns the screen — the fixed comms
+    // floor must yield so it can neither cover overlay content (COFM note, AAR actions) nor
+    // sit visible-but-inert above it (isolateForOverlay marks body children aria-hidden).
+    // WATCH keeps handing the lower-left corner to #dir-feed, unchanged.
+    document.body.classList.toggle('dir-overlay-active', overlayActive);
     if (p === 'brief' || p === 'commit' || p === 'aar') {
       setTimeout(function () { try { $('dir-wrap').focus(); } catch (e) {} }, 0);
     }
@@ -1305,7 +1316,13 @@ window.DirectorModule = (function () {
       return '<div class="dir-belief"><div class="head"><b>' + esc(cause.label) + '</b><output id="dir-value-pm-' + esc(cause.id) + '">' + Math.round(value * 100) + '%</output></div>' +
         '<input type="range" min="0" max="100" step="1" value="' + Math.round(value * 100) + '" data-premortem="' + esc(cause.id) + '" aria-label="Premortem probability: ' + esc(cause.label) + '">' + house + '</div>';
     }).join('');
-    return '<div class="dir-card"><h3>PRE-MORTEM PICK · IT FAILED—WHY?</h3><div class="dir-note">Move one cause. The other three rebalance automatically so your distribution stays at 100%.</div>' + controls + '</div>';
+    // CO-011: in the blind step this is a REQUIRED, easy-to-miss fourth call — flag it and
+    // say so plainly. In the house-revealed (reveal) card the gate is already past.
+    var flag = reveal ? '' : '<span class="dir-req' + (card.touched.premortem ? ' done' : '') + '" id="dir-pm-flag">' + (card.touched.premortem ? '✓ DONE' : 'REQUIRED') + '</span>';
+    var note = reveal
+      ? 'Move one cause. The other three rebalance automatically so your distribution stays at 100%.'
+      : 'Required to unlock the blind forecast — move one cause. The other three rebalance automatically so your distribution stays at 100%.';
+    return '<div class="dir-card" id="dir-premortem-card"><h3>PRE-MORTEM PICK · IT FAILED—WHY?' + flag + '</h3><div class="dir-note">' + note + '</div>' + controls + '</div>';
   }
 
   function renderBlindCommit() {
@@ -1324,7 +1341,11 @@ window.DirectorModule = (function () {
       premortemControls(card, card.values, false) +
       '<div class="dir-note">Your point probabilities are the instrument. The game is not issuing an operation-success probability.</div>' +
       '<div class="dir-note is-gate" id="dir-lock-note" role="status">' + esc(forecastGateProgress(card)) + '</div>' +
-      '<div class="dir-actions"><button class="dir-btn" data-act="unlock-commit">← UNLOCK &amp; REPLAN</button>' +
+      '<div class="dir-actions">' +
+      // CO-011: while the pre-mortem is still the blocker, keep a direct, keyboard-reachable
+      // route to it pinned in the sticky action bar — never buried below the scrolling form.
+      '<button class="dir-btn dir-jump" data-act="focus-premortem"' + (card.touched.premortem ? ' hidden' : '') + '>▼ COMPLETE THE PRE-MORTEM</button>' +
+      '<button class="dir-btn" data-act="unlock-commit">← UNLOCK &amp; REPLAN</button>' +
       '<button class="dir-btn primary" data-act="submit-blind"' + (cardIsReady(card) ? '' : ' disabled') + '>LOCK BLIND FORECASTS →</button></div>';
   }
 
@@ -1332,12 +1353,18 @@ window.DirectorModule = (function () {
   // player records each belief. The gate itself is unchanged (CO-005 discipline:
   // no lazy default forecasts) — it just explains itself now.
   function forecastGateProgress(card) {
-    if (cardIsReady(card)) return 'All calls recorded. Lock when ready — the house line reveals after you commit.';
+    if (cardIsReady(card)) return 'Ready — all three event calls moved, the pre-mortem set, and LOWER below UPPER. Lock when ready; the house line reveals after you commit.';
+    var total = card.set.questions.length;
     var moved = card.set.questions.filter(function (q) { return !!card.touched[q.id]; }).length;
-    var parts = [moved + ' of ' + card.set.questions.length + ' event sliders moved'];
-    parts.push(card.touched.premortem ? 'pre-mortem done' : 'pre-mortem: drag one cause');
-    if (!(card.values && card.values.lower < card.values.upper)) parts.push('range: LOWER must sit below UPPER');
-    return 'Still needed to unlock: ' + parts.join(' · ') + '. A default is not a forecast — move a slider even to keep its value.';
+    var mark = function (done) { return done ? '✓' : '☐'; };
+    // Every required call is listed with its own done/to-do state so the button and this
+    // status can never disagree — and the pre-mortem is named, not implied.
+    var parts = [
+      mark(moved === total) + ' event calls ' + moved + '/' + total,
+      mark(!!card.touched.premortem) + ' pre-mortem (drag one cause)',
+      mark(!!(card.values && card.values.lower < card.values.upper)) + ' range: LOWER below UPPER'
+    ];
+    return 'To unlock — ' + parts.join('   ') + '. A default is not a forecast: move a slider even to keep its value.';
   }
 
   function renderHybridCommit() {
@@ -2408,6 +2435,11 @@ window.DirectorModule = (function () {
     if (gateNote && card.step === 'blind') {
       gateNote.textContent = forecastGateProgress(card);
       gateNote.classList.toggle('is-ready', cardIsReady(card));
+      // CO-011: keep the pre-mortem flag and its jump affordance honest with the same state.
+      var pmFlag = $('dir-pm-flag');
+      if (pmFlag) { pmFlag.textContent = card.touched.premortem ? '✓ DONE' : 'REQUIRED'; pmFlag.classList.toggle('done', !!card.touched.premortem); }
+      var jumpBtn = $('dir-wrap').querySelector('[data-act="focus-premortem"]');
+      if (jumpBtn) jumpBtn.hidden = !!card.touched.premortem;
     }
   }
 
@@ -2453,6 +2485,14 @@ window.DirectorModule = (function () {
       renderBlindCommit();
       var blindButton = $('dir-wrap').querySelector('[data-act="submit-blind"]');
       if (blindButton) blindButton.focus();
+    }
+    else if (act === 'focus-premortem') {
+      // CO-011: the one-click route to the required pre-mortem — scroll it into the
+      // reading area and put keyboard focus on its first cause slider.
+      var pmCard = $('dir-premortem-card');
+      var firstPm = pmCard && pmCard.querySelector('[data-premortem]');
+      try { if (pmCard && pmCard.scrollIntoView) pmCard.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' }); } catch (e) {}
+      if (firstPm && firstPm.focus) { try { firstPm.focus(); } catch (e) {} }
     }
     else if (act === 'unlock-commit') {
       if (op.commitCard && op.commitCard.step === 'blind') {

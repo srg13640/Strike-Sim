@@ -377,6 +377,27 @@ check('P4: the settings panel is complete and honest — sliders, mute, motion, 
   assert.ok(!cinSrc.includes('arrive with CO-006 Phase 4'), 'the IOU copy is gone — the features shipped');
 });
 
+// ═══════════════ CO-011: the comms floor is overlay-aware (no overlap, no inert-but-visible) ═══
+
+check('CO-011: the comms floor sits below the Director overlay and stands down during modal overlays', () => {
+  const commsZ = (cinSrc.match(/#cin-comms\{[^}]*z-index:(\d+)/) || [])[1];
+  assert.ok(commsZ && Number(commsZ) < 5000, 'comms z-index (' + commsZ + ') is below the overlay z 5000');
+  assert.ok(!/#cin-comms\{[^}]*z-index:5150/.test(cinSrc), 'the old 5150 collision level is gone');
+  assert.ok(cinSrc.includes('body.dir-overlay-active #cin-comms{display:none;}'), 'comms hides while a Director overlay owns the screen');
+  // the Director publishes exactly that state for BRIEF/COMMIT/AAR (and only those).
+  assert.ok(/overlayActive = p === 'brief' \|\| p === 'commit' \|\| p === 'aar'/.test(directorSrc), 'overlayActive covers the three modal phases');
+  assert.ok(directorSrc.includes("classList.toggle('dir-overlay-active', overlayActive)"), 'Director toggles the overlay class from that state');
+});
+
+check('CO-011: WATCH still hands the corner to #dir-feed and AAR actions stay sticky/operable', () => {
+  const cinExec = cinSrc.slice(cinSrc.indexOf('function executeCinematic'), cinSrc.indexOf('function watchCinematic'));
+  assert.ok(cinExec.includes('commsVisible(false)'), 'executeCinematic still hides comms for WATCH');
+  const cinWatch = cinSrc.slice(cinSrc.indexOf('function watchCinematic'), cinSrc.indexOf('function watchDone'));
+  assert.ok(cinWatch.includes('commsVisible(false)'), 'watchCinematic still hides comms — #dir-feed owns the corner');
+  assert.ok(directorSrc.includes('#dir-overlay>.wrap>.dir-actions{position:sticky'), 'AAR/commit actions remain sticky and operable');
+  assert.ok(/\.cc-line\{[^}]*overflow-wrap:anywhere/.test(cinSrc), 'long comms lines wrap — no horizontal overflow');
+});
+
 console.log('UNCLASSIFIED // NOTIONAL RESEARCH TOOL');
 if (failures.length) {
   console.log('Performance-layer proof: IMPLEMENTATION MISMATCH (' + failures.length + '/' + (passed.length + failures.length) + ' checks failed)');
