@@ -22,6 +22,13 @@
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function probability(v) { return clamp(Number(v) || 0, 0, 1); }
+  // CO-012: locale-free string order. NEVER use String.localeCompare on a determinism
+  // path — with no locale argument it follows the host's ICU collation, so identical
+  // inputs order differently across machines. UTF-16 code units are machine-independent.
+  function cmpStr(a, b) {
+    var x = String(a), y = String(b);
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
   function round(v, places) {
     var scale = Math.pow(10, places == null ? 4 : places);
     return Math.round(Number(v || 0) * scale) / scale;
@@ -248,7 +255,7 @@
     });
     var categories = FAILURE_CAUSES.map(function (cause) {
       return { id: cause.id, label: cause.label, count: counts[cause.id], q: failed ? counts[cause.id] / failed : 0.25 };
-    }).sort(function (a, b) { return b.count - a.count || a.id.localeCompare(b.id); });
+    }).sort(function (a, b) { return b.count - a.count || cmpStr(a.id, b.id); });
     return { categories: categories, failedWorlds: failed, K: (worlds || []).length };
   }
 

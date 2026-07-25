@@ -145,10 +145,29 @@ check('ensemble returns counts, uncertainty bands, paired decision value, and pr
 check('worker imports the one kernel and never imports the legacy simulation core', () => {
   const worker = read('counterfactual-worker.js');
   const director = read('director.js');
-  assert.ok(worker.includes("importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js')"));
+
+  // CO-012: the import list is now assembled by appending the worker's own ?v= token to
+  // each path, so assert the module SET and ORDER rather than one brittle source literal.
+  const importList = worker.match(/importScripts\.apply\(self,\s*\[([^\]]*)\]/);
+  assert.ok(importList, 'worker builds its importScripts list from an array literal');
+  const mods = importList[1].split(',')
+    .map(s => s.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+  assert.deepStrictEqual(mods,
+    ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js']);
+  // Harness law (ARCHI §6): strategic-state.js must load before game.js.
+  assert.ok(mods.indexOf('strategic-state.js') < mods.indexOf('game.js'), 'strategic-state before game');
+  // CO-012: every imported module inherits the worker's cache-busting token, so the worker
+  // can never run a stale engine copy while the main thread runs a fresh one.
+  assert.ok(/\.map\([\s\S]{0,80}?CF_BUILD/.test(worker), 'imports inherit the worker ?v= token');
+  assert.ok(/self\.location\s*&&\s*self\.location\.search/.test(worker), 'token derived from own URL');
+
   assert.ok(!worker.includes('sim.js') && !worker.includes('sim-worker.js') && !worker.includes('simulateTrialCore'));
   assert.ok(!worker.includes('Math.random') && !worker.includes('Date.now'));
-  assert.ok(director.includes("new Worker('counterfactual-worker.js')"));
+
+  // CO-012: the worker URL itself is versioned at both construction sites.
+  assert.ok(/new Worker\('counterfactual-worker\.js'\s*\+\s*WORKER_BUILD\)/.test(director));
+  assert.ok(/var WORKER_BUILD = '\?v=/.test(director), 'director defines a worker build token');
   assert.ok(!director.includes('EXPERIMENTAL ATTRITION SENSITIVITY'));
 });
 

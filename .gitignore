@@ -47,3 +47,6 @@ sandbox/
 # iCloud-pinned git lock copies renamed by agents (inert)
 *.lock.stale*
 *.lock.s[0-9]*
+
+# Build output (regenerate with tools/build-dist.sh)
+/dist/

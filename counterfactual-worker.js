@@ -5,7 +5,18 @@
 'use strict';
 
 if (typeof window === 'undefined') self.window = self;
-importScripts('moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js');
+
+// CO-012: inherit this worker's own cache-busting token and propagate it to every
+// importScripts path. Without it the worker loads `game.js` under a SEPARATE, untokenized
+// cache entry from the main thread's `game.js?v=…`, so after an update the forecast (worker)
+// and the world (main thread) can silently resolve from different engine versions —
+// which would void the determinism invariant the whole design rests on.
+// Load order is load-bearing: strategic-state.js must precede game.js (harness law).
+var CF_BUILD = (function () {
+  try { return (self.location && self.location.search) || ''; } catch (e) { return ''; }
+})();
+importScripts.apply(self, ['moe.js', 'red-mind.js', 'strategic-state.js', 'logistics.js', 'game.js', 'counterfactual.js']
+  .map(function (f) { return f + CF_BUILD; }));
 
 var activeRun = null;
 

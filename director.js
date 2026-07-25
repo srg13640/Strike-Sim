@@ -21,6 +21,10 @@ window.DirectorModule = (function () {
 
   var GM = null;          // window.GameModule, resolved at boot
   var GHOSTS = 200;       // ghost worlds per forecast
+  // CO-012: cache-busting token for worker URLs. The worker propagates its own ?v= to every
+  // importScripts path, so this one string governs the worker AND the engine copy it loads.
+  // Bump it in lockstep with the `director.js?v=` / `game.js?v=` tokens in StrikeSim2040.html.
+  var WORKER_BUILD = '?v=co012';
   var OBJ_LOSS_FRAC = 0.25; // mirror of game.js key-terrain threshold (engine const, not exported)
 
   // Operation state (UI-side only; the engine owns the match)
@@ -513,8 +517,39 @@ window.DirectorModule = (function () {
     // sit visible-but-inert above it (isolateForOverlay marks body children aria-hidden).
     // WATCH keeps handing the lower-left corner to #dir-feed, unchanged.
     document.body.classList.toggle('dir-overlay-active', overlayActive);
+    lockLegacyGraphControls(p !== 'idle');
     if (p === 'brief' || p === 'commit' || p === 'aar') {
       setTimeout(function () { try { $('dir-wrap').focus(); } catch (e) {} }, 0);
+    }
+  }
+
+  // CO-012: the legacy console can still mutate or replace the graph while the Director owns
+  // a seeded match. "Strike Selected" was already guarded; Reset Sim and Import JSON were not,
+  // and either one desynchronizes the Director's board from AppState — which silently voids the
+  // replay/challenge-link guarantee. Disable them for the duration of an operation and restore
+  // whatever state they had when it ends.
+  var legacyLockPrev = null;
+  function lockLegacyGraphControls(locked) {
+    var ids = ['reset-sim-btn', 'import-json-btn'];
+    if (locked) {
+      if (legacyLockPrev) return;                 // already locked; don't re-capture state
+      legacyLockPrev = {};
+      ids.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        legacyLockPrev[id] = { disabled: !!el.disabled, title: el.title || '' };
+        el.disabled = true;
+        el.title = 'Unavailable during an operation — exit to the console first.';
+      });
+    } else {
+      if (!legacyLockPrev) return;
+      ids.forEach(function (id) {
+        var el = document.getElementById(id), prev = legacyLockPrev[id];
+        if (!el || !prev) return;
+        el.disabled = prev.disabled;
+        el.title = prev.title;
+      });
+      legacyLockPrev = null;
     }
   }
 
@@ -1885,7 +1920,7 @@ window.DirectorModule = (function () {
     cf.status = 'running'; cf.progress = 0; cf.error = null; cf.result = null;
     cf.runId = String(GM._internal.hashSeed(op.record.seed, 'counterfactual-ui', cf.turn, cf.orderIndex, cf.action, cf.targetId, cf.methodKey, cf.authoredForecast));
     renderCounterfactualCard();
-    var worker = new Worker('counterfactual-worker.js');
+    var worker = new Worker('counterfactual-worker.js' + WORKER_BUILD);
     op.counterfactualWorker = worker;
     worker.onmessage = function (event) {
       var message = event.data || {};
@@ -2023,7 +2058,7 @@ window.DirectorModule = (function () {
       runId: String(GM._internal.hashSeed(op.record.seed, 'exploit-probe-ui'))
     };
     refreshPredictCard();
-    var worker = new Worker('counterfactual-worker.js');
+    var worker = new Worker('counterfactual-worker.js' + WORKER_BUILD);
     op.exploitWorker = worker;
     worker.onmessage = function (event) {
       var m = event.data || {};
@@ -2539,12 +2574,18 @@ window.DirectorModule = (function () {
   function endOperation() {
     clearWatchTimers();
     stopCounterfactualWorker();
+    // CO-012: the AAR exploit probe owns a SECOND worker. Without this, exiting mid-probe
+    // orphaned it: op.exploitProbe stayed 'running' so runExploitProbe early-returned for
+    // the rest of the session, and a late 'done' from the orphan could render the previous
+    // operation's halt rates inside the next operation's AAR.
+    stopExploitWorker();
     stopSelPoll();
     hideObjectiveOverlay();
     if (GM.isActive()) GM.endMatch();
     op.forecasts = {}; op.actuals = {}; op.judgments = {}; op.standingForecasts = [];
     op.scoredEntries = []; op.intervalScores = []; op.commitCard = null; op.standingCarry = null;
     op.record = null; op.counterfactual = null; op.aar = null; op.aarExported = false; op.lastForecast = null;
+    op.exploitProbe = null;
     op.tutorial = false;
     restoreBaseScenario();                     // CO-005 C5: put the boot force networks back
     restorePanels();

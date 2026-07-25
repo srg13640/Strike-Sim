@@ -109,6 +109,14 @@
     return Math.min(hi, Math.max(lo, value));
   }
 
+  // CO-012: locale-free string order. NEVER use String.localeCompare on a determinism
+  // path — with no locale argument it follows the host's ICU collation, so the same seed
+  // resolves differently across machines. UTF-16 code units are machine-independent.
+  function cmpStr(a, b) {
+    var x = String(a), y = String(b);
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
+
   function uniqueSorted(values) {
     var seen = {};
     return (values || []).filter(function (value) {
@@ -211,7 +219,7 @@
     var floor = clamp(finite(config.floor, 0.20), 0, 1);
     var rows = impulses.filter(function (impulse) { return impulse[field] > 0; })
       .map(function (impulse) { return { key: impulse.key, raw: impulse[field] }; })
-      .sort(function (a, b) { return b.raw - a.raw || a.key.localeCompare(b.key); });
+      .sort(function (a, b) { return b.raw - a.raw || cmpStr(a.key, b.key); });
     var raw = 0;
     var adjusted = 0;
     rows.forEach(function (row, rank) {
@@ -599,7 +607,7 @@
   function indicatorCandidates(orders, nodesById, config) {
     var candidates = [];
     (orders || []).slice().sort(function (a, b) {
-      return String(a.id || a.orderId || a.targetId || '').localeCompare(String(b.id || b.orderId || b.targetId || ''));
+      return cmpStr(a.id || a.orderId || a.targetId || '', b.id || b.orderId || b.targetId || '');
     }).forEach(function (order, index) {
       order = order || {};
       var target = orderTarget(order, nodesById);
@@ -630,7 +638,7 @@
       if (targetClass) add(order.kind === 'harden' || order.kind === 'repair' ? 'defense' : 'target');
       if (!axis && !method && !targetClass) add('summary');
     });
-    return candidates.sort(function (a, b) { return a.key.localeCompare(b.key); });
+    return candidates.sort(function (a, b) { return cmpStr(a.key, b.key); });
   }
 
   function replaceTokens(template, candidate) {

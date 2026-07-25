@@ -20,10 +20,14 @@
   'use strict';
 
   var FLAGS = {
-    share: true,        // serverless challenge/replay links (no network involved)
-    dailySeed: false,   // PARKED — daily-seed leaderboard client
-    careerSync: false,  // PARKED — cross-device career sync
-    feedback: false     // PARKED — hosted-build playtest feedback endpoint
+    share: true,          // serverless challenge/replay links (no network involved)
+    onlineBasemaps: false,// CO-012 — CARTO/Esri tile layers in the map layer control. OFF here:
+                          // this is the offline build, and selecting one egresses the operator's
+                          // viewport (i.e. the theater under study) to a third party. The hosted
+                          // build may set this true. Offline bundled imagery is always available.
+    dailySeed: false,     // PARKED — daily-seed leaderboard client
+    careerSync: false,    // PARKED — cross-device career sync
+    feedback: false       // PARKED — hosted-build playtest feedback endpoint
   };
 
   window.OnlineFlags = Object.freeze({

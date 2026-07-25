@@ -9,14 +9,12 @@ None — deliberately. StrikeSim 2040 uses **proof-contract harnesses**: plain N
 ## Running Tests
 
 ```bash
-# Syntax gate (closest thing to lint/typecheck)
-for f in *.js tools/*.js; do node --check "$f" || { echo "SYNTAX FAIL: $f"; break; }; done
+# THE gate. Use this — it is the only command whose exit status is trustworthy.
+tools/run-all-gates.sh              # syntax + every real proof + locale invariance
+tools/run-all-gates.sh --full       # adds the ~15 min balance gate (engine-touching work)
 
 # One area's proof
 node tools/<area>-proof.js            # e.g. node tools/mind-games-proof.js
-
-# All proofs (release-time full pass)
-for p in tools/*-proof.js; do echo "== $p"; node "$p" || break; done
 
 # Scenario data ↔ schema
 node tools/validate-scenarios.js
@@ -28,6 +26,15 @@ node tools/wargame-loop-eval.js --matches 20 --seed-base 42   # chunked slice fo
 # Replay determinism (share/order-log/red-model work)
 node tools/replay-verify.js --payload <SS1z.… or file>        # exit 0 / 1 MISMATCH / 2 MALFORMED
 ```
+
+> **Never gate on `... || break`.** `break` returns 0, so a loop written that way exits
+> **successfully even when a proof fails** — the documented commands did exactly this until
+> CO-012, and any script or agent trusting them got a false green. Use `|| exit 1`, or
+> `tools/run-all-gates.sh`, which accumulates failures explicitly.
+
+> **Locale matters.** `String.localeCompare` with no locale argument follows the host's ICU
+> collation, so it must never appear on a determinism path (CO-012). `run-all-gates.sh` runs a
+> second pass under `LC_ALL=lt_LT.UTF-8` and requires byte-identical output.
 
 ## Test Organization
 

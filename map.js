@@ -229,12 +229,20 @@ window.MapModule = (function () {
     globalSatelliteLoaded = true;
     setBasemapStatus('Basemap: offline imagery', 'ok');
 
+    // CO-012: the online basemaps now key off online-flags.js (ARCHI §15: anything
+    // network-touching keys off OnlineFlags, never an ad-hoc check). In the offline build the
+    // flag is false, so these entries are never offered and no tile request can ever fire —
+    // which is what makes README's "no external network calls at runtime" literally true.
+    // A missing OnlineFlags is treated as false, per the CO-007 kill-switch contract.
+    var onlineBasemapsAllowed = !!(window.OnlineFlags && window.OnlineFlags.enabled('onlineBasemaps'));
+    var baseLayers = { 'Offline imagery (default)': offlineLayer };
+    if (onlineBasemapsAllowed) {
+      baseLayers['Dark — online opt-in'] = darkLayer;
+      baseLayers['Satellite — online opt-in'] = satLayer;
+    }
+
     L.control.layers(
-      {
-        'Offline imagery (default)': offlineLayer,
-        'Dark — online opt-in': darkLayer,
-        'Satellite — online opt-in': satLayer
-      },
+      baseLayers,
       { 'Engagement zones (notional)': rangeRingsLayer },
       { position: 'topright', collapsed: true }
     ).addTo(leafletMap);

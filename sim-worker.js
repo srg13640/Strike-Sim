@@ -17,8 +17,13 @@
 // failure posts an error for the shell's log and leaves self.MoeModule undefined,
 // which the core reports as 'denial unavailable' — non-denial runs are unaffected.
 if (typeof window === 'undefined') self.window = self;
+// CO-012: inherit this worker's own cache-busting token (?v=…) so moe.js is fetched under
+// the SAME cache key generation as the main thread's, never a stale untokenized copy.
+var SW_BUILD = (function () {
+  try { return (self.location && self.location.search) || ''; } catch (e) { return ''; }
+})();
 try {
-  importScripts('moe.js');
+  importScripts('moe.js' + SW_BUILD);
 } catch (err) {
   try {
     self.postMessage({

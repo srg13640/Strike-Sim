@@ -139,6 +139,14 @@ window.GameModule = (function () {
     }
     return (h >>> 0) || 1;
   }
+  // CO-012: locale-free string order. NEVER use String.localeCompare on a determinism
+  // path — with no locale argument it follows the host's ICU collation, so the same seed
+  // resolves differently on a Lithuanian/Latvian browser than on an en-US one. This
+  // compares UTF-16 code units, which is identical on every machine.
+  function cmpStr(a, b) {
+    const x = String(a), y = String(b);
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
   function makeRng(seed) {
     let s = (seed >>> 0) % 2147483647;
     if (s <= 0) s += 2147483646;
@@ -251,7 +259,7 @@ window.GameModule = (function () {
       .map(id => board.nodes[id])
       .filter(n => canSourceStrikeWith(n, methodKey, aliveFn))
       .sort((a, b) => (resourceForMethod(b, methodKey) - resourceForMethod(a, methodKey)) ||
-        String(a.id).localeCompare(String(b.id)));
+        cmpStr(a.id, b.id));
   }
 
   // AUTHORITATIVE availability rule (C-003): may `side` strike `targetId` with `methodKey`
@@ -311,7 +319,7 @@ window.GameModule = (function () {
         score: resourceForMethod(n, methodKey) * affinity(n, tgt, methodKey),
         tie: hashSeed('source', side, methodKey, tgt.id, n.id)
       }))
-      .sort((a, b) => b.score - a.score || b.tie - a.tie || String(a.n.id).localeCompare(String(b.n.id)))[0]?.n;
+      .sort((a, b) => b.score - a.score || b.tie - a.tie || cmpStr(a.n.id, b.n.id))[0]?.n;
     if (!src) return { ok: false, reason: 'no-source' };
     return { ok: true, reason: 'ok', sourceId: src.id };
   }
@@ -579,9 +587,9 @@ window.GameModule = (function () {
     const rank = { feint: -2, decoy: -1, harden: 0, repair: 1, strike: 2 };
     const sorted = orders.slice().sort((a, b) =>
       (rank[a.kind] - rank[b.kind]) ||
-      String(a.side).localeCompare(String(b.side)) ||
-      String(a.targetId).localeCompare(String(b.targetId)) ||
-      String(a.methodKey || '').localeCompare(String(b.methodKey || '')));
+      cmpStr(a.side, b.side) ||
+      cmpStr(a.targetId, b.targetId) ||
+      cmpStr(a.methodKey || '', b.methodKey || ''));
     const L = logisticsModule();
     const logisticsPlan = L && board.logistics ? L.prepareTurn(board.logistics, board, sorted) : null;
 
@@ -766,7 +774,7 @@ window.GameModule = (function () {
         n,
         score: resourceForMethod(n, methodKey) * affinity(n, target, methodKey)
       }))
-      .sort((a, b) => (b.score - a.score) || String(a.n.id).localeCompare(String(b.n.id)))[0]?.n || null;
+      .sort((a, b) => (b.score - a.score) || cmpStr(a.n.id, b.n.id))[0]?.n || null;
   }
 
   function sideStrikeCapacity(board, side) {
@@ -822,7 +830,7 @@ window.GameModule = (function () {
       .map(id => board.nodes[id])
       .filter(n => n && n.alive)
       .map(n => ({ n, score: targetScore(n) }))
-      .sort((a, b) => (b.score - a.score) || String(a.n.id).localeCompare(String(b.n.id)));
+      .sort((a, b) => (b.score - a.score) || cmpStr(a.n.id, b.n.id));
 
     const bestMethodFor = (n) => {
       // Prefer a doctrine-weighted method the target is vulnerable to; stable method-key
@@ -835,7 +843,7 @@ window.GameModule = (function () {
         const m = METHODS[k];
         const ev = m.baseProb * diffMult(n.difficulty) * vulnMult(n, m) * ((m.dmg[0] + m.dmg[1]) / 2) *
           Math.sqrt(resourceForMethod(source, k)) * Number(methodW[k] == null ? 1 : methodW[k]);
-        if (ev > bestEV || (ev === bestEV && String(k).localeCompare(String(best || '')) < 0)) {
+        if (ev > bestEV || (ev === bestEV && cmpStr(k, best || '') < 0)) {
           bestEV = ev; best = k; bestSource = source;
         }
       }
@@ -864,8 +872,8 @@ window.GameModule = (function () {
       const protVal = (n) => nodeValue(n) * (1 + Number(protectW.tempo || 0) * tempoWeightOf(n)) +
         (side === 'red' ? Number(protectW.lodgment || 0) * lodgmentWeightOf(n) * 30 * diffMult(n.difficulty) : 0);
       const damaged = own.filter(n => n.health < n.healthMax * 0.8)
-        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)) || String(a.id).localeCompare(String(b.id)));
-      const healthy = own.slice().sort((a, b) => (protVal(b) - protVal(a)) || String(a.id).localeCompare(String(b.id)));
+        .sort((a, b) => (protVal(b) * (1 - b.health / b.healthMax)) - (protVal(a) * (1 - a.health / a.healthMax)) || cmpStr(a.id, b.id));
+      const healthy = own.slice().sort((a, b) => (protVal(b) - protVal(a)) || cmpStr(a.id, b.id));
       while (remaining > 0) {
         const repairValue = damaged.length ? protVal(damaged[0]) * Number(p.repairBias == null ? 0.6 : p.repairBias) : -1;
         const hardenValue = healthy.length ? protVal(healthy[0]) * (1 - Number(p.repairBias == null ? 0.6 : p.repairBias)) : -1;
@@ -1568,7 +1576,7 @@ window.GameModule = (function () {
     const enemy = enemyOf(side);
     const targets = (match.board.rosters[enemy] || []).map(id => match.board.nodes[id])
       .filter(n => n && n.alive && n.active !== false)
-      .sort((a, b) => nodeValue(b) - nodeValue(a) || String(a.id).localeCompare(String(b.id)));
+      .sort((a, b) => nodeValue(b) - nodeValue(a) || cmpStr(a.id, b.id));
     if (!targets.length || rate <= 0) return orders;
     const out = orders.slice();
     const target = targets[Math.floor(makeRng(hashSeed(match.seed, 'deception-target', match.turn, side)).next() * targets.length)];
@@ -1602,7 +1610,7 @@ window.GameModule = (function () {
     const candidates = (match.board.rosters.red || []).map(id => match.board.nodes[id]).filter(node => {
       const tags = node && node.indicatorTags || {};
       return node && node.alive && tags.targetClass === targetClass;
-    }).sort((a, b) => nodeValue(b) - nodeValue(a) || String(a.id).localeCompare(String(b.id)));
+    }).sort((a, b) => nodeValue(b) - nodeValue(a) || cmpStr(a.id, b.id));
     if (!candidates.length || !orders.length) return orders;
     const out = orders.slice();
     out[out.length - 1] = { side: 'red', kind: 'harden', targetId: candidates[0].id, indicatorResponse: targetClass };
