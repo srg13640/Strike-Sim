@@ -192,6 +192,33 @@ check('P2: comms floor caps its backlog, types with ticks, and captions instantl
   assert.ok(pump.includes('if (reduceMotion())') && pump.includes('tx.textContent = next.text'), 'reduced motion lands the caption instantly');
 });
 
+check('P2: decoration never paints over controls — the comms floor stacks below every interactive surface', () => {
+  // CO-013. The comms floor is pointer-events:none decoration. At z-index 3000 it painted OVER
+  // the command dock (1500), the phase rail (1700) and the "?" help button (1450), which made the
+  // dock's primary call-to-action illegible during PLAN on any viewport under ~1400px (the
+  // centered dock and this bottom-left panel necessarily overlap there). Pin the ordering so a
+  // future "just bump the z-index" fix cannot silently reintroduce the collision.
+  const zOf = (src, sel) => {
+    const i = src.indexOf(sel);
+    assert.ok(i >= 0, 'selector present: ' + sel);
+    const m = /z-index:\s*(\d+)/.exec(src.slice(i, i + 400));
+    assert.ok(m, 'z-index declared for ' + sel);
+    return Number(m[1]);
+  };
+  const comms = zOf(cinSrc, '#cin-comms{');
+  const dock  = zOf(directorSrc, '#dir-dock{');
+  const feed  = zOf(directorSrc, '#dir-feed{');
+  const rail  = zOf(directorSrc, '#dir-rail{');
+
+  assert.ok(/#cin-comms\{[^}]*pointer-events:\s*none/.test(cinSrc), 'comms floor is non-interactive');
+  assert.ok(comms < dock, `comms (${comms}) must stack below the command dock (${dock})`);
+  assert.ok(comms < feed, `comms (${comms}) must stack below the watch feed (${feed})`);
+  assert.ok(comms < rail, `comms (${comms}) must stack below the phase rail (${rail})`);
+  // ...and below the help button, which lives in the same bottom-left corner.
+  const help = zOf(shell, '#fr-help-btn');
+  assert.ok(comms < help, `comms (${comms}) must stack below the help button (${help})`);
+});
+
 check('P2: typewriter restores real markup and stands down when a re-render replaces the DOM', () => {
   assert.ok(cinSrc.includes('node.isConnected'), 'typing aborts on disconnected nodes');
   assert.ok(cinSrc.includes('restoreHtml'), 'inline markup (bolded initiating event) is restored');

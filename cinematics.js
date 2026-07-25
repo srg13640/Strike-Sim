@@ -172,7 +172,13 @@ window.CinematicsModule = (function () {
       '@keyframes cinStamp{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6);}60%{opacity:1;transform:translate(-50%,-50%) scale(.96);}100%{opacity:1;transform:translate(-50%,-50%) scale(1);}}',
       // CO-011: below the Director overlay (z 5000) so it can never paint over modal content,
       // still above the operational HUD/dock (≤1900) during PLAN/WATCH.
-      '#cin-comms{position:fixed;left:16px;bottom:14px;z-index:3000;width:min(430px,calc(100vw - 32px));pointer-events:none;',
+      // CO-013 stacking rule: the comms floor is DECORATION (pointer-events:none). It must
+      // never paint over an interactive surface. At its old z-index 3000 it drew on top of the
+      // command dock (1500), the phase rail (1700) and the "?" help button (1450) — the dock's
+      // primary call-to-action was rendered illegible during PLAN on any viewport narrower than
+      // ~1400px, because the centered dock and this bottom-left panel overlap there.
+      // 1300 keeps it above the map and the vignette (1250) and below every control.
+      '#cin-comms{position:fixed;left:16px;bottom:14px;z-index:1300;width:min(430px,calc(100vw - 32px));pointer-events:none;',
       '  font-family:var(--mono);font-size:12px;line-height:1.5;color:#bfe0f2;display:flex;flex-direction:column;gap:3px;}',
       '#cin-comms.hidden{display:none;}',
       'body:not(.operation-active) #cin-comms{display:none;}',
