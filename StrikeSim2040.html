@@ -327,9 +327,9 @@
     display: none;
     pointer-events: auto;
     }
-    #node-popup h4 { margin: 0 0 6px; font-size: 14px; color: var(--text); }
+    #node-popup h4 { margin: 0 0 6px; font-size: 14px; line-height: 1.25; color: var(--text); }
     #node-popup .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    #node-popup .kv { font-size: 12px; margin: 2px 0; }
+    #node-popup .kv { font-size: 12px; margin: 3px 0; line-height: 1.45; }
     #node-popup .capability-profile { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(148,163,184,.24); }
     #node-popup .capability-profile a { color: var(--accent); text-decoration: none; }
     #node-popup .capability-profile a:hover { text-decoration: underline; }
@@ -373,6 +373,8 @@
     #cmd-bar .cb-switch button { background: transparent; border: none; color: var(--muted); font: 600 12px 'Inter',system-ui; letter-spacing: .5px; padding: 7px 16px; border-radius: 6px; cursor: pointer; }
     #cmd-bar .cb-switch button.active { background: #18466a; color: #eaf6ff; }
     #cmd-bar .cb-switch button:hover:not(.active) { color: #cfe6ff; }
+    /* Visible keyboard focus for the tablist (pairs with arrow-key navigation). */
+    #cmd-bar .cb-switch button:focus-visible { outline: 2px solid var(--accent, #63d7ff); outline-offset: 2px; }
     #cmd-bar #cmd-actions { display: flex; align-items: center; gap: 8px; }
     /* Normalize relocated module buttons (War Game / Campaign / Fullscreen / Retry 3D) into the bar */
     #cmd-actions > button { position: static !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; transform: none !important; margin: 0 !important; box-shadow: none !important; height: 32px; }
