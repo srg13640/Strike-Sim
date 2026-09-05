@@ -1,0 +1,43 @@
+# StrikeSim 2040 — automated safety gates.
+#
+# Runs the SAME single entry point a developer runs locally (tools/run-all-gates.sh):
+# syntax check on every module, the proof-contract harnesses, scenario/data validation,
+# and the locale-invariance determinism check. The build has no dependencies to install
+# (no npm, no package.json) — it only needs Node, matching the project's no-build design.
+#
+# "All gates green" here means logic + data contracts pass. It does NOT exercise the
+# browser UI / WebGL — see docs/4-unit-tests/COVERAGE-DEBT.md for what stays manual.
+name: gates
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly full run (adds the slow ~15 min balance gate) every Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Show Node version
+        run: node --version
+
+      - name: Run standard gates
+        run: bash tools/run-all-gates.sh
+
+      - name: Run full balance gate (scheduled only)
+        if: github.event_name == 'schedule'
+        run: bash tools/run-all-gates.sh --full

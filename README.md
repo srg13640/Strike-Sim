@@ -72,6 +72,21 @@ static server.
 | `engine.js` (`EngineModule`) | 3D engine lifecycle (3d-force-graph / Three.js), the Blue→Red opening camera shot, and geo-mode layout. |
 | `views.js` (`ViewsModule`) | Alternate render views: the data table and the D3 task-org chart. |
 | `inline-datasets.js` | Startup auto-loader for the bundled Red and Blue force networks. |
+| `game.js` (`GameModule`) | **The one resolver.** All turn-based combat and victory math; every other layer reads its state rather than forking the rules. |
+| `wargame.js` | The turn-based War Game HUD (legacy/alternate surface to the Director's Operation Loop). |
+| `strategic-state.js` | Pure escalation / strategic-posture layer feeding War Game setup. Headless-testable. |
+| `red-mind.js` | Red's bounded-rationality adversary model (doctrine, beliefs, premortem). Headless-testable. |
+| `forecasting.js` | Honest forecast bands (model ranges, not predictions) and Brier/skill scoring. |
+| `counterfactual.js` / `counterfactual-worker.js` | AAR "what if": re-runs the same seeded world under a changed policy (off the main thread). |
+| `sim-worker.js` | Monte Carlo trial runner in a Web Worker; mirrors `sim.js`'s core with a parity check to prevent drift. |
+| `cofm.js` (`CofmModule`) | Correlation of Forces & Means: the parity/readiness ledger shown in the brief. |
+| `moe.js` | Measures-of-effectiveness helpers used by the engine and proofs. |
+| `symbols.js` | MIL-STD-2525 symbology helpers (inline, offline). |
+| `cinematics.js` (`CinematicsModule`) | Title/transition cinematics; pure presentation, respects reduced-motion. |
+| `audio.js` (`AudioModule`) | UI/event sound cues; pure presentation, no engine reach. |
+| `stage.js` (`StageModule`) | View-stage sizing/activation glue across 3D/Map/Table/Task-Org. |
+| `share.js` (`ShareModule`) | Serverless share links: deterministic state encoded in the URL fragment (no server call). |
+| `online-flags.js` | Feature flags for the (parked) hosted/online layer; all off in the offline build. |
 | `vendor/` | Vendored libraries (offline): Three.js r128, OrbitControls, 3d-force-graph, D3 v7, Leaflet 1.9.4. |
 
 ### Design conventions
