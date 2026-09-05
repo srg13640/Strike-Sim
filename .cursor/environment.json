@@ -1,0 +1,16 @@
+{
+  "name": "StrikeSim 2040",
+  "terminals": [
+    {
+      "name": "static-server",
+      "command": "python3 -m http.server 8000",
+      "description": "Static file server for the game. Open http://localhost:8000/StrikeSim2040.html to play. No build step or dependencies are required."
+    }
+  ],
+  "ports": [
+    {
+      "name": "static-server",
+      "port": 8000
+    }
+  ]
+}
