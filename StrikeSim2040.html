@@ -80,6 +80,9 @@
   <!-- Alternate render views: data table + task-org chart (depends on state.js + d3). -->
   <script src="views.js?v=p9"></script>
   <script src="inline-datasets.js?v=p9"></script>
+  <!-- CO-015 Keyboard Shortcuts overlay: self-contained presentation module that surfaces
+       the app's existing shortcuts (launcher button + "?" hotkey). No engine reach. -->
+  <script src="shortcuts.js?v=co015"></script>
   <style>
     :root {
     --bg: #050a10;
@@ -1551,10 +1554,10 @@
     </div>
     <div class="cb-spacer"></div>
     <div class="cb-switch" id="cb-switch" role="tablist" aria-label="View">
-      <button type="button" role="tab" data-view="3d">3D</button>
-      <button type="button" role="tab" data-view="map">MAP</button>
-      <button type="button" role="tab" data-view="table">TABLE</button>
-      <button type="button" role="tab" data-view="org">TASK ORG</button>
+      <button type="button" role="tab" data-view="3d" title="3D force-graph view">3D</button>
+      <button type="button" role="tab" data-view="map" title="Geographic map view">MAP</button>
+      <button type="button" role="tab" data-view="table" title="Sortable data table view">TABLE</button>
+      <button type="button" role="tab" data-view="org" title="Task-organization chart view">TASK ORG</button>
     </div>
     <div class="cb-spacer"></div>
     <div id="cmd-actions"></div>
@@ -4122,7 +4125,7 @@
       ].join(','));
     };
     const shortcutLayerIsOpen = () => Array.prototype.some.call(
-      document.querySelectorAll('.modal-backdrop, #first-run-card, #dir-overlay'),
+      document.querySelectorAll('.modal-backdrop, #first-run-card, #dir-overlay, #shortcuts-overlay'),
       (el) => {
         const style = getComputedStyle(el);
         return style.display !== 'none' && style.visibility !== 'hidden';

@@ -48,6 +48,12 @@ cp "$ROOT/grok150red.json" "$ROOT/grokblue90.json" "$OUT/"
 cp -R "$ROOT/vendor" "$ROOT/assets" "$ROOT/scenarios" "$OUT/"
 [ -d "$ROOT/tiles" ] && cp -R "$ROOT/tiles" "$OUT/"
 
+# Drop assets that are NOT loaded by the app at runtime so shared builds stay lean.
+# assets/image.png (~1.4 MB) is a historical design-reference screenshot cited only by
+# change-orders/CO-008 — it is never fetched by the game. The completeness check below
+# still guarantees every asset the app actually references remains present.
+rm -f "$OUT/assets/image.png"
+
 # 4. Completeness check — every relative reference must resolve inside dist/.
 missing=0
 while read -r ref; do
