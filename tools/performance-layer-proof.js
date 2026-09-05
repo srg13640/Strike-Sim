@@ -24,6 +24,9 @@ const audioSrc = read('audio.js');
 const cinSrc = read('cinematics.js');
 const directorSrc = read('director.js');
 const shell = read('StrikeSim2040.html');
+// CO-016: the Stark-HUD ambient layer (radar/ticker/telemetry/DEFCON) now lives in its
+// own module. Contracts that used to grep the shell for it read the module instead.
+const consoleChrome = read('console-chrome.js');
 
 function fnBody(src, name, nextName) {
   const start = src.indexOf('function ' + name);
@@ -343,7 +346,7 @@ check('P4: forced reduced motion silences every CSS family the media query silen
   assert.ok(directorSrc.includes('html.cin-rm .cin-armed{animation:none'), 'armed pulse');
   assert.ok(mapSrc.includes('html.cin-rm #map-radar-sweep{animation:none'), 'radar sweep');
   assert.ok(mapSrc.includes('html.cin-rm .wg-tracer-dot'), 'strike tracers');
-  assert.ok(shell.includes('html.cin-rm #hud-ticker .ht-track{animation:none}'), 'HUD ticker');
+  assert.ok(consoleChrome.includes('html.cin-rm #hud-ticker .ht-track{animation:none}'), 'HUD ticker');
 });
 
 check('P4: performance mode is one dial to zero — scanlines consumed then killed, glow tokens out, vignette out', () => {
@@ -360,12 +363,12 @@ check('P4: performance mode is one dial to zero — scanlines consumed then kill
 });
 
 check('P4: Performance Mode covers ambient HUD work, including hidden surfaces', () => {
-  assert.ok(shell.includes('function radarLight()'), 'radar has a performance-aware cadence');
-  assert.ok(shell.includes('radarLight()?1000:33'), 'performance/reduced radar is deliberately limited to 1 Hz');
-  assert.ok(shell.includes("!s.hidden&&!s.overlayOpen"), 'radar stops for hidden tabs and overlays');
-  assert.ok(shell.includes('function stopTicker()'), 'ticker owns a stoppable timer');
-  assert.ok(shell.includes("s.view==='3d'&&!s.hidden&&!s.overlayOpen"), 'ticker schedules only on its visible surface');
-  assert.ok(shell.includes("k==='perfMode'"), 'live Performance Mode changes resync ambient work');
+  assert.ok(consoleChrome.includes('function radarLight()'), 'radar has a performance-aware cadence');
+  assert.ok(consoleChrome.includes('radarLight()?1000:33'), 'performance/reduced radar is deliberately limited to 1 Hz');
+  assert.ok(consoleChrome.includes("!s.hidden&&!s.overlayOpen"), 'radar stops for hidden tabs and overlays');
+  assert.ok(consoleChrome.includes('function stopTicker()'), 'ticker owns a stoppable timer');
+  assert.ok(consoleChrome.includes("s.view==='3d'&&!s.hidden&&!s.overlayOpen"), 'ticker schedules only on its visible surface');
+  assert.ok(consoleChrome.includes("k==='perfMode'"), 'live Performance Mode changes resync ambient work');
 });
 
 check('P4: callsign is sanitized at the boundary and the Director reads it over the guarded bridge', () => {
