@@ -1549,10 +1549,10 @@
     </div>
     <div class="cb-spacer"></div>
     <div class="cb-switch" id="cb-switch" role="tablist" aria-label="View">
-      <button type="button" data-view="3d" onclick="setView('3d')">3D</button>
-      <button type="button" data-view="map" onclick="setView('map')">MAP</button>
-      <button type="button" data-view="table" onclick="setView('table')">TABLE</button>
-      <button type="button" data-view="org" onclick="setView('org')">TASK ORG</button>
+      <button type="button" role="tab" data-view="3d">3D</button>
+      <button type="button" role="tab" data-view="map">MAP</button>
+      <button type="button" role="tab" data-view="table">TABLE</button>
+      <button type="button" role="tab" data-view="org">TASK ORG</button>
     </div>
     <div class="cb-spacer"></div>
     <div id="cmd-actions"></div>
@@ -2608,13 +2608,13 @@
         sourceHtml ? '<div class="kv">Sources: ' + sourceHtml + '</div>' : ''
       ].filter(Boolean).join('') : '';
       pop.innerHTML = `
-        <h4>${node.name} <span class="meta">(${node.id})</span></h4>
+        <h4>${htmlText(node.name)} <span class="meta">(${htmlText(node.id)})</span></h4>
         <div class="meta">Team: <strong style="color:${colorFromTeam(node)}">${htmlText(teamName)}</strong> · ${htmlText(nationName)} · ${htmlText(componentName)}</div>
         <div class="kv">Domain: ${htmlText(node.domain?.join(', ') || '—')}</div>
-        <div class="kv">Type: ${node.type || '—'}</div>
+        <div class="kv">Type: ${htmlText(node.type || '—')}</div>
         <div class="kv">Health: <span style="color:${healthColor}">${Math.round(node.health)} / ${node.healthMax || 100}</span></div>
-        <div class="kv">Difficulty: ${node.difficulty || '—'}</div>
-        <div class="kv">Vulnerabilities: ${(node.vulnerabilities || []).join(', ') || 'None'}</div>
+        <div class="kv">Difficulty: ${htmlText(node.difficulty || '—')}</div>
+        <div class="kv">Vulnerabilities: ${htmlText((node.vulnerabilities || []).join(', ') || 'None')}</div>
         <div class="kv">Coords: ${coords}</div>
         <div class="kv"><strong>Resources (per type)</strong></div>
         <div class="kv"><label>Kinetic <input id="popup-kinetic" type="number" min="0" value="${rgt.kinetic ?? 0}" style="width:80px;"></label></div>
@@ -2720,7 +2720,36 @@
     document.querySelectorAll('#cb-switch button').forEach(b => {
       const on = b.getAttribute('data-view') === curView;
       b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on));
+      // Roving tabindex (WAI-ARIA tabs pattern): only the selected tab is in the tab order.
+      b.setAttribute('tabindex', on ? '0' : '-1');
     });
+    }
+
+    // Wire the command-bar view switcher as a keyboard-accessible ARIA tablist:
+    // click / Enter / Space activate; Arrow keys move focus (manual activation, so
+    // arrowing past "3D" does not force the heavy WebGL load). Replaces inline onclick.
+    let viewSwitcherWired = false;
+    function wireViewSwitcher() {
+      if (viewSwitcherWired) return;
+      const tablist = document.getElementById('cb-switch');
+      if (!tablist) return;
+      const tabs = () => Array.from(tablist.querySelectorAll('button[data-view]'));
+      tablist.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-view]');
+        if (btn) setView(btn.getAttribute('data-view'));
+      });
+      tablist.addEventListener('keydown', (e) => {
+        const list = tabs();
+        const idx = list.indexOf(document.activeElement);
+        if (idx === -1) return;
+        let next = -1;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % list.length;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + list.length) % list.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = list.length - 1;
+        if (next >= 0) { e.preventDefault(); list[next].focus(); }
+      });
+      viewSwitcherWired = true;
     }
 
     // Command-bar view switcher: set the app to exactly one view. Reuses the existing
@@ -3084,7 +3113,7 @@
     return;
     }
     resultsEl.innerHTML = visible.slice(0, 5).map(n =>
-    `<span class="badge" data-node-id="${n.id}">${n.name} (${n.id})</span>`
+    `<span class="badge" data-node-id="${UiModule.escapeHtml(n.id)}">${UiModule.escapeHtml(n.name)} (${UiModule.escapeHtml(n.id)})</span>`
     ).join(' ') + (hidden ? ` <span class="muted-note">+${hidden} hidden by filters</span>` : '');
     resultsEl.querySelectorAll('.badge').forEach(badge => {
     badge.addEventListener('click', () => selectNodeById(badge.dataset.nodeId));
@@ -4603,6 +4632,7 @@
     setLegendVisible(true);
     updateViewStatus();
     try { relocateBarButtons(); } catch (e) {}
+    try { wireViewSwitcher(); } catch (e) {}
     try { maybeShowFirstRun(); } catch (e) {}
     }
 
@@ -4786,7 +4816,7 @@
       const sel = document.getElementById('coa-target-select');
       if (!sel) return;
       const reds = getActiveRedNodes();
-      sel.innerHTML = reds.map(n => `<option value="${n.id}">${n.name} (${n.id})</option>`).join('');
+      sel.innerHTML = reds.map(n => `<option value="${UiModule.escapeHtml(n.id)}">${UiModule.escapeHtml(n.name)} (${UiModule.escapeHtml(n.id)})</option>`).join('');
     }
 
     function strikeProbFor(node, methodKey) {
@@ -5316,7 +5346,7 @@
         const likely = nodeOdds.filter(o => (o.p / 100) >= highlightThresh);
         const likelyEl = document.getElementById('mc-likely');
         if (likelyEl) {
-          likelyEl.innerHTML = likely.length ? `Likely neutralized (≥${Math.round(highlightThresh*100)}%): ${likely.map(l=>`${l.name} (${l.p}%)`).join(', ')}` : 'No nodes consistently neutralized at current threshold.';
+          likelyEl.innerHTML = likely.length ? `Likely neutralized (≥${Math.round(highlightThresh*100)}%): ${likely.map(l=>`${UiModule.escapeHtml(l.name)} (${l.p}%)`).join(', ')}` : 'No nodes consistently neutralized at current threshold.';
         }
 
         const details = document.getElementById('mc-details');
